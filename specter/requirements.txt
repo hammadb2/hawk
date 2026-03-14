@@ -1,0 +1,5 @@
+# Specter scanner (runs on 10.0.0.2:8002)
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+dnspython>=2.4.0
+requests>=2.31.0

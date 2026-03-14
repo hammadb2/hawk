@@ -1,0 +1,81 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/providers/auth-provider";
+import { cn } from "@/lib/utils";
+
+const NAV = [
+  { href: "/dashboard", label: "Overview" },
+  { href: "/dashboard/findings", label: "Findings" },
+  { href: "/dashboard/history", label: "History" },
+  { href: "/dashboard/reports", label: "Reports" },
+  { href: "/dashboard/domains", label: "Domains" },
+  { href: "/dashboard/hawk", label: "Ask HAWK" },
+  { href: "/dashboard/compliance", label: "Compliance" },
+  { href: "/dashboard/agency", label: "Agency" },
+  { href: "/dashboard/notifications", label: "Notifications" },
+  { href: "/dashboard/settings", label: "Settings" },
+];
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading, logout } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-text-secondary">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.replace("/login");
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="border-b border-surface-3 px-6 py-4 flex items-center justify-between">
+        <Link href="/dashboard" className="font-bold text-lg text-text-primary">
+          HAWK
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/notifications" className="text-text-secondary hover:text-text-primary text-sm">
+            Notifications
+          </Link>
+          <span className="text-sm text-text-secondary">{user.email}</span>
+          <Button variant="ghost" size="sm" onClick={() => logout()}>
+            Log out
+          </Button>
+        </div>
+      </header>
+      <div className="flex flex-1">
+        <aside className="w-56 border-r border-surface-3 p-4 flex flex-col gap-1">
+          {NAV.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                pathname === href ? "bg-surface-2 text-text-primary" : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+              )}
+            >
+              {label}
+            </Link>
+          ))}
+        </aside>
+        <main className="flex-1 p-6 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
