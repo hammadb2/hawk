@@ -3,10 +3,10 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+specter/.venv/
 *.db
 .env
 .env.local
 .next/
 dist/
 build/
-specter/.venv/
