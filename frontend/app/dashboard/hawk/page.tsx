@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -98,7 +99,7 @@ export default function AskHawkPage() {
       <Card className="flex flex-col min-h-[400px]">
         <CardHeader>
           <CardTitle>Chat</CardTitle>
-          <CardDescription>Ask in plain English. HAWK uses DeepSeek R1 with your scan context.</CardDescription>
+          <CardDescription>Ask in plain English. HAWK summarizes findings and writes clear steps your team can action.</CardDescription>
         </CardHeader>
         <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
           <div className="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[240px] max-h-[400px]">
@@ -129,9 +130,9 @@ export default function AskHawkPage() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-lg px-3 py-2 text-sm bg-surface-2 text-text-primary border border-surface-3 max-w-[85%] whitespace-pre-wrap"
+                className="rounded-lg px-3 py-2 text-sm bg-surface-2 text-text-primary border border-surface-3 max-w-[85%] prose prose-invert prose-sm"
               >
-                {reply}
+                <ReactMarkdown>{reply}</ReactMarkdown>
               </motion.div>
             )}
             <div ref={bottomRef} />

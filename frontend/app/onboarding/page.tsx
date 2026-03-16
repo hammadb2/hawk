@@ -31,6 +31,12 @@ export default function OnboardingPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const d = params.get("domain");
+    if (d) setDomain(d);
+  }, []);
+
   if (!mounted) {
     return <div className="min-h-screen flex items-center justify-center bg-background text-text-secondary">Loading…</div>;
   }

@@ -185,7 +185,7 @@ export default function GatePage() {
                   {scanError ? (
                     <>
                       <p className="text-red mb-4">{scanError}</p>
-                      <Link href="/onboarding">
+                      <Link href={`/onboarding${scanResult?.domain ? `?domain=${encodeURIComponent(scanResult.domain)}` : ""}`}>
                         <Button className="w-full">Create free account</Button>
                       </Link>
                       <Button variant="ghost" className="w-full mt-2" onClick={() => setShowLeadModal(false)}>
@@ -201,7 +201,7 @@ export default function GatePage() {
                           <>We’re ready to scan <strong className="text-text-primary">{scanResult.domain}</strong>. Sign up to run the scan, save results, and get compliance-ready reports.</>
                         )}
                       </p>
-                      <Link href="/onboarding">
+                      <Link href={`/onboarding${scanResult?.domain ? `?domain=${encodeURIComponent(scanResult.domain)}` : ""}`}>
                         <Button className="w-full">Create free account</Button>
                       </Link>
                       <Link href="/login" className="block mt-2">
@@ -211,7 +211,7 @@ export default function GatePage() {
                   ) : (
                     <>
                       <p className="text-text-secondary mb-4">The scan couldn’t complete. You can sign up and try again from your dashboard.</p>
-                      <Link href="/onboarding">
+                      <Link href={`/onboarding${scanResult?.domain ? `?domain=${encodeURIComponent(scanResult.domain)}` : ""}`}>
                         <Button className="w-full">Create free account</Button>
                       </Link>
                     </>
