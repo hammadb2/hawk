@@ -99,12 +99,16 @@ export default function AskHawkPage() {
       <Card className="flex flex-col min-h-[400px]">
         <CardHeader>
           <CardTitle>Chat</CardTitle>
-          <CardDescription>Ask in plain English. HAWK summarizes findings and writes clear steps your team can action.</CardDescription>
+          <CardDescription>
+            Ask HAWK follow-up questions like you would in a GPT-style chat. It reads your findings and replies with concise, practical next steps.
+          </CardDescription>
         </CardHeader>
         <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
           <div className="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[240px] max-h-[400px]">
             {history.length === 0 && !reply && !loading && (
-              <p className="text-text-dim text-sm">e.g. “How do I fix my DMARC?” or “Which findings map to PIPEDA?”</p>
+              <p className="text-text-dim text-sm">
+                e.g. “Summarize my findings in plain English” or “Give me a short checklist to fix my DMARC”.
+              </p>
             )}
             {history.map((m, i) => (
               <motion.div
