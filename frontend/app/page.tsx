@@ -77,7 +77,73 @@ export default function GatePage() {
     );
   }
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: 'HAWK',
+        url: 'https://hawk.akbstudios.com',
+        applicationCategory: 'SecurityApplication',
+        operatingSystem: 'Web',
+        description: 'Attack surface management and cybersecurity monitoring for Canadian small businesses.',
+        offers: {
+          '@type': 'Offer',
+          price: '99',
+          priceCurrency: 'CAD'
+        },
+        provider: {
+          '@type': 'Organization',
+          name: 'AKB Studios',
+          url: 'https://akbstudios.com'
+        }
+      },
+      {
+        '@type': 'Organization',
+        name: 'HAWK by AKB Studios',
+        url: 'https://hawk.akbstudios.com',
+        logo: 'https://hawk.akbstudios.com/logo.png',
+        contactPoint: {
+          '@type': 'ContactPoint',
+          email: 'hello@akbstudios.com',
+          contactType: 'customer support'
+        },
+        areaServed: 'CA'
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'What is HAWK?',
+            acceptedAnswer: { '@type': 'Answer', text: 'HAWK is a cybersecurity tool that scans your business for exposed attack surfaces, breached credentials, and lookalike domains. It is built specifically for Canadian small and medium businesses.' }
+          },
+          {
+            '@type': 'Question',
+            name: 'How much does HAWK cost?',
+            acceptedAnswer: { '@type': 'Answer', text: 'HAWK plans start at $99 CAD per month. There is a free scan available with no credit card required.' }
+          },
+          {
+            '@type': 'Question',
+            name: 'Is HAWK suitable for small businesses in Canada?',
+            acceptedAnswer: { '@type': 'Answer', text: 'Yes. HAWK is purpose-built for Canadian SMBs who need enterprise-grade security monitoring without the enterprise price tag.' }
+          },
+          {
+            '@type': 'Question',
+            name: 'What does HAWK scan for?',
+            acceptedAnswer: { '@type': 'Answer', text: 'HAWK scans for exposed subdomains, breached credentials, lookalike domains, misconfigured email records (SPF/DKIM/DMARC), and known CVE vulnerabilities.' }
+          }
+        ]
+      }
+    ]
+  }
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-surface-3 px-6 py-4 flex items-center justify-between">
         <Link href="/">
@@ -234,5 +300,6 @@ export default function GatePage() {
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 }
