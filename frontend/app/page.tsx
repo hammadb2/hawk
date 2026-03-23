@@ -80,8 +80,8 @@ export default function GatePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-surface-3 px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="font-bold text-lg text-text-primary">
-          HAWK
+        <Link href="/">
+          <img src="/hawk-logo.png" alt="HAWK" className="h-8 w-auto" />
         </Link>
         <div className="flex gap-3">
           <Link href="/login">

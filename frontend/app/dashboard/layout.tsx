@@ -44,8 +44,8 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="border-b border-surface-3 px-6 py-4 flex items-center justify-between">
-        <Link href="/dashboard" className="font-bold text-lg text-text-primary">
-          HAWK
+        <Link href="/dashboard">
+          <img src="/hawk-logo.png" alt="HAWK" className="h-8 w-auto" />
         </Link>
         <div className="flex items-center gap-4">
           <Link href="/dashboard/notifications" className="text-text-secondary hover:text-text-primary text-sm">
