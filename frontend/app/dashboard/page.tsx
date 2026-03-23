@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/providers/auth-provider";
-import { scansApi } from "@/lib/api";
+import { scansApi, domainsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const GRADE_COLORS: Record<string, string> = {
@@ -26,14 +26,14 @@ export default function DashboardOverviewPage() {
   const [criticalCount, setCriticalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [scanDomain, setScanDomain] = useState("");
+  const [accountDomain, setAccountDomain] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
-    scansApi
-      .list(token)
-      .then((r) => {
+    Promise.all([
+      scansApi.list(token).then((r) => {
         const list = r.scans.slice(0, 5);
         setScans(list);
         const latestId = list[0]?.id;
@@ -47,7 +47,13 @@ export default function DashboardOverviewPage() {
             }
           });
         }
-      })
+      }),
+      domainsApi.list(token).then((r) => {
+        const first = r.domains[0]?.domain ?? null;
+        setAccountDomain(first);
+        if (first) setScanDomain(first);
+      }),
+    ])
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
@@ -145,23 +151,31 @@ export default function DashboardOverviewPage() {
           <CardHeader>
             <CardTitle>Quick scan</CardTitle>
             <CardDescription className="text-text-secondary">
-              Enter a domain and run a scan now, or add a domain in Domains to scan on a schedule.
+              {accountDomain
+                ? `Run a scan for ${accountDomain}.`
+                : "Enter a domain and run a scan now, or add a domain in Domains to scan on a schedule."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2">
-              <Input
-                placeholder="yourcompany.com"
-                value={scanDomain}
-                onChange={(e) => setScanDomain(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && runScan()}
-                disabled={scanning}
-                className="flex-1"
-              />
-              <Button onClick={runScan} disabled={scanning || !scanDomain.trim()}>
+            {accountDomain ? (
+              <Button onClick={runScan} disabled={scanning}>
                 {scanning ? "Scanning…" : "Run Scan"}
               </Button>
-            </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="yourcompany.com"
+                  value={scanDomain}
+                  onChange={(e) => setScanDomain(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && runScan()}
+                  disabled={scanning}
+                  className="flex-1"
+                />
+                <Button onClick={runScan} disabled={scanning || !scanDomain.trim()}>
+                  {scanning ? "Scanning…" : "Run Scan"}
+                </Button>
+              </div>
+            )}
             {scanError && <p className="text-red text-sm mt-2">{scanError}</p>}
           </CardContent>
         </Card>
