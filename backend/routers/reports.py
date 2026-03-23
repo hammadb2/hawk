@@ -43,7 +43,7 @@ def generate_report(
     user: User = Depends(get_current_user),
 ):
     limit = PLAN_PDF_PER_MONTH.get(user.plan, 0)
-    if limit >= 0:
+    if limit != -1:
         from datetime import timedelta
         month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         count = db.query(Report).filter(Report.user_id == user.id, Report.created_at >= month_start).count()

@@ -46,5 +46,5 @@ CRON_SECRET = os.environ.get("HAWK_CRON_SECRET", "")
 # Plan limits
 PLAN_DOMAINS = {"trial": 1, "starter": 1, "pro": 3, "agency": 10}
 PLAN_ASK_HAWK_LIMIT = {"trial": 5, "starter": -1, "pro": -1, "agency": -1}  # -1 = unlimited
-PLAN_PDF_PER_MONTH = {"trial": 0, "starter": 1, "pro": -1, "agency": -1}
+PLAN_PDF_PER_MONTH = {"trial": 2, "starter": 3, "pro": -1, "agency": -1}
 TRIAL_DAYS = 7
