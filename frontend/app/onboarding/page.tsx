@@ -74,6 +74,9 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
       <div className="w-full max-w-lg">
+        <div className="flex justify-center mb-6">
+          <img src="/hawk-logo.png" alt="HAWK" className="h-16 w-auto" />
+        </div>
         <div className="flex justify-between mb-8 text-sm text-text-dim">
           {STEPS.map((s, i) => (
             <span key={s} className={i <= step ? "text-text-secondary" : ""}>

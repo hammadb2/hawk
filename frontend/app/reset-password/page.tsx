@@ -52,6 +52,9 @@ function ResetPasswordForm() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
+        <div className="flex justify-center mb-6">
+          <Link href="/"><img src="/hawk-logo.png" alt="HAWK" className="h-16 w-auto" /></Link>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Set new password</CardTitle>
