@@ -182,40 +182,46 @@ export default function GatePage() {
                   </button>
                 </CardHeader>
                 <CardContent>
-                  {scanError ? (
-                    <>
-                      <p className="text-red mb-4">{scanError}</p>
-                      <Link href={`/onboarding${scanResult?.domain ? `?domain=${encodeURIComponent(scanResult.domain)}` : ""}`}>
-                        <Button className="w-full">Create free account</Button>
-                      </Link>
-                      <Button variant="ghost" className="w-full mt-2" onClick={() => setShowLeadModal(false)}>
-                        Close
-                      </Button>
-                    </>
-                  ) : scanResult?.scan_id || scanResult?.domain ? (
-                    <>
-                      <p className="text-text-secondary mb-4">
-                        {scanResult.grade != null ? (
-                          <>We scanned <strong className="text-text-primary">{scanResult.domain}</strong> — Grade {scanResult.grade} ({scanResult.score}/100). Sign up to save results and get compliance-ready reports.</>
-                        ) : (
-                          <>We’re ready to scan <strong className="text-text-primary">{scanResult.domain}</strong>. Sign up to run the scan, save results, and get compliance-ready reports.</>
-                        )}
-                      </p>
-                      <Link href={`/onboarding${scanResult?.domain ? `?domain=${encodeURIComponent(scanResult.domain)}` : ""}`}>
-                        <Button className="w-full">Create free account</Button>
-                      </Link>
-                      <Link href="/login" className="block mt-2">
-                        <Button variant="ghost" className="w-full">I already have an account</Button>
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-text-secondary mb-4">The scan couldn’t complete. You can sign up and try again from your dashboard.</p>
-                      <Link href={`/onboarding${scanResult?.domain ? `?domain=${encodeURIComponent(scanResult.domain)}` : ""}`}>
-                        <Button className="w-full">Create free account</Button>
-                      </Link>
-                    </>
-                  )}
+                  {(() => {
+                    const onboardingPath = scanResult?.domain
+                      ? `/onboarding?domain=${encodeURIComponent(scanResult.domain)}`
+                      : "/onboarding";
+                    const registerHref = `/login?register=1&next=${encodeURIComponent(onboardingPath)}`;
+                    return scanError ? (
+                      <>
+                        <p className="text-red mb-4">{scanError}</p>
+                        <Link href={registerHref}>
+                          <Button className="w-full">Create free account</Button>
+                        </Link>
+                        <Button variant="ghost" className="w-full mt-2" onClick={() => setShowLeadModal(false)}>
+                          Close
+                        </Button>
+                      </>
+                    ) : scanResult?.scan_id || scanResult?.domain ? (
+                      <>
+                        <p className="text-text-secondary mb-4">
+                          {scanResult.grade != null ? (
+                            <>We scanned <strong className="text-text-primary">{scanResult.domain}</strong> — Grade {scanResult.grade} ({scanResult.score}/100). Sign up to save results and get compliance-ready reports.</>
+                          ) : (
+                            <>We’re ready to scan <strong className="text-text-primary">{scanResult.domain}</strong>. Sign up to run the scan, save results, and get compliance-ready reports.</>
+                          )}
+                        </p>
+                        <Link href={registerHref}>
+                          <Button className="w-full">Create free account</Button>
+                        </Link>
+                        <Link href={`/login?next=${encodeURIComponent(onboardingPath)}`} className="block mt-2">
+                          <Button variant="ghost" className="w-full">I already have an account</Button>
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-text-secondary mb-4">The scan couldn’t complete. You can sign up and try again from your dashboard.</p>
+                        <Link href={registerHref}>
+                          <Button className="w-full">Create free account</Button>
+                        </Link>
+                      </>
+                    );
+                  })()}
                   {!scanError && (
                     <Button variant="ghost" className="w-full mt-2" onClick={() => setShowLeadModal(false)}>
                       Maybe later
