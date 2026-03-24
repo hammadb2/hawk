@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database import init_db
 from backend.routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications
+from backend.routers.crm import crm_router
 
 
 @asynccontextmanager
@@ -45,6 +46,7 @@ app.include_router(billing.router)
 app.include_router(hawk.router)
 app.include_router(agency.router)
 app.include_router(notifications.router)
+app.include_router(crm_router)
 
 
 @app.get("/health")

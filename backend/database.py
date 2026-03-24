@@ -31,5 +31,12 @@ def init_db():
         AgencyClient,
         HawkMessage,
         PasswordResetToken,
+        CRMUser,
+        CRMProspect,
+        CRMClient,
+        CRMActivity,
+        CRMTask,
+        CRMCommission,
+        CRMCharlotteEmail,
     )
     Base.metadata.create_all(bind=engine)

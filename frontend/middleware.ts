@@ -5,7 +5,7 @@ const AUTH_COOKIE = "hawk_auth";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) {
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding") || pathname.startsWith("/crm")) {
     const auth = request.cookies.get(AUTH_COOKIE)?.value;
     if (!auth) {
       const login = new URL("/login", request.url);
@@ -17,5 +17,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/onboarding"],
+  matcher: ["/dashboard/:path*", "/onboarding", "/crm/:path*"],
 };

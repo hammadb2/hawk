@@ -4,6 +4,7 @@ from backend.schemas.auth import (
     UserResponse,
     TokenResponse,
     ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from backend.schemas.scan import (
     ScanStartRequest,
