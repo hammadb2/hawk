@@ -43,6 +43,7 @@ export default function ReportsPage() {
 
   const load = async () => {
     setLoading(true);
+    try {
     const supabase = createClient();
     const now = new Date();
     const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -50,7 +51,7 @@ export default function ReportsPage() {
 
     const [prospectsRes, clientsRes, commissionsRes, usersRes] = await Promise.all([
       supabase.from("prospects").select("id, stage, source, close_date, created_at"),
-      supabase.from("clients").select("id, status, mrr, churn_risk_score, nps_latest, close_date, closing_rep:closing_rep_id(name)"),
+      supabase.from("clients").select("id, status, mrr, churn_risk_score, nps_latest, close_date, closing_rep_id"),
       supabase.from("commissions").select("rep_id, type, amount, status, month_year"),
       supabase.from("users").select("id, name, status").in("role", ["rep", "team_lead"]),
     ]);
@@ -128,6 +129,9 @@ export default function ReportsPage() {
       mrr: { data: mrrTrend },
     });
     setLoading(false);
+    } catch {
+      setLoading(false);
+    }
   };
 
   const handleExport = (reportName: string) => {
