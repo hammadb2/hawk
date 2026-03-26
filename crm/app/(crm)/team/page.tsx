@@ -110,7 +110,7 @@ export default function TeamPage() {
             <RepCard
               key={rep.id}
               rep={rep}
-              performance={performances[rep.id] ?? { closes_this_month: 0, monthly_target: 5, commission_earned: 0, at_risk_14_day: false, rank: 0 }}
+              performance={performances[rep.id] ?? { closes_this_month: 0, monthly_target: 5, commission_earned: 0, at_risk_14_day: false, rank: 0, conversion_rate: 0, avg_days_to_close: 0, days_since_last_close: 0 }}
               canManage={canManage}
               onAtRiskAction={(action) => handleAtRiskAction(rep.id, action)}
             />
