@@ -25,7 +25,7 @@ from backend.services.supabase_crm import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/crm/webhooks", tags=["crm-stripe"])
 
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_CRM_WEBHOOK_SECRET", "")
 CLAWBACK_WINDOW_DAYS = int(os.getenv("CLAWBACK_WINDOW_DAYS", "90"))
 
 PLAN_MRR = {"starter": 99, "shield": 199, "enterprise": 399}

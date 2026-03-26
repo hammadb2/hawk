@@ -48,13 +48,6 @@ export function MyEarnings() {
         const result = await commissionsApi.myEarnings(monthYear);
         if (result.success && result.data) {
           setCommissions(result.data);
-        } else {
-          // Use mock data
-          setCommissions([
-            { id: "c1", rep_id: "", type: "closing", amount: 594, client_id: null, month_year: monthYear, status: "pending", deel_payment_ref: null, calculated_at: new Date().toISOString() },
-            { id: "c2", rep_id: "", type: "residual", amount: 297, client_id: null, month_year: monthYear, status: "pending", deel_payment_ref: null, calculated_at: new Date().toISOString() },
-            { id: "c3", rep_id: "", type: "bonus", amount: 250, client_id: null, month_year: monthYear, status: "pending", deel_payment_ref: null, calculated_at: new Date().toISOString() },
-          ]);
         }
       } catch {
         toast({ title: "Failed to load earnings", variant: "destructive" });
@@ -66,7 +59,8 @@ export function MyEarnings() {
   }, [monthYear]);
 
   const totals = calculateMonthlyTotal(commissions);
-  const bonusTier = getNextBonusTier(2); // Mock: 2 closes
+  const closesThisMonth = commissions.filter((c) => c.type === "closing").length;
+  const bonusTier = getNextBonusTier(closesThisMonth);
 
   const pieData = [
     { name: "Closing", value: totals.closing, color: PIE_COLORS.closing },
@@ -75,14 +69,18 @@ export function MyEarnings() {
     { name: "Override", value: totals.override, color: PIE_COLORS.override },
   ].filter((d) => d.value > 0);
 
-  const historyData = [
-    { month: "Oct", earned: 891 },
-    { month: "Nov", earned: 1188 },
-    { month: "Dec", earned: 1485 },
-    { month: "Jan", earned: 990 },
-    { month: "Feb", earned: 1287 },
-    { month: "Mar", earned: totals.net },
-  ];
+  // Build history from real commissions grouped by month_year
+  const historyMap: Record<string, number> = {};
+  commissions.forEach((c) => {
+    historyMap[c.month_year] = (historyMap[c.month_year] || 0) + c.amount;
+  });
+  const historyData = Object.entries(historyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([key, earned]) => {
+      const [, m] = key.split("-");
+      return { month: new Date(0, Number(m) - 1).toLocaleString("default", { month: "short" }), earned };
+    });
 
   const handleExport = () => {
     downloadCSV(

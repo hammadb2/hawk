@@ -16,27 +16,10 @@ export default function TeamPage() {
   const [reps, setReps] = useState<CRMUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const MOCK_PERFORMANCE = {
-    closes_this_month: 3,
-    monthly_target: 5,
-    conversion_rate: 24,
-    avg_days_to_close: 14,
-    commission_earned: 891,
-    rank: 1,
-    days_since_last_close: 3,
-    at_risk_14_day: false,
-  };
-
-  const MOCK_AT_RISK_PERFORMANCE = {
-    closes_this_month: 0,
-    monthly_target: 5,
-    conversion_rate: 8,
-    avg_days_to_close: 21,
-    commission_earned: 0,
-    rank: 5,
-    days_since_last_close: 17,
-    at_risk_14_day: true,
-  };
+  const [performances, setPerformances] = useState<Record<string, {
+    closes_this_month: number; monthly_target: number; commission_earned: number;
+    at_risk_14_day: boolean; rank: number;
+  }>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -44,14 +27,34 @@ export default function TeamPage() {
       try {
         const result = await usersApi.list();
         if (result.success && result.data) {
-          setReps(result.data.filter((u) => u.role === "rep" || u.role === "team_lead"));
+          const teamMembers = result.data.filter((u) => u.role === "rep" || u.role === "team_lead" || u.role === "csm");
+          setReps(teamMembers);
+
+          // Load commission data for this month
+          const { createClient } = await import("@/lib/supabase");
+          const supabase = createClient();
+          const now = new Date();
+          const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const { data: comms } = await supabase.from("commissions").select("rep_id, type, amount").eq("month_year", monthYear);
+
+          const perfMap: typeof performances = {};
+          teamMembers.forEach((rep, idx) => {
+            const repComms = (comms ?? []).filter((c) => c.rep_id === rep.id);
+            const closes = repComms.filter((c) => c.type === "closing").length;
+            const commission = repComms.reduce((s, c) => s + (c.amount || 0), 0);
+            const lastClose = rep.last_close_at ? new Date(rep.last_close_at) : null;
+            const daysSince = lastClose ? Math.floor((Date.now() - lastClose.getTime()) / 86400000) : 999;
+            perfMap[rep.id] = {
+              closes_this_month: closes,
+              monthly_target: 5,
+              commission_earned: commission,
+              at_risk_14_day: rep.status === "at_risk" || daysSince >= 14,
+              rank: idx + 1,
+            };
+          });
+          setPerformances(perfMap);
         } else {
-          // Use mock users
-          setReps([
-            { id: "u1", name: "Jordan K.", email: "jordan@hawk.ca", role: "rep", team_lead_id: null, status: "active", last_close_at: new Date(Date.now() - 259200000).toISOString(), whatsapp_number: null, invited_by: null, created_at: new Date().toISOString() },
-            { id: "u2", name: "Alex M.", email: "alex@hawk.ca", role: "rep", team_lead_id: null, status: "active", last_close_at: new Date(Date.now() - 432000000).toISOString(), whatsapp_number: null, invited_by: null, created_at: new Date().toISOString() },
-            { id: "u3", name: "Mike T.", email: "mike@hawk.ca", role: "rep", team_lead_id: null, status: "at_risk", last_close_at: new Date(Date.now() - 1468800000).toISOString(), whatsapp_number: null, invited_by: null, created_at: new Date().toISOString() },
-          ]);
+          toast({ title: "Failed to load team", variant: "destructive" });
         }
       } catch {
         toast({ title: "Failed to load team", variant: "destructive" });
@@ -107,7 +110,7 @@ export default function TeamPage() {
             <RepCard
               key={rep.id}
               rep={rep}
-              performance={rep.status === "at_risk" ? MOCK_AT_RISK_PERFORMANCE : MOCK_PERFORMANCE}
+              performance={performances[rep.id] ?? { closes_this_month: 0, monthly_target: 5, commission_earned: 0, at_risk_14_day: false, rank: 0 }}
               canManage={canManage}
               onAtRiskAction={(action) => handleAtRiskAction(rep.id, action)}
             />

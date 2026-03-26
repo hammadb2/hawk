@@ -5,16 +5,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ─── Helper: get current user's role (used by all RLS policies) ───────────────
-CREATE OR REPLACE FUNCTION get_my_role()
-RETURNS text
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-AS $$
-  SELECT role FROM public.users WHERE id = auth.uid();
-$$;
-
 -- ─── users ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,

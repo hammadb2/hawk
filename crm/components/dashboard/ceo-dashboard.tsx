@@ -2,55 +2,138 @@
 
 import { useState, useEffect } from "react";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
 } from "recharts";
-import { AlertTriangle, Bot, TrendingUp, Users, Activity } from "lucide-react";
+import { AlertTriangle, Bot, TrendingUp, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
-import { formatCurrency, formatRelativeTime, stageLabel, cn } from "@/lib/utils";
-import type { Prospect } from "@/types/crm";
+import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase";
+import { charlotteApi } from "@/lib/api";
 
-const MOCK_MRR_HISTORY = [
-  { month: "Oct", gross: 8200, net: 7800 },
-  { month: "Nov", gross: 9100, net: 8600 },
-  { month: "Dec", gross: 10200, net: 9500 },
-  { month: "Jan", gross: 11400, net: 10800 },
-  { month: "Feb", gross: 12100, net: 11200 },
-  { month: "Mar", gross: 13800, net: 12900 },
-];
+interface MRRPoint { month: string; gross: number; net: number }
+interface FeedItem { id: string; type: string; text: string; time: string }
+interface ChurnClient { id: string; company: string; mrr: number; nps: number | null; rep: string; risk: string }
+interface CharStats { emails_today?: number; open_rate?: number; reply_rate?: number; hot_leads?: number; closes_attributed?: number }
 
 export function CEODashboard() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"3M" | "6M" | "12M" | "All">("6M");
-  const [feed, setFeed] = useState<Array<{
-    id: string;
-    type: string;
-    text: string;
-    time: string;
-  }>>([]);
+  const [mrrHistory, setMrrHistory] = useState<MRRPoint[]>([]);
+  const [stats, setStats] = useState({ currentMRR: 0, mrrAdded: 0, mrrAtRisk: 0, activeClients: 0 });
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [churnAlerts, setChurnAlerts] = useState<ChurnClient[]>([]);
+  const [charlotteStats, setCharlotteStats] = useState<CharStats>({});
 
   useEffect(() => {
-    setTimeout(() => {
-      setFeed([
-        { id: "1", type: "close", text: "Jordan closed Maple Tech on Shield — $199/mo", time: new Date(Date.now() - 300000).toISOString() },
-        { id: "2", type: "prospect", text: "Charlotte created 12 new prospects from fintech.io campaign", time: new Date(Date.now() - 1200000).toISOString() },
-        { id: "3", type: "reply", text: "Charlotte got a positive reply from canuck-solutions.ca", time: new Date(Date.now() - 2400000).toISOString() },
-        { id: "4", type: "churn", text: "Churn risk HIGH flagged for GoldLeaf Corp (NPS: 4)", time: new Date(Date.now() - 3600000).toISOString() },
-        { id: "5", type: "close", text: "Alex closed Northshore Dental on Starter — $99/mo", time: new Date(Date.now() - 5400000).toISOString() },
-      ]);
-      setLoading(false);
-    }, 900);
+    load();
   }, []);
+
+  const load = async () => {
+    setLoading(true);
+    const supabase = createClient();
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [clientsRes, activitiesRes, charRes] = await Promise.all([
+      supabase.from("clients").select(
+        "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep:closing_rep_id(name), prospect:prospect_id(company_name)"
+      ),
+      supabase.from("activities")
+        .select("id, type, notes, metadata, created_at, author:created_by(name), prospect:prospect_id(company_name), client:client_id(id)")
+        .order("created_at", { ascending: false })
+        .limit(8),
+      charlotteApi.stats(),
+    ]);
+
+    const clients = clientsRes.data ?? [];
+    const activeClients = clients.filter((c) => c.status === "active");
+
+    // MRR stats
+    const currentMRR = activeClients.reduce((s, c) => s + (c.mrr || 0), 0);
+    const mrrAdded = clients
+      .filter((c) => c.close_date && c.close_date >= startOfMonth && c.status !== "churned")
+      .reduce((s, c) => s + (c.mrr || 0), 0);
+    const mrrAtRisk = clients
+      .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
+      .reduce((s, c) => s + (c.mrr || 0), 0);
+
+    setStats({ currentMRR, mrrAdded, mrrAtRisk, activeClients: activeClients.length });
+
+    // Build MRR history from client close dates (cumulative)
+    const monthlyMRR: Record<string, number> = {};
+    clients
+      .filter((c) => c.close_date && c.status !== "churned")
+      .forEach((c) => {
+        const d = new Date(c.close_date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        monthlyMRR[key] = (monthlyMRR[key] || 0) + (c.mrr || 0);
+      });
+
+    const sortedMonths = Object.keys(monthlyMRR).sort();
+    let cumulative = 0;
+    const history: MRRPoint[] = sortedMonths.map((key) => {
+      cumulative += monthlyMRR[key];
+      const [, m] = key.split("-");
+      const label = new Date(0, Number(m) - 1).toLocaleString("default", { month: "short" });
+      return { month: label, gross: cumulative, net: Math.round(cumulative * 0.93) };
+    });
+    setMrrHistory(history);
+
+    // Activity feed
+    const activities = activitiesRes.data ?? [];
+    const feedItems: FeedItem[] = activities.map((a: any) => {
+      const companyName = a.prospect?.company_name ?? "a client";
+      const authorName = a.author?.name ?? "Someone";
+      const textMap: Record<string, string> = {
+        close_won: `${authorName} closed ${companyName}`,
+        call: `${authorName} logged a call with ${companyName}`,
+        loom_sent: `${authorName} sent a loom to ${companyName}`,
+        scan_run: `${authorName} ran a scan on ${companyName}`,
+        stage_changed: `${companyName} moved to ${a.metadata?.to_stage ?? "next stage"}`,
+        note_added: a.notes ? `${authorName}: ${a.notes.slice(0, 60)}` : `Note added on ${companyName}`,
+        hot_flagged: `${companyName} flagged as hot lead`,
+      };
+      return {
+        id: a.id,
+        type: a.type,
+        text: textMap[a.type] ?? `${authorName} — ${a.type.replace(/_/g, " ")}`,
+        time: a.created_at,
+      };
+    });
+    setFeed(feedItems);
+
+    // Churn alerts
+    const churn = clients
+      .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
+      .sort((a, b) => (b.mrr || 0) - (a.mrr || 0))
+      .slice(0, 5)
+      .map((c: any) => ({
+        id: c.id,
+        company: c.prospect?.company_name ?? "Unknown",
+        mrr: c.mrr || 0,
+        nps: c.nps_latest,
+        rep: c.closing_rep?.name ?? "Unassigned",
+        risk: c.churn_risk_score,
+      }));
+    setChurnAlerts(churn);
+
+    // Charlotte stats
+    if (charRes.success && charRes.data) {
+      setCharlotteStats(charRes.data as CharStats);
+    }
+
+    setLoading(false);
+  };
+
+  const filteredHistory = (() => {
+    const n = timeRange === "3M" ? 3 : timeRange === "6M" ? 6 : timeRange === "12M" ? 12 : undefined;
+    return n ? mrrHistory.slice(-n) : mrrHistory;
+  })();
 
   if (loading) {
     return (
@@ -67,17 +150,15 @@ export function CEODashboard() {
         <p className="text-sm text-text-secondary mt-0.5">Full organization overview.</p>
       </div>
 
-      {/* MRR Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard label="Current MRR" value={formatCurrency(13800)} trend={{ value: 14, label: "MoM" }} accent />
-        <StatCard label="Net MRR" value={formatCurrency(12900)} trend={{ value: 7 }} />
-        <StatCard label="MRR Added" value={formatCurrency(2800)} subValue="This month" trend={{ value: 24 }} />
-        <StatCard label="MRR at Risk" value={formatCurrency(1100)} subValue="High churn" trend={{ value: -2 }} />
-        <StatCard label="Active Clients" value="31" trend={{ value: 3 }} />
+        <StatCard label="Current MRR" value={formatCurrency(stats.currentMRR)} accent />
+        <StatCard label="Net MRR" value={formatCurrency(Math.round(stats.currentMRR * 0.93))} />
+        <StatCard label="MRR Added" value={formatCurrency(stats.mrrAdded)} subValue="This month" />
+        <StatCard label="MRR at Risk" value={formatCurrency(stats.mrrAtRisk)} subValue="High churn" />
+        <StatCard label="Active Clients" value={String(stats.activeClients)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue Chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -92,9 +173,7 @@ export function CEODashboard() {
                     onClick={() => setTimeRange(range)}
                     className={cn(
                       "px-2 py-0.5 rounded text-xs font-medium transition-colors",
-                      timeRange === range
-                        ? "bg-accent text-white"
-                        : "text-text-dim hover:text-text-secondary"
+                      timeRange === range ? "bg-accent text-white" : "text-text-dim hover:text-text-secondary"
                     )}
                   >
                     {range}
@@ -104,30 +183,30 @@ export function CEODashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={MOCK_MRR_HISTORY}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
-                <XAxis dataKey="month" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fill: "#5C5876", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }}
-                  labelStyle={{ color: "#9B98B4" }}
-                  formatter={(v: number) => [formatCurrency(v), ""]}
-                />
-                <Legend iconType="circle" />
-                <Line type="monotone" dataKey="gross" stroke="#7B5CF5" strokeWidth={2} dot={false} name="Gross MRR" />
-                <Line type="monotone" dataKey="net" stroke="#34D399" strokeWidth={2} dot={false} name="Net MRR" />
-              </LineChart>
-            </ResponsiveContainer>
+            {filteredHistory.length === 0 ? (
+              <div className="flex items-center justify-center h-[220px] text-text-dim text-sm">
+                No revenue data yet — closes will appear here
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={filteredHistory}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
+                  <XAxis dataKey="month" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }}
+                    labelStyle={{ color: "#9B98B4" }}
+                    formatter={(v: number) => [formatCurrency(v), ""]}
+                  />
+                  <Legend iconType="circle" />
+                  <Line type="monotone" dataKey="gross" stroke="#7B5CF5" strokeWidth={2} dot={false} name="Gross MRR" />
+                  <Line type="monotone" dataKey="net" stroke="#34D399" strokeWidth={2} dot={false} name="Net MRR" />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Charlotte status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -141,11 +220,11 @@ export function CEODashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { label: "Emails Today", value: "248" },
-              { label: "Open Rate", value: "42%" },
-              { label: "Reply Rate", value: "8.1%" },
-              { label: "Hot Leads", value: "7" },
-              { label: "Closes Attributed", value: "3" },
+              { label: "Emails Today", value: charlotteStats.emails_today != null ? String(charlotteStats.emails_today) : "—" },
+              { label: "Open Rate", value: charlotteStats.open_rate != null ? `${charlotteStats.open_rate}%` : "—" },
+              { label: "Reply Rate", value: charlotteStats.reply_rate != null ? `${charlotteStats.reply_rate}%` : "—" },
+              { label: "Hot Leads", value: charlotteStats.hot_leads != null ? String(charlotteStats.hot_leads) : "—" },
+              { label: "Closes Attributed", value: charlotteStats.closes_attributed != null ? String(charlotteStats.closes_attributed) : "—" },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between">
                 <span className="text-xs text-text-secondary">{label}</span>
@@ -157,7 +236,6 @@ export function CEODashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Today's Activity Feed */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -169,52 +247,56 @@ export function CEODashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {feed.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-surface-2">
-                <div className={cn(
-                  "w-2 h-2 rounded-full mt-1.5 flex-shrink-0",
-                  item.type === "close" ? "bg-green" :
-                  item.type === "churn" ? "bg-red" :
-                  item.type === "reply" ? "bg-accent" : "bg-blue"
-                )} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-primary leading-relaxed">{item.text}</p>
-                  <p className="text-2xs text-text-dim mt-0.5">{formatRelativeTime(item.time)}</p>
+            {feed.length === 0 ? (
+              <p className="text-xs text-text-dim text-center py-6">No activity yet — activity will appear here as your team works</p>
+            ) : (
+              feed.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-surface-2">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full mt-1.5 flex-shrink-0",
+                    item.type === "close_won" ? "bg-green" :
+                    item.type === "hot_flagged" ? "bg-orange" :
+                    item.type === "stage_changed" ? "bg-accent" : "bg-blue"
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-text-primary leading-relaxed">{item.text}</p>
+                    <p className="text-2xs text-text-dim mt-0.5">{formatRelativeTime(item.time)}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
-        {/* Churn Alerts */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red" />
               Churn Alerts
-              <Badge variant="destructive" className="ml-auto">3 high risk</Badge>
+              {churnAlerts.length > 0 && (
+                <Badge variant="destructive" className="ml-auto">{churnAlerts.length} at risk</Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {[
-              { company: "GoldLeaf Corp", mrr: 199, nps: 4, rep: "Jordan" },
-              { company: "Apex Digital", mrr: 399, nps: 3, rep: "Alex" },
-              { company: "Sigma Media", mrr: 99, nps: 5, rep: "Jordan" },
-            ].map((client) => (
-              <div
-                key={client.company}
-                className="flex items-center gap-3 p-3 rounded-lg border border-red/20 bg-red/5"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary">{client.company}</p>
-                  <p className="text-xs text-text-dim">Rep: {client.rep} · NPS: {client.nps}</p>
+            {churnAlerts.length === 0 ? (
+              <p className="text-xs text-text-dim text-center py-6">No high churn risk clients</p>
+            ) : (
+              churnAlerts.map((client) => (
+                <div key={client.id} className="flex items-center gap-3 p-3 rounded-lg border border-red/20 bg-red/5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary">{client.company}</p>
+                    <p className="text-xs text-text-dim">
+                      Rep: {client.rep}{client.nps != null ? ` · NPS: ${client.nps}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-text-primary">{formatCurrency(client.mrr)}/mo</p>
+                    <Badge variant="destructive" className="text-2xs capitalize">{client.risk} Risk</Badge>
+                  </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-text-primary">{formatCurrency(client.mrr)}/mo</p>
-                  <Badge variant="destructive" className="text-2xs">High Risk</Badge>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

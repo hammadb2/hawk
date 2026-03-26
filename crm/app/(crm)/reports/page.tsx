@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { BarChart3, Download, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -9,44 +9,140 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { formatCurrency, downloadCSV } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
+import { createClient } from "@/lib/supabase";
+
+interface ReportData {
+  pipeline: { stages: { stage: string; count: number }[]; total: number; wonThisMonth: number; avgDaysToClose: number };
+  commission: { totalPaid: number; totalPending: number; clawbacks: number; net: number };
+  clientHealth: { active: number; highChurn: number; avgNPS: number | null; churnRate: number };
+  repPerformance: { topCloser: string; teamCloseRate: number; totalCloses: number; atRiskReps: number };
+  attribution: { data: { name: string; value: number; color: string }[] };
+  mrr: { data: { month: string; mrr: number }[] };
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  new: "New", scanned: "Scanned", loom_sent: "Loom", replied: "Replied",
+  call_booked: "Call Bkd", proposal_sent: "Proposal", closed_won: "Won", lost: "Lost",
+};
+
+const SOURCE_COLORS: Record<string, string> = {
+  charlotte: "#7B5CF5", manual: "#60A5FA", inbound: "#34D399", referral: "#FBBF24", inbound_signup: "#F472B6",
+};
 
 export default function ReportsPage() {
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ReportData | null>(null);
 
-  const pipelineData = [
-    { stage: "New", count: 42 },
-    { stage: "Scanned", count: 28 },
-    { stage: "Loom", count: 19 },
-    { stage: "Replied", count: 14 },
-    { stage: "Call Bkd", count: 9 },
-    { stage: "Proposal", count: 6 },
-    { stage: "Won", count: 14 },
-    { stage: "Lost", count: 18 },
-  ];
+  useEffect(() => {
+    load();
+  }, []);
 
-  const mrrData = [
-    { month: "Oct", mrr: 8200 },
-    { month: "Nov", mrr: 9100 },
-    { month: "Dec", mrr: 10200 },
-    { month: "Jan", mrr: 11400 },
-    { month: "Feb", mrr: 12100 },
-    { month: "Mar", mrr: 13800 },
-  ];
+  const load = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const now = new Date();
+    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const sourceData = [
-    { name: "Charlotte", value: 58, color: "#7B5CF5" },
-    { name: "Manual", value: 24, color: "#60A5FA" },
-    { name: "Inbound", value: 12, color: "#34D399" },
-    { name: "Referral", value: 6, color: "#FBBF24" },
-  ];
+    const [prospectsRes, clientsRes, commissionsRes, usersRes] = await Promise.all([
+      supabase.from("prospects").select("id, stage, source, close_date, created_at"),
+      supabase.from("clients").select("id, status, mrr, churn_risk_score, nps_latest, close_date, closing_rep:closing_rep_id(name)"),
+      supabase.from("commissions").select("rep_id, type, amount, status, month_year"),
+      supabase.from("users").select("id, name, status").in("role", ["rep", "team_lead"]),
+    ]);
+
+    const prospects = prospectsRes.data ?? [];
+    const clients = clientsRes.data ?? [];
+    const commissions = commissionsRes.data ?? [];
+    const reps = usersRes.data ?? [];
+
+    // Pipeline
+    const allStages = ["new", "scanned", "loom_sent", "replied", "call_booked", "proposal_sent", "closed_won", "lost"];
+    const stages = allStages.map((s) => ({
+      stage: STAGE_LABELS[s] ?? s,
+      count: prospects.filter((p) => p.stage === s).length,
+    }));
+    const wonThisMonth = prospects.filter((p) => p.stage === "closed_won" && p.close_date && p.close_date >= startOfMonth).length;
+    const totalWon = prospects.filter((p) => p.stage === "closed_won").length;
+    const winRate = prospects.length > 0 ? Math.round((totalWon / prospects.length) * 100) : 0;
+
+    // Commission
+    const monthComms = commissions.filter((c) => c.month_year === monthYear);
+    const totalPaid = monthComms.filter((c) => c.status === "paid").reduce((s, c) => s + (c.amount || 0), 0);
+    const totalPending = monthComms.filter((c) => c.status === "pending").reduce((s, c) => s + (c.amount || 0), 0);
+    const clawbacks = Math.abs(commissions.filter((c) => c.type === "clawback").reduce((s, c) => s + (c.amount || 0), 0));
+
+    // Client health
+    const activeClients = clients.filter((c) => c.status === "active");
+    const highChurn = clients.filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active").length;
+    const npsScores = clients.filter((c) => c.nps_latest != null).map((c) => c.nps_latest as number);
+    const avgNPS = npsScores.length > 0 ? Math.round((npsScores.reduce((a, b) => a + b, 0) / npsScores.length) * 10) / 10 : null;
+    const churnedThisMonth = clients.filter((c) => c.status === "churned").length;
+    const churnRate = clients.length > 0 ? Math.round((churnedThisMonth / clients.length) * 1000) / 10 : 0;
+
+    // Rep performance
+    const thisMonthCloses = commissions.filter((c) => c.month_year === monthYear && c.type === "closing");
+    const closesByRep: Record<string, number> = {};
+    thisMonthCloses.forEach((c) => { closesByRep[c.rep_id] = (closesByRep[c.rep_id] || 0) + 1; });
+    const topRepId = Object.entries(closesByRep).sort(([, a], [, b]) => b - a)[0]?.[0];
+    const topCloser = reps.find((r) => r.id === topRepId)?.name ?? "—";
+    const atRiskReps = reps.filter((r) => r.status === "at_risk").length;
+    const closeRate = prospects.length > 0 ? Math.round((totalWon / prospects.length) * 100) : 0;
+
+    // Attribution
+    const sourceCounts: Record<string, number> = {};
+    prospects.filter((p) => p.stage === "closed_won").forEach((p) => {
+      sourceCounts[p.source] = (sourceCounts[p.source] || 0) + 1;
+    });
+    const totalAttrib = Object.values(sourceCounts).reduce((a, b) => a + b, 0) || 1;
+    const attribution = Object.entries(sourceCounts).map(([name, count]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, " "),
+      value: Math.round((count / totalAttrib) * 100),
+      color: SOURCE_COLORS[name] ?? "#9B98B4",
+    }));
+
+    // MRR trend from client close dates
+    const mrrByMonth: Record<string, number> = {};
+    clients.filter((c) => c.close_date && c.status !== "churned").forEach((c) => {
+      const d = new Date(c.close_date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      mrrByMonth[key] = (mrrByMonth[key] || 0) + (c.mrr || 0);
+    });
+    let cumMRR = 0;
+    const mrrTrend = Object.keys(mrrByMonth).sort().map((key) => {
+      cumMRR += mrrByMonth[key];
+      const [, m] = key.split("-");
+      return { month: new Date(0, Number(m) - 1).toLocaleString("default", { month: "short" }), mrr: cumMRR };
+    });
+
+    setData({
+      pipeline: { stages, total: prospects.length, wonThisMonth, avgDaysToClose: 18 },
+      commission: { totalPaid, totalPending, clawbacks, net: totalPaid + totalPending - clawbacks },
+      clientHealth: { active: activeClients.length, highChurn, avgNPS, churnRate },
+      repPerformance: { topCloser, teamCloseRate: closeRate, totalCloses: totalWon, atRiskReps },
+      attribution: { data: attribution },
+      mrr: { data: mrrTrend },
+    });
+    setLoading(false);
+  };
 
   const handleExport = (reportName: string) => {
     toast({ title: `${reportName} exported`, variant: "success" });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -59,7 +155,6 @@ export default function ReportsPage() {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="commission">Commission</TabsTrigger>
-          <TabsTrigger value="charlotte">Charlotte</TabsTrigger>
           <TabsTrigger value="client_health">Client Health</TabsTrigger>
           <TabsTrigger value="rep_performance">Rep Performance</TabsTrigger>
           <TabsTrigger value="forecast">Forecast</TabsTrigger>
@@ -75,25 +170,27 @@ export default function ReportsPage() {
               </Button>
             </div>
             <div className="grid grid-cols-4 gap-4">
-              <StatCard label="Total Prospects" value="136" trend={{ value: 12 }} />
-              <StatCard label="Won This Month" value="14" trend={{ value: 8 }} />
-              <StatCard label="Avg Win Rate" value="24%" trend={{ value: 2 }} />
-              <StatCard label="Avg Days to Close" value="18d" />
+              <StatCard label="Total Prospects" value={String(data.pipeline.total)} />
+              <StatCard label="Won This Month" value={String(data.pipeline.wonThisMonth)} />
+              <StatCard label="Win Rate" value={`${data.repPerformance.teamCloseRate}%`} />
+              <StatCard label="Total Won" value={String(data.repPerformance.totalCloses)} />
             </div>
             <Card>
-              <CardHeader>
-                <CardTitle>Pipeline by Stage</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Pipeline by Stage</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={pipelineData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
-                    <XAxis dataKey="stage" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} />
-                    <Bar dataKey="count" fill="#7B5CF5" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {data.pipeline.stages.every((s) => s.count === 0) ? (
+                  <div className="flex items-center justify-center h-[250px] text-text-dim text-sm">No prospects yet</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={data.pipeline.stages}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
+                      <XAxis dataKey="stage" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} />
+                      <Bar dataKey="count" fill="#7B5CF5" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -102,33 +199,16 @@ export default function ReportsPage() {
         <TabsContent value="commission">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-secondary">Commission Report — March 2026</h2>
+              <h2 className="text-sm font-semibold text-text-secondary">Commission Report — This Month</h2>
               <Button variant="secondary" size="sm" onClick={() => handleExport("Commission Report")} className="gap-1.5 h-7 text-xs">
                 <Download className="w-3 h-3" /> Export CSV
               </Button>
             </div>
             <div className="grid grid-cols-4 gap-4">
-              <StatCard label="Total Paid" value={formatCurrency(4158)} />
-              <StatCard label="Total Pending" value={formatCurrency(2178)} accent />
-              <StatCard label="Clawbacks" value={formatCurrency(297)} />
-              <StatCard label="Net Commissions" value={formatCurrency(6039)} />
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="charlotte">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-secondary">Charlotte Report — This Week</h2>
-              <Button variant="secondary" size="sm" onClick={() => handleExport("Charlotte Report")} className="gap-1.5 h-7 text-xs">
-                <Download className="w-3 h-3" /> Export CSV
-              </Button>
-            </div>
-            <div className="grid grid-cols-4 gap-4">
-              <StatCard label="Emails Sent" value="1,240" />
-              <StatCard label="Open Rate" value="41.2%" trend={{ value: 3 }} />
-              <StatCard label="Reply Rate" value="8.4%" trend={{ value: 1 }} accent />
-              <StatCard label="Closes Attributed" value="7" />
+              <StatCard label="Total Paid" value={formatCurrency(data.commission.totalPaid)} />
+              <StatCard label="Total Pending" value={formatCurrency(data.commission.totalPending)} accent />
+              <StatCard label="Clawbacks" value={formatCurrency(data.commission.clawbacks)} />
+              <StatCard label="Net Commissions" value={formatCurrency(data.commission.net)} />
             </div>
           </div>
         </TabsContent>
@@ -142,10 +222,10 @@ export default function ReportsPage() {
               </Button>
             </div>
             <div className="grid grid-cols-4 gap-4">
-              <StatCard label="Active Clients" value="31" trend={{ value: 3 }} />
-              <StatCard label="High Churn Risk" value="3" />
-              <StatCard label="Avg NPS" value="7.8" trend={{ value: 0 }} />
-              <StatCard label="Churn Rate MTD" value="3.2%" />
+              <StatCard label="Active Clients" value={String(data.clientHealth.active)} />
+              <StatCard label="High Churn Risk" value={String(data.clientHealth.highChurn)} />
+              <StatCard label="Avg NPS" value={data.clientHealth.avgNPS != null ? String(data.clientHealth.avgNPS) : "—"} />
+              <StatCard label="Churn Rate MTD" value={`${data.clientHealth.churnRate}%`} />
             </div>
           </div>
         </TabsContent>
@@ -159,10 +239,10 @@ export default function ReportsPage() {
               </Button>
             </div>
             <div className="grid grid-cols-4 gap-4">
-              <StatCard label="Top Closer" value="Jordan K." />
-              <StatCard label="Team Close Rate" value="22%" trend={{ value: 4 }} />
-              <StatCard label="Total Closes" value="14" trend={{ value: 8 }} accent />
-              <StatCard label="At Risk Reps" value="2" />
+              <StatCard label="Top Closer" value={data.repPerformance.topCloser} />
+              <StatCard label="Team Close Rate" value={`${data.repPerformance.teamCloseRate}%`} />
+              <StatCard label="Total Closes" value={String(data.repPerformance.totalCloses)} accent />
+              <StatCard label="At Risk Reps" value={String(data.repPerformance.atRiskReps)} />
             </div>
           </div>
         </TabsContent>
@@ -178,15 +258,19 @@ export default function ReportsPage() {
             <Card>
               <CardHeader><CardTitle>MRR Trend</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={mrrData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
-                    <XAxis dataKey="month" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} formatter={(v: number) => [formatCurrency(v), "MRR"]} />
-                    <Line type="monotone" dataKey="mrr" stroke="#7B5CF5" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+                {data.mrr.data.length === 0 ? (
+                  <div className="flex items-center justify-center h-[220px] text-text-dim text-sm">No revenue data yet</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={data.mrr.data}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
+                      <XAxis dataKey="month" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} formatter={(v: number) => [formatCurrency(v), "MRR"]} />
+                      <Line type="monotone" dataKey="mrr" stroke="#7B5CF5" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -200,29 +284,33 @@ export default function ReportsPage() {
                 <Download className="w-3 h-3" /> Export CSV
               </Button>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader><CardTitle>Closes by Source</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie data={sourceData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
-                        {sourceData.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} />
-                      <Legend iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-              <div className="grid grid-cols-2 gap-3">
-                {sourceData.map((s) => (
-                  <StatCard key={s.name} label={s.name} value={`${s.value}%`} />
-                ))}
+            {data.attribution.data.length === 0 ? (
+              <p className="text-sm text-text-dim text-center py-12">No closed deals yet — attribution will appear here</p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader><CardTitle>Closes by Source</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie data={data.attribution.data} cx="50%" cy="50%" outerRadius={80} dataKey="value">
+                          {data.attribution.data.map((entry, i) => (
+                            <Cell key={i} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} />
+                        <Legend iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+                <div className="grid grid-cols-2 gap-3">
+                  {data.attribution.data.map((s) => (
+                    <StatCard key={s.name} label={s.name} value={`${s.value}%`} />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

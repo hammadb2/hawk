@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings, Users, Link2, Bot, DollarSign, Bell, Target, Shield,
-  CreditCard, Code2, FileText, AlertTriangle
+  FileText, AlertTriangle, Plus, X, Loader2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { PLAN_VALUES, COMMISSION_RATES } from "@/lib/commission";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
+import { usersApi, auditApi } from "@/lib/api";
+import type { CRMUser } from "@/types/crm";
+
+const ROLE_OPTIONS = [
+  { value: "rep", label: "Sales Rep" },
+  { value: "team_lead", label: "Team Lead" },
+  { value: "csm", label: "CSM" },
+  { value: "hos", label: "Head of Sales" },
+  { value: "ceo", label: "CEO" },
+];
+
+const ROLE_LABEL: Record<string, string> = {
+  ceo: "CEO", hos: "HoS", team_lead: "Team Lead", rep: "Rep", csm: "CSM", charlotte: "Charlotte",
+};
 
 const INTEGRATIONS = [
   { id: "smartlead", label: "Smartlead", description: "Email outreach automation", connected: true },
@@ -29,12 +44,70 @@ export default function SettingsPage() {
   const [confirmText, setConfirmText] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Users state
+  const [users, setUsers] = useState<CRMUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "rep", team_lead_id: "" });
+
+  // Audit log state
+  const [auditLogs, setAuditLogs] = useState<Record<string, unknown>[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    const result = await usersApi.list();
+    if (result.success && result.data) {
+      setUsers(result.data);
+    }
+    setUsersLoading(false);
+  };
+
+  const loadAuditLog = async () => {
+    setAuditLoading(true);
+    const result = await auditApi.list({ limit: 50 });
+    if (result.success && result.data) {
+      setAuditLogs(result.data);
+    }
+    setAuditLoading(false);
+  };
+
+  const handleInvite = async () => {
+    if (!inviteForm.name || !inviteForm.email || !inviteForm.role) {
+      toast({ title: "Fill in all fields", variant: "destructive" });
+      return;
+    }
+    setInviting(true);
+    const result = await usersApi.invite({
+      name: inviteForm.name,
+      email: inviteForm.email,
+      role: inviteForm.role,
+      team_lead_id: inviteForm.team_lead_id || undefined,
+    });
+    if (result.success) {
+      toast({ title: `Invite sent to ${inviteForm.email}`, variant: "success" });
+      setShowInvite(false);
+      setInviteForm({ name: "", email: "", role: "rep", team_lead_id: "" });
+      loadUsers();
+    } else {
+      toast({ title: result.error ?? "Failed to invite", variant: "destructive" });
+    }
+    setInviting(false);
+  };
+
   const handleSave = async (section: string) => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 600));
     setSaving(false);
     toast({ title: `${section} settings saved`, variant: "success" });
   };
+
+  const teamLeads = users.filter((u) => u.role === "team_lead");
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -43,7 +116,7 @@ export default function SettingsPage() {
         <p className="text-sm text-text-secondary mt-0.5">Configure HAWK CRM</p>
       </div>
 
-      <Tabs defaultValue="general">
+      <Tabs defaultValue="users">
         <TabsList className="flex flex-wrap h-auto gap-1 mb-6">
           <TabsTrigger value="general" className="gap-1.5"><Settings className="w-3.5 h-3.5" />General</TabsTrigger>
           <TabsTrigger value="users" className="gap-1.5"><Users className="w-3.5 h-3.5" />Users</TabsTrigger>
@@ -53,7 +126,7 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications" className="gap-1.5"><Bell className="w-3.5 h-3.5" />Notifications</TabsTrigger>
           <TabsTrigger value="sales" className="gap-1.5"><Target className="w-3.5 h-3.5" />Sales Config</TabsTrigger>
           <TabsTrigger value="healing" className="gap-1.5"><Shield className="w-3.5 h-3.5" />Self-Healing</TabsTrigger>
-          <TabsTrigger value="audit" className="gap-1.5"><FileText className="w-3.5 h-3.5" />Audit Log</TabsTrigger>
+          <TabsTrigger value="audit" className="gap-1.5" onClick={loadAuditLog}><FileText className="w-3.5 h-3.5" />Audit Log</TabsTrigger>
         </TabsList>
 
         {/* General */}
@@ -92,27 +165,97 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Users & Permissions
-                <Button size="sm" className="text-xs">+ Invite Rep</Button>
+                <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowInvite(true)}>
+                  <Plus className="w-3.5 h-3.5" /> Invite Member
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {[
-                  { name: "Admin User", email: "admin@hawk.ca", role: "CEO" },
-                  { name: "Sales Manager", email: "hos@hawk.ca", role: "HoS" },
-                  { name: "Jordan K.", email: "jordan@hawk.ca", role: "Rep" },
-                  { name: "Alex M.", email: "alex@hawk.ca", role: "Rep" },
-                ].map((u) => (
-                  <div key={u.email} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-surface-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary">{u.name}</p>
-                      <p className="text-xs text-text-dim">{u.email}</p>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">{u.role}</Badge>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs">Edit</Button>
+              {/* Invite form */}
+              {showInvite && (
+                <div className="mb-4 p-4 rounded-xl border border-accent/30 bg-accent/5 space-y-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-text-primary">Invite Team Member</p>
+                    <button onClick={() => setShowInvite(false)}><X className="w-4 h-4 text-text-dim" /></button>
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-text-dim mb-1">Full Name</label>
+                      <Input
+                        placeholder="Jane Smith"
+                        value={inviteForm.name}
+                        onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-dim mb-1">Email</label>
+                      <Input
+                        type="email"
+                        placeholder="jane@hawk.ca"
+                        value={inviteForm.email}
+                        onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-dim mb-1">Role</label>
+                      <select
+                        value={inviteForm.role}
+                        onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
+                        className="w-full h-8 text-sm rounded-lg border border-border bg-surface-2 text-text-primary px-2 focus:outline-none focus:border-accent/60"
+                      >
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {inviteForm.role === "rep" && teamLeads.length > 0 && (
+                      <div>
+                        <label className="block text-xs text-text-dim mb-1">Team Lead (optional)</label>
+                        <select
+                          value={inviteForm.team_lead_id}
+                          onChange={(e) => setInviteForm({ ...inviteForm, team_lead_id: e.target.value })}
+                          className="w-full h-8 text-sm rounded-lg border border-border bg-surface-2 text-text-primary px-2 focus:outline-none focus:border-accent/60"
+                        >
+                          <option value="">None</option>
+                          {teamLeads.map((tl) => (
+                            <option key={tl.id} value={tl.id}>{tl.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <Button size="sm" onClick={handleInvite} disabled={inviting} className="gap-1.5">
+                    {inviting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...</> : "Send Invite"}
+                  </Button>
+                  <p className="text-2xs text-text-dim">They'll receive an email invite and set their own password.</p>
+                </div>
+              )}
+
+              {/* Users list */}
+              {usersLoading ? (
+                <div className="flex justify-center py-8"><Spinner size="md" /></div>
+              ) : users.length === 0 ? (
+                <p className="text-xs text-text-dim text-center py-8">No team members yet — invite your first member above.</p>
+              ) : (
+                <div className="space-y-2">
+                  {users.map((u) => (
+                    <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-surface-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary">{u.name}</p>
+                        <p className="text-xs text-text-dim">{u.email}</p>
+                      </div>
+                      <Badge variant={u.status === "at_risk" ? "warning" : "secondary"} className="text-xs">
+                        {ROLE_LABEL[u.role] ?? u.role}
+                      </Badge>
+                      {u.status === "at_risk" && (
+                        <Badge variant="warning" className="text-2xs">At Risk</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -127,19 +270,14 @@ export default function SettingsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-text-primary">{integration.label}</p>
-                      <Badge
-                        variant={integration.connected ? "success" : "secondary"}
-                        className="text-2xs"
-                      >
+                      <Badge variant={integration.connected ? "success" : "secondary"} className="text-2xs">
                         {integration.connected ? "Connected" : "Not Connected"}
                       </Badge>
                     </div>
                     <p className="text-xs text-text-dim">{integration.description}</p>
                   </div>
                   {!integration.connected && (
-                    <div className="flex-shrink-0">
-                      <Input placeholder="API key..." className="h-7 text-xs w-48" />
-                    </div>
+                    <Input placeholder="API key..." className="h-7 text-xs w-48" />
                   )}
                   <Button variant={integration.connected ? "secondary" : "default"} size="sm" className="text-xs h-7 flex-shrink-0">
                     {integration.connected ? "Disconnect" : "Connect"}
@@ -196,44 +334,25 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-
               <div className="space-y-2">
                 <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Commission Rates</p>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(COMMISSION_RATES).map(([key, rate]) => (
                     <div key={key}>
-                      <label className="block text-xs text-text-dim mb-1">
-                        {key.replace(/_/g, " ")}
-                      </label>
+                      <label className="block text-xs text-text-dim mb-1">{key.replace(/_/g, " ")}</label>
                       <Input type="number" step="0.01" defaultValue={rate * 100} className="h-8 text-sm" />
                     </div>
                   ))}
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">Clawback Window (days)</label>
                 <Input type="number" defaultValue={90} className="w-24" />
               </div>
-
-              <div className={cn(
-                "rounded-lg p-3 border",
-                confirmText === "CONFIRM" ? "border-green/30 bg-green/5" : "border-yellow/30 bg-yellow/5"
-              )}>
-                <p className="text-xs text-yellow mb-2">
-                  Type CONFIRM to apply changes. Historical commissions are unaffected.
-                </p>
-                <Input
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder="Type CONFIRM..."
-                  className="h-8 text-sm mb-2"
-                />
-                <Button
-                  disabled={confirmText !== "CONFIRM" || saving}
-                  onClick={() => { handleSave("Commission"); setConfirmText(""); }}
-                  className="h-8 text-xs"
-                >
+              <div className={cn("rounded-lg p-3 border", confirmText === "CONFIRM" ? "border-green/30 bg-green/5" : "border-yellow/30 bg-yellow/5")}>
+                <p className="text-xs text-yellow mb-2">Type CONFIRM to apply changes. Historical commissions are unaffected.</p>
+                <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Type CONFIRM..." className="h-8 text-sm mb-2" />
+                <Button disabled={confirmText !== "CONFIRM" || saving} onClick={() => { handleSave("Commission"); setConfirmText(""); }} className="h-8 text-xs">
                   {saving ? "Saving..." : "Apply Commission Changes"}
                 </Button>
               </div>
@@ -258,17 +377,11 @@ export default function SettingsPage() {
                   <div key={event} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-surface-2">
                     <span className="text-sm text-text-primary flex-1">{event}</span>
                     <div className="flex items-center gap-2">
-                      {roles.map((r) => (
-                        <Badge key={r} variant="secondary" className="text-2xs">{r}</Badge>
-                      ))}
+                      {roles.map((r) => <Badge key={r} variant="secondary" className="text-2xs">{r}</Badge>)}
                     </div>
                     <Switch defaultChecked />
                   </div>
                 ))}
-              </div>
-              <div className="mt-4 flex items-center gap-3 p-3 rounded-lg border border-border bg-surface-2">
-                <span className="text-sm text-text-primary flex-1">Quiet Hours (10pm–8am MST)</span>
-                <Switch />
               </div>
               <Button className="mt-4" onClick={() => handleSave("Notifications")} disabled={saving}>
                 {saving ? "Saving..." : "Save Notification Settings"}
@@ -314,11 +427,8 @@ export default function SettingsPage() {
                 <div className="w-2 h-2 rounded-full bg-green" />
                 <span className="text-sm text-green font-medium">All systems operational</span>
               </div>
-
               <div>
-                <p className="text-xs font-medium text-text-dim uppercase tracking-wide mb-2">
-                  Auto-Resolve Settings
-                </p>
+                <p className="text-xs font-medium text-text-dim uppercase tracking-wide mb-2">Auto-Resolve Settings</p>
                 {[
                   { type: "Broken RLS policies", enabled: true },
                   { type: "Missing activity logs", enabled: true },
@@ -345,36 +455,37 @@ export default function SettingsPage() {
                   Audit Log
                   <Badge variant="secondary" className="text-2xs">Immutable</Badge>
                 </span>
-                <Button variant="secondary" size="sm" className="text-xs h-7">Export CSV</Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-xl border border-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-2">
-                      <th className="text-left text-xs font-medium text-text-dim px-3 py-2">User</th>
-                      <th className="text-left text-xs font-medium text-text-dim px-3 py-2">Action</th>
-                      <th className="text-left text-xs font-medium text-text-dim px-3 py-2">Record</th>
-                      <th className="text-left text-xs font-medium text-text-dim px-3 py-2">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { user: "Admin", action: "stage_changed", record: "Prospect: Maple Tech", time: "5m ago" },
-                      { user: "Jordan K.", action: "close_won", record: "Prospect: NorthShore", time: "1h ago" },
-                      { user: "Admin", action: "settings_updated", record: "Commission rates", time: "2d ago" },
-                    ].map((log, i) => (
-                      <tr key={i} className={cn("border-b border-border last:border-0")}>
-                        <td className="px-3 py-2 text-xs text-text-secondary">{log.user}</td>
-                        <td className="px-3 py-2 text-xs font-mono text-text-dim">{log.action}</td>
-                        <td className="px-3 py-2 text-xs text-text-dim">{log.record}</td>
-                        <td className="px-3 py-2 text-xs text-text-dim">{log.time}</td>
+              {auditLoading ? (
+                <div className="flex justify-center py-8"><Spinner size="md" /></div>
+              ) : auditLogs.length === 0 ? (
+                <p className="text-xs text-text-dim text-center py-8">No audit log entries yet.</p>
+              ) : (
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-2">
+                        <th className="text-left text-xs font-medium text-text-dim px-3 py-2">User</th>
+                        <th className="text-left text-xs font-medium text-text-dim px-3 py-2">Action</th>
+                        <th className="text-left text-xs font-medium text-text-dim px-3 py-2">Record</th>
+                        <th className="text-left text-xs font-medium text-text-dim px-3 py-2">Time</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {auditLogs.slice(0, 50).map((log: any, i) => (
+                        <tr key={i} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2 text-xs text-text-secondary">{log.user?.name ?? "System"}</td>
+                          <td className="px-3 py-2 text-xs font-mono text-text-dim">{String(log.action)}</td>
+                          <td className="px-3 py-2 text-xs text-text-dim">{String(log.record_type)}</td>
+                          <td className="px-3 py-2 text-xs text-text-dim">{formatRelativeTime(String(log.created_at))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
