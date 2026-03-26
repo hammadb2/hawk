@@ -3,12 +3,6 @@
   "buildCommand": "next build",
   "devCommand": "next dev -p 3001",
   "installCommand": "npm install",
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@hawk-crm-supabase-url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@hawk-crm-supabase-anon-key",
-    "NEXT_PUBLIC_API_URL": "@hawk-api-url",
-    "NEXT_PUBLIC_CAL_USERNAME": "@hawk-cal-username"
-  },
   "headers": [
     {
       "source": "/(.*)",
