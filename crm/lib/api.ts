@@ -51,7 +51,10 @@ async function apiCall<T>(
   };
 
   try {
-    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers, signal: controller.signal });
+    clearTimeout(timer);
     if (!res.ok) {
       const errText = await res.text().catch(() => "Unknown error");
       return { success: false, data: null, error: errText };

@@ -40,13 +40,12 @@ export function CEODashboard() {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [clientsRes, activitiesRes, charRes] = await Promise.all([
+      const [clientsRes, activitiesRes] = await Promise.all([
         supabase.from("clients").select("id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id"),
         supabase.from("activities")
           .select("id, type, notes, metadata, created_at, created_by")
           .order("created_at", { ascending: false })
           .limit(8),
-        charlotteApi.stats(),
       ]);
 
       const clients = clientsRes.data ?? [];
@@ -107,10 +106,12 @@ export function CEODashboard() {
         }));
       setChurnAlerts(churn);
 
-      // Charlotte stats
-      if (charRes.success && charRes.data) {
-        setCharlotteStats(charRes.data as CharStats);
-      }
+      // Charlotte stats — fetch separately so it never blocks the main load
+      charlotteApi.stats().then((charRes) => {
+        if (charRes.success && charRes.data) {
+          setCharlotteStats(charRes.data as CharStats);
+        }
+      }).catch(() => {});
     } catch {
       // fail silently — show empty state
     } finally {
