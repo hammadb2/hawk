@@ -19,6 +19,7 @@ export default function TeamPage() {
   const [performances, setPerformances] = useState<Record<string, {
     closes_this_month: number; monthly_target: number; commission_earned: number;
     at_risk_14_day: boolean; rank: number;
+    conversion_rate: number; avg_days_to_close: number; days_since_last_close: number;
   }>>({});
 
   useEffect(() => {
@@ -50,6 +51,9 @@ export default function TeamPage() {
               commission_earned: commission,
               at_risk_14_day: rep.status === "at_risk" || daysSince >= 14,
               rank: idx + 1,
+              conversion_rate: 0,
+              avg_days_to_close: 0,
+              days_since_last_close: daysSince,
             };
           });
           setPerformances(perfMap);
