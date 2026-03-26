@@ -34,100 +34,88 @@ export function CEODashboard() {
 
   const load = async () => {
     setLoading(true);
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const [clientsRes, activitiesRes, charRes] = await Promise.all([
-      supabase.from("clients").select(
-        "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep:closing_rep_id(name), prospect:prospect_id(company_name)"
-      ),
-      supabase.from("activities")
-        .select("id, type, notes, metadata, created_at, author:created_by(name), prospect:prospect_id(company_name), client:client_id(id)")
-        .order("created_at", { ascending: false })
-        .limit(8),
-      charlotteApi.stats(),
-    ]);
+      const [clientsRes, activitiesRes, charRes] = await Promise.all([
+        supabase.from("clients").select("id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id"),
+        supabase.from("activities")
+          .select("id, type, notes, metadata, created_at, created_by")
+          .order("created_at", { ascending: false })
+          .limit(8),
+        charlotteApi.stats(),
+      ]);
 
-    const clients = clientsRes.data ?? [];
-    const activeClients = clients.filter((c) => c.status === "active");
+      const clients = clientsRes.data ?? [];
+      const activeClients = clients.filter((c) => c.status === "active");
 
-    // MRR stats
-    const currentMRR = activeClients.reduce((s, c) => s + (c.mrr || 0), 0);
-    const mrrAdded = clients
-      .filter((c) => c.close_date && c.close_date >= startOfMonth && c.status !== "churned")
-      .reduce((s, c) => s + (c.mrr || 0), 0);
-    const mrrAtRisk = clients
-      .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
-      .reduce((s, c) => s + (c.mrr || 0), 0);
+      // MRR stats
+      const currentMRR = activeClients.reduce((s, c) => s + (c.mrr || 0), 0);
+      const mrrAdded = clients
+        .filter((c) => c.close_date && c.close_date >= startOfMonth && c.status !== "churned")
+        .reduce((s, c) => s + (c.mrr || 0), 0);
+      const mrrAtRisk = clients
+        .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
+        .reduce((s, c) => s + (c.mrr || 0), 0);
 
-    setStats({ currentMRR, mrrAdded, mrrAtRisk, activeClients: activeClients.length });
+      setStats({ currentMRR, mrrAdded, mrrAtRisk, activeClients: activeClients.length });
 
-    // Build MRR history from client close dates (cumulative)
-    const monthlyMRR: Record<string, number> = {};
-    clients
-      .filter((c) => c.close_date && c.status !== "churned")
-      .forEach((c) => {
-        const d = new Date(c.close_date);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        monthlyMRR[key] = (monthlyMRR[key] || 0) + (c.mrr || 0);
+      // Build MRR history from client close dates (cumulative)
+      const monthlyMRR: Record<string, number> = {};
+      clients
+        .filter((c) => c.close_date && c.status !== "churned")
+        .forEach((c) => {
+          const d = new Date(c.close_date);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          monthlyMRR[key] = (monthlyMRR[key] || 0) + (c.mrr || 0);
+        });
+
+      const sortedMonths = Object.keys(monthlyMRR).sort();
+      let cumulative = 0;
+      const history: MRRPoint[] = sortedMonths.map((key) => {
+        cumulative += monthlyMRR[key];
+        const [, m] = key.split("-");
+        const label = new Date(0, Number(m) - 1).toLocaleString("default", { month: "short" });
+        return { month: label, gross: cumulative, net: Math.round(cumulative * 0.93) };
       });
+      setMrrHistory(history);
 
-    const sortedMonths = Object.keys(monthlyMRR).sort();
-    let cumulative = 0;
-    const history: MRRPoint[] = sortedMonths.map((key) => {
-      cumulative += monthlyMRR[key];
-      const [, m] = key.split("-");
-      const label = new Date(0, Number(m) - 1).toLocaleString("default", { month: "short" });
-      return { month: label, gross: cumulative, net: Math.round(cumulative * 0.93) };
-    });
-    setMrrHistory(history);
+      // Activity feed — no nested joins, just raw fields
+      const activities = activitiesRes.data ?? [];
+      const feedItems: FeedItem[] = activities.map((a: any) => {
+        const typeLabel = (a.type as string).replace(/_/g, " ");
+        const text = a.notes ? a.notes.slice(0, 80) : typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+        return { id: a.id, type: a.type, text, time: a.created_at };
+      });
+      setFeed(feedItems);
 
-    // Activity feed
-    const activities = activitiesRes.data ?? [];
-    const feedItems: FeedItem[] = activities.map((a: any) => {
-      const companyName = a.prospect?.company_name ?? "a client";
-      const authorName = a.author?.name ?? "Someone";
-      const textMap: Record<string, string> = {
-        close_won: `${authorName} closed ${companyName}`,
-        call: `${authorName} logged a call with ${companyName}`,
-        loom_sent: `${authorName} sent a loom to ${companyName}`,
-        scan_run: `${authorName} ran a scan on ${companyName}`,
-        stage_changed: `${companyName} moved to ${a.metadata?.to_stage ?? "next stage"}`,
-        note_added: a.notes ? `${authorName}: ${a.notes.slice(0, 60)}` : `Note added on ${companyName}`,
-        hot_flagged: `${companyName} flagged as hot lead`,
-      };
-      return {
-        id: a.id,
-        type: a.type,
-        text: textMap[a.type] ?? `${authorName} — ${a.type.replace(/_/g, " ")}`,
-        time: a.created_at,
-      };
-    });
-    setFeed(feedItems);
+      // Churn alerts
+      const churn = clients
+        .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
+        .sort((a, b) => (b.mrr || 0) - (a.mrr || 0))
+        .slice(0, 5)
+        .map((c: any) => ({
+          id: c.id,
+          company: `Client ${c.id.slice(0, 6)}`,
+          mrr: c.mrr || 0,
+          nps: c.nps_latest,
+          rep: "—",
+          risk: c.churn_risk_score,
+        }));
+      setChurnAlerts(churn);
 
-    // Churn alerts
-    const churn = clients
-      .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
-      .sort((a, b) => (b.mrr || 0) - (a.mrr || 0))
-      .slice(0, 5)
-      .map((c: any) => ({
-        id: c.id,
-        company: c.prospect?.company_name ?? "Unknown",
-        mrr: c.mrr || 0,
-        nps: c.nps_latest,
-        rep: c.closing_rep?.name ?? "Unassigned",
-        risk: c.churn_risk_score,
-      }));
-    setChurnAlerts(churn);
-
-    // Charlotte stats
-    if (charRes.success && charRes.data) {
-      setCharlotteStats(charRes.data as CharStats);
+      // Charlotte stats
+      if (charRes.success && charRes.data) {
+        setCharlotteStats(charRes.data as CharStats);
+      }
+    } catch {
+      // fail silently — show empty state
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const filteredHistory = (() => {

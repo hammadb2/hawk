@@ -44,36 +44,40 @@ export function RepDashboard() {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const { createClient } = await import("@/lib/supabase");
-      const supabase = createClient();
-      const now = new Date();
-      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      try {
+        const { createClient } = await import("@/lib/supabase");
+        const supabase = createClient();
+        const now = new Date();
+        const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-      const [commissionsRes, allRepsRes, activitiesRes] = await Promise.all([
-        supabase.from("commissions").select("id, type, amount").eq("rep_id", user.id).eq("month_year", monthYear),
-        supabase.from("users").select("id").in("role", ["rep", "team_lead"]),
-        supabase.from("activities").select("id, type, created_at").eq("created_by", user.id).gte("created_at", new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
-      ]);
+        const [commissionsRes, allRepsRes, activitiesRes] = await Promise.all([
+          supabase.from("commissions").select("id, type, amount").eq("rep_id", user.id).eq("month_year", monthYear),
+          supabase.from("users").select("id").in("role", ["rep", "team_lead"]),
+          supabase.from("activities").select("id, type, created_at").eq("created_by", user.id).gte("created_at", new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
+        ]);
 
-      const comms = commissionsRes.data ?? [];
-      const allReps = allRepsRes.data ?? [];
-      const acts = activitiesRes.data ?? [];
+        const comms = commissionsRes.data ?? [];
+        const allReps = allRepsRes.data ?? [];
+        const acts = activitiesRes.data ?? [];
 
-      const closesThisMonth = comms.filter((c) => c.type === "closing").length;
-      const commissionEarned = comms.reduce((s, c) => s + (c.amount || 0), 0);
-      const calls = acts.filter((a) => a.type === "call").length;
-      const looms = acts.filter((a) => a.type === "loom_sent").length;
-      const scans = acts.filter((a) => a.type === "scan_run").length;
+        const closesThisMonth = comms.filter((c) => c.type === "closing").length;
+        const commissionEarned = comms.reduce((s, c) => s + (c.amount || 0), 0);
+        const calls = acts.filter((a) => a.type === "call").length;
+        const looms = acts.filter((a) => a.type === "loom_sent").length;
+        const scans = acts.filter((a) => a.type === "scan_run").length;
 
-      // Rank: count reps with more closes than me this month
-      const { data: allComms } = await supabase.from("commissions").select("rep_id, type").eq("month_year", monthYear).eq("type", "closing");
-      const closesByRep: Record<string, number> = {};
-      (allComms ?? []).forEach((c) => { closesByRep[c.rep_id] = (closesByRep[c.rep_id] || 0) + 1; });
-      const rank = Object.values(closesByRep).filter((n) => n > closesThisMonth).length + 1;
+        const { data: allComms } = await supabase.from("commissions").select("rep_id, type").eq("month_year", monthYear).eq("type", "closing");
+        const closesByRep: Record<string, number> = {};
+        (allComms ?? []).forEach((c) => { closesByRep[c.rep_id] = (closesByRep[c.rep_id] || 0) + 1; });
+        const rank = Object.values(closesByRep).filter((n) => n > closesThisMonth).length + 1;
 
-      setStats({ closesThisMonth, monthlyTarget: 5, commissionEarned, calls, looms, scans, rank, totalReps: allReps.length });
-      setTasks([]);
-      setLoading(false);
+        setStats({ closesThisMonth, monthlyTarget: 5, commissionEarned, calls, looms, scans, rank, totalReps: allReps.length });
+        setTasks([]);
+      } catch {
+        // fail silently — show zeros
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, [user]);

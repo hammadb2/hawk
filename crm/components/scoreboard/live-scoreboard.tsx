@@ -69,59 +69,67 @@ export function LiveScoreboard() {
 
   const loadScores = async () => {
     setLoading(true);
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    const monthYears =
-      period === "this_month" ? [getMonthYear(0)] :
-      period === "last_month" ? [getMonthYear(-1)] :
-      getQuarterMonths();
+      const monthYears =
+        period === "this_month" ? [getMonthYear(0)] :
+        period === "last_month" ? [getMonthYear(-1)] :
+        getQuarterMonths();
 
-    const [repsRes, commissionsRes, activitiesRes] = await Promise.all([
-      supabase.from("users").select("id, name, role, status, last_close_at").in("role", ["rep", "team_lead"]),
-      supabase.from("commissions").select("id, rep_id, type, amount, client_id, calculated_at")
-        .in("month_year", monthYears).in("type", ["closing"]),
-      supabase.from("activities")
-        .select("id, type, metadata, created_at, author:created_by(name), prospect:prospect_id(company_name), client:client_id(id)")
-        .eq("type", "close_won")
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
+      const [repsRes, commissionsRes, activitiesRes] = await Promise.all([
+        supabase.from("users").select("id, name, role, status, last_close_at").in("role", ["rep", "team_lead"]),
+        supabase.from("commissions").select("id, rep_id, type, amount, calculated_at")
+          .in("month_year", monthYears).eq("type", "closing"),
+        supabase.from("activities")
+          .select("id, type, metadata, created_at, created_by, prospect_id")
+          .eq("type", "close_won")
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
 
-    const reps = repsRes.data ?? [];
-    const commissions = commissionsRes.data ?? [];
+      const reps = repsRes.data ?? [];
+      const commissions = commissionsRes.data ?? [];
 
-    const repScores: RepScore[] = reps.map((rep) => {
-      const repComms = commissions.filter((c) => c.rep_id === rep.id);
-      const closes = repComms.length;
-      const commission = repComms.reduce((s, c) => s + (c.amount || 0), 0);
-      const lastClose = rep.last_close_at ? new Date(rep.last_close_at) : null;
-      const daysSince = lastClose ? Math.floor((Date.now() - lastClose.getTime()) / 86400000) : 999;
+      const repScores: RepScore[] = reps.map((rep) => {
+        const repComms = commissions.filter((c) => c.rep_id === rep.id);
+        const closes = repComms.length;
+        const commission = repComms.reduce((s, c) => s + (c.amount || 0), 0);
+        const lastClose = rep.last_close_at ? new Date(rep.last_close_at) : null;
+        const daysSince = lastClose ? Math.floor((Date.now() - lastClose.getTime()) / 86400000) : 999;
 
-      return {
-        id: rep.id,
-        name: rep.name,
-        closes,
-        target: 5,
-        commission,
-        atRisk14Day: rep.status === "at_risk" || daysSince >= 14,
-        rank: 0,
-      };
-    });
+        return {
+          id: rep.id,
+          name: rep.name,
+          closes,
+          target: 5,
+          commission,
+          atRisk14Day: rep.status === "at_risk" || daysSince >= 14,
+          rank: 0,
+        };
+      });
 
-    repScores.sort((a, b) => b.closes - a.closes || b.commission - a.commission);
-    repScores.forEach((r, i) => { r.rank = i + 1; });
-    setScores(repScores);
+      repScores.sort((a, b) => b.closes - a.closes || b.commission - a.commission);
+      repScores.forEach((r, i) => { r.rank = i + 1; });
+      setScores(repScores);
 
-    // Feed from close_won activities
-    const activities = activitiesRes.data ?? [];
-    const feedItems: FeedItem[] = activities.map((a: any) => ({
-      id: a.id,
-      text: `${a.author?.name ?? "Rep"} closed ${a.prospect?.company_name ?? "a client"}`,
-      amount: a.metadata?.mrr || 0,
-      time: a.created_at,
-    }));
-    setFeed(feedItems);
-    setLoading(false);
+      // Build feed from activities — look up rep name from reps list
+      const activities = activitiesRes.data ?? [];
+      const feedItems: FeedItem[] = activities.map((a: any) => {
+        const rep = reps.find((r) => r.id === a.created_by);
+        return {
+          id: a.id,
+          text: `${rep?.name ?? "A rep"} closed a deal`,
+          amount: a.metadata?.mrr || 0,
+          time: a.created_at,
+        };
+      });
+      setFeed(feedItems);
+    } catch {
+      // fail silently — show empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {

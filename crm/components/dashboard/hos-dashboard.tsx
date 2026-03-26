@@ -30,58 +30,56 @@ export function HOSDashboard() {
 
   const load = async () => {
     setLoading(true);
-    const supabase = createClient();
-    const now = new Date();
-    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    try {
+      const supabase = createClient();
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const [usersRes, commissionsRes, clientsRes, prospectsRes] = await Promise.all([
-      supabase.from("users").select("id, name, status, last_close_at").in("role", ["rep", "team_lead"]),
-      supabase.from("commissions").select("rep_id, type, amount, status").eq("month_year", monthYear),
-      supabase.from("clients").select("mrr, close_date, status").eq("status", "active"),
-      supabase.from("prospects").select("id, assigned_rep_id"),
-    ]);
+      const [usersRes, commissionsRes, clientsRes, prospectsRes] = await Promise.all([
+        supabase.from("users").select("id, name, status, last_close_at").in("role", ["rep", "team_lead"]),
+        supabase.from("commissions").select("rep_id, type, amount").eq("month_year", monthYear),
+        supabase.from("clients").select("mrr, close_date").eq("status", "active"),
+        supabase.from("prospects").select("id"),
+      ]);
 
-    const allReps = usersRes.data ?? [];
-    const commissions = commissionsRes.data ?? [];
-    const activeClients = clientsRes.data ?? [];
-    const allProspects = prospectsRes.data ?? [];
+      const allReps = usersRes.data ?? [];
+      const commissions = commissionsRes.data ?? [];
+      const activeClients = clientsRes.data ?? [];
+      const allProspects = prospectsRes.data ?? [];
 
-    // Stats
-    const closingCommissions = commissions.filter((c) => c.type === "closing");
-    const teamCloses = closingCommissions.length;
-    const mrrAdded = activeClients
-      .filter((c) => c.close_date && c.close_date >= startOfMonth)
-      .reduce((s, c) => s + (c.mrr || 0), 0);
+      const teamCloses = commissions.filter((c) => c.type === "closing").length;
+      const mrrAdded = activeClients
+        .filter((c) => c.close_date && c.close_date >= startOfMonth)
+        .reduce((s, c) => s + (c.mrr || 0), 0);
+      const totalPipeline = allProspects.length * 149;
 
-    // Pipeline value: count prospects * avg deal size
-    const totalPipeline = allProspects.length * 149;
+      setStats({ teamCloses, totalPipeline, mrrAdded });
 
-    setStats({ teamCloses, totalPipeline, mrrAdded });
+      const repRows: RepRow[] = allReps.map((rep) => {
+        const repCommissions = commissions.filter((c) => c.rep_id === rep.id);
+        const closes = repCommissions.filter((c) => c.type === "closing").length;
+        const totalCommission = repCommissions.reduce((s, c) => s + (c.amount || 0), 0);
+        const lastClose = rep.last_close_at ? new Date(rep.last_close_at) : null;
+        const daysSinceClose = lastClose ? Math.floor((Date.now() - lastClose.getTime()) / 86400000) : 999;
 
-    // Build leaderboard
-    const repRows: RepRow[] = allReps.map((rep) => {
-      const repCommissions = commissions.filter((c) => c.rep_id === rep.id);
-      const closes = repCommissions.filter((c) => c.type === "closing").length;
-      const totalCommission = repCommissions.reduce((s, c) => s + (c.amount || 0), 0);
-      const lastClose = rep.last_close_at ? new Date(rep.last_close_at) : null;
-      const daysSinceClose = lastClose
-        ? Math.floor((Date.now() - lastClose.getTime()) / 86400000)
-        : 999;
+        return {
+          id: rep.id,
+          name: rep.name,
+          closes,
+          target: 5,
+          commission: totalCommission,
+          atRisk: rep.status === "at_risk" || daysSinceClose >= 14,
+        };
+      });
 
-      return {
-        id: rep.id,
-        name: rep.name,
-        closes,
-        target: 5,
-        commission: totalCommission,
-        atRisk: rep.status === "at_risk" || daysSinceClose >= 14,
-      };
-    });
-
-    repRows.sort((a, b) => b.closes - a.closes || b.commission - a.commission);
-    setReps(repRows);
-    setLoading(false);
+      repRows.sort((a, b) => b.closes - a.closes || b.commission - a.commission);
+      setReps(repRows);
+    } catch {
+      // fail silently — show empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
