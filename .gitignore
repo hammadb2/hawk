@@ -10,3 +10,4 @@ specter/.venv/
 .next/
 dist/
 build/
+.vercel

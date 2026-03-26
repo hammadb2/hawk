@@ -101,6 +101,12 @@ export const hawkApi = {
     request<{ reply: string; trigger_rescan?: string }>("/api/hawk/chat", { method: "POST", body: JSON.stringify(body), token }),
 };
 
+// Breach Check
+export const breachApi = {
+  check: (body: { domain: string; emails: string[] }, token: string) =>
+    request<BreachCheckResponse>("/api/breach-check", { method: "POST", body: JSON.stringify(body), token }),
+};
+
 // Notifications
 export const notificationsApi = {
   list: (token: string) =>
@@ -178,6 +184,31 @@ export interface ReportListItem {
   domain: string;
   pdf_path: string | null;
   created_at: string | null;
+}
+
+export interface BreachEntry {
+  name: string;
+  title: string;
+  breach_date: string;
+  data_classes: string[];
+  is_verified: boolean;
+  pwn_count: number;
+}
+
+export interface EmailBreachResult {
+  email: string;
+  breached: boolean;
+  breach_count: number;
+  breaches: BreachEntry[];
+  error?: string | null;
+}
+
+export interface BreachCheckResponse {
+  domain: string;
+  total_checked: number;
+  breached_count: number;
+  clean_count: number;
+  results: EmailBreachResult[];
 }
 
 export interface Notification {

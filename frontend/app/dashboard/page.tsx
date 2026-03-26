@@ -119,7 +119,7 @@ export default function DashboardOverviewPage() {
         </motion.div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Quick scan</CardTitle>
@@ -160,6 +160,20 @@ export default function DashboardOverviewPage() {
                 ))}
               </ul>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Breach Check</CardTitle>
+            <CardDescription className="text-text-secondary">
+              Check if staff email addresses appear in known data breaches via HaveIBeenPwned.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/dashboard/breach">
+              <Button variant="secondary">Run breach check</Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

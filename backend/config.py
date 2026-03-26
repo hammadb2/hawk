@@ -40,6 +40,9 @@ CHARLOTTE_API_KEY = os.environ.get("CHARLOTTE_API_KEY", "akb-revenue-ops-2026")
 # Frontend base URL (for Stripe redirects)
 BASE_URL = os.environ.get("HAWK_BASE_URL", "https://hawk.akbstudios.com")
 
+# HaveIBeenPwned (breach check)
+HIBP_API_KEY = os.environ.get("HIBP_API_KEY", "")
+
 # Cron (scheduled scans) — set to a secret; cron calls with X-Cron-Secret
 CRON_SECRET = os.environ.get("HAWK_CRON_SECRET", "")
 

@@ -13,6 +13,7 @@ const NAV = [
   { href: "/dashboard/reports", label: "Reports" },
   { href: "/dashboard/domains", label: "Domains" },
   { href: "/dashboard/hawk", label: "Ask HAWK" },
+  { href: "/dashboard/breach", label: "Breach Check" },
   { href: "/dashboard/compliance", label: "Compliance" },
   { href: "/dashboard/agency", label: "Agency" },
   { href: "/dashboard/notifications", label: "Notifications" },

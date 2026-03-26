@@ -11,3 +11,6 @@ httpx>=0.26.0
 stripe>=8.0.0
 python-multipart>=0.0.6
 weasyprint>=61.0
+supabase>=2.7.0
+python-dotenv>=1.0.0
+apscheduler>=3.10.0
