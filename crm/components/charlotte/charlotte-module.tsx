@@ -15,7 +15,7 @@ export function CharlotteModule() {
   const [stats, setStats] = useState<CharlotteStats | null>(null);
   const [domains, setDomains] = useState<SendingDomain[]>([]);
   const [sequences, setSequences] = useState<SequencePerformance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {

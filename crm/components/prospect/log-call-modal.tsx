@@ -40,11 +40,15 @@ export function LogCallModal({ open, onClose, prospect }: LogCallModalProps) {
 
   const handleSubmit = async () => {
     if (!prospect) return;
+    const durationNum = parseInt(duration) || 0;
+    if (outcome === "answered" && durationNum <= 0) {
+      toast({ title: "Enter a call duration for answered calls", variant: "destructive" });
+      return;
+    }
     setLoading(true);
-
     try {
       const result = await prospectsApi.logCall(prospect.id, {
-        duration_minutes: parseInt(duration) || 0,
+        duration_minutes: durationNum,
         outcome,
         notes: notes.trim() || undefined,
         next_action: nextAction.trim() || undefined,

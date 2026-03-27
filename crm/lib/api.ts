@@ -9,7 +9,7 @@
  * while FastAPI handles business logic that requires server-side trust.
  */
 
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import type {
   Prospect,
   Client,
@@ -40,7 +40,7 @@ async function apiCall<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const supabase = createClient();
+  const supabase = getSupabaseClient();
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
 
@@ -73,7 +73,7 @@ async function apiCall<T>(
 // ─── Supabase helper ──────────────────────────────────────────────────────────
 
 function sb() {
-  return createClient();
+  return getSupabaseClient();
 }
 
 function toResponse<T>(data: T | null, error: { message: string } | null): ApiResponse<T> {
@@ -116,12 +116,12 @@ export const prospectsApi = {
     const [prospectRes, activitiesRes, scansRes, emailsRes] = await Promise.all([
       sb()
         .from("prospects")
-        .select("*, assigned_rep:assigned_rep_id(id, name, email, role)")
+        .select("*")
         .eq("id", id)
         .single(),
       sb()
         .from("activities")
-        .select("*, author:created_by(id, name, email, role)")
+        .select("*")
         .eq("prospect_id", id)
         .order("created_at", { ascending: false }),
       sb()
@@ -163,7 +163,7 @@ export const prospectsApi = {
     const suppressed = await sb()
       .from("suppressions")
       .select("id")
-      .or(`domain.eq.${data.domain},email.ilike.%@${data.domain}`)
+      .or(`domain.eq.${data.domain},email.ilike.%@${data.domain}%`)
       .limit(1);
     if (suppressed.data && suppressed.data.length > 0) {
       return {
@@ -265,7 +265,7 @@ export const prospectsApi = {
           next_action: data.next_action,
         },
       })
-      .select("*, author:created_by(id, name, email, role)")
+      .select("*")
       .single();
 
     if (!error) {
@@ -285,7 +285,7 @@ export const prospectsApi = {
         type: "note_added",
         notes,
       })
-      .select("*, author:created_by(id, name, email, role)")
+      .select("*")
       .single();
 
     if (!error) {
@@ -326,9 +326,7 @@ export const clientsApi = {
   }): Promise<ApiResponse<Client[]>> => {
     let query = sb()
       .from("clients")
-      .select(
-        "*, prospect:prospect_id(id, company_name, domain, industry, city), closing_rep:closing_rep_id(id, name, email)"
-      )
+      .select("*, prospect:prospect_id(id, company_name, domain), closing_rep:closing_rep_id(id, name, email)")
       .order("close_date", { ascending: false });
 
     if (params?.status) query = query.eq("status", params.status);
@@ -345,14 +343,12 @@ export const clientsApi = {
     const [clientRes, activitiesRes, scansRes] = await Promise.all([
       sb()
         .from("clients")
-        .select(
-          "*, prospect:prospect_id(*), closing_rep:closing_rep_id(id, name, email, role)"
-        )
+        .select("*")
         .eq("id", id)
         .single(),
       sb()
         .from("activities")
-        .select("*, author:created_by(id, name, email, role)")
+        .select("*")
         .eq("client_id", id)
         .order("created_at", { ascending: false }),
       sb()
@@ -418,7 +414,7 @@ export const commissionsApi = {
   myEarnings: async (monthYear?: string): Promise<ApiResponse<Commission[]>> => {
     let query = sb()
       .from("commissions")
-      .select("*, client:client_id(id, plan, mrr, prospect:prospect_id(company_name))")
+      .select("*")
       .order("calculated_at", { ascending: false });
 
     if (monthYear) query = query.eq("month_year", monthYear);
@@ -430,7 +426,7 @@ export const commissionsApi = {
   list: async (repId?: string, monthYear?: string): Promise<ApiResponse<Commission[]>> => {
     let query = sb()
       .from("commissions")
-      .select("*, rep:rep_id(id, name, email, role), client:client_id(id, plan, mrr, prospect:prospect_id(company_name))")
+      .select("*")
       .order("calculated_at", { ascending: false });
 
     if (repId) query = query.eq("rep_id", repId);
@@ -525,7 +521,7 @@ export const ticketsApi = {
   }): Promise<ApiResponse<Ticket[]>> => {
     let query = sb()
       .from("tickets")
-      .select("*, submitter:submitted_by(id, name, email, role)")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (params?.status) query = query.eq("status", params.status);
@@ -591,7 +587,7 @@ export const reportsApi = {
 
 export const usersApi = {
   me: async (): Promise<ApiResponse<CRMUser>> => {
-    const supabase = createClient();
+    const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, data: null, error: "Not authenticated" };
 

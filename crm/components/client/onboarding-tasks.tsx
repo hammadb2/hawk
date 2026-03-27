@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Clock, AlertCircle, SkipForward } from "lucide-react";
 import { OnboardingTask } from "@/types/crm";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { cn, formatDate } from "@/lib/utils";
 
 interface OnboardingTasksProps {
@@ -30,7 +30,7 @@ export function OnboardingTasks({ tasks, onUpdate }: OnboardingTasksProps) {
     if (task.status === "completed") return;
     setLoading(task.id);
     try {
-      const sb = createClient();
+      const sb = getSupabaseClient();
       await sb.from("onboarding_tasks").update({
         status: "completed",
         completed_at: new Date().toISOString(),
@@ -44,7 +44,7 @@ export function OnboardingTasks({ tasks, onUpdate }: OnboardingTasksProps) {
   async function markSkipped(task: OnboardingTask) {
     setLoading(task.id);
     try {
-      const sb = createClient();
+      const sb = getSupabaseClient();
       await sb.from("onboarding_tasks").update({ status: "skipped" }).eq("id", task.id);
       onUpdate?.();
     } finally {

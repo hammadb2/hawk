@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
 import { useCRMStore } from "@/store/crm-store";
+import { useAuthReady } from "@/components/layout/providers";
 import { formatCurrency, formatRelativeTime, stageLabel, cn } from "@/lib/utils";
 import type { Prospect } from "@/types/crm";
 
@@ -21,8 +22,10 @@ interface DailyNonNeg {
 }
 
 export function RepDashboard() {
+  const authReady = useAuthReady();
   const { user, prospects } = useCRMStore();
-  const [loading, setLoading] = useState(true);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     closesThisMonth: 0,
     monthlyTarget: 5,
@@ -42,18 +45,24 @@ export function RepDashboard() {
   }>>([]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!authReady) return;
     const load = async () => {
       try {
-        const { createClient } = await import("@/lib/supabase");
-        const supabase = createClient();
+        const { getSupabaseClient } = await import("@/lib/supabase");
+        const supabase = getSupabaseClient();
+
+        // Get user ID directly from auth — don't depend on store timing
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        setAuthUserId(authUser.id);
+
         const now = new Date();
         const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
         const [commissionsRes, allRepsRes, activitiesRes] = await Promise.all([
-          supabase.from("commissions").select("id, type, amount").eq("rep_id", user.id).eq("month_year", monthYear),
+          supabase.from("commissions").select("id, type, amount").eq("rep_id", authUser.id).eq("month_year", monthYear),
           supabase.from("users").select("id").in("role", ["rep", "team_lead"]),
-          supabase.from("activities").select("id, type, created_at").eq("created_by", user.id).gte("created_at", new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
+          supabase.from("activities").select("id, type, created_at").eq("created_by", authUser.id).gte("created_at", new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
         ]);
 
         const comms = commissionsRes.data ?? [];
@@ -80,9 +89,10 @@ export function RepDashboard() {
       }
     };
     load();
-  }, [user]);
+  }, [authReady]);
 
-  const myProspects = prospects.filter((p) => p.assigned_rep_id === user?.id);
+  const repId = authUserId ?? user?.id;
+  const myProspects = prospects.filter((p) => p.assigned_rep_id === repId);
   const hotLeads = myProspects.filter((p) => p.is_hot && p.stage !== "closed_won" && p.stage !== "lost");
 
   const nonNegs: DailyNonNeg[] = [

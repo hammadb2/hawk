@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, formatRelativeTime, getInitials, cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { useCRMStore } from "@/store/crm-store";
 import { canManageTeam } from "@/lib/auth";
 
@@ -51,26 +51,29 @@ export function LiveScoreboard() {
   const [scores, setScores] = useState<RepScore[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [teamTarget] = useState(25);
-  const [loading, setLoading] = useState(true);
-  const supabaseRef = useRef(createClient());
+  const [loading, setLoading] = useState(false);
+  const initialLoadDone = useRef(false);
+  const channelId = useRef(`scoreboard-${Math.random().toString(36).slice(2)}`);
+  const supabaseRef = useRef(getSupabaseClient());
 
   useEffect(() => {
+    initialLoadDone.current = false;
     loadScores();
 
     const sub = supabaseRef.current
-      .channel("scoreboard")
+      .channel(channelId.current)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "commissions" }, () => {
-        loadScores();
+        loadScores(true);
       })
       .subscribe();
 
     return () => { sub.unsubscribe(); };
   }, [period]);
 
-  const loadScores = async () => {
-    setLoading(true);
+  const loadScores = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const supabase = createClient();
+      const supabase = supabaseRef.current;
 
       const monthYears =
         period === "this_month" ? [getMonthYear(0)] :
@@ -128,7 +131,8 @@ export function LiveScoreboard() {
     } catch {
       // fail silently — show empty state
     } finally {
-      setLoading(false);
+      initialLoadDone.current = true;
+      if (!silent) setLoading(false);
     }
   };
 

@@ -25,9 +25,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Use getUser() not getSession() — getUser() validates the JWT with the auth
+  // server and refreshes an expired access token, ensuring cookies are always
+  // fresh when the page renders. getSession() only reads from the cookie without
+  // validating, so an expired token would reach the client un-refreshed.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
@@ -37,14 +41,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  if (!session && !isPublicRoute) {
+  if (!user && !isPublicRoute) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirected_from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (session && pathname === "/login") {
+  if (user && pathname === "/login") {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     return NextResponse.redirect(dashboardUrl);

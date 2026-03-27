@@ -7,7 +7,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
+import { useAuthReady } from "@/components/layout/providers";
 
 interface RepRow {
   id: string;
@@ -19,19 +20,21 @@ interface RepRow {
 }
 
 export function HOSDashboard() {
-  const [loading, setLoading] = useState(true);
+  const authReady = useAuthReady();
+  const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ teamCloses: 0, totalPipeline: 0, mrrAdded: 0 });
   const [reps, setReps] = useState<RepRow[]>([]);
   const [teamTarget] = useState(25);
 
   useEffect(() => {
+    if (!authReady) return;
     load();
-  }, []);
+  }, [authReady]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
+      const supabase = getSupabaseClient();
       const now = new Date();
       const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();

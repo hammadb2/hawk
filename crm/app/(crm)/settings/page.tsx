@@ -46,7 +46,7 @@ export default function SettingsPage() {
 
   // Users state
   const [users, setUsers] = useState<CRMUser[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "rep", team_lead_id: "" });
@@ -61,20 +61,34 @@ export default function SettingsPage() {
 
   const loadUsers = async () => {
     setUsersLoading(true);
-    const result = await usersApi.list();
-    if (result.success && result.data) {
-      setUsers(result.data);
+    try {
+      const result = await usersApi.list();
+      if (result.success && result.data) {
+        setUsers(result.data);
+      } else {
+        toast({ title: "Failed to load team members", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error loading team", variant: "destructive" });
+    } finally {
+      setUsersLoading(false);
     }
-    setUsersLoading(false);
   };
 
   const loadAuditLog = async () => {
     setAuditLoading(true);
-    const result = await auditApi.list({ limit: 50 });
-    if (result.success && result.data) {
-      setAuditLogs(result.data);
+    try {
+      const result = await auditApi.list({ limit: 50 });
+      if (result.success && result.data) {
+        setAuditLogs(result.data);
+      } else {
+        toast({ title: "Failed to load audit log", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error loading audit log", variant: "destructive" });
+    } finally {
+      setAuditLoading(false);
     }
-    setAuditLoading(false);
   };
 
   const handleInvite = async () => {

@@ -38,13 +38,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Check if first login by looking at user metadata
-      const isFirstLogin = data.user?.user_metadata?.first_login !== false;
-      if (isFirstLogin) {
-        router.push("/onboarding");
-      } else {
-        router.push("/dashboard");
-      }
+      router.push("/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Login error:", err);

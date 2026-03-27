@@ -11,7 +11,7 @@ import { formatDateTime, getInitials } from "@/lib/utils";
 import { prospectsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { useCRMStore } from "@/store/crm-store";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { Activity } from "@/types/crm";
 
 interface NotesTabProps {
@@ -22,19 +22,19 @@ export function NotesTab({ prospectId }: NotesTabProps) {
   const { user } = useCRMStore();
   const [notes, setNotes] = useState<Activity[]>([]);
   const [newNote, setNewNote] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const loadNotes = async () => {
-    const supabase = createClient();
-    const { data, error } = await supabase
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
       .from("activities")
-      .select("*, author:created_by(id, name, role)")
+      .select("id, type, notes, metadata, created_at, created_by, prospect_id")
       .eq("prospect_id", prospectId)
       .eq("type", "note_added")
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
+    if (data) {
       setNotes(data as Activity[]);
     }
   };
@@ -42,8 +42,13 @@ export function NotesTab({ prospectId }: NotesTabProps) {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await loadNotes();
-      setLoading(false);
+      try {
+        await loadNotes();
+      } catch {
+        // fail silently
+      } finally {
+        setLoading(false);
+      }
     };
     init();
   }, [prospectId]);

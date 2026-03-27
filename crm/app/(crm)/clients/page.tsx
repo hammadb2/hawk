@@ -30,7 +30,7 @@ const PLAN_LABELS: Record<ClientPlan, string> = {
 export default function ClientsPage() {
   const router = useRouter();
   const { clients, setClients } = useCRMStore();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(clients.length === 0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ClientStatus | "all">("all");
   const [churnFilter, setChurnFilter] = useState<ChurnRisk | "all">("all");
@@ -42,16 +42,17 @@ export default function ClientsPage() {
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      const hasData = clients.length > 0;
+      if (!hasData) setLoading(true);
       try {
         const result = await clientsApi.list();
         if (result.success && result.data) {
           setClients(result.data);
-        } else {
+        } else if (!hasData) {
           toast({ title: "Failed to load clients", variant: "destructive" });
         }
       } catch {
-        toast({ title: "Network error", variant: "destructive" });
+        if (!hasData) toast({ title: "Network error", variant: "destructive" });
       } finally {
         setLoading(false);
       }
@@ -66,7 +67,9 @@ export default function ClientsPage() {
       if (search) {
         const q = search.toLowerCase();
         const name = c.prospect?.company_name?.toLowerCase() ?? "";
-        if (!name.includes(q)) return false;
+        const domain = c.prospect?.domain?.toLowerCase() ?? "";
+        const plan = c.plan?.toLowerCase() ?? "";
+        if (!name.includes(q) && !domain.includes(q) && !plan.includes(q)) return false;
       }
       return true;
     });

@@ -13,7 +13,8 @@ import {
 } from "recharts";
 import { formatCurrency, downloadCSV } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
+import { useAuthReady } from "@/components/layout/providers";
 
 interface ReportData {
   pipeline: { stages: { stage: string; count: number }[]; total: number; wonThisMonth: number; avgDaysToClose: number };
@@ -34,23 +35,25 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const [loading, setLoading] = useState(true);
+  const authReady = useAuthReady();
+  const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
 
   useEffect(() => {
+    if (!authReady) return;
     load();
-  }, []);
+  }, [authReady]);
 
   const load = async () => {
     setLoading(true);
     try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient();
     const now = new Date();
     const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
     const [prospectsRes, clientsRes, commissionsRes, usersRes] = await Promise.all([
-      supabase.from("prospects").select("id, stage, source, close_date, created_at"),
+      supabase.from("prospects").select("id, stage, source, created_at"),
       supabase.from("clients").select("id, status, mrr, churn_risk_score, nps_latest, close_date, closing_rep_id"),
       supabase.from("commissions").select("rep_id, type, amount, status, month_year"),
       supabase.from("users").select("id, name, status").in("role", ["rep", "team_lead"]),
@@ -67,7 +70,7 @@ export default function ReportsPage() {
       stage: STAGE_LABELS[s] ?? s,
       count: prospects.filter((p) => p.stage === s).length,
     }));
-    const wonThisMonth = prospects.filter((p) => p.stage === "closed_won" && p.close_date && p.close_date >= startOfMonth).length;
+    const wonThisMonth = clients.filter((c) => c.close_date && c.close_date >= startOfMonth).length;
     const totalWon = prospects.filter((p) => p.stage === "closed_won").length;
     const winRate = prospects.length > 0 ? Math.round((totalWon / prospects.length) * 100) : 0;
 

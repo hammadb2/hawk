@@ -18,7 +18,7 @@ import { cn, formatDateTime, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { Activity, ActivityType } from "@/types/crm";
 
 const ACTIVITY_CONFIG: Record<
@@ -44,23 +44,28 @@ interface TimelineProps {
 
 export function Timeline({ prospectId }: TimelineProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("activities")
-        .select("*, author:created_by(id, name, role)")
-        .eq("prospect_id", prospectId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      try {
+        const supabase = getSupabaseClient();
+        const { data } = await supabase
+          .from("activities")
+          .select("id, type, notes, metadata, created_at, created_by, prospect_id")
+          .eq("prospect_id", prospectId)
+          .order("created_at", { ascending: false })
+          .limit(50);
 
-      if (!error && data) {
-        setActivities(data as Activity[]);
+        if (data) {
+          setActivities(data as Activity[]);
+        }
+      } catch {
+        // fail silently
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     load();

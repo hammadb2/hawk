@@ -37,7 +37,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { getInitials, roleShortLabel } from "@/lib/utils";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 
 const NAV_ITEMS = [
   {
@@ -124,8 +124,12 @@ export function Sidebar() {
   const { user, sidebarCollapsed, toggleSidebar } = useCRMStore();
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    const supabase = getSupabaseClient();
+    // scope: 'local' clears the session from cookies immediately without
+    // waiting for a network round-trip. Using 'global' (the default) can
+    // stall if the auth server is slow, leaving cookies intact so the
+    // middleware redirects the user straight back to the dashboard.
+    await supabase.auth.signOut({ scope: "local" });
     window.location.href = "/login";
   };
 

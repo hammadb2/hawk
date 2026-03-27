@@ -14,7 +14,7 @@ import type { CRMUser } from "@/types/crm";
 export default function TeamPage() {
   const { user } = useCRMStore();
   const [reps, setReps] = useState<CRMUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [performances, setPerformances] = useState<Record<string, {
     closes_this_month: number; monthly_target: number; commission_earned: number;
@@ -32,8 +32,8 @@ export default function TeamPage() {
           setReps(teamMembers);
 
           // Load commission data for this month
-          const { createClient } = await import("@/lib/supabase");
-          const supabase = createClient();
+          const { getSupabaseClient } = await import("@/lib/supabase");
+          const supabase = getSupabaseClient();
           const now = new Date();
           const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
           const { data: comms } = await supabase.from("commissions").select("rep_id, type, amount").eq("month_year", monthYear);

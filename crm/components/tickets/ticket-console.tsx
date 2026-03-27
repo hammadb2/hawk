@@ -31,7 +31,7 @@ const SEVERITY_LABELS: Record<number, string> = {
 
 export function TicketConsole() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
 
   useEffect(() => {

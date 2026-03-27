@@ -11,7 +11,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
+import { useAuthReady } from "@/components/layout/providers";
 import { charlotteApi } from "@/lib/api";
 
 interface MRRPoint { month: string; gross: number; net: number }
@@ -20,7 +21,8 @@ interface ChurnClient { id: string; company: string; mrr: number; nps: number | 
 interface CharStats { emails_today?: number; open_rate?: number; reply_rate?: number; hot_leads?: number; closes_attributed?: number }
 
 export function CEODashboard() {
-  const [loading, setLoading] = useState(true);
+  const authReady = useAuthReady();
+  const [loading, setLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<"3M" | "6M" | "12M" | "All">("6M");
   const [mrrHistory, setMrrHistory] = useState<MRRPoint[]>([]);
   const [stats, setStats] = useState({ currentMRR: 0, mrrAdded: 0, mrrAtRisk: 0, activeClients: 0 });
@@ -29,13 +31,14 @@ export function CEODashboard() {
   const [charlotteStats, setCharlotteStats] = useState<CharStats>({});
 
   useEffect(() => {
+    if (!authReady) return;
     load();
-  }, []);
+  }, [authReady]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
+      const supabase = getSupabaseClient();
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();

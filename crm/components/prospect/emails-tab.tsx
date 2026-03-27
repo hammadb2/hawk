@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDateTime, cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { EmailEvent, ReplySentiment } from "@/types/crm";
 
 const SENTIMENT_CONFIG: Record<ReplySentiment, { label: string; variant: "success" | "destructive" | "info" | "warning" }> = {
@@ -22,22 +22,27 @@ interface EmailsTabProps {
 
 export function EmailsTab({ prospectId }: EmailsTabProps) {
   const [emails, setEmails] = useState<EmailEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("email_events")
-        .select("*")
-        .eq("prospect_id", prospectId)
-        .order("created_at", { ascending: false });
+      try {
+        const supabase = getSupabaseClient();
+        const { data } = await supabase
+          .from("email_events")
+          .select("*")
+          .eq("prospect_id", prospectId)
+          .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        setEmails(data as EmailEvent[]);
+        if (data) {
+          setEmails(data as EmailEvent[]);
+        }
+      } catch {
+        // fail silently
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, [prospectId]);

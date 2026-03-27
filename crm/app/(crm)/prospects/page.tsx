@@ -19,7 +19,7 @@ import type { Prospect } from "@/types/crm";
 
 export default function ProspectsPage() {
   const { prospects, setProspects, setSelectedProspect, setDrawerOpen, user } = useCRMStore();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(prospects.length === 0);
   const [search, setSearch] = useState("");
   const [hotOnly, setHotOnly] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -35,16 +35,17 @@ export default function ProspectsPage() {
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      const hasData = prospects.length > 0;
+      if (!hasData) setLoading(true);
       try {
         const result = await prospectsApi.list();
         if (result.success && result.data) {
           setProspects(result.data);
-        } else {
+        } else if (!hasData) {
           toast({ title: "Failed to load prospects", variant: "destructive" });
         }
       } catch {
-        toast({ title: "Network error", variant: "destructive" });
+        if (!hasData) toast({ title: "Network error", variant: "destructive" });
       } finally {
         setLoading(false);
       }

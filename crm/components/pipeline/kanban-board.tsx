@@ -120,10 +120,6 @@ export function KanbanBoard({ prospects }: KanbanBoardProps) {
         <div className="flex gap-3 px-4 pb-4 overflow-x-auto h-full min-h-0">
           {STAGES.map((stage) => {
             const stageProspects = getProspectsByStage(stage.id);
-            const totalValue = stageProspects.reduce((sum, p) => {
-              // Estimate based on common plan value
-              return sum + 199; // placeholder
-            }, 0);
 
             return (
               <div

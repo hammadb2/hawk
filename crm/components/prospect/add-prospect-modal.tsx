@@ -21,7 +21,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { useCRMStore } from "@/store/crm-store";
 import { prospectsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 
 const CANADIAN_PROVINCES = [
   "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"
@@ -51,7 +51,7 @@ export function AddProspectModal({ open, onClose }: AddProspectModalProps) {
 
   const checkSuppression = async (d: string) => {
     if (!d) return;
-    const supabase = createClient();
+    const supabase = getSupabaseClient();
     const { data } = await supabase
       .from("suppressions")
       .select("id")

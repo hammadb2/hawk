@@ -28,18 +28,23 @@ interface ScanResultsTabProps {
 export function ScanResultsTab({ prospectId }: ScanResultsTabProps) {
   const { updateProspect } = useCRMStore();
   const [scans, setScans] = useState<ScanResult[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const result = await scansApi.getForProspect(prospectId);
-      if (result.success && result.data) {
-        setScans(result.data);
+      try {
+        const result = await scansApi.getForProspect(prospectId);
+        if (result.success && result.data) {
+          setScans(result.data);
+        }
+      } catch {
+        // fail silently
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, [prospectId]);

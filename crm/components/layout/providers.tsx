@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { createClient } from "@/lib/supabase";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { getSupabaseClient } from "@/lib/supabase";
 import { useCRMStore } from "@/store/crm-store";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { CRMUser } from "@/types/crm";
+
+const AuthReadyContext = createContext(false);
+export const useAuthReady = () => useContext(AuthReadyContext);
 
 interface ProvidersProps {
   children: ReactNode;
@@ -14,6 +17,7 @@ interface ProvidersProps {
 
 export function Providers({ children, initialUser }: ProvidersProps) {
   const setUser = useCRMStore((s) => s.setUser);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     if (initialUser) {
@@ -22,25 +26,36 @@ export function Providers({ children, initialUser }: ProvidersProps) {
   }, [initialUser, setUser]);
 
   useEffect(() => {
-    const supabase = createClient();
+    const supabase = getSupabaseClient();
+
+    // getSession() resolves once Supabase has restored the session from
+    // cookies. This is the reliable signal that auth state is known and
+    // it's safe to fire authenticated queries.
+    supabase.auth.getSession().then(() => {
+      setAuthReady(true);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === "SIGNED_OUT" || !session) {
+        setAuthReady(true);
+
+        if (event === "SIGNED_OUT") {
           setUser(null);
           window.location.href = "/login";
           return;
         }
 
+        if (!session) return;
+
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           const { data: userProfile } = await supabase
             .from("users")
-            .select("*, team_lead:team_lead_id(id, name, email, role)")
+            .select("id, name, email, role, status, team_lead_id, whatsapp_number, team_lead:team_lead_id(id, name, email, role)")
             .eq("id", session.user.id)
             .single();
 
           if (userProfile) {
-            setUser(userProfile as CRMUser);
+            setUser(userProfile as unknown as CRMUser);
           }
         }
       }
@@ -51,10 +66,22 @@ export function Providers({ children, initialUser }: ProvidersProps) {
     };
   }, [setUser]);
 
+  // Don't render anything until auth state is known — prevents data-fetching
+  // components from firing unauthenticated queries on page reload.
+  if (!authReady) {
+    return (
+      <div className="flex items-center justify-center h-screen" style={{ background: "#07060C" }}>
+        <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <TooltipProvider delayDuration={300}>
-      {children}
-      <Toaster />
-    </TooltipProvider>
+    <AuthReadyContext.Provider value={authReady}>
+      <TooltipProvider delayDuration={300}>
+        {children}
+        <Toaster />
+      </TooltipProvider>
+    </AuthReadyContext.Provider>
   );
 }

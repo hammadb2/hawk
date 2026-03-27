@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Calendar, TrendingUp, CheckSquare, Users, ArrowUpRight } from "lucide-react";
 import { Client, OnboardingTask, ClientHealthSync, ChurnRisk } from "@/types/crm";
-import { createClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
+import { useAuthReady } from "@/components/layout/providers";
 import { cn, formatDate, formatCurrency, formatRelativeTime } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -64,26 +65,27 @@ function StatCard({ label, value, sub, icon }: { label: string; value: string | 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export function CSMDashboard({ csmId }: { csmId: string }) {
+  const authReady = useAuthReady();
   const [clients, setClients] = useState<CSMClientRow[]>([]);
   const [renewals, setRenewals] = useState<RenewalItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!authReady) return;
     loadData();
-  }, [csmId]);
+  }, [authReady, csmId]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const sb = createClient();
+      const sb = getSupabaseClient();
 
-      // Load assigned clients with health sync
+      // Load assigned clients
       const clientsRes = await sb
         .from("clients")
-        .select("*, health:client_health_sync(*)")
+        .select("*")
         .eq("csm_rep_id", csmId)
-        .eq("status", "active")
-        .order("churn_risk_numeric", { ascending: false });
+        .eq("status", "active");
 
       const rawClients = clientsRes.data ?? [];
 
@@ -109,9 +111,9 @@ export function CSMDashboard({ csmId }: { csmId: string }) {
         }
       }
 
-      const enriched: CSMClientRow[] = rawClients.map((c) => ({
+      const enriched: CSMClientRow[] = rawClients.map((c: any) => ({
         ...c,
-        health: Array.isArray(c.health) ? c.health[0] ?? null : c.health,
+        health: null,
         overdue_tasks: taskCounts[c.id]?.overdue ?? 0,
         total_tasks: taskCounts[c.id]?.total ?? 0,
         completed_tasks: taskCounts[c.id]?.completed ?? 0,
