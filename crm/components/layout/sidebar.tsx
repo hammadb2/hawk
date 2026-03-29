@@ -99,7 +99,7 @@ const NAV_ITEMS = [
     href: "/tickets",
     label: "Support Tickets",
     icon: LifeBuoy,
-    roles: ["ceo"],
+    roles: ["ceo", "hos"],
     badge: "open_tickets",
   },
   {

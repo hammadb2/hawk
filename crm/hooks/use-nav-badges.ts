@@ -17,7 +17,7 @@ export interface NavBadgeCounts {
   charlotteSentToday: number | null;
   /** Reps / team leads marked at_risk. */
   flaggedReps: number;
-  /** Tickets not yet resolved (CEO console). */
+  /** Tickets not yet resolved (CEO / HoS console). */
   openTickets: number;
 }
 
@@ -87,7 +87,7 @@ export function useNavBadges(user: CRMUser | null): NavBadgeCounts {
         }
       }
 
-      if (role === "ceo") {
+      if (role === "ceo" || role === "hos") {
         const { count: open } = await sb
           .from("tickets")
           .select("id", { count: "exact", head: true })

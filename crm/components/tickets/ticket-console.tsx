@@ -33,17 +33,26 @@ export function TicketConsole() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
+  const [stats, setStats] = useState<{
+    avg_resolution_hours: number;
+    auto_resolve_pct: number;
+    user_error_pct: number;
+    open_over_4h: number;
+  } | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const result = await ticketsApi.list();
-        if (result.success && result.data) {
-          setTickets(result.data);
+        const [listRes, statsRes] = await Promise.all([ticketsApi.list(), ticketsApi.stats()]);
+        if (listRes.success && listRes.data) {
+          setTickets(listRes.data);
         } else {
           setTickets([]);
           toast({ title: "Failed to load tickets", variant: "destructive" });
+        }
+        if (statsRes.success && statsRes.data) {
+          setStats(statsRes.data);
         }
       } catch {
         setTickets([]);
@@ -58,11 +67,11 @@ export function TicketConsole() {
   const handleUpdateStatus = async (id: string, status: TicketStatus) => {
     try {
       const result = await ticketsApi.updateStatus(id, status);
-      if (result.success) {
-        setTickets((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, status } : t))
-        );
+      if (result.success && result.data) {
+        setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, ...result.data } : t)));
         toast({ title: "Ticket status updated", variant: "success" });
+      } else {
+        toast({ title: result.error || "Failed to update ticket", variant: "destructive" });
       }
     } catch {
       toast({ title: "Failed to update ticket", variant: "destructive" });
@@ -88,17 +97,27 @@ export function TicketConsole() {
         <p className="text-sm text-text-secondary mt-0.5">Self-healing console and support triage</p>
       </div>
 
-      {/* Resolution stats */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* Resolution stats — API when available; placeholders otherwise */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Open Tickets" value={openCount.toString()} />
-        <StatCard label="Avg Resolution" value="2.4h" />
-        <StatCard label="Auto-Resolved" value="67%" trend={{ value: 5 }} />
-        <StatCard label="Open >4h" value="1" />
+        <StatCard
+          label="Avg resolution"
+          value={stats != null ? `${stats.avg_resolution_hours.toFixed(1)}h` : "—"}
+          subValue={stats ? undefined : "API offline"}
+        />
+        <StatCard
+          label="Auto-resolved"
+          value={stats != null ? `${Math.round(stats.auto_resolve_pct)}%` : "—"}
+        />
+        <StatCard
+          label="Open &gt;4h"
+          value={stats != null ? String(stats.open_over_4h) : "—"}
+        />
       </div>
 
       {/* Filter */}
       <div className="flex items-center gap-2">
-        {(["all", "received", "in_progress", "resolved", "monitoring"] as const).map((s) => (
+        {(["all", "received", "in_progress", "resolved", "duplicate", "monitoring"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
@@ -178,14 +197,14 @@ export function TicketConsole() {
                   </div>
                 </div>
 
-                {ticket.status !== "resolved" && (
-                  <div className="flex flex-col gap-1.5 flex-shrink-0">
+                {!["resolved", "duplicate"].includes(ticket.status) && (
+                  <div className="flex flex-col gap-1.5 flex-shrink-0 min-w-[5.5rem]">
                     {ticket.status === "received" && (
                       <Button
                         variant="secondary"
                         size="sm"
                         className="h-7 text-2xs"
-                        onClick={() => handleUpdateStatus(ticket.id, "in_progress")}
+                        onClick={() => void handleUpdateStatus(ticket.id, "in_progress")}
                       >
                         Start
                       </Button>
@@ -194,9 +213,25 @@ export function TicketConsole() {
                       variant="success"
                       size="sm"
                       className="h-7 text-2xs"
-                      onClick={() => handleUpdateStatus(ticket.id, "resolved")}
+                      onClick={() => void handleUpdateStatus(ticket.id, "resolved")}
                     >
                       Resolve
+                    </Button>
+                    <Button
+                      variant="warning"
+                      size="sm"
+                      className="h-7 text-2xs"
+                      onClick={() => void handleUpdateStatus(ticket.id, "duplicate")}
+                    >
+                      Duplicate
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 text-2xs"
+                      onClick={() => void handleUpdateStatus(ticket.id, "monitoring")}
+                    >
+                      Monitor
                     </Button>
                   </div>
                 )}

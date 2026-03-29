@@ -20,29 +20,15 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { formatCurrency, formatRelativeTime, cn, withTimeout, stageLabel } from "@/lib/utils";
+import { formatCurrency, formatRelativeTime, cn, withTimeout } from "@/lib/utils";
+import { buildFunnelRowsFromProspects } from "@/lib/pipeline-funnel";
 import { getSupabaseClient } from "@/lib/supabase";
 import { charlotteApi } from "@/lib/api";
+import { activityToFeedItem, type FeedItem } from "@/lib/activity-feed";
 import { toast } from "@/components/ui/toast";
 import type { Activity, ChurnRisk, ClientStatus, PipelineStage } from "@/types/crm";
 
-const OPEN_PIPELINE_STAGES: PipelineStage[] = [
-  "new",
-  "scanned",
-  "loom_sent",
-  "replied",
-  "call_booked",
-  "proposal_sent",
-];
-
 interface MRRPoint { month: string; gross: number; net: number }
-interface FeedItem { id: string; type: string; text: string; time: string }
-
-function activityToFeedItem(a: Activity): FeedItem {
-  const typeLabel = a.type.replace(/_/g, " ");
-  const text = a.notes ? a.notes.slice(0, 80) : typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
-  return { id: a.id, type: a.type, text, time: a.created_at };
-}
 interface ChurnClient { id: string; company: string; mrr: number; nps: number | null; rep: string; risk: string }
 interface CharStats { emails_today?: number; open_rate?: number; reply_rate?: number; hot_leads?: number; closes_attributed?: number }
 
@@ -66,7 +52,9 @@ export function CEODashboard() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [churnAlerts, setChurnAlerts] = useState<ChurnClient[]>([]);
   const [charlotteStats, setCharlotteStats] = useState<CharStats>({});
-  const [funnelRows, setFunnelRows] = useState<{ stage: string; count: number; key: PipelineStage }[]>([]);
+  const [funnelRows, setFunnelRows] = useState<
+    { stage: string; count: number; key: PipelineStage }[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,23 +93,10 @@ export function CEODashboard() {
 
         if (cancelled) return;
 
-        const prospectStages = (prospectsRes.error ? [] : prospectsRes.data ?? []) as { stage: PipelineStage }[];
-        const byStage: Partial<Record<PipelineStage, number>> = {};
-        OPEN_PIPELINE_STAGES.forEach((s) => {
-          byStage[s] = 0;
-        });
-        prospectStages.forEach((p) => {
-          if (OPEN_PIPELINE_STAGES.includes(p.stage)) {
-            byStage[p.stage] = (byStage[p.stage] || 0) + 1;
-          }
-        });
-        setFunnelRows(
-          OPEN_PIPELINE_STAGES.map((s) => ({
-            key: s,
-            stage: stageLabel(s),
-            count: byStage[s] ?? 0,
-          }))
-        );
+        const prospectStages = (prospectsRes.error ? [] : prospectsRes.data ?? []) as {
+          stage: PipelineStage;
+        }[];
+        setFunnelRows(buildFunnelRowsFromProspects(prospectStages));
 
       const clients = (clientsRes.data ?? []) as unknown as ClientRow[];
       const activeClients = clients.filter((c) => c.status === "active");

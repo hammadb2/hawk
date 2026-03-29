@@ -205,7 +205,7 @@ export function MobileNav() {
                   My Earnings
                 </DropdownMenuItem>
               )}
-              {user.role === "ceo" && (
+              {hasRole(user, "ceo", "hos") && (
                 <DropdownMenuItem onClick={() => router.push("/tickets")}>
                   <LifeBuoy className="w-4 h-4 mr-2 opacity-70" />
                   Support Tickets

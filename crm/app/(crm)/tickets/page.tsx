@@ -16,7 +16,7 @@ export default async function TicketsPage() {
     .eq("id", session.user.id)
     .single();
 
-  if (!user || user.role !== "ceo") {
+  if (!user || (user.role !== "ceo" && user.role !== "hos")) {
     redirect("/dashboard");
   }
 
