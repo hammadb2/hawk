@@ -18,6 +18,7 @@ import {
   Settings,
   DollarSign,
   LifeBuoy,
+  Ban,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -209,6 +210,12 @@ export function MobileNav() {
                 <DropdownMenuItem onClick={() => router.push("/tickets")}>
                   <LifeBuoy className="w-4 h-4 mr-2 opacity-70" />
                   Support Tickets
+                </DropdownMenuItem>
+              )}
+              {hasRole(user, "ceo", "hos") && (
+                <DropdownMenuItem onClick={() => router.push("/suppressions")}>
+                  <Ban className="w-4 h-4 mr-2 opacity-70" />
+                  Suppressions
                 </DropdownMenuItem>
               )}
               {user.role === "ceo" && (

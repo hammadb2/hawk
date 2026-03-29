@@ -15,6 +15,7 @@ import {
   Copy,
   Loader2,
   UserCog,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { stageBgColor, stageLabel, cn } from "@/lib/utils";
-import { prospectsApi } from "@/lib/api";
+import { apolloApi, prospectsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { useCRMStore } from "@/store/crm-store";
 import { LogCallModal } from "./log-call-modal";
@@ -60,6 +61,7 @@ export function ProfileHeader({ prospect, onScanComplete }: ProfileHeaderProps) 
   const [logCallOpen, setLogCallOpen] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
   const [closeWonOpen, setCloseWonOpen] = useState(false);
+  const [enriching, setEnriching] = useState(false);
 
   const handleStageChange = async (stage: PipelineStage) => {
     if (stage === "lost") { setLostOpen(true); return; }
@@ -114,6 +116,40 @@ export function ProfileHeader({ prospect, onScanComplete }: ProfileHeaderProps) 
     const url = `${window.location.origin}/prospects/${prospect.id}`;
     navigator.clipboard.writeText(url);
     toast({ title: "Link copied", variant: "success" });
+  };
+
+  const handleApolloEnrich = async () => {
+    setEnriching(true);
+    try {
+      const result = await apolloApi.enrich(prospect.domain);
+      if (!result.success) {
+        toast({ title: result.error || "Enrichment failed", variant: "destructive" });
+        return;
+      }
+      const payload = result.data as Record<string, unknown> | null;
+      if (payload?.configured === false) {
+        toast({
+          title: String(payload.message ?? "Apollo is not configured on the API server"),
+          variant: "destructive",
+        });
+        return;
+      }
+      if (payload?.matched === false) {
+        toast({ title: String(payload.message ?? "No prospect match"), variant: "default" });
+        return;
+      }
+      toast({
+        title: payload?.organization_name
+          ? `Enriched: ${payload.organization_name}`
+          : "Apollo enrichment saved",
+        variant: "success",
+      });
+      router.refresh();
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    } finally {
+      setEnriching(false);
+    }
   };
 
   return (
@@ -175,6 +211,20 @@ export function ProfileHeader({ prospect, onScanComplete }: ProfileHeaderProps) 
               <><Loader2 className="w-3 h-3 animate-spin" /> Scanning...</>
             ) : (
               <><Scan className="w-3 h-3" /> Run Scan</>
+            )}
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleApolloEnrich()}
+            disabled={enriching}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {enriching ? (
+              <><Loader2 className="w-3 h-3 animate-spin" /> Enriching...</>
+            ) : (
+              <><Sparkles className="w-3 h-3" /> Apollo enrich</>
             )}
           </Button>
 

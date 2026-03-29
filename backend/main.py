@@ -24,6 +24,7 @@ from backend.routers import (
     crm_sync,
     crm_product_commands,
     crm_inbound,
+    crm_apollo,
 )
 
 
@@ -77,6 +78,7 @@ app.include_router(crm_reports.router)
 app.include_router(crm_sync.router)
 app.include_router(crm_product_commands.router)
 app.include_router(crm_inbound.router)
+app.include_router(crm_apollo.router)
 
 _register_crm_scheduler(app)
 

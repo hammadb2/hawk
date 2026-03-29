@@ -785,8 +785,10 @@ export const reportsApi = {
     const qs = params ? `?${new URLSearchParams(params)}` : "";
     return apiCall<RepPerformance[]>(`/api/crm/reports/rep-performance${qs}`);
   },
-  forecast: (months?: number) =>
-    apiCall<Record<string, unknown>>(`/api/crm/reports/forecast${months ? `?months=${months}` : ""}`),
+  forecast: (monthsAhead?: number) =>
+    apiCall<Record<string, unknown>>(
+      `/api/crm/reports/forecast${monthsAhead != null ? `?months_ahead=${monthsAhead}` : ""}`
+    ),
   attribution: (params?: Record<string, string>) => {
     const qs = params ? `?${new URLSearchParams(params)}` : "";
     return apiCall<Record<string, unknown>>(`/api/crm/reports/attribution${qs}`);

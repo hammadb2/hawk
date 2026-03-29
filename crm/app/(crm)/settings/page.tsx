@@ -30,14 +30,20 @@ const ROLE_LABEL: Record<string, string> = {
   ceo: "CEO", hos: "HoS", team_lead: "Team Lead", rep: "Rep", csm: "CSM", charlotte: "Charlotte",
 };
 
+/** `NEXT_PUBLIC_APOLLO_CONFIGURED=1` when `APOLLO_API_KEY` is set on the API (cosmetic badge only). */
 const INTEGRATIONS = [
   { id: "smartlead", label: "Smartlead", description: "Email outreach automation", connected: true },
   { id: "stripe", label: "Stripe", description: "Payment processing", connected: true },
-  { id: "apollo", label: "Apollo.io", description: "Prospect data enrichment", connected: false },
-  { id: "twilio", label: "Twilio", description: "WhatsApp notifications", connected: false },
-  { id: "deel", label: "Deel", description: "Commission payouts", connected: false },
-  { id: "google_calendar", label: "Google Calendar", description: "Call booking", connected: false },
-  { id: "loom", label: "Loom", description: "Video messaging", connected: false },
+  {
+    id: "apollo",
+    label: "Apollo.io",
+    description: "Prospect enrichment via API (`APOLLO_API_KEY` on server). Optional: `NEXT_PUBLIC_APOLLO_CONFIGURED=1` to show Connected.",
+    connected: process.env.NEXT_PUBLIC_APOLLO_CONFIGURED === "1",
+  },
+  { id: "twilio", label: "Twilio", description: "WhatsApp notifications (not wired in UI)", connected: false },
+  { id: "deel", label: "Deel", description: "Commission payouts (export from My Earnings)", connected: false },
+  { id: "google_calendar", label: "Google Calendar", description: "Call booking (Cal.com links in product)", connected: false },
+  { id: "loom", label: "Loom", description: "Video messaging (log via activities)", connected: false },
 ];
 
 const CRM_API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://api.hawk.akbstudios.com").replace(/\/$/, "");

@@ -16,6 +16,7 @@ import {
   LifeBuoy,
   Trophy,
   Shield,
+  Ban,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -101,6 +102,13 @@ const NAV_ITEMS = [
     icon: LifeBuoy,
     roles: ["ceo", "hos"],
     badge: "open_tickets",
+  },
+  {
+    href: "/suppressions",
+    label: "Suppressions",
+    icon: Ban,
+    roles: ["ceo", "hos"],
+    badge: null,
   },
   {
     href: "/settings",

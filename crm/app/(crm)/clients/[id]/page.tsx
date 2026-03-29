@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ClientProfile } from "@/components/clients/client-profile";
-import type { Client } from "@/types/crm";
+import type { Client, UserRole } from "@/types/crm";
 
 interface ClientPageProps {
   params: { id: string };
@@ -31,6 +31,12 @@ export default async function ClientPage({ params }: ClientPageProps) {
 
   if (error || !client) notFound();
 
+  const { data: crmViewer } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", session.user.id)
+    .maybeSingle();
+
   return (
     <div className="max-w-4xl mx-auto p-4">
       <div className="mb-4">
@@ -52,7 +58,7 @@ export default async function ClientPage({ params }: ClientPageProps) {
         </p>
       </div>
 
-      <ClientProfile client={client as Client} />
+      <ClientProfile client={client as Client} viewerRole={(crmViewer?.role as UserRole) ?? null} />
     </div>
   );
 }

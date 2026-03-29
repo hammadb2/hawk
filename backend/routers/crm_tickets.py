@@ -1,103 +1,103 @@
 """
 CRM Tickets Router
-Ticket stats endpoint requires service-role aggregation.
+Ticket stats use the real CRM schema (received / in_progress / resolved / duplicate / monitoring).
 Simple CRUD (submit, list, update status) goes through Supabase JS client directly.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 
 from backend.services.supabase_crm import supabase_available, get_supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/crm/tickets", tags=["crm-tickets"])
 
+OPEN_STATUSES = frozenset({"received", "in_progress", "monitoring"})
+CLOSED_STATUSES = frozenset({"resolved", "duplicate"})
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+
+def _parse_ts(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
 
 
 @router.get("/stats")
 async def ticket_stats():
     """
-    Ticket statistics for the self-healing console.
-    Returns open/in-progress counts, resolved today, critical open, avg resolution time.
+    Ticket statistics for the self-healing console (matches CRM `tickets` table + Next.js console).
     """
     if not supabase_available():
         return _empty_stats()
 
     try:
         sb = get_supabase()
-
-        open_res = (
+        res = (
             sb.table("tickets")
-            .select("id", count="exact")
-            .eq("status", "open")
+            .select("id, status, severity, created_at, resolved_at, resolution_type, classification")
             .execute()
         )
-        in_progress_res = (
-            sb.table("tickets")
-            .select("id", count="exact")
-            .eq("status", "in_progress")
-            .execute()
-        )
-        critical_res = (
-            sb.table("tickets")
-            .select("id", count="exact")
-            .in_("status", ["open", "in_progress"])
-            .eq("severity", "critical")
-            .execute()
-        )
+        rows = res.data or []
 
-        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        resolved_today_res = (
-            sb.table("tickets")
-            .select("id", count="exact")
-            .in_("status", ["resolved", "closed"])
-            .gte("resolved_at", today)
-            .execute()
+        now = datetime.now(timezone.utc)
+        four_hours_ago = now - timedelta(hours=4)
+
+        open_over_4h = 0
+        for r in rows:
+            st = r.get("status") or ""
+            if st not in OPEN_STATUSES:
+                continue
+            created = _parse_ts(r.get("created_at"))
+            if created and created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if created and created < four_hours_ago:
+                open_over_4h += 1
+
+        resolution_hours: list[float] = []
+        auto_count = 0
+        user_error_count = 0
+        resolved_total = 0
+
+        for r in rows:
+            st = r.get("status") or ""
+            if st not in CLOSED_STATUSES:
+                continue
+            if not r.get("resolved_at"):
+                continue
+            resolved_total += 1
+
+            rt = (r.get("resolution_type") or "").lower()
+            cls = (r.get("classification") or "").lower()
+            if "auto" in rt or "auto" in cls:
+                auto_count += 1
+            if "user" in rt and "error" in rt:
+                user_error_count += 1
+            elif "user_error" in cls or ("user" in cls and "error" in cls):
+                user_error_count += 1
+
+            created = _parse_ts(r.get("created_at"))
+            resolved = _parse_ts(r.get("resolved_at"))
+            if created and resolved:
+                resolution_hours.append((resolved - created).total_seconds() / 3600.0)
+
+        avg_hours = (
+            round(sum(resolution_hours) / len(resolution_hours), 1) if resolution_hours else 0.0
         )
-
-        # Average resolution time (hours) for tickets resolved in the last 30 days
-        thirty_days_ago = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        from datetime import timedelta
-        thirty_days_ago = (thirty_days_ago - timedelta(days=30)).isoformat()
-
-        resolved_res = (
-            sb.table("tickets")
-            .select("created_at, resolved_at")
-            .in_("status", ["resolved", "closed"])
-            .gte("resolved_at", thirty_days_ago)
-            .not_.is_("resolved_at", "null")
-            .execute()
-        )
-
-        avg_hours = 0.0
-        resolution_times = []
-        for ticket in (resolved_res.data or []):
-            try:
-                created = datetime.fromisoformat(ticket["created_at"].replace("Z", "+00:00"))
-                resolved = datetime.fromisoformat(ticket["resolved_at"].replace("Z", "+00:00"))
-                hours = (resolved - created).total_seconds() / 3600
-                resolution_times.append(hours)
-            except (ValueError, TypeError, KeyError):
-                pass
-
-        if resolution_times:
-            avg_hours = round(sum(resolution_times) / len(resolution_times), 1)
+        auto_resolve_pct = round(100.0 * auto_count / resolved_total, 1) if resolved_total else 0.0
+        user_error_pct = round(100.0 * user_error_count / resolved_total, 1) if resolved_total else 0.0
 
         return {
-            "open": open_res.count or 0,
-            "in_progress": in_progress_res.count or 0,
-            "resolved_today": resolved_today_res.count or 0,
-            "critical_open": critical_res.count or 0,
             "avg_resolution_hours": avg_hours,
+            "auto_resolve_pct": auto_resolve_pct,
+            "user_error_pct": user_error_pct,
+            "open_over_4h": open_over_4h,
         }
 
     except Exception as exc:
@@ -107,9 +107,8 @@ async def ticket_stats():
 
 def _empty_stats() -> dict:
     return {
-        "open": 0,
-        "in_progress": 0,
-        "resolved_today": 0,
-        "critical_open": 0,
         "avg_resolution_hours": 0.0,
+        "auto_resolve_pct": 0.0,
+        "user_error_pct": 0.0,
+        "open_over_4h": 0,
     }

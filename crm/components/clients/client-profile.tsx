@@ -10,13 +10,16 @@ import { formatCurrency, formatDate, churnRiskColor, cn } from "@/lib/utils";
 import { clientsApi, scansApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { formatRelativeTime } from "@/lib/utils";
-import type { Client, ScanResult } from "@/types/crm";
+import { ProductCommands } from "@/components/client/product-commands";
+import type { Client, ScanResult, UserRole } from "@/types/crm";
 
 interface ClientProfileProps {
   client: Client;
+  /** Logged-in CRM role (from server) — gates product command deck. */
+  viewerRole?: UserRole | null;
 }
 
-export function ClientProfile({ client }: ClientProfileProps) {
+export function ClientProfile({ client, viewerRole }: ClientProfileProps) {
   const [generating, setGenerating] = useState(false);
   const [recentScans, setRecentScans] = useState<ScanResult[]>([]);
 
@@ -107,6 +110,14 @@ export function ClientProfile({ client }: ClientProfileProps) {
           </div>
           <Badge variant="warning" className="flex-shrink-0">Upsell</Badge>
         </div>
+      )}
+
+      {viewerRole && ["ceo", "hos", "csm"].includes(viewerRole) && (
+        <ProductCommands
+          clientId={client.id}
+          userRole={viewerRole}
+          companyName={client.prospect?.company_name ?? "Client"}
+        />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

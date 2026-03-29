@@ -7,6 +7,7 @@ const ROLE_GUARDED_ROUTES: { prefix: string; roles: readonly string[] }[] = [
   { prefix: "/tickets", roles: ["ceo", "hos"] },
   { prefix: "/charlotte", roles: ["ceo", "hos"] },
   { prefix: "/team", roles: ["ceo", "hos"] },
+  { prefix: "/suppressions", roles: ["ceo", "hos"] },
 ];
 
 function pathnameMatchesRoute(pathname: string, prefix: string): boolean {

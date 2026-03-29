@@ -14,6 +14,7 @@ import {
 import { formatCurrency, downloadCSV } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { getSupabaseClient } from "@/lib/supabase";
+import { reportsApi } from "@/lib/api";
 
 interface ReportData {
   pipeline: { stages: { stage: string; count: number }[]; total: number; wonThisMonth: number; avgDaysToClose: number };
@@ -22,6 +23,14 @@ interface ReportData {
   repPerformance: { topCloser: string; teamCloseRate: number; totalCloses: number; atRiskReps: number };
   attribution: { data: { name: string; value: number; color: string }[] };
   mrr: { data: { month: string; mrr: number }[] };
+}
+
+interface ForecastFromApi {
+  current_mrr: number;
+  pipeline_value: number;
+  assumed_close_rate: number;
+  assumed_churn_rate: number;
+  projected_mrr: { month: string; projected_mrr: number; new_mrr: number; churn_mrr: number }[];
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -36,6 +45,7 @@ const SOURCE_COLORS: Record<string, string> = {
 export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
+  const [forecastApi, setForecastApi] = useState<ForecastFromApi | null>(null);
 
   useEffect(() => {
     void load();
@@ -128,6 +138,22 @@ export default function ReportsPage() {
       attribution: { data: attribution },
       mrr: { data: mrrTrend },
     });
+
+    const fr = await reportsApi.forecast(6);
+    if (fr.success && fr.data) {
+      const raw = fr.data as Record<string, unknown>;
+      const projected = (raw.projected_mrr as ForecastFromApi["projected_mrr"]) ?? [];
+      setForecastApi({
+        current_mrr: Number(raw.current_mrr) || 0,
+        pipeline_value: Number(raw.pipeline_value) || 0,
+        assumed_close_rate: Number(raw.assumed_close_rate) || 0,
+        assumed_churn_rate: Number(raw.assumed_churn_rate) || 0,
+        projected_mrr: Array.isArray(projected) ? projected : [],
+      });
+    } else {
+      setForecastApi(null);
+    }
+
     setLoading(false);
     } catch {
       setLoading(false);
@@ -254,13 +280,46 @@ export default function ReportsPage() {
         <TabsContent value="forecast">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-secondary">Revenue Forecast</h2>
+              <h2 className="text-sm font-semibold text-text-secondary">Revenue forecast</h2>
               <Button variant="secondary" size="sm" onClick={() => handleExport("Forecast")} className="gap-1.5 h-7 text-xs">
                 <Download className="w-3 h-3" /> Export CSV
               </Button>
             </div>
+            {forecastApi && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard label="Current MRR (API)" value={formatCurrency(forecastApi.current_mrr)} />
+                <StatCard label="Pipeline value (est.)" value={formatCurrency(forecastApi.pipeline_value)} />
+                <StatCard label="Assumed close rate" value={`${Math.round(forecastApi.assumed_close_rate * 100)}%`} />
+                <StatCard label="Assumed monthly churn" value={`${Math.round(forecastApi.assumed_churn_rate * 100)}%`} />
+              </div>
+            )}
             <Card>
-              <CardHeader><CardTitle>MRR Trend</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Projected MRR (server model)</CardTitle></CardHeader>
+              <CardContent>
+                {!forecastApi || forecastApi.projected_mrr.length === 0 ? (
+                  <p className="text-sm text-text-dim text-center py-10">
+                    Forecast unavailable — ensure FastAPI has Supabase service credentials and open /api/crm/reports/forecast.
+                  </p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart
+                      data={forecastApi.projected_mrr.map((r) => ({
+                        month: r.month,
+                        mrr: r.projected_mrr,
+                      }))}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" />
+                      <XAxis dataKey="month" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} formatter={(v: number) => [formatCurrency(v), "Projected"]} />
+                      <Line type="monotone" dataKey="mrr" stroke="#34D399" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Historical cumulative MRR (from closes)</CardTitle></CardHeader>
               <CardContent>
                 {data.mrr.data.length === 0 ? (
                   <div className="flex items-center justify-center h-[220px] text-text-dim text-sm">No revenue data yet</div>
@@ -271,7 +330,7 @@ export default function ReportsPage() {
                       <XAxis dataKey="month" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }} formatter={(v: number) => [formatCurrency(v), "MRR"]} />
-                      <Line type="monotone" dataKey="mrr" stroke="#7B5CF5" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="mrr" stroke="#7B5CF5" strokeWidth={2} dot={false} name="Cumulative MRR" />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
