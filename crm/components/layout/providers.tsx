@@ -27,12 +27,18 @@ export function Providers({ children, initialUser }: ProvidersProps) {
 
   useEffect(() => {
     const supabase = getSupabaseClient();
+    let cancelled = false;
+    const AUTH_SESSION_TIMEOUT_MS = 5000;
 
     // getSession() resolves once Supabase has restored the session from
-    // cookies. This is the reliable signal that auth state is known and
-    // it's safe to fire authenticated queries.
+    // cookies. If the network stalls, still unblock the shell after a cap.
+    const timeoutId = window.setTimeout(() => {
+      if (!cancelled) setAuthReady(true);
+    }, AUTH_SESSION_TIMEOUT_MS);
+
     supabase.auth.getSession().then(() => {
-      setAuthReady(true);
+      window.clearTimeout(timeoutId);
+      if (!cancelled) setAuthReady(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -62,6 +68,8 @@ export function Providers({ children, initialUser }: ProvidersProps) {
     );
 
     return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, [setUser]);

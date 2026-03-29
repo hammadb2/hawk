@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LifeBuoy, Clock, CheckCircle2, AlertTriangle, Filter } from "lucide-react";
+import { LifeBuoy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useAuthReady } from "@/components/layout/providers";
 import { ticketsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { formatDateTime, cn } from "@/lib/utils";
@@ -30,11 +31,13 @@ const SEVERITY_LABELS: Record<number, string> = {
 };
 
 export function TicketConsole() {
+  const authReady = useAuthReady();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
 
   useEffect(() => {
+    if (!authReady) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -42,48 +45,18 @@ export function TicketConsole() {
         if (result.success && result.data) {
           setTickets(result.data);
         } else {
-          // Mock data
-          setTickets([
-            {
-              id: "t1",
-              submitted_by: null,
-              channel: "in_crm",
-              raw_text: "Pipeline page is not loading for me, shows spinner indefinitely",
-              classification: "bug",
-              severity: 2,
-              status: "in_progress",
-              triage_diagnosis: "Supabase RLS policy blocking query",
-              pr_url: null,
-              resolved_at: null,
-              resolution_type: null,
-              parent_ticket_id: null,
-              created_at: new Date(Date.now() - 3600000).toISOString(),
-            },
-            {
-              id: "t2",
-              submitted_by: null,
-              channel: "whatsapp",
-              raw_text: "How do I reassign a prospect to another rep?",
-              classification: "user_question",
-              severity: 5,
-              status: "resolved",
-              triage_diagnosis: "Explained reassign flow",
-              pr_url: null,
-              resolved_at: new Date(Date.now() - 1800000).toISOString(),
-              resolution_type: "user_education",
-              parent_ticket_id: null,
-              created_at: new Date(Date.now() - 7200000).toISOString(),
-            },
-          ]);
+          setTickets([]);
+          toast({ title: "Failed to load tickets", variant: "destructive" });
         }
       } catch {
+        setTickets([]);
         toast({ title: "Failed to load tickets", variant: "destructive" });
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [authReady]);
 
   const handleUpdateStatus = async (id: string, status: TicketStatus) => {
     try {

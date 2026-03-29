@@ -8,7 +8,9 @@ import {
   Plus,
   Trophy,
   MoreHorizontal,
+  LogOut,
 } from "lucide-react";
+import { getSupabaseClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useCRMStore } from "@/store/crm-store";
 import {
@@ -29,6 +31,12 @@ const TABS = [
 export function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseClient();
+    await supabase.auth.signOut({ scope: "local" });
+    window.location.href = "/login";
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface-1 md:hidden safe-area-inset-bottom">
@@ -110,6 +118,16 @@ export function MobileNav() {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push("/settings")}>
               Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                void handleSignOut();
+              }}
+              className="text-red focus:text-red gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -150,6 +150,8 @@ export const useCRMStore = create<CRMStore>()(
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         pipelineView: state.pipelineView,
+        prospects: state.prospects,
+        clients: state.clients,
       }),
     }
   )

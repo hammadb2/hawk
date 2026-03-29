@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Settings, Users, Link2, Bot, DollarSign, Bell, Target, Shield,
   FileText, AlertTriangle, Plus, X, Loader2,
@@ -16,7 +16,7 @@ import { toast } from "@/components/ui/toast";
 import { PLAN_VALUES, COMMISSION_RATES } from "@/lib/commission";
 import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
 import { usersApi, auditApi } from "@/lib/api";
-import type { CRMUser } from "@/types/crm";
+import type { CRMUser, AuditLogEntry } from "@/types/crm";
 
 const ROLE_OPTIONS = [
   { value: "rep", label: "Sales Rep" },
@@ -52,12 +52,8 @@ export default function SettingsPage() {
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "rep", team_lead_id: "" });
 
   // Audit log state
-  const [auditLogs, setAuditLogs] = useState<Record<string, unknown>[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -80,7 +76,7 @@ export default function SettingsPage() {
     try {
       const result = await auditApi.list({ limit: 50 });
       if (result.success && result.data) {
-        setAuditLogs(result.data);
+        setAuditLogs(result.data as unknown as AuditLogEntry[]);
       } else {
         toast({ title: "Failed to load audit log", variant: "destructive" });
       }
@@ -130,10 +126,18 @@ export default function SettingsPage() {
         <p className="text-sm text-text-secondary mt-0.5">Configure HAWK CRM</p>
       </div>
 
-      <Tabs defaultValue="users">
+      <Tabs defaultValue="general">
         <TabsList className="flex flex-wrap h-auto gap-1 mb-6">
           <TabsTrigger value="general" className="gap-1.5"><Settings className="w-3.5 h-3.5" />General</TabsTrigger>
-          <TabsTrigger value="users" className="gap-1.5"><Users className="w-3.5 h-3.5" />Users</TabsTrigger>
+          <TabsTrigger
+            value="users"
+            className="gap-1.5"
+            onClick={() => {
+              void loadUsers();
+            }}
+          >
+            <Users className="w-3.5 h-3.5" />Users
+          </TabsTrigger>
           <TabsTrigger value="integrations" className="gap-1.5"><Link2 className="w-3.5 h-3.5" />Integrations</TabsTrigger>
           <TabsTrigger value="charlotte" className="gap-1.5"><Bot className="w-3.5 h-3.5" />Charlotte</TabsTrigger>
           <TabsTrigger value="commission" className="gap-1.5"><DollarSign className="w-3.5 h-3.5" />Commissions</TabsTrigger>
@@ -179,7 +183,14 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Users & Permissions
-                <Button size="sm" className="text-xs gap-1.5" onClick={() => setShowInvite(true)}>
+                <Button
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  onClick={() => {
+                    void loadUsers();
+                    setShowInvite(true);
+                  }}
+                >
                   <Plus className="w-3.5 h-3.5" /> Invite Member
                 </Button>
               </CardTitle>
@@ -488,12 +499,12 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {auditLogs.slice(0, 50).map((log: any, i) => (
+                      {auditLogs.slice(0, 50).map((log, i) => (
                         <tr key={i} className="border-b border-border last:border-0">
                           <td className="px-3 py-2 text-xs text-text-secondary">{log.user?.name ?? "System"}</td>
-                          <td className="px-3 py-2 text-xs font-mono text-text-dim">{String(log.action)}</td>
-                          <td className="px-3 py-2 text-xs text-text-dim">{String(log.record_type)}</td>
-                          <td className="px-3 py-2 text-xs text-text-dim">{formatRelativeTime(String(log.created_at))}</td>
+                          <td className="px-3 py-2 text-xs font-mono text-text-dim">{log.action}</td>
+                          <td className="px-3 py-2 text-xs text-text-dim">{log.record_type}</td>
+                          <td className="px-3 py-2 text-xs text-text-dim">{formatRelativeTime(log.created_at)}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, formatRelativeTime, getInitials, cn } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
+import { useAuthReady } from "@/components/layout/providers";
 import { useCRMStore } from "@/store/crm-store";
+import type { Activity } from "@/types/crm";
 import { canManageTeam } from "@/lib/auth";
 
 type TimePeriod = "this_month" | "last_month" | "this_quarter";
@@ -46,6 +48,7 @@ function getQuarterMonths(): string[] {
 }
 
 export function LiveScoreboard() {
+  const authReady = useAuthReady();
   const { user } = useCRMStore();
   const [period, setPeriod] = useState<TimePeriod>("this_month");
   const [scores, setScores] = useState<RepScore[]>([]);
@@ -57,6 +60,7 @@ export function LiveScoreboard() {
   const supabaseRef = useRef(getSupabaseClient());
 
   useEffect(() => {
+    if (!authReady) return;
     initialLoadDone.current = false;
     loadScores();
 
@@ -67,8 +71,10 @@ export function LiveScoreboard() {
       })
       .subscribe();
 
-    return () => { sub.unsubscribe(); };
-  }, [period]);
+    return () => {
+      sub.unsubscribe();
+    };
+  }, [period, authReady]);
 
   const loadScores = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -117,13 +123,14 @@ export function LiveScoreboard() {
       setScores(repScores);
 
       // Build feed from activities — look up rep name from reps list
-      const activities = activitiesRes.data ?? [];
-      const feedItems: FeedItem[] = activities.map((a: any) => {
+      const activities = (activitiesRes.data ?? []) as Activity[];
+      const feedItems: FeedItem[] = activities.map((a) => {
         const rep = reps.find((r) => r.id === a.created_by);
+        const mrr = typeof a.metadata?.mrr === "number" ? a.metadata.mrr : 0;
         return {
           id: a.id,
           text: `${rep?.name ?? "A rep"} closed a deal`,
-          amount: a.metadata?.mrr || 0,
+          amount: mrr,
           time: a.created_at,
         };
       });

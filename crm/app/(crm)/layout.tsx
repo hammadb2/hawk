@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase-server";
+import { createClient, getUser } from "@/lib/supabase-server";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -11,26 +11,22 @@ export default async function CRMLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = createClient();
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
+  const authUser = await getUser();
+  if (!authUser) {
     redirect("/login");
   }
 
-  // Load user profile
+  const supabase = createClient();
+
+  // Load user profile (JWT already validated via getUser)
   const { data: userProfile } = await supabase
     .from("users")
     .select("*, team_lead:team_lead_id(id, name, email, role)")
-    .eq("id", session.user.id)
+    .eq("id", authUser.id)
     .single();
 
   if (!userProfile) {
-    // User authenticated but no profile — might be first time
-    redirect("/onboarding");
+    redirect("/setup-required");
   }
 
   return (

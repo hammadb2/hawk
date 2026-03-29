@@ -226,8 +226,23 @@ export function Sidebar() {
               <p className="text-2xs text-text-dim truncate">{roleShortLabel(user.role)}</p>
             </div>
           )}
-          {!sidebarCollapsed && (
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="p-1 rounded text-text-dim hover:text-red transition-colors"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Sign out</TooltipContent>
+            </Tooltip>
+          ) : (
             <button
+              type="button"
               onClick={handleSignOut}
               className="p-1 rounded text-text-dim hover:text-red transition-colors"
               title="Sign out"

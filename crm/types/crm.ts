@@ -392,6 +392,14 @@ export interface ApiResponse<T> {
   };
 }
 
+/** Audit log row from `auditApi.list` / Supabase `audit_log`. */
+export interface AuditLogEntry {
+  action: string;
+  record_type: string;
+  created_at: string;
+  user?: { name: string } | null;
+}
+
 // ─── Store Types ───────────────────────────────────────────────────────────────
 
 export interface CRMStoreState {

@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from "recharts";
-import { AlertTriangle, Bot, TrendingUp, Activity } from "lucide-react";
+import { AlertTriangle, Bot, TrendingUp, Activity as ActivityIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +14,24 @@ import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuthReady } from "@/components/layout/providers";
 import { charlotteApi } from "@/lib/api";
+import type { Activity, ChurnRisk, ClientStatus } from "@/types/crm";
 
 interface MRRPoint { month: string; gross: number; net: number }
 interface FeedItem { id: string; type: string; text: string; time: string }
 interface ChurnClient { id: string; company: string; mrr: number; nps: number | null; rep: string; risk: string }
 interface CharStats { emails_today?: number; open_rate?: number; reply_rate?: number; hot_leads?: number; closes_attributed?: number }
+
+interface ClientRow {
+  id: string;
+  mrr: number | null;
+  status: ClientStatus;
+  churn_risk_score: ChurnRisk;
+  close_date: string | null;
+  nps_latest: number | null;
+  closing_rep_id: string | null;
+  prospect: { company_name: string } | null;
+  closing_rep: { name: string } | null;
+}
 
 export function CEODashboard() {
   const authReady = useAuthReady();
@@ -44,14 +57,18 @@ export function CEODashboard() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       const [clientsRes, activitiesRes] = await Promise.all([
-        supabase.from("clients").select("id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id"),
+        supabase
+          .from("clients")
+          .select(
+            "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id, prospect:prospect_id(company_name), closing_rep:closing_rep_id(name)"
+          ),
         supabase.from("activities")
           .select("id, type, notes, metadata, created_at, created_by")
           .order("created_at", { ascending: false })
           .limit(8),
       ]);
 
-      const clients = clientsRes.data ?? [];
+      const clients = (clientsRes.data ?? []) as unknown as ClientRow[];
       const activeClients = clients.filter((c) => c.status === "active");
 
       // MRR stats
@@ -70,7 +87,7 @@ export function CEODashboard() {
       clients
         .filter((c) => c.close_date && c.status !== "churned")
         .forEach((c) => {
-          const d = new Date(c.close_date);
+          const d = new Date(c.close_date as string);
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           monthlyMRR[key] = (monthlyMRR[key] || 0) + (c.mrr || 0);
         });
@@ -86,9 +103,9 @@ export function CEODashboard() {
       setMrrHistory(history);
 
       // Activity feed — no nested joins, just raw fields
-      const activities = activitiesRes.data ?? [];
-      const feedItems: FeedItem[] = activities.map((a: any) => {
-        const typeLabel = (a.type as string).replace(/_/g, " ");
+      const activities = (activitiesRes.data ?? []) as Activity[];
+      const feedItems: FeedItem[] = activities.map((a) => {
+        const typeLabel = a.type.replace(/_/g, " ");
         const text = a.notes ? a.notes.slice(0, 80) : typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
         return { id: a.id, type: a.type, text, time: a.created_at };
       });
@@ -99,12 +116,12 @@ export function CEODashboard() {
         .filter((c) => ["high", "critical"].includes(c.churn_risk_score) && c.status === "active")
         .sort((a, b) => (b.mrr || 0) - (a.mrr || 0))
         .slice(0, 5)
-        .map((c: any) => ({
+        .map((c) => ({
           id: c.id,
-          company: `Client ${c.id.slice(0, 6)}`,
+          company: c.prospect?.company_name ?? `Client ${c.id.slice(0, 6)}`,
           mrr: c.mrr || 0,
           nps: c.nps_latest,
-          rep: "—",
+          rep: c.closing_rep?.name ?? "—",
           risk: c.churn_risk_score,
         }));
       setChurnAlerts(churn);
@@ -231,7 +248,7 @@ export function CEODashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue" />
+              <ActivityIcon className="w-4 h-4 text-blue" />
               Live Activity Feed
               <span className="ml-auto flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green realtime-dot" />

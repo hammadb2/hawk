@@ -20,6 +20,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useAuthReady } from "@/components/layout/providers";
 import { commissionsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { formatCurrency, formatDate, downloadCSV, daysUntil, cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const PIE_COLORS = {
 };
 
 export function MyEarnings() {
+  const authReady = useAuthReady();
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(false);
   const [monthYear] = useState(() => {
@@ -42,6 +44,7 @@ export function MyEarnings() {
   });
 
   useEffect(() => {
+    if (!authReady) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -56,7 +59,7 @@ export function MyEarnings() {
       }
     };
     load();
-  }, [monthYear]);
+  }, [authReady, monthYear]);
 
   const totals = calculateMonthlyTotal(commissions);
   const closesThisMonth = commissions.filter((c) => c.type === "closing").length;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, Phone, FileText, Shield, Scan } from "lucide-react";
+import { Search, Bell, Plus, Phone, FileText, Scan, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCRMStore } from "@/store/crm-store";
 import {
@@ -16,6 +16,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { getInitials, roleShortLabel, formatRelativeTime } from "@/lib/utils";
+import { getSupabaseClient } from "@/lib/supabase";
 
 export function TopBar() {
   const router = useRouter();
@@ -24,6 +25,12 @@ export function TopBar() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseClient();
+    await supabase.auth.signOut({ scope: "local" });
+    window.location.href = "/login";
+  };
 
   // Cmd+K shortcut
   useEffect(() => {
@@ -161,18 +168,43 @@ export function TopBar() {
         </DropdownMenu>
 
         {/* User */}
-        <div className="flex items-center gap-2 ml-1 pl-2 border-l border-border">
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-xs font-medium text-text-primary leading-none">{user.name}</span>
-            <span className="text-2xs text-text-dim">{roleShortLabel(user.role)}</span>
-          </div>
-          <div className="relative">
-            <Avatar className="w-7 h-7">
-              <AvatarFallback className="text-xs">{getInitials(user.name)}</AvatarFallback>
-            </Avatar>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green border border-surface-1" />
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-2 ml-1 pl-2 border-l border-border rounded-lg pr-1 py-0.5 hover:bg-surface-2/80 transition-colors"
+            >
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-xs font-medium text-text-primary leading-none">{user.name}</span>
+                <span className="text-2xs text-text-dim">{roleShortLabel(user.role)}</span>
+              </div>
+              <div className="relative">
+                <Avatar className="w-7 h-7">
+                  <AvatarFallback className="text-xs">{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green border border-surface-1" />
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-0.5">
+                <span className="text-sm font-medium">{user.name}</span>
+                <span className="text-2xs text-text-dim">{roleShortLabel(user.role)}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                void handleSignOut();
+              }}
+              className="text-red focus:text-red gap-2"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
