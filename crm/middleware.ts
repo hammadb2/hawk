@@ -1,6 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/** Routes limited by CRM role (prefix match). Keeps deep links aligned with sidebar access. */
+const ROLE_GUARDED_ROUTES: { prefix: string; roles: readonly string[] }[] = [
+  { prefix: "/settings", roles: ["ceo"] },
+  { prefix: "/tickets", roles: ["ceo", "hos"] },
+  { prefix: "/charlotte", roles: ["ceo", "hos"] },
+  { prefix: "/team", roles: ["ceo", "hos"] },
+];
+
+function pathnameMatchesRoute(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -37,9 +49,10 @@ export async function middleware(request: NextRequest) {
 
   // Public routes that don't require auth
   const publicRoutes = ["/login", "/auth/callback"];
-  const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+
+  const profileExemptPrefixes = ["/setup-required", "/onboarding"];
+  const isProfileExempt = profileExemptPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   if (!user && !isPublicRoute) {
     const loginUrl = request.nextUrl.clone();
@@ -52,6 +65,23 @@ export async function middleware(request: NextRequest) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  if (user && !isPublicRoute && !isProfileExempt) {
+    const rule = ROLE_GUARDED_ROUTES.find((r) => pathnameMatchesRoute(pathname, r.prefix));
+    if (rule) {
+      const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+      if (!profile?.role) {
+        const setupUrl = request.nextUrl.clone();
+        setupUrl.pathname = "/setup-required";
+        return NextResponse.redirect(setupUrl);
+      }
+      if (!rule.roles.includes(profile.role)) {
+        const dash = request.nextUrl.clone();
+        dash.pathname = "/dashboard";
+        return NextResponse.redirect(dash);
+      }
+    }
   }
 
   return supabaseResponse;
