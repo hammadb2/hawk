@@ -40,6 +40,9 @@ const INTEGRATIONS = [
   { id: "loom", label: "Loom", description: "Video messaging", connected: false },
 ];
 
+const CRM_API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://api.hawk.akbstudios.com").replace(/\/$/, "");
+const SMARTLEAD_WEBHOOK_URL = `${CRM_API_BASE}/api/crm/webhooks/smartlead`;
+
 export default function SettingsPage() {
   const [confirmText, setConfirmText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -331,6 +334,27 @@ export default function SettingsPage() {
                       <span className="text-sm text-text-secondary">{rule}</span>
                     </label>
                   ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface-2 p-3 space-y-2">
+                <p className="text-xs font-medium text-text-secondary">Smartlead webhook URL</p>
+                <p className="text-2xs text-text-dim">
+                  Configure this endpoint in Smartlead. It must reach your FastAPI server (not Vercel).
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="flex-1 min-w-0 text-2xs text-text-secondary break-all">{SMARTLEAD_WEBHOOK_URL}</code>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="text-xs shrink-0"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(SMARTLEAD_WEBHOOK_URL);
+                      toast({ title: "Webhook URL copied", variant: "success" });
+                    }}
+                  >
+                    Copy
+                  </Button>
                 </div>
               </div>
               <Button onClick={() => handleSave("Charlotte")} disabled={saving}>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bot, Mail, Globe } from "lucide-react";
+import { Bot, Mail, Globe, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,6 +12,8 @@ import { charlotteApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { CharlotteStats, SendingDomain, SequencePerformance } from "@/types/crm";
+
+const SMARTLEAD_WEBHOOK_URL = `${(process.env.NEXT_PUBLIC_API_URL || "https://api.hawk.akbstudios.com").replace(/\/$/, "")}/api/crm/webhooks/smartlead`;
 
 export function CharlotteModule() {
   const [stats, setStats] = useState<CharlotteStats | null>(null);
@@ -232,6 +235,38 @@ export function CharlotteModule() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Link2 className="w-4 h-4 text-text-dim" />
+            Smartlead webhook (Phase 2)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-text-dim">
+            Point Smartlead webhooks at this URL on your Ghost / FastAPI host. Events create prospects and update the
+            timeline.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="flex-1 min-w-0 text-2xs text-text-secondary bg-surface-2 border border-border rounded-lg px-2 py-1.5 break-all">
+              {SMARTLEAD_WEBHOOK_URL}
+            </code>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="text-xs shrink-0"
+              onClick={() => {
+                void navigator.clipboard.writeText(SMARTLEAD_WEBHOOK_URL);
+                toast({ title: "Webhook URL copied", variant: "success" });
+              }}
+            >
+              Copy
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

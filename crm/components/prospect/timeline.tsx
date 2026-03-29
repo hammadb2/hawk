@@ -18,8 +18,9 @@ import { cn, formatDateTime, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { Activity, ActivityType } from "@/types/crm";
+import type { Activity, ActivityType, EmailEvent, ReplySentiment } from "@/types/crm";
 
 const ACTIVITY_CONFIG: Record<
   ActivityType,
@@ -38,12 +39,28 @@ const ACTIVITY_CONFIG: Record<
   close_won: { icon: TrendingUp, color: "text-green", bg: "bg-green/10", label: "Closed Won" },
 };
 
+function emailEventLabel(t: string): string {
+  return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const SENTIMENT_BADGE: Record<ReplySentiment, string> = {
+  positive: "bg-green/15 text-green border-green/30",
+  negative: "bg-red/15 text-red border-red/30",
+  question: "bg-blue/15 text-blue border-blue/30",
+  ooo: "bg-yellow/15 text-yellow border-yellow/30",
+};
+
+type MergedRow =
+  | { kind: "activity"; id: string; at: string; activity: Activity }
+  | { kind: "email"; id: string; at: string; email: EmailEvent };
+
 interface TimelineProps {
   prospectId: string;
 }
 
+/** Master spec §02 — unified timeline: rep activities + Charlotte email_events (merged, newest first). */
 export function Timeline({ prospectId }: TimelineProps) {
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [rows, setRows] = useState<MergedRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -51,24 +68,49 @@ export function Timeline({ prospectId }: TimelineProps) {
       setLoading(true);
       try {
         const supabase = getSupabaseClient();
-        const { data } = await supabase
-          .from("activities")
-          .select("id, type, notes, metadata, created_at, created_by, prospect_id")
-          .eq("prospect_id", prospectId)
-          .order("created_at", { ascending: false })
-          .limit(50);
+        const [actRes, mailRes] = await Promise.all([
+          supabase
+            .from("activities")
+            .select("id, type, notes, metadata, created_at, created_by, prospect_id")
+            .eq("prospect_id", prospectId)
+            .order("created_at", { ascending: false })
+            .limit(80),
+          supabase
+            .from("email_events")
+            .select("*")
+            .eq("prospect_id", prospectId)
+            .order("created_at", { ascending: false })
+            .limit(80),
+        ]);
 
-        if (data) {
-          setActivities(data as Activity[]);
-        }
+        const activities = (actRes.data as Activity[]) ?? [];
+        const emails = (mailRes.data as EmailEvent[]) ?? [];
+
+        const merged: MergedRow[] = [
+          ...activities.map((a) => ({
+            kind: "activity" as const,
+            id: `a-${a.id}`,
+            at: a.created_at,
+            activity: a,
+          })),
+          ...emails.map((e) => ({
+            kind: "email" as const,
+            id: `e-${e.id}`,
+            at: e.sent_at || e.replied_at || e.created_at,
+            email: e,
+          })),
+        ];
+
+        merged.sort((x, y) => new Date(y.at).getTime() - new Date(x.at).getTime());
+        setRows(merged.slice(0, 100));
       } catch {
-        // fail silently
+        setRows([]);
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    void load();
   }, [prospectId]);
 
   if (loading) {
@@ -79,26 +121,79 @@ export function Timeline({ prospectId }: TimelineProps) {
     );
   }
 
-  if (activities.length === 0) {
+  if (rows.length === 0) {
     return (
       <EmptyState
         icon={Phone}
         title="No activity yet"
-        description="Log a call, add a note, or run a scan to get started."
+        description="Charlotte emails, calls, notes, and scans will appear here in one timeline."
       />
     );
   }
 
   return (
     <div className="space-y-1 py-2">
-      {activities.map((activity, i) => {
+      {rows.map((row, i) => {
+        const isLast = i === rows.length - 1;
+
+        if (row.kind === "email") {
+          const e = row.email;
+          return (
+            <div key={row.id} className="flex gap-3 group">
+              <div className="flex flex-col items-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-accent/10 border border-accent/25">
+                  <Mail className="w-3.5 h-3.5 text-accent-light" />
+                </div>
+                {!isLast && <div className="w-px flex-1 bg-border mt-1 min-h-[16px]" />}
+              </div>
+              <div className={cn("flex-1 pb-4", isLast && "pb-0")}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-accent-light">Charlotte</span>
+                    <span className="text-2xs text-text-dim">·</span>
+                    <span className="text-xs text-text-secondary">{emailEventLabel(e.smartlead_event_type)}</span>
+                    {e.reply_sentiment && (
+                      <Badge
+                        variant="secondary"
+                        className={cn("text-2xs capitalize border", SENTIMENT_BADGE[e.reply_sentiment])}
+                      >
+                        {e.reply_sentiment}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-2xs text-text-dim flex-shrink-0">{formatDateTime(row.at)}</span>
+                </div>
+                {e.subject && (
+                  <p className="text-xs text-text-secondary mt-1 leading-relaxed">{e.subject}</p>
+                )}
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {e.sequence_step != null && (
+                    <span className="text-2xs text-text-dim bg-surface-3 rounded px-1.5 py-0.5">
+                      Step {e.sequence_step}
+                    </span>
+                  )}
+                  {e.open_count > 0 && (
+                    <span className="text-2xs text-text-dim bg-surface-3 rounded px-1.5 py-0.5">
+                      {e.open_count} open{e.open_count !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {e.click_count > 0 && (
+                    <span className="text-2xs text-text-dim bg-surface-3 rounded px-1.5 py-0.5">
+                      {e.click_count} click{e.click_count !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const activity = row.activity;
         const config = ACTIVITY_CONFIG[activity.type] ?? ACTIVITY_CONFIG.note_added;
         const Icon = config.icon;
-        const isLast = i === activities.length - 1;
 
         return (
-          <div key={activity.id} className="flex gap-3 group">
-            {/* Timeline line */}
+          <div key={row.id} className="flex gap-3 group">
             <div className="flex flex-col items-center flex-shrink-0">
               <div className={cn("w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0", config.bg)}>
                 <Icon className={cn("w-3.5 h-3.5", config.color)} />
@@ -106,7 +201,6 @@ export function Timeline({ prospectId }: TimelineProps) {
               {!isLast && <div className="w-px flex-1 bg-border mt-1 min-h-[16px]" />}
             </div>
 
-            {/* Content */}
             <div className={cn("flex-1 pb-4", isLast && "pb-0")}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
