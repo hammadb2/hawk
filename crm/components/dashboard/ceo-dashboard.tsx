@@ -12,8 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, formatRelativeTime, cn, withTimeout } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useAuthReady } from "@/components/layout/providers";
 import { charlotteApi } from "@/lib/api";
+import { toast } from "@/components/ui/toast";
 import type { Activity, ChurnRisk, ClientStatus } from "@/types/crm";
 
 interface MRRPoint { month: string; gross: number; net: number }
@@ -34,8 +34,7 @@ interface ClientRow {
 }
 
 export function CEODashboard() {
-  const authReady = useAuthReady();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"3M" | "6M" | "12M" | "All">("6M");
   const [mrrHistory, setMrrHistory] = useState<MRRPoint[]>([]);
   const [stats, setStats] = useState({ currentMRR: 0, mrrAdded: 0, mrrAtRisk: 0, activeClients: 0 });
@@ -44,34 +43,40 @@ export function CEODashboard() {
   const [charlotteStats, setCharlotteStats] = useState<CharStats>({});
 
   useEffect(() => {
-    if (!authReady) return;
-    load();
-  }, [authReady]);
+    let cancelled = false;
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const supabase = getSupabaseClient();
+    const load = async () => {
+      try {
+        const supabase = getSupabaseClient();
 
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [clientsRes, activitiesRes] = await withTimeout(
-        Promise.all([
-          supabase
-            .from("clients")
-            .select(
-              "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id, prospect:prospect_id(company_name), closing_rep:closing_rep_id(name)"
-            ),
-          supabase
-            .from("activities")
-            .select("id, type, notes, metadata, created_at, created_by")
-            .order("created_at", { ascending: false })
-            .limit(8),
-        ]),
-        25_000,
-        "CEO dashboard"
-      );
+        const [clientsRes, activitiesRes] = await withTimeout(
+          Promise.all([
+            supabase
+              .from("clients")
+              .select(
+                "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id, prospect:prospect_id(company_name), closing_rep:closing_rep_id(name)"
+              ),
+            supabase
+              .from("activities")
+              .select("id, type, notes, metadata, created_at, created_by")
+              .order("created_at", { ascending: false })
+              .limit(8),
+          ]),
+          25_000,
+          "CEO dashboard"
+        );
+
+        if (clientsRes.error) {
+          throw new Error(clientsRes.error.message);
+        }
+        if (activitiesRes.error) {
+          throw new Error(activitiesRes.error.message);
+        }
+
+        if (cancelled) return;
 
       const clients = (clientsRes.data ?? []) as unknown as ClientRow[];
       const activeClients = clients.filter((c) => c.status === "active");
@@ -133,16 +138,29 @@ export function CEODashboard() {
 
       // Charlotte stats — fetch separately so it never blocks the main load
       charlotteApi.stats().then((charRes) => {
+        if (cancelled) return;
         if (charRes.success && charRes.data) {
           setCharlotteStats(charRes.data as CharStats);
         }
       }).catch(() => {});
-    } catch {
-      // fail silently — show empty state
+    } catch (e) {
+      if (!cancelled) {
+        toast({
+          title: "Could not load dashboard",
+          description: e instanceof Error ? e.message : "Check Supabase env vars and network.",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
-  };
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredHistory = (() => {
     const n = timeRange === "3M" ? 3 : timeRange === "6M" ? 6 : timeRange === "12M" ? 12 : undefined;

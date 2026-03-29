@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useAuthReady } from "@/components/layout/providers";
 import { useCRMStore } from "@/store/crm-store";
 import { clientsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
@@ -29,7 +28,6 @@ const PLAN_LABELS: Record<ClientPlan, string> = {
 };
 
 export default function ClientsPage() {
-  const authReady = useAuthReady();
   const router = useRouter();
   const { clients, setClients } = useCRMStore();
   const [loading, setLoading] = useState(false);
@@ -43,7 +41,6 @@ export default function ClientsPage() {
   );
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       const hasData = useCRMStore.getState().clients.length > 0;
       if (!hasData) setLoading(true);
@@ -60,8 +57,8 @@ export default function ClientsPage() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady, setClients]);
+    void load();
+  }, [setClients]);
 
   const filtered = useMemo(() => {
     return clients.filter((c) => {
