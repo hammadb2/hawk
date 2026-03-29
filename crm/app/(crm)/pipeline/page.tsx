@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { LayoutGrid, List, Table2, Filter, X } from "lucide-react";
+import { LayoutGrid, List, Table2, Filter, X, AlertTriangle } from "lucide-react";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { PipelineListView } from "@/components/pipeline/pipeline-list-view";
 import { PipelineTableView } from "@/components/pipeline/pipeline-table-view";
@@ -136,6 +136,25 @@ export default function PipelinePage() {
     (v) => v !== undefined && v !== "" && v !== null
   ).length;
 
+  /** Master spec §01 — bottleneck when a stage holds ≥3× the count of the next stage. */
+  const bottleneck = useMemo(() => {
+    const order = PIPELINE_STAGES.filter((s) => s !== "lost");
+    const counts: Record<string, number> = {};
+    for (const s of order) {
+      counts[s] = prospects.filter((p) => p.stage === s).length;
+    }
+    for (let i = 0; i < order.length - 1; i++) {
+      const a = order[i];
+      const b = order[i + 1];
+      const na = counts[a];
+      const nb = counts[b];
+      if (nb > 0 && na >= 3 * nb) {
+        return { stage: a, count: na, nextStage: b, nextCount: nb };
+      }
+    }
+    return null;
+  }, [prospects]);
+
   const applyFilters = () => {
     setPipelineFilters(draftFilters);
     setFiltersOpen(false);
@@ -211,6 +230,23 @@ export default function PipelinePage() {
           + Add Prospect
         </Button>
       </div>
+
+      {bottleneck && (
+        <button
+          type="button"
+          onClick={() =>
+            setPipelineFilters({ ...pipelineFilters, stage: bottleneck.stage as PipelineStage })
+          }
+          className="mx-4 mt-2 mb-1 flex items-center gap-2 rounded-lg border border-yellow/40 bg-yellow/10 px-3 py-2 text-left text-xs text-yellow-200 hover:bg-yellow/15 transition-colors"
+        >
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-yellow" />
+          <span>
+            Bottleneck at <strong>{stageLabel(bottleneck.stage as PipelineStage)}</strong> —{" "}
+            {bottleneck.count} prospects stalled (3× the next stage, {stageLabel(bottleneck.nextStage as PipelineStage)}: {bottleneck.nextCount}).{" "}
+            <span className="text-yellow/80 underline-offset-2">Filter to this stage</span>
+          </span>
+        </button>
+      )}
 
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent className="max-w-md">

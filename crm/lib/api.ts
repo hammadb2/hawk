@@ -502,12 +502,21 @@ export const ticketsApi = {
       ? `${data.raw_text}\n\nWhat I was trying to do: ${data.what_were_you_doing}`
       : data.raw_text;
 
+    const supabase = getSupabaseClient();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) {
+      return { success: false, data: null, error: "Not authenticated" };
+    }
+
     const { data: result, error } = await sb()
       .from("tickets")
       .insert({
         raw_text: combined,
         channel: "in_crm",
         status: "received",
+        submitted_by: authUser.id,
       })
       .select()
       .single();

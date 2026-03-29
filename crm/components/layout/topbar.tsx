@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, Phone, FileText, Scan, LogOut } from "lucide-react";
+import { Search, Bell, Plus, Phone, FileText, Scan, LogOut, LifeBuoy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCRMStore } from "@/store/crm-store";
 import {
@@ -17,11 +17,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { getInitials, roleShortLabel, formatRelativeTime } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
+import { SubmitTicketModal } from "@/components/tickets/submit-ticket-modal";
 
 export function TopBar() {
   const router = useRouter();
   const { user, notifications, markRead, markAllRead, globalSearch, setGlobalSearch } = useCRMStore();
   const [searchFocused, setSearchFocused] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -52,6 +54,7 @@ export function TopBar() {
 
   return (
     <header className="h-14 flex items-center gap-3 px-4 border-b border-border bg-surface-1 flex-shrink-0">
+      <SubmitTicketModal open={reportOpen} onClose={() => setReportOpen(false)} />
       {/* Search */}
       <div className={cn(
         "flex items-center gap-2 rounded-lg border transition-all flex-1 max-w-md px-3 h-8",
@@ -104,8 +107,25 @@ export function TopBar() {
               <Scan className="w-3.5 h-3.5" />
               Run Scan
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setReportOpen(true)}
+              className="text-text-secondary"
+            >
+              <LifeBuoy className="w-3.5 h-3.5" />
+              Report issue
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <button
+          type="button"
+          onClick={() => setReportOpen(true)}
+          className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg text-text-dim hover:text-text-primary hover:bg-surface-2 transition-all border border-transparent hover:border-border"
+          title="Report issue — HAWK Support"
+        >
+          <LifeBuoy className="w-4 h-4" />
+        </button>
 
         {/* Notifications */}
         <DropdownMenu>
@@ -174,9 +194,13 @@ export function TopBar() {
               type="button"
               className="flex items-center gap-2 ml-1 pl-2 border-l border-border rounded-lg pr-1 py-0.5 hover:bg-surface-2/80 transition-colors"
             >
-              <div className="hidden sm:flex flex-col items-end">
+              <div className="hidden sm:flex flex-col items-end gap-0.5">
                 <span className="text-xs font-medium text-text-primary leading-none">{user.name}</span>
-                <span className="text-2xs text-text-dim">{roleShortLabel(user.role)}</span>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-2xs px-1.5 py-0 h-4 font-medium capitalize">
+                    {roleShortLabel(user.role)}
+                  </Badge>
+                </div>
               </div>
               <div className="relative">
                 <Avatar className="w-7 h-7">
