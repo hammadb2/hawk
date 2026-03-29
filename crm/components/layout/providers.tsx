@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useCRMStore } from "@/store/crm-store";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import type { CRMUser } from "@/types/crm";
 
 const AuthReadyContext = createContext(false);
@@ -17,9 +18,11 @@ interface ProvidersProps {
 
 export function Providers({ children, initialUser }: ProvidersProps) {
   const setUser = useCRMStore((s) => s.setUser);
-  const [authReady, setAuthReady] = useState(false);
+  // Server layout already ran getUser() + loaded profile — safe to render immediately.
+  // Waiting on client getSession() alone caused hard-refresh hangs (spinner forever, no shell/sign-out).
+  const [authReady, setAuthReady] = useState(() => Boolean(initialUser));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (initialUser) {
       setUser(initialUser);
     }
@@ -30,20 +33,25 @@ export function Providers({ children, initialUser }: ProvidersProps) {
     let cancelled = false;
     const AUTH_SESSION_TIMEOUT_MS = 5000;
 
-    // getSession() resolves once Supabase has restored the session from
-    // cookies. If the network stalls, still unblock the shell after a cap.
+    // For routes without initialUser (future use): unblock after timeout or when session resolves.
     const timeoutId = window.setTimeout(() => {
       if (!cancelled) setAuthReady(true);
     }, AUTH_SESSION_TIMEOUT_MS);
 
-    supabase.auth.getSession().then(() => {
-      window.clearTimeout(timeoutId);
-      if (!cancelled) setAuthReady(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(() => {
+        window.clearTimeout(timeoutId);
+        if (!cancelled) setAuthReady(true);
+      })
+      .catch(() => {
+        window.clearTimeout(timeoutId);
+        if (!cancelled) setAuthReady(true);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setAuthReady(true);
+        if (!cancelled) setAuthReady(true);
 
         if (event === "SIGNED_OUT") {
           setUser(null);
@@ -74,12 +82,30 @@ export function Providers({ children, initialUser }: ProvidersProps) {
     };
   }, [setUser]);
 
-  // Don't render anything until auth state is known — prevents data-fetching
-  // components from firing unauthenticated queries on page reload.
+  const handleEmergencySignOut = async () => {
+    const supabase = getSupabaseClient();
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      // still leave the app
+    }
+    window.location.href = "/login";
+  };
+
+  // Without initialUser, wait until client session is known (or timeout).
   if (!authReady) {
     return (
-      <div className="flex items-center justify-center h-screen" style={{ background: "#07060C" }}>
+      <div
+        className="flex flex-col items-center justify-center gap-6 h-screen px-4"
+        style={{ background: "#07060C" }}
+      >
         <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+        <p className="text-xs text-text-dim text-center max-w-xs">
+          If this takes too long, you can sign out and try again.
+        </p>
+        <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={() => void handleEmergencySignOut()}>
+          Sign out
+        </Button>
       </div>
     );
   }
