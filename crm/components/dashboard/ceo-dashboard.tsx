@@ -1,23 +1,48 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
 } from "recharts";
-import { AlertTriangle, Bot, TrendingUp, Activity as ActivityIcon } from "lucide-react";
+import { AlertTriangle, Bot, TrendingUp, Activity as ActivityIcon, Filter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { formatCurrency, formatRelativeTime, cn, withTimeout } from "@/lib/utils";
+import { formatCurrency, formatRelativeTime, cn, withTimeout, stageLabel } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
 import { charlotteApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
-import type { Activity, ChurnRisk, ClientStatus } from "@/types/crm";
+import type { Activity, ChurnRisk, ClientStatus, PipelineStage } from "@/types/crm";
+
+const OPEN_PIPELINE_STAGES: PipelineStage[] = [
+  "new",
+  "scanned",
+  "loom_sent",
+  "replied",
+  "call_booked",
+  "proposal_sent",
+];
 
 interface MRRPoint { month: string; gross: number; net: number }
 interface FeedItem { id: string; type: string; text: string; time: string }
+
+function activityToFeedItem(a: Activity): FeedItem {
+  const typeLabel = a.type.replace(/_/g, " ");
+  const text = a.notes ? a.notes.slice(0, 80) : typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+  return { id: a.id, type: a.type, text, time: a.created_at };
+}
 interface ChurnClient { id: string; company: string; mrr: number; nps: number | null; rep: string; risk: string }
 interface CharStats { emails_today?: number; open_rate?: number; reply_rate?: number; hot_leads?: number; closes_attributed?: number }
 
@@ -41,6 +66,7 @@ export function CEODashboard() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [churnAlerts, setChurnAlerts] = useState<ChurnClient[]>([]);
   const [charlotteStats, setCharlotteStats] = useState<CharStats>({});
+  const [funnelRows, setFunnelRows] = useState<{ stage: string; count: number; key: PipelineStage }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +78,7 @@ export function CEODashboard() {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-        const [clientsRes, activitiesRes] = await withTimeout(
+        const [clientsRes, activitiesRes, prospectsRes] = await withTimeout(
           Promise.all([
             supabase
               .from("clients")
@@ -64,6 +90,7 @@ export function CEODashboard() {
               .select("id, type, notes, metadata, created_at, created_by")
               .order("created_at", { ascending: false })
               .limit(8),
+            supabase.from("prospects").select("stage"),
           ]),
           25_000,
           "CEO dashboard"
@@ -77,6 +104,24 @@ export function CEODashboard() {
         }
 
         if (cancelled) return;
+
+        const prospectStages = (prospectsRes.error ? [] : prospectsRes.data ?? []) as { stage: PipelineStage }[];
+        const byStage: Partial<Record<PipelineStage, number>> = {};
+        OPEN_PIPELINE_STAGES.forEach((s) => {
+          byStage[s] = 0;
+        });
+        prospectStages.forEach((p) => {
+          if (OPEN_PIPELINE_STAGES.includes(p.stage)) {
+            byStage[p.stage] = (byStage[p.stage] || 0) + 1;
+          }
+        });
+        setFunnelRows(
+          OPEN_PIPELINE_STAGES.map((s) => ({
+            key: s,
+            stage: stageLabel(s),
+            count: byStage[s] ?? 0,
+          }))
+        );
 
       const clients = (clientsRes.data ?? []) as unknown as ClientRow[];
       const activeClients = clients.filter((c) => c.status === "active");
@@ -114,11 +159,7 @@ export function CEODashboard() {
 
       // Activity feed — no nested joins, just raw fields
       const activities = (activitiesRes.data ?? []) as Activity[];
-      const feedItems: FeedItem[] = activities.map((a) => {
-        const typeLabel = a.type.replace(/_/g, " ");
-        const text = a.notes ? a.notes.slice(0, 80) : typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
-        return { id: a.id, type: a.type, text, time: a.created_at };
-      });
+      const feedItems: FeedItem[] = activities.map(activityToFeedItem);
       setFeed(feedItems);
 
       // Churn alerts
@@ -162,6 +203,33 @@ export function CEODashboard() {
     };
   }, []);
 
+  const mergeFeedItem = useCallback((a: Activity) => {
+    setFeed((prev) => {
+      const item = activityToFeedItem(a);
+      if (prev.some((p) => p.id === item.id)) return prev;
+      return [item, ...prev].slice(0, 8);
+    });
+  }, []);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    const channel = supabase.channel(`ceo-activity-${Math.random().toString(36).slice(2)}`);
+    channel.on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "activities" },
+      (payload) => {
+        const row = payload.new as Activity;
+        if (row?.id && row.type) {
+          mergeFeedItem(row);
+        }
+      }
+    );
+    channel.subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [mergeFeedItem]);
+
   const filteredHistory = (() => {
     const n = timeRange === "3M" ? 3 : timeRange === "6M" ? 6 : timeRange === "12M" ? 12 : undefined;
     return n ? mrrHistory.slice(-n) : mrrHistory;
@@ -189,6 +257,43 @@ export function CEODashboard() {
         <StatCard label="MRR at Risk" value={formatCurrency(stats.mrrAtRisk)} subValue="High churn" />
         <StatCard label="Active Clients" value={String(stats.activeClients)} />
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-accent-light" />
+            Pipeline funnel
+          </CardTitle>
+          <Button variant="secondary" size="sm" asChild>
+            <Link href="/pipeline">Open pipeline</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {funnelRows.every((r) => r.count === 0) ? (
+            <p className="text-sm text-text-dim text-center py-8">No open pipeline stages yet — add prospects to see volume by stage.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart layout="vertical" data={funnelRows} margin={{ left: 4, right: 16, top: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1F1C2E" horizontal={false} />
+                <XAxis type="number" tick={{ fill: "#5C5876", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis
+                  type="category"
+                  dataKey="stage"
+                  width={100}
+                  tick={{ fill: "#9B98B4", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{ background: "#0D0B14", border: "1px solid #1F1C2E", borderRadius: 8 }}
+                  formatter={(v: number) => [String(v), "Prospects"]}
+                />
+                <Bar dataKey="count" fill="#7B5CF5" radius={[0, 6, 6, 0]} name="Open deals" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">

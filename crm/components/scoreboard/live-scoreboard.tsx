@@ -63,8 +63,14 @@ export function LiveScoreboard() {
 
     const sub = supabaseRef.current
       .channel(channelId.current)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "commissions" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "commissions" }, () => {
         loadScores(true);
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "activities" }, (payload) => {
+        const row = payload.new as { type?: string };
+        if (row?.type === "close_won") {
+          loadScores(true);
+        }
       })
       .subscribe();
 
