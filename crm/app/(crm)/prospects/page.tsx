@@ -18,7 +18,7 @@ import { stageLabel, stageBgColor, formatRelativeTime, getInitials, daysSince, c
 import type { Prospect } from "@/types/crm";
 
 export default function ProspectsPage() {
-  const { prospects, setProspects, setSelectedProspect, setDrawerOpen } = useCRMStore();
+  const { prospects, setProspects, setSelectedProspect, setDrawerOpen, globalSearch } = useCRMStore();
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [hotOnly, setHotOnly] = useState(false);
@@ -54,17 +54,17 @@ export default function ProspectsPage() {
   }, [setProspects]);
 
   const filtered = useMemo(() => {
+    const q = (search.trim() || globalSearch.trim()).toLowerCase();
     return prospects.filter((p) => {
       if (hotOnly && !p.is_hot) return false;
-      if (search) {
-        const q = search.toLowerCase();
+      if (q) {
         if (!p.company_name.toLowerCase().includes(q) && !p.domain.toLowerCase().includes(q)) {
           return false;
         }
       }
       return true;
     });
-  }, [prospects, search, hotOnly]);
+  }, [prospects, search, globalSearch, hotOnly]);
 
   const openProspect = (p: Prospect) => {
     setSelectedProspect(p);

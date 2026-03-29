@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { LayoutGrid, List, Table2, Filter, X, AlertTriangle } from "lucide-react";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
+import { PipelineBulkActions } from "@/components/pipeline/pipeline-bulk-actions";
 import { PipelineListView } from "@/components/pipeline/pipeline-list-view";
 import { PipelineTableView } from "@/components/pipeline/pipeline-table-view";
 import { ProspectDrawer } from "@/components/prospect/profile-drawer";
@@ -26,9 +27,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCRMStore } from "@/store/crm-store";
-import { prospectsApi } from "@/lib/api";
+import { prospectsApi, usersApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { cn, stageLabel } from "@/lib/utils";
+import { canReassignProspect } from "@/lib/auth";
 import type { PipelineStage, ProspectSource } from "@/types/crm";
 
 const ANY = "__any__";
@@ -55,6 +57,9 @@ export default function PipelinePage() {
     pipelineFilters,
     setPipelineFilters,
     clearPipelineFilters,
+    globalSearch,
+    user,
+    updateProspect,
   } = useCRMStore();
 
   const [loading, setLoading] = useState(false);
@@ -62,6 +67,36 @@ export default function PipelinePage() {
   const [addOpen, setAddOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState(pipelineFilters);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [reassignOptions, setReassignOptions] = useState<{ id: string; name: string }[]>([]);
+
+  const toggleBulkSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const refreshProspects = async () => {
+    const result = await prospectsApi.list();
+    if (result.success && result.data) setProspects(result.data);
+  };
+
+  useEffect(() => {
+    if (!user || !canReassignProspect(user)) return;
+    void usersApi.list().then((r) => {
+      if (r.success && r.data) {
+        setReassignOptions(
+          r.data
+            .filter((u) => u.role === "rep" || u.role === "team_lead")
+            .map((u) => ({ id: u.id, name: u.name }))
+        );
+      }
+    });
+  }, [user]);
 
   useEffect(() => {
     if (filtersOpen) setDraftFilters(pipelineFilters);
@@ -88,9 +123,9 @@ export default function PipelinePage() {
   }, [setProspects]);
 
   const filteredProspects = useMemo(() => {
+    const q = (search.trim() || globalSearch.trim()).toLowerCase();
     return prospects.filter((p) => {
-      if (search) {
-        const q = search.toLowerCase();
+      if (q) {
         if (!p.company_name.toLowerCase().includes(q) && !p.domain.toLowerCase().includes(q)) {
           return false;
         }
@@ -104,7 +139,7 @@ export default function PipelinePage() {
       if (pipelineFilters.scoreMax !== undefined && (p.hawk_score ?? 100) > pipelineFilters.scoreMax) return false;
       return true;
     });
-  }, [prospects, search, pipelineFilters]);
+  }, [prospects, search, globalSearch, pipelineFilters]);
 
   const industries = useMemo(() => {
     const s = new Set<string>();
@@ -230,6 +265,21 @@ export default function PipelinePage() {
           + Add Prospect
         </Button>
       </div>
+
+      <PipelineBulkActions
+        bulkMode={bulkMode}
+        onBulkModeChange={(v) => {
+          setBulkMode(v);
+          if (!v) setSelectedIds(new Set());
+        }}
+        selectedIds={selectedIds}
+        onClearSelection={() => setSelectedIds(new Set())}
+        selectedProspects={filteredProspects.filter((p) => selectedIds.has(p.id))}
+        reassignOptions={reassignOptions}
+        canReassign={!!user && canReassignProspect(user)}
+        onProspectsUpdated={() => void refreshProspects()}
+        updateProspect={updateProspect}
+      />
 
       {bottleneck && (
         <button
@@ -491,15 +541,30 @@ export default function PipelinePage() {
       <div className="flex-1 min-h-0 overflow-hidden">
         {pipelineView === "kanban" ? (
           <div className="h-full overflow-hidden pt-4">
-            <KanbanBoard prospects={filteredProspects} />
+            <KanbanBoard
+              prospects={filteredProspects}
+              bulkMode={bulkMode}
+              selectedIds={selectedIds}
+              onToggleBulkSelect={toggleBulkSelect}
+            />
           </div>
         ) : pipelineView === "table" ? (
           <div className="h-full overflow-y-auto pt-4">
-            <PipelineTableView prospects={filteredProspects} />
+            <PipelineTableView
+              prospects={filteredProspects}
+              bulkMode={bulkMode}
+              selectedIds={selectedIds}
+              onToggleBulkSelect={toggleBulkSelect}
+            />
           </div>
         ) : (
           <div className="h-full overflow-y-auto pt-4">
-            <PipelineListView prospects={filteredProspects} />
+            <PipelineListView
+              prospects={filteredProspects}
+              bulkMode={bulkMode}
+              selectedIds={selectedIds}
+              onToggleBulkSelect={toggleBulkSelect}
+            />
           </div>
         )}
       </div>

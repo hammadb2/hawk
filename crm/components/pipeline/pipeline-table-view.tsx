@@ -5,16 +5,25 @@ import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCRMStore } from "@/store/crm-store";
 import { Building2 } from "lucide-react";
 import type { Prospect } from "@/types/crm";
 
 interface PipelineTableViewProps {
   prospects: Prospect[];
+  bulkMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleBulkSelect?: (id: string) => void;
 }
 
 /** Dense data table for pipeline “Table” view (distinct from list layout). */
-export function PipelineTableView({ prospects }: PipelineTableViewProps) {
+export function PipelineTableView({
+  prospects,
+  bulkMode,
+  selectedIds,
+  onToggleBulkSelect,
+}: PipelineTableViewProps) {
   const { setSelectedProspect, setDrawerOpen } = useCRMStore();
 
   if (prospects.length === 0) {
@@ -34,6 +43,9 @@ export function PipelineTableView({ prospects }: PipelineTableViewProps) {
         <table className="w-full min-w-[720px]">
           <thead>
             <tr className="border-b border-border bg-surface-2">
+              {bulkMode && (
+                <th className="w-10 px-2 py-3 text-center text-xs font-medium text-text-dim"> </th>
+              )}
               <th className="text-left text-xs font-medium text-text-dim px-4 py-3">Company</th>
               <th className="text-left text-xs font-medium text-text-dim px-4 py-3">Domain</th>
               <th className="text-left text-xs font-medium text-text-dim px-4 py-3">Industry</th>
@@ -50,14 +62,32 @@ export function PipelineTableView({ prospects }: PipelineTableViewProps) {
               <tr
                 key={prospect.id}
                 onClick={() => {
+                  if (bulkMode) {
+                    onToggleBulkSelect?.(prospect.id);
+                    return;
+                  }
                   setSelectedProspect(prospect);
                   setDrawerOpen(true);
                 }}
                 className={cn(
                   "cursor-pointer transition-colors hover:bg-surface-2",
+                  selectedIds?.has(prospect.id) && bulkMode && "bg-accent/5",
                   i !== prospects.length - 1 && "border-b border-border"
                 )}
               >
+                {bulkMode && (
+                  <td
+                    className="px-2 py-3 w-10 text-center"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={selectedIds?.has(prospect.id)}
+                      onCheckedChange={() => onToggleBulkSelect?.(prospect.id)}
+                      aria-label={`Select ${prospect.company_name}`}
+                    />
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     {prospect.is_hot && <span className="text-yellow text-xs">★</span>}

@@ -24,16 +24,7 @@ import { useCRMStore } from "@/store/crm-store";
 import { prospectsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import type { Prospect, LostReasonData } from "@/types/crm";
-
-const LOST_REASONS = [
-  "Price too high",
-  "No decision maker access",
-  "Went with competitor",
-  "No budget right now",
-  "Not interested",
-  "Could not reach after 5 attempts",
-  "Other (requires note)",
-] as const;
+import { LOST_REASON_OPTIONS } from "@/lib/pipeline-constants";
 
 interface LostModalProps {
   open: boolean;
@@ -121,7 +112,7 @@ export function LostModal({ open, onClose, prospect, onConfirm }: LostModalProps
                 <SelectValue placeholder="Select a reason..." />
               </SelectTrigger>
               <SelectContent>
-                {LOST_REASONS.map((r) => (
+                {LOST_REASON_OPTIONS.map((r) => (
                   <SelectItem key={r} value={r}>{r}</SelectItem>
                 ))}
               </SelectContent>

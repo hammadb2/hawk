@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { AlertTriangle, TrendingDown } from "lucide-react";
-import { cn, stageLabel, formatCurrency, agingBorderColor } from "@/lib/utils";
+import { cn, stageLabel, formatCurrency } from "@/lib/utils";
+import { ESTIMATED_PIPELINE_VALUE_PER_PROSPECT } from "@/lib/pipeline-constants";
 import { ProspectCard } from "./prospect-card";
 import { LostModal } from "./lost-modal";
 import { CloseWonModal } from "./close-won-modal";
@@ -27,9 +27,17 @@ const STAGES: { id: PipelineStage; color: string; headerColor: string }[] = [
 
 interface KanbanBoardProps {
   prospects: Prospect[];
+  bulkMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleBulkSelect?: (id: string) => void;
 }
 
-export function KanbanBoard({ prospects }: KanbanBoardProps) {
+export function KanbanBoard({
+  prospects,
+  bulkMode,
+  selectedIds,
+  onToggleBulkSelect,
+}: KanbanBoardProps) {
   const { moveProspect, updateProspect } = useCRMStore();
   const [lostModalOpen, setLostModalOpen] = useState(false);
   const [closeWonModalOpen, setCloseWonModalOpen] = useState(false);
@@ -90,36 +98,17 @@ export function KanbanBoard({ prospects }: KanbanBoardProps) {
     }
   };
 
-  // Bottleneck detection: if any stage has 3x more than next stage
-  const bottlenecks = STAGES.slice(0, -2).reduce<PipelineStage[]>((acc, stage, i) => {
-    const count = getProspectsByStage(stage.id).length;
-    const nextCount = getProspectsByStage(STAGES[i + 1].id).length;
-    if (count > 0 && nextCount > 0 && count >= nextCount * 3) {
-      acc.push(stage.id);
-    }
-    return acc;
-  }, []);
-
   const pendingProspect = pendingDrop
     ? prospects.find((p) => p.id === pendingDrop.prospectId) ?? null
     : null;
 
   return (
     <>
-      {/* Bottleneck alert */}
-      {bottlenecks.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-yellow/10 border border-yellow/25 rounded-lg mb-4 mx-4">
-          <AlertTriangle className="w-4 h-4 text-yellow flex-shrink-0" />
-          <p className="text-xs text-yellow">
-            Pipeline bottleneck detected in: {bottlenecks.map(stageLabel).join(", ")}
-          </p>
-        </div>
-      )}
-
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-3 px-4 pb-4 overflow-x-auto h-full min-h-0">
           {STAGES.map((stage) => {
             const stageProspects = getProspectsByStage(stage.id);
+            const stageValue = stageProspects.length * ESTIMATED_PIPELINE_VALUE_PER_PROSPECT;
 
             return (
               <div
@@ -128,17 +117,20 @@ export function KanbanBoard({ prospects }: KanbanBoardProps) {
               >
                 {/* Column header */}
                 <div className={cn(
-                  "rounded-t-xl border-t-2 border-x border-border bg-surface-1 px-3 py-2.5 flex items-center justify-between",
+                  "rounded-t-xl border-t-2 border-x border-border bg-surface-1 px-3 py-2.5 flex flex-col gap-0.5",
                   stage.color
                 )}>
-                  <div>
+                  <div className="flex items-center justify-between gap-2">
                     <span className={cn("text-xs font-semibold", stage.headerColor)}>
                       {stageLabel(stage.id)}
                     </span>
+                    <span className="text-xs font-medium text-text-dim bg-surface-3 rounded-md px-1.5 py-0.5 tabular-nums">
+                      {stageProspects.length}
+                    </span>
                   </div>
-                  <span className="text-xs font-medium text-text-dim bg-surface-3 rounded-md px-1.5 py-0.5">
-                    {stageProspects.length}
-                  </span>
+                  <p className="text-2xs text-text-dim tabular-nums">
+                    ~{formatCurrency(stageValue)} pipeline
+                  </p>
                 </div>
 
                 {/* Droppable area */}
@@ -175,6 +167,9 @@ export function KanbanBoard({ prospects }: KanbanBoardProps) {
                               <ProspectCard
                                 prospect={prospect}
                                 isDragging={dragSnapshot.isDragging}
+                                bulkMode={bulkMode}
+                                bulkSelected={selectedIds?.has(prospect.id)}
+                                onBulkToggle={onToggleBulkSelect}
                               />
                             </div>
                           )}

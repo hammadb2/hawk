@@ -29,7 +29,7 @@ const PLAN_LABELS: Record<ClientPlan, string> = {
 
 export default function ClientsPage() {
   const router = useRouter();
-  const { clients, setClients } = useCRMStore();
+  const { clients, setClients, globalSearch } = useCRMStore();
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ClientStatus | "all">("all");
@@ -61,11 +61,11 @@ export default function ClientsPage() {
   }, [setClients]);
 
   const filtered = useMemo(() => {
+    const q = (search.trim() || globalSearch.trim()).toLowerCase();
     return clients.filter((c) => {
       if (statusFilter !== "all" && c.status !== statusFilter) return false;
       if (churnFilter !== "all" && c.churn_risk_score !== churnFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
+      if (q) {
         const name = c.prospect?.company_name?.toLowerCase() ?? "";
         const domain = c.prospect?.domain?.toLowerCase() ?? "";
         const plan = c.plan?.toLowerCase() ?? "";
@@ -73,7 +73,7 @@ export default function ClientsPage() {
       }
       return true;
     });
-  }, [clients, search, statusFilter, churnFilter]);
+  }, [clients, search, globalSearch, statusFilter, churnFilter]);
 
   return (
     <div className="flex flex-col h-full">

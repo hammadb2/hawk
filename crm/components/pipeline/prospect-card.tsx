@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Phone, FileText, Scan, Star, ExternalLink, Clock } from "lucide-react";
-import { cn, formatRelativeTime, agingBorderColor, stageBgColor, stageLabel, getInitials } from "@/lib/utils";
+import { cn, formatRelativeTime, agingBorderColor, getInitials } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,9 +15,18 @@ import type { Prospect } from "@/types/crm";
 interface ProspectCardProps {
   prospect: Prospect;
   isDragging?: boolean;
+  bulkMode?: boolean;
+  bulkSelected?: boolean;
+  onBulkToggle?: (id: string) => void;
 }
 
-export function ProspectCard({ prospect, isDragging }: ProspectCardProps) {
+export function ProspectCard({
+  prospect,
+  isDragging,
+  bulkMode,
+  bulkSelected,
+  onBulkToggle,
+}: ProspectCardProps) {
   const { setSelectedProspect, setDrawerOpen, updateProspect } = useCRMStore();
   const [hovering, setHovering] = useState(false);
   const [hotLoading, setHotLoading] = useState(false);
@@ -44,6 +54,10 @@ export function ProspectCard({ prospect, isDragging }: ProspectCardProps) {
   };
 
   const handleOpenDrawer = () => {
+    if (bulkMode) {
+      onBulkToggle?.(prospect.id);
+      return;
+    }
     setSelectedProspect(prospect);
     setDrawerOpen(true);
   };
@@ -57,10 +71,27 @@ export function ProspectCard({ prospect, isDragging }: ProspectCardProps) {
         "rounded-xl border bg-surface-2 p-3.5 cursor-pointer transition-all select-none",
         "hover:border-accent/40 hover:bg-surface-3",
         isDragging ? "shadow-2xl opacity-90 rotate-1 scale-105" : "shadow-sm",
-        hasAgingWarning ? agingClass : "border-border"
+        hasAgingWarning ? agingClass : "border-border",
+        bulkSelected && "ring-2 ring-accent/50 border-accent/40"
       )}
     >
+      {prospect.duplicate_of && (
+        <p className="text-2xs font-medium text-yellow mb-1.5">Possible duplicate — review merge</p>
+      )}
       <div className="flex items-start gap-2.5">
+        {bulkMode && (
+          <div
+            className="pt-0.5"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={bulkSelected}
+              onCheckedChange={() => onBulkToggle?.(prospect.id)}
+              aria-label={`Select ${prospect.company_name}`}
+            />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             {prospect.is_hot && <Star className="w-3 h-3 text-yellow fill-yellow flex-shrink-0" />}

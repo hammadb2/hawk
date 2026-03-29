@@ -209,6 +209,30 @@ export const prospectsApi = {
     return toResponse(data as Prospect | null, error);
   },
 
+  reassign: async (id: string, assigned_rep_id: string): Promise<ApiResponse<Prospect>> => {
+    const supabase = getSupabaseClient();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    const { data, error } = await sb()
+      .from("prospects")
+      .update({ assigned_rep_id, last_activity_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*, assigned_rep:assigned_rep_id(id, name, email, role)")
+      .single();
+
+    if (!error && data) {
+      await sb().from("activities").insert({
+        prospect_id: id,
+        type: "reassigned",
+        created_by: authUser?.id ?? null,
+        metadata: { assigned_rep_id },
+      });
+    }
+    return toResponse(data as Prospect | null, error);
+  },
+
   moveLost: async (id: string, lostData: LostReasonData): Promise<ApiResponse<Prospect>> => {
     const { data, error } = await sb()
       .from("prospects")
