@@ -208,3 +208,20 @@ export function downloadCSV(data: Record<string, unknown>[], filename: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Reject if promise does not settle within `ms` (clears spinner / hung Supabase fetches). */
+export function withTimeout<T>(promise: Promise<T>, ms: number, label = "Request"): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}

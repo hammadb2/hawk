@@ -8,8 +8,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import type { CRMUser } from "@/types/crm";
 
-const AuthReadyContext = createContext(false);
-export const useAuthReady = () => useContext(AuthReadyContext);
+const AuthReadyContext = createContext<boolean>(false);
+
+/**
+ * True when the auth gate in Providers is open, OR when the CRM user is already
+ * in the store (set from SSR `initialUser`). The OR avoids a stuck state where
+ * context reads false (e.g. boundary quirks) so effects never fetch but list pages
+ * stay on loading=true from `useState(rows.length === 0)`.
+ */
+export function useAuthReady(): boolean {
+  const fromProvider = useContext(AuthReadyContext);
+  const hasUser = useCRMStore((s) => Boolean(s.user));
+  return fromProvider || hasUser;
+}
 
 interface ProvidersProps {
   children: ReactNode;

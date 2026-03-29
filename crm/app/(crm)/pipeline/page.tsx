@@ -59,7 +59,7 @@ export default function PipelinePage() {
     clearPipelineFilters,
   } = useCRMStore();
 
-  const [loading, setLoading] = useState(prospects.length === 0);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);

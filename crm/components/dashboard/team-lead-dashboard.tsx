@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
+import { formatCurrency, formatRelativeTime, cn, withTimeout } from "@/lib/utils";
 import { useCRMStore } from "@/store/crm-store";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuthReady } from "@/components/layout/providers";
@@ -43,13 +43,16 @@ export function TeamLeadDashboard() {
 
       const now = new Date();
       const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [repsRes, commissionsRes, pipelineRes] = await Promise.all([
-        supabase.from("users").select("id, name, status, last_close_at").eq("team_lead_id", authUser.id).in("role", ["rep"]),
-        supabase.from("commissions").select("rep_id, type, amount, month_year").eq("month_year", monthYear),
-        supabase.from("prospects").select("id, assigned_rep_id").not("stage", "in", '("closed_won","lost")'),
-      ]);
+      const [repsRes, commissionsRes, pipelineRes] = await withTimeout(
+        Promise.all([
+          supabase.from("users").select("id, name, status, last_close_at").eq("team_lead_id", authUser.id).in("role", ["rep"]),
+          supabase.from("commissions").select("rep_id, type, amount, month_year").eq("month_year", monthYear),
+          supabase.from("prospects").select("id, assigned_rep_id").not("stage", "in", '("closed_won","lost")'),
+        ]),
+        25_000,
+        "Team lead dashboard"
+      );
 
       const reps = repsRes.data ?? [];
       const commissions = commissionsRes.data ?? [];

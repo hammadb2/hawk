@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { formatCurrency, formatRelativeTime, cn } from "@/lib/utils";
+import { formatCurrency, formatRelativeTime, cn, withTimeout } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuthReady } from "@/components/layout/providers";
 import { charlotteApi } from "@/lib/api";
@@ -56,17 +56,22 @@ export function CEODashboard() {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [clientsRes, activitiesRes] = await Promise.all([
-        supabase
-          .from("clients")
-          .select(
-            "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id, prospect:prospect_id(company_name), closing_rep:closing_rep_id(name)"
-          ),
-        supabase.from("activities")
-          .select("id, type, notes, metadata, created_at, created_by")
-          .order("created_at", { ascending: false })
-          .limit(8),
-      ]);
+      const [clientsRes, activitiesRes] = await withTimeout(
+        Promise.all([
+          supabase
+            .from("clients")
+            .select(
+              "id, mrr, status, churn_risk_score, close_date, nps_latest, closing_rep_id, prospect:prospect_id(company_name), closing_rep:closing_rep_id(name)"
+            ),
+          supabase
+            .from("activities")
+            .select("id, type, notes, metadata, created_at, created_by")
+            .order("created_at", { ascending: false })
+            .limit(8),
+        ]),
+        25_000,
+        "CEO dashboard"
+      );
 
       const clients = (clientsRes.data ?? []) as unknown as ClientRow[];
       const activeClients = clients.filter((c) => c.status === "active");

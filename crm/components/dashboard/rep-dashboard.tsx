@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
 import { useCRMStore } from "@/store/crm-store";
 import { useAuthReady } from "@/components/layout/providers";
-import { formatCurrency, formatRelativeTime, stageLabel, cn } from "@/lib/utils";
+import { formatCurrency, formatRelativeTime, stageLabel, cn, withTimeout } from "@/lib/utils";
 import type { Prospect } from "@/types/crm";
 
 interface DailyNonNeg {
@@ -47,6 +47,7 @@ export function RepDashboard() {
   useEffect(() => {
     if (!authReady) return;
     const load = async () => {
+      setLoading(true);
       try {
         const { getSupabaseClient } = await import("@/lib/supabase");
         const supabase = getSupabaseClient();
@@ -59,11 +60,15 @@ export function RepDashboard() {
         const now = new Date();
         const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-        const [commissionsRes, allRepsRes, activitiesRes] = await Promise.all([
-          supabase.from("commissions").select("id, type, amount").eq("rep_id", authUser.id).eq("month_year", monthYear),
-          supabase.from("users").select("id").in("role", ["rep", "team_lead"]),
-          supabase.from("activities").select("id, type, created_at").eq("created_by", authUser.id).gte("created_at", new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
-        ]);
+        const [commissionsRes, allRepsRes, activitiesRes] = await withTimeout(
+          Promise.all([
+            supabase.from("commissions").select("id, type, amount").eq("rep_id", authUser.id).eq("month_year", monthYear),
+            supabase.from("users").select("id").in("role", ["rep", "team_lead"]),
+            supabase.from("activities").select("id, type, created_at").eq("created_by", authUser.id).gte("created_at", new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
+          ]),
+          25_000,
+          "Rep dashboard"
+        );
 
         const comms = commissionsRes.data ?? [];
         const allReps = allRepsRes.data ?? [];

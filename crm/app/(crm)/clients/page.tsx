@@ -32,7 +32,7 @@ export default function ClientsPage() {
   const authReady = useAuthReady();
   const router = useRouter();
   const { clients, setClients } = useCRMStore();
-  const [loading, setLoading] = useState(clients.length === 0);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ClientStatus | "all">("all");
   const [churnFilter, setChurnFilter] = useState<ChurnRisk | "all">("all");

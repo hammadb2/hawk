@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, cn, withTimeout } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuthReady } from "@/components/layout/providers";
 
@@ -39,12 +39,16 @@ export function HOSDashboard() {
       const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [usersRes, commissionsRes, clientsRes, prospectsRes] = await Promise.all([
-        supabase.from("users").select("id, name, status, last_close_at").in("role", ["rep", "team_lead"]),
-        supabase.from("commissions").select("rep_id, type, amount").eq("month_year", monthYear),
-        supabase.from("clients").select("mrr, close_date").eq("status", "active"),
-        supabase.from("prospects").select("id"),
-      ]);
+      const [usersRes, commissionsRes, clientsRes, prospectsRes] = await withTimeout(
+        Promise.all([
+          supabase.from("users").select("id, name, status, last_close_at").in("role", ["rep", "team_lead"]),
+          supabase.from("commissions").select("rep_id, type, amount").eq("month_year", monthYear),
+          supabase.from("clients").select("mrr, close_date").eq("status", "active"),
+          supabase.from("prospects").select("id"),
+        ]),
+        25_000,
+        "HoS dashboard"
+      );
 
       const allReps = usersRes.data ?? [];
       const commissions = commissionsRes.data ?? [];

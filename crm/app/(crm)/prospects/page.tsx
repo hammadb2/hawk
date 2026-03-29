@@ -21,7 +21,7 @@ import type { Prospect } from "@/types/crm";
 export default function ProspectsPage() {
   const authReady = useAuthReady();
   const { prospects, setProspects, setSelectedProspect, setDrawerOpen } = useCRMStore();
-  const [loading, setLoading] = useState(prospects.length === 0);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [hotOnly, setHotOnly] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
