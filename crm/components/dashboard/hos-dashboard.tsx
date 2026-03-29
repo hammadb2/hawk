@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, cn, withTimeout } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useAuthReady } from "@/components/layout/providers";
 
 interface RepRow {
   id: string;
@@ -20,16 +19,14 @@ interface RepRow {
 }
 
 export function HOSDashboard() {
-  const authReady = useAuthReady();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ teamCloses: 0, totalPipeline: 0, mrrAdded: 0 });
   const [reps, setReps] = useState<RepRow[]>([]);
   const [teamTarget] = useState(25);
 
   useEffect(() => {
-    if (!authReady) return;
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   const load = async () => {
     setLoading(true);

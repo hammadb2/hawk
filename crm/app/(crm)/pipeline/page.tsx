@@ -25,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuthReady } from "@/components/layout/providers";
 import { useCRMStore } from "@/store/crm-store";
 import { prospectsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
@@ -48,7 +47,6 @@ const PIPELINE_STAGES: PipelineStage[] = [
 const SOURCES: ProspectSource[] = ["charlotte", "manual", "inbound", "inbound_signup", "referral"];
 
 export default function PipelinePage() {
-  const authReady = useAuthReady();
   const {
     prospects,
     setProspects,
@@ -70,7 +68,6 @@ export default function PipelinePage() {
   }, [filtersOpen, pipelineFilters]);
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       const hasData = useCRMStore.getState().prospects.length > 0;
       if (!hasData) setLoading(true);
@@ -87,8 +84,8 @@ export default function PipelinePage() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady, setProspects]);
+    void load();
+  }, [setProspects]);
 
   const filteredProspects = useMemo(() => {
     return prospects.filter((p) => {

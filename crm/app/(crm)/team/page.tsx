@@ -5,7 +5,6 @@ import { Users } from "lucide-react";
 import { RepCard } from "@/components/team/rep-card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useAuthReady } from "@/components/layout/providers";
 import { useCRMStore } from "@/store/crm-store";
 import { usersApi } from "@/lib/api";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -25,7 +24,6 @@ type PerformanceRow = {
 };
 
 export default function TeamPage() {
-  const authReady = useAuthReady();
   const { user } = useCRMStore();
   const [reps, setReps] = useState<CRMUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,7 +31,6 @@ export default function TeamPage() {
   const [performances, setPerformances] = useState<Record<string, PerformanceRow>>({});
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -95,8 +92,8 @@ export default function TeamPage() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   const handleAtRiskAction = async (
     repId: string,

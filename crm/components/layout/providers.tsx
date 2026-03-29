@@ -8,18 +8,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import type { CRMUser } from "@/types/crm";
 
-const AuthReadyContext = createContext<boolean>(false);
+// Default true: data hooks must not block forever if context mismatches (Next.js boundaries).
+// The CRM layout + middleware already guarantee auth before these pages mount.
+const AuthReadyContext = createContext<boolean>(true);
 
-/**
- * True when the auth gate in Providers is open, OR when the CRM user is already
- * in the store (set from SSR `initialUser`). The OR avoids a stuck state where
- * context reads false (e.g. boundary quirks) so effects never fetch but list pages
- * stay on loading=true from `useState(rows.length === 0)`.
- */
 export function useAuthReady(): boolean {
-  const fromProvider = useContext(AuthReadyContext);
-  const hasUser = useCRMStore((s) => Boolean(s.user));
-  return fromProvider || hasUser;
+  return useContext(AuthReadyContext);
 }
 
 interface ProvidersProps {

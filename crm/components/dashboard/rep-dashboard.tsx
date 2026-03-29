@@ -9,7 +9,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
 import { useCRMStore } from "@/store/crm-store";
-import { useAuthReady } from "@/components/layout/providers";
 import { formatCurrency, formatRelativeTime, stageLabel, cn, withTimeout } from "@/lib/utils";
 import type { Prospect } from "@/types/crm";
 
@@ -22,7 +21,6 @@ interface DailyNonNeg {
 }
 
 export function RepDashboard() {
-  const authReady = useAuthReady();
   const { user, prospects } = useCRMStore();
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +43,6 @@ export function RepDashboard() {
   }>>([]);
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -93,8 +90,8 @@ export function RepDashboard() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   const repId = authUserId ?? user?.id;
   const myProspects = prospects.filter((p) => p.assigned_rep_id === repId);

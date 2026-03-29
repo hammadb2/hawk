@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useAuthReady } from "@/components/layout/providers";
 import { ticketsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { formatDateTime, cn } from "@/lib/utils";
@@ -31,13 +30,11 @@ const SEVERITY_LABELS: Record<number, string> = {
 };
 
 export function TicketConsole() {
-  const authReady = useAuthReady();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -55,8 +52,8 @@ export function TicketConsole() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   const handleUpdateStatus = async (id: string, status: TicketStatus) => {
     try {

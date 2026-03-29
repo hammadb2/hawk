@@ -37,11 +37,15 @@ function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise
 }
 
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { fetch: fetchWithTimeout } }
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  if (typeof window !== "undefined" && (!url || !key)) {
+    console.error(
+      "[HAWK CRM] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. " +
+        "Set them in Vercel → Settings → Environment Variables and redeploy."
+    );
+  }
+  return createBrowserClient(url, key, { global: { fetch: fetchWithTimeout } });
 }
 
 // Singleton for client-side use

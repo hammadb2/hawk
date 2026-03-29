@@ -14,7 +14,6 @@ import {
 import { formatCurrency, downloadCSV } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useAuthReady } from "@/components/layout/providers";
 
 interface ReportData {
   pipeline: { stages: { stage: string; count: number }[]; total: number; wonThisMonth: number; avgDaysToClose: number };
@@ -35,14 +34,12 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const authReady = useAuthReady();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
 
   useEffect(() => {
-    if (!authReady) return;
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   const load = async () => {
     setLoading(true);

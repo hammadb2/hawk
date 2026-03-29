@@ -9,7 +9,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, formatRelativeTime, cn, withTimeout } from "@/lib/utils";
 import { useCRMStore } from "@/store/crm-store";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useAuthReady } from "@/components/layout/providers";
 
 interface RepRow {
   id: string;
@@ -21,16 +20,14 @@ interface RepRow {
 }
 
 export function TeamLeadDashboard() {
-  const authReady = useAuthReady();
   const { user } = useCRMStore();
   const [loading, setLoading] = useState(false);
   const [teamReps, setTeamReps] = useState<RepRow[]>([]);
   const [stats, setStats] = useState({ teamCloses: 0, ownCloses: 0, overrideEarned: 0, teamPipeline: 0 });
 
   useEffect(() => {
-    if (!authReady) return;
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   const load = async () => {
     setLoading(true);

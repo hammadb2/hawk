@@ -11,7 +11,6 @@ import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ProspectDrawer } from "@/components/prospect/profile-drawer";
 import { AddProspectModal } from "@/components/prospect/add-prospect-modal";
-import { useAuthReady } from "@/components/layout/providers";
 import { useCRMStore } from "@/store/crm-store";
 import { prospectsApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
@@ -19,7 +18,6 @@ import { stageLabel, stageBgColor, formatRelativeTime, getInitials, daysSince, c
 import type { Prospect } from "@/types/crm";
 
 export default function ProspectsPage() {
-  const authReady = useAuthReady();
   const { prospects, setProspects, setSelectedProspect, setDrawerOpen } = useCRMStore();
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -36,7 +34,6 @@ export default function ProspectsPage() {
   }, [prospects]);
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       const hasData = useCRMStore.getState().prospects.length > 0;
       if (!hasData) setLoading(true);
@@ -53,8 +50,8 @@ export default function ProspectsPage() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady, setProspects]);
+    void load();
+  }, [setProspects]);
 
   const filtered = useMemo(() => {
     return prospects.filter((p) => {

@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, formatRelativeTime, getInitials, cn } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useAuthReady } from "@/components/layout/providers";
 import { useCRMStore } from "@/store/crm-store";
 import type { Activity } from "@/types/crm";
 import { canManageTeam } from "@/lib/auth";
@@ -48,7 +47,6 @@ function getQuarterMonths(): string[] {
 }
 
 export function LiveScoreboard() {
-  const authReady = useAuthReady();
   const { user } = useCRMStore();
   const [period, setPeriod] = useState<TimePeriod>("this_month");
   const [scores, setScores] = useState<RepScore[]>([]);
@@ -60,7 +58,6 @@ export function LiveScoreboard() {
   const supabaseRef = useRef(getSupabaseClient());
 
   useEffect(() => {
-    if (!authReady) return;
     initialLoadDone.current = false;
     loadScores();
 
@@ -74,7 +71,7 @@ export function LiveScoreboard() {
     return () => {
       sub.unsubscribe();
     };
-  }, [period, authReady]);
+  }, [period]);
 
   const loadScores = async (silent = false) => {
     if (!silent) setLoading(true);

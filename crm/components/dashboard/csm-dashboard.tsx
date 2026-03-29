@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Calendar, TrendingUp, CheckSquare, Users, ArrowUpRight } from "lucide-react";
 import { Client, OnboardingTask, ClientHealthSync, ChurnRisk } from "@/types/crm";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useAuthReady } from "@/components/layout/providers";
 import { cn, formatDate, formatCurrency, formatRelativeTime } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,15 +64,13 @@ function StatCard({ label, value, sub, icon }: { label: string; value: string | 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export function CSMDashboard({ csmId }: { csmId: string }) {
-  const authReady = useAuthReady();
   const [clients, setClients] = useState<CSMClientRow[]>([]);
   const [renewals, setRenewals] = useState<RenewalItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!authReady) return;
-    loadData();
-  }, [authReady, csmId]);
+    void loadData();
+  }, [csmId]);
 
   async function loadData() {
     setLoading(true);

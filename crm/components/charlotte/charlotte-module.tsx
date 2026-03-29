@@ -7,14 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useAuthReady } from "@/components/layout/providers";
 import { charlotteApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { CharlotteStats, SendingDomain, SequencePerformance } from "@/types/crm";
 
 export function CharlotteModule() {
-  const authReady = useAuthReady();
   const [stats, setStats] = useState<CharlotteStats | null>(null);
   const [domains, setDomains] = useState<SendingDomain[]>([]);
   const [sequences, setSequences] = useState<SequencePerformance[]>([]);
@@ -22,7 +20,6 @@ export function CharlotteModule() {
   const [fatalError, setFatalError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authReady) return;
     const load = async () => {
       setLoading(true);
       setFatalError(null);
@@ -66,8 +63,8 @@ export function CharlotteModule() {
         setLoading(false);
       }
     };
-    load();
-  }, [authReady]);
+    void load();
+  }, []);
 
   if (loading) {
     return (

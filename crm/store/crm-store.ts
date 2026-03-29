@@ -153,6 +153,12 @@ export const useCRMStore = create<CRMStore>()(
         prospects: state.prospects,
         clients: state.clients,
       }),
+      // Old localStorage snapshots may include `user: null` and wipe SSR-hydrated user on rehydrate.
+      merge: (persistedState, currentState) => {
+        if (!persistedState || typeof persistedState !== "object") return currentState;
+        const { user: _ignored, ...rest } = persistedState as Partial<CRMStore> & { user?: unknown };
+        return { ...currentState, ...rest };
+      },
     }
   )
 );
