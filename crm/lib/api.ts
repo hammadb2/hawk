@@ -13,7 +13,9 @@ import { getSupabaseClient } from "@/lib/supabase";
 import type {
   Prospect,
   Client,
+  ClientPlan,
   Commission,
+  RepTask,
   ScanResult,
   CharlotteStats,
   SendingDomain,
@@ -79,6 +81,74 @@ function sb() {
 function toResponse<T>(data: T | null, error: { message: string } | null): ApiResponse<T> {
   if (error) return { success: false, data: null, error: error.message };
   return { success: true, data, error: null };
+}
+
+type ClientsJoinRow = {
+  id: string;
+  close_date: string;
+  clawback_deadline: string | null;
+  mrr: number;
+  plan: ClientPlan;
+  prospect_id: string | null;
+  prospects?: { company_name?: string | null; domain?: string | null } | null;
+};
+
+/** Map Supabase `clients(...)` embed on commission rows into `Commission.client`. */
+function mapCommissionsWithClientJoin(data: unknown[] | null): Commission[] {
+  if (!data?.length) return (data ?? []) as Commission[];
+  return data.map((row) => {
+    const r = row as Record<string, unknown> & { clients?: ClientsJoinRow | ClientsJoinRow[] | null };
+    const raw = r.clients;
+    const j = Array.isArray(raw) ? raw[0] : raw;
+    const { clients: _drop, ...rest } = r;
+    if (!j || typeof j !== "object") {
+      return rest as unknown as Commission;
+    }
+    const pr = j.prospects;
+    const prospect: Prospect | undefined =
+      pr && typeof pr === "object"
+        ? {
+            id: j.prospect_id ?? "",
+            domain: pr.domain ?? "",
+            company_name: pr.company_name ?? "",
+            industry: null,
+            city: null,
+            province: null,
+            stage: "closed_won",
+            assigned_rep_id: null,
+            hawk_score: null,
+            source: "manual",
+            consent_basis: null,
+            is_hot: false,
+            duplicate_of: null,
+            lost_reason: null,
+            lost_notes: null,
+            reactivate_at: null,
+            apollo_data: null,
+            created_at: "",
+            last_activity_at: "",
+          }
+        : undefined;
+    const client = {
+      id: j.id,
+      prospect_id: j.prospect_id,
+      plan: j.plan,
+      mrr: Number(j.mrr),
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      closing_rep_id: null,
+      csm_rep_id: null,
+      status: "active" as const,
+      close_date: j.close_date,
+      clawback_deadline: j.clawback_deadline,
+      churn_risk_score: "low" as const,
+      nps_latest: null,
+      last_login_at: null,
+      created_at: "",
+      prospect,
+    } satisfies Client;
+    return { ...(rest as object), client } as Commission;
+  });
 }
 
 // ─── Prospects API ────────────────────────────────────────────────────────────
@@ -435,16 +505,37 @@ export const clientsApi = {
 // ─── Commissions API ──────────────────────────────────────────────────────────
 
 export const commissionsApi = {
-  myEarnings: async (monthYear?: string): Promise<ApiResponse<Commission[]>> => {
+  /**
+   * Rep's commissions (RLS). Optionally filter by month; pass `limit` for history charts
+   * without loading the full table. Joins `clients` for clawback / company context.
+   */
+  myEarnings: async (
+    monthYear?: string,
+    opts?: { limit?: number }
+  ): Promise<ApiResponse<Commission[]>> => {
     let query = sb()
       .from("commissions")
-      .select("*")
+      .select(
+        `
+        *,
+        clients (
+          id,
+          close_date,
+          clawback_deadline,
+          mrr,
+          plan,
+          prospect_id,
+          prospects ( company_name, domain )
+        )
+      `
+      )
       .order("calculated_at", { ascending: false });
 
     if (monthYear) query = query.eq("month_year", monthYear);
+    if (opts?.limit != null) query = query.limit(opts.limit);
 
     const { data, error } = await query;
-    return toResponse(data as Commission[] | null, error);
+    return toResponse(mapCommissionsWithClientJoin(data as unknown[] | null), error);
   },
 
   list: async (repId?: string, monthYear?: string): Promise<ApiResponse<Commission[]>> => {
@@ -470,6 +561,92 @@ export const commissionsApi = {
   /** Deel export CSV — FastAPI */
   exportCSV: (monthYear: string) =>
     apiCall<{ url: string }>(`/api/crm/commissions/export?month_year=${monthYear}`),
+};
+
+// ─── Rep tasks (Supabase `rep_tasks`) ─────────────────────────────────────────
+
+export const repTasksApi = {
+  list: async (params?: {
+    openOnly?: boolean;
+    limit?: number;
+  }): Promise<ApiResponse<RepTask[]>> => {
+    let query = sb()
+      .from("rep_tasks")
+      .select("*, prospect:prospect_id ( id, company_name, domain )")
+      .order("due_at", { ascending: true });
+
+    if (params?.openOnly !== false) query = query.is("completed_at", null);
+    if (params?.limit != null) query = query.limit(params.limit);
+
+    const { data, error } = await query;
+    return toResponse(data as RepTask[] | null, error);
+  },
+
+  create: async (payload: {
+    title: string;
+    due_at: string;
+    prospect_id?: string | null;
+    notes?: string | null;
+  }): Promise<ApiResponse<RepTask>> => {
+    const supabase = getSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, data: null, error: "Not authenticated" };
+    }
+
+    const { data, error } = await sb()
+      .from("rep_tasks")
+      .insert({
+        rep_id: user.id,
+        title: payload.title,
+        due_at: payload.due_at,
+        prospect_id: payload.prospect_id ?? null,
+        notes: payload.notes ?? null,
+      })
+      .select("*, prospect:prospect_id ( id, company_name, domain )")
+      .single();
+
+    if (!error && data?.prospect_id) {
+      await sb().from("activities").insert({
+        prospect_id: data.prospect_id,
+        type: "task_created",
+        created_by: user.id,
+        metadata: { rep_task_id: data.id, title: payload.title },
+      });
+    }
+
+    return toResponse(data as RepTask | null, error);
+  },
+
+  complete: async (id: string): Promise<ApiResponse<RepTask>> => {
+    const { data: existing, error: fetchErr } = await sb()
+      .from("rep_tasks")
+      .select("prospect_id")
+      .eq("id", id)
+      .single();
+    if (fetchErr) {
+      return { success: false, data: null, error: fetchErr.message };
+    }
+
+    const { data, error } = await sb()
+      .from("rep_tasks")
+      .update({ completed_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (!error && existing?.prospect_id) {
+      await sb().from("activities").insert({
+        prospect_id: existing.prospect_id,
+        type: "task_completed",
+        metadata: { rep_task_id: id },
+      });
+    }
+
+    return toResponse(data as RepTask | null, error);
+  },
 };
 
 // ─── Scans API ────────────────────────────────────────────────────────────────

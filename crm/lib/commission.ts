@@ -27,7 +27,7 @@ export const BONUS_TIERS = [
   { closes: 5, bonus: 250 },
   { closes: 10, bonus: 750 },
   { closes: 15, bonus: 1500 },
-  { closes: 20, bonus: 3000 },
+  { closes: 20, bonus: 2000 },
 ] as const;
 
 // ─── Clawback Config ─────────────────────────────────────────────────────────

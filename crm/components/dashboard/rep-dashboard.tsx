@@ -1,16 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Phone, Video, Scan, Target, DollarSign, CheckSquare, Flame, Trophy, TrendingUp } from "lucide-react";
+import { Phone, Video, Scan, CheckSquare, Flame, Trophy, TrendingUp, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { HawkScoreRing } from "@/components/ui/hawk-score-ring";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
 import { useCRMStore } from "@/store/crm-store";
+import { repTasksApi } from "@/lib/api";
 import { formatCurrency, formatRelativeTime, stageLabel, cn, withTimeout } from "@/lib/utils";
-import type { Prospect } from "@/types/crm";
+import type { Prospect, RepTask } from "@/types/crm";
 
 interface DailyNonNeg {
   label: string;
@@ -34,13 +46,11 @@ export function RepDashboard() {
     rank: 0,
     totalReps: 0,
   });
-  const [tasks, setTasks] = useState<Array<{
-    id: string;
-    title: string;
-    dueTime: string;
-    overdue: boolean;
-    done: boolean;
-  }>>([]);
+  const [tasks, setTasks] = useState<RepTask[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDue, setNewDue] = useState("");
+  const [savingTask, setSavingTask] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -83,7 +93,13 @@ export function RepDashboard() {
         const rank = Object.values(closesByRep).filter((n) => n > closesThisMonth).length + 1;
 
         setStats({ closesThisMonth, monthlyTarget: 5, commissionEarned, calls, looms, scans, rank, totalReps: allReps.length });
-        setTasks([]);
+
+        const tasksRes = await repTasksApi.list({ limit: 30 });
+        if (tasksRes.success && tasksRes.data) {
+          setTasks(tasksRes.data);
+        } else {
+          setTasks([]);
+        }
       } catch {
         // fail silently — show zeros
       } finally {
@@ -92,6 +108,51 @@ export function RepDashboard() {
     };
     void load();
   }, []);
+
+  const defaultDueInput = () => {
+    const t = new Date();
+    t.setHours(17, 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+  };
+
+  const openAddTask = () => {
+    setNewTitle("");
+    setNewDue(defaultDueInput());
+    setAddOpen(true);
+  };
+
+  const submitTask = async () => {
+    const title = newTitle.trim();
+    if (!title) {
+      toast({ title: "Add a task title", variant: "destructive" });
+      return;
+    }
+    const due = newDue ? new Date(newDue).toISOString() : new Date().toISOString();
+    setSavingTask(true);
+    try {
+      const res = await repTasksApi.create({ title, due_at: due });
+      if (res.success && res.data) {
+        setTasks((prev) => [...prev, res.data!].sort((a, b) => a.due_at.localeCompare(b.due_at)));
+        setAddOpen(false);
+        toast({ title: "Task added", variant: "success" });
+      } else {
+        toast({ title: res.error || "Could not create task", variant: "destructive" });
+      }
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
+  const completeTask = async (id: string) => {
+    const res = await repTasksApi.complete(id);
+    if (res.success) {
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      toast({ title: "Task completed", variant: "success" });
+    } else {
+      toast({ title: res.error || "Could not complete task", variant: "destructive" });
+    }
+  };
 
   const repId = authUserId ?? user?.id;
   const myProspects = prospects.filter((p) => p.assigned_rep_id === repId);
@@ -218,53 +279,60 @@ export function RepDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Tasks */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <CheckSquare className="w-4 h-4 text-accent-light" />
-              Today's Tasks
+              Open tasks
             </CardTitle>
+            <Button variant="secondary" size="sm" className="gap-1" onClick={openAddTask}>
+              <Plus className="w-3.5 h-3.5" />
+              Add
+            </Button>
           </CardHeader>
           <CardContent className="space-y-2">
             {tasks.length === 0 ? (
               <EmptyState
                 icon={CheckSquare}
-                title="No tasks today"
-                description="You're all caught up!"
+                title="No open tasks"
+                description="Add follow-ups so nothing slips through the cracks."
                 className="py-8"
               />
             ) : (
-              tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={cn(
-                    "flex items-start gap-3 p-3 rounded-lg border transition-all",
-                    task.overdue
-                      ? "border-red/30 bg-red/5"
-                      : "border-border bg-surface-2"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={task.done}
-                    onChange={() => {}}
-                    className="mt-0.5 rounded border-border"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-sm",
-                      task.done ? "text-text-dim line-through" : "text-text-primary"
-                    )}>
-                      {task.title}
-                    </p>
-                    <p className={cn(
-                      "text-xs mt-0.5",
-                      task.overdue ? "text-red font-medium" : "text-text-dim"
-                    )}>
-                      {task.overdue ? "Overdue — " : ""}{task.dueTime}
-                    </p>
+              tasks.map((task) => {
+                const overdue = new Date(task.due_at).getTime() < Date.now();
+                return (
+                  <div
+                    key={task.id}
+                    className={cn(
+                      "flex items-start gap-3 p-3 rounded-lg border transition-all",
+                      overdue ? "border-red/30 bg-red/5" : "border-border bg-surface-2"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={() => void completeTask(task.id)}
+                      className="mt-0.5 rounded border-border cursor-pointer"
+                      aria-label={`Complete ${task.title}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-text-primary">{task.title}</p>
+                      {task.prospect?.company_name && (
+                        <p className="text-2xs text-text-dim truncate mt-0.5">{task.prospect.company_name}</p>
+                      )}
+                      <p
+                        className={cn(
+                          "text-xs mt-0.5",
+                          overdue ? "text-red font-medium" : "text-text-dim"
+                        )}
+                      >
+                        {overdue ? "Overdue — " : "Due "}
+                        {formatRelativeTime(task.due_at)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </CardContent>
         </Card>
@@ -311,6 +379,37 @@ export function RepDashboard() {
           <PipelineSnapshot prospects={myProspects} />
         </CardContent>
       </Card>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New task</DialogTitle>
+            <DialogDescription>Add a follow-up with a due time. It appears in your open task list.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-text-secondary mb-1">Title</p>
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Call back, send proposal…"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-text-secondary mb-1">Due</p>
+              <Input type="datetime-local" value={newDue} onChange={(e) => setNewDue(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitTask()} disabled={savingTask}>
+              {savingTask ? "Saving…" : "Save task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { TrendingUp, AlertTriangle, CreditCard, FileText, Shield, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { TrendingUp, CreditCard, FileText, RefreshCw, ScanLine } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate, churnRiskColor, cn } from "@/lib/utils";
-import { clientsApi } from "@/lib/api";
+import { clientsApi, scansApi } from "@/lib/api";
 import { toast } from "@/components/ui/toast";
-import type { Client } from "@/types/crm";
+import { formatRelativeTime } from "@/lib/utils";
+import type { Client, ScanResult } from "@/types/crm";
 
 interface ClientProfileProps {
   client: Client;
@@ -17,6 +18,19 @@ interface ClientProfileProps {
 
 export function ClientProfile({ client }: ClientProfileProps) {
   const [generating, setGenerating] = useState(false);
+  const [recentScans, setRecentScans] = useState<ScanResult[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void scansApi.getForClient(client.id).then((res) => {
+      if (!cancelled && res.success && res.data) {
+        setRecentScans(res.data.slice(0, 6));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [client.id]);
 
   const daysAsClient = Math.floor(
     (Date.now() - new Date(client.close_date).getTime()) / (1000 * 60 * 60 * 24)
@@ -165,6 +179,38 @@ export function ClientProfile({ client }: ClientProfileProps) {
           </CardContent>
         </Card>
       </div>
+
+      {recentScans.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ScanLine className="w-4 h-4 text-accent-light" />
+              Recent HAWK scans
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {recentScans.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between gap-3 py-2 border-b border-border/60 last:border-0"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-text-primary">
+                    Score {s.hawk_score ?? "—"} ·{" "}
+                    <span className="text-text-dim capitalize">{s.status}</span>
+                  </p>
+                  <p className="text-2xs text-text-dim mt-0.5">{formatRelativeTime(s.created_at)}</p>
+                </div>
+                {s.findings?.length ? (
+                  <span className="text-2xs text-text-dim flex-shrink-0">
+                    {s.findings.length} finding{s.findings.length !== 1 ? "s" : ""}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

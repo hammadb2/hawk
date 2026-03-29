@@ -188,6 +188,19 @@ export interface Commission {
   client?: Client;
 }
 
+/** Rep follow-up tasks (`rep_tasks` table). */
+export interface RepTask {
+  id: string;
+  rep_id: string;
+  prospect_id: string | null;
+  title: string;
+  due_at: string;
+  completed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  prospect?: Pick<Prospect, "id" | "company_name" | "domain">;
+}
+
 export interface Ticket {
   id: string;
   submitted_by: string | null;
