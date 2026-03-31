@@ -1,0 +1,280 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CrmActivityRow, Prospect, Profile } from "@/lib/crm/types";
+import { sumOpenPipelineValueDollars } from "@/lib/crm/pipeline-value";
+
+type Kpis = {
+  emailsSentToday: number;
+  emailRepliesToday: number;
+  callsBookedToday: number;
+  closesMtd: number;
+  pipelineOpenDollars: number;
+  stale48h: number;
+  activeMrrCents: number;
+};
+
+type LeaderRow = { repId: string; name: string; closes: number; mrrCents: number };
+
+function localStartOfDayIso(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function localStartOfMonthIso(): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+export function CeoLiveDashboard({
+  supabase,
+  profile,
+}: {
+  supabase: SupabaseClient;
+  profile: Profile;
+}) {
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
+  const [activities, setActivities] = useState<CrmActivityRow[]>([]);
+  const [activityFilter, setActivityFilter] = useState<string>("all");
+  const [prospectsCache, setProspectsCache] = useState<Prospect[]>([]);
+
+  const loadAll = useCallback(async () => {
+    const startDay = localStartOfDayIso();
+    const startMonth = localStartOfMonthIso();
+    const staleCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+
+    const [evRes, actRes, clientsRes, prospectsRes] = await Promise.all([
+      supabase.from("prospect_email_events").select("id,sent_at,replied_at,created_at").gte("created_at", startDay).limit(2000),
+      supabase
+        .from("activities")
+        .select("id,prospect_id,type,notes,metadata,created_by,created_at")
+        .order("created_at", { ascending: false })
+        .limit(80),
+      supabase.from("clients").select("id,closing_rep_id,mrr_cents,close_date,status").eq("status", "active").limit(500),
+      supabase.from("prospects").select("*").limit(800),
+    ]);
+
+    const events = evRes.data ?? [];
+    const emailsSentToday = events.length;
+    const emailRepliesToday = events.filter((e) => e.replied_at && e.replied_at >= startDay).length;
+
+    const acts = (actRes.data ?? []) as CrmActivityRow[];
+    const callsBookedToday = acts.filter((a) => {
+      if (a.type !== "stage_changed") return false;
+      const to = (a.metadata as { to?: string } | null)?.to;
+      return to === "call_booked" && a.created_at >= startDay;
+    }).length;
+
+    const clients = clientsRes.data ?? [];
+    const closesMtd = clients.filter((c) => c.close_date && c.close_date >= startMonth).length;
+
+    const prospects = (prospectsRes.data ?? []) as Prospect[];
+    setProspectsCache(prospects);
+    const pipelineOpenDollars = sumOpenPipelineValueDollars(prospects);
+    const stale48h = prospects.filter((p) => {
+      if (p.stage === "lost" || p.stage === "closed_won") return false;
+      return p.last_activity_at < staleCut;
+    }).length;
+    const activeMrrCents = clients.reduce((s, c) => s + (c.mrr_cents ?? 0), 0);
+
+    setKpis({
+      emailsSentToday,
+      emailRepliesToday,
+      callsBookedToday,
+      closesMtd,
+      pipelineOpenDollars,
+      stale48h,
+      activeMrrCents,
+    });
+    setActivities(acts);
+
+    const mtdClients = clients.filter((c) => c.close_date && c.close_date >= startMonth && c.closing_rep_id);
+    const byRep = new Map<string, { closes: number; mrrCents: number }>();
+    for (const c of mtdClients) {
+      const rid = c.closing_rep_id as string;
+      const cur = byRep.get(rid) ?? { closes: 0, mrrCents: 0 };
+      cur.closes += 1;
+      cur.mrrCents += c.mrr_cents ?? 0;
+      byRep.set(rid, cur);
+    }
+    const repIds = Array.from(byRep.keys());
+    if (repIds.length === 0) {
+      setLeaderboard([]);
+      return;
+    }
+    const profRes = await supabase.from("profiles").select("id,full_name,email").in("id", repIds);
+    const profs = profRes.data ?? [];
+    const nameById = new Map(profs.map((p) => [p.id, p.full_name || p.email || p.id]));
+    setLeaderboard(
+      repIds
+        .map((id) => ({
+          repId: id,
+          name: nameById.get(id) ?? id,
+          closes: byRep.get(id)?.closes ?? 0,
+          mrrCents: byRep.get(id)?.mrrCents ?? 0,
+        }))
+        .sort((a, b) => b.mrrCents - a.mrrCents),
+    );
+  }, [supabase]);
+
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    const ch = supabase
+      .channel("ceo-live")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "activities" },
+        () => {
+          void loadAll();
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [supabase, loadAll]);
+
+  const filteredActivities = useMemo(() => {
+    if (activityFilter === "all") return activities;
+    return activities.filter((a) => a.type === activityFilter);
+  }, [activities, activityFilter]);
+
+  const prospectLabel = useCallback(
+    (pid: string | null) => {
+      if (!pid) return "—";
+      const p = prospectsCache.find((x) => x.id === pid);
+      return p ? p.company_name || p.domain : pid.slice(0, 8);
+    },
+    [prospectsCache],
+  );
+
+  if (!kpis) {
+    return (
+      <div className="flex min-h-[120px] items-center justify-center text-zinc-500">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  const roleNote = profile.role === "hos" ? "HoS" : "CEO";
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
+        <h2 className="text-sm font-semibold text-emerald-200">Live ops ({roleNote})</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          KPIs use your browser&apos;s local calendar day. Pipeline $ uses the same hawk-score bands as the Kanban. Activity feed updates in real time.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Emails logged today" value={kpis.emailsSentToday} />
+        <KpiCard label="Replies today" value={kpis.emailRepliesToday} />
+        <KpiCard label="Calls booked today" value={kpis.callsBookedToday} />
+        <KpiCard label="Closes (MTD)" value={kpis.closesMtd} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <KpiCard label="Open pipeline ($ est.)" value={`$${kpis.pipelineOpenDollars.toLocaleString()}`} />
+        <KpiCard label="Stale 48h+ (open)" value={kpis.stale48h} hint="Any open stage, no activity 48h+" />
+        <KpiCard label="Active client MRR" value={`$${(kpis.activeMrrCents / 100).toLocaleString()}`} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+          <h3 className="text-sm font-medium text-zinc-200">Rep leaderboard (MTD)</h3>
+          <p className="text-xs text-zinc-500">By revenue closed this month</p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {leaderboard.length === 0 && <li className="text-zinc-500">No closes recorded this month yet.</li>}
+            {leaderboard.map((row, i) => (
+              <li key={row.repId} className="flex justify-between gap-2 text-zinc-300">
+                <span>
+                  {i + 1}. {row.name}
+                </span>
+                <span className="text-zinc-500">
+                  {row.closes} deal{row.closes === 1 ? "" : "s"} · ${(row.mrrCents / 100).toLocaleString()} MRR
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+          <h3 className="text-sm font-medium text-zinc-200">Quick links</h3>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link href="/crm/pipeline" className="text-emerald-400 hover:underline">
+                Pipeline
+              </Link>
+            </li>
+            <li>
+              <Link href="/crm/settings" className="text-emerald-400 hover:underline">
+                Settings &amp; monitor history
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-zinc-200">Activity feed</h3>
+          <select
+            value={activityFilter}
+            onChange={(e) => setActivityFilter(e.target.value)}
+            className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+          >
+            <option value="all">All types</option>
+            <option value="stage_changed">Stage changes</option>
+            <option value="note">Notes</option>
+            <option value="call">Calls</option>
+          </select>
+        </div>
+        <ul className="mt-3 max-h-[420px] space-y-2 overflow-y-auto text-sm">
+          {filteredActivities.map((a) => (
+            <li key={a.id} className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
+              <div className="flex flex-wrap justify-between gap-2 text-zinc-400">
+                <span className="text-emerald-400/90">{a.type}</span>
+                <span className="text-xs">{new Date(a.created_at).toLocaleString()}</span>
+              </div>
+              <div className="mt-1 text-zinc-300">
+                {a.prospect_id ? (
+                  <Link href={`/crm/prospects/${a.prospect_id}`} className="hover:text-emerald-400 hover:underline">
+                    {prospectLabel(a.prospect_id)}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </div>
+              {a.type === "stage_changed" && a.metadata && (
+                <p className="mt-1 text-xs text-zinc-500">
+                  {(a.metadata as { from?: string; to?: string }).from} → {(a.metadata as { to?: string }).to}
+                </p>
+              )}
+              {a.notes && <p className="mt-1 text-xs text-zinc-400">{a.notes}</p>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-zinc-100">{value}</div>
+      {hint && <p className="mt-1 text-xs text-zinc-600">{hint}</p>}
+    </div>
+  );
+}
