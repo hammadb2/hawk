@@ -69,7 +69,7 @@ Open http://localhost:3000.
 
 ## Cron (production)
 
-Call these with **header** `X-Cron-Secret: <HAWK_CRON_SECRET>`.
+Call these with **header** `X-Cron-Secret: <secret>`. The secret is read from `HAWK_CRON_SECRET`, or **`CRON_SECRET`** (e.g. on Railway) if the former is unset.
 
 | Endpoint | Schedule | Purpose |
 |----------|----------|--------|
@@ -96,7 +96,9 @@ See **backend/.env.example**. Main ones:
 - `STRIPE_*` — Billing
 - `DEEPSEEK_API_KEY` — Ask HAWK
 - `CHARLOTTE_*` — Transactional email (Revenue-Ops)
-- `HAWK_CRON_SECRET` — Cron endpoints
+- `HAWK_CRON_SECRET` or `CRON_SECRET` — Cron endpoints (same header value)
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRM_EMAIL_WEBHOOK_SECRET` — CRM webhooks (backend only)
+- `ANTHROPIC_API_KEY`, `SMARTLEAD_API_KEY` — optional; reserved for future integrations
 
 ---
 

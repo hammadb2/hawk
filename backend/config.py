@@ -43,8 +43,16 @@ BASE_URL = os.environ.get("HAWK_BASE_URL", "https://hawk.akbstudios.com")
 # HaveIBeenPwned (breach check)
 HIBP_API_KEY = os.environ.get("HIBP_API_KEY", "")
 
+# Optional — wire when used (CRM/AI integrations)
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+SMARTLEAD_API_KEY = os.environ.get("SMARTLEAD_API_KEY", "")
+
 # Cron (scheduled scans) — set to a secret; cron calls with X-Cron-Secret
-CRON_SECRET = os.environ.get("HAWK_CRON_SECRET", "")
+# Railway often uses CRON_SECRET; we accept that as an alias for HAWK_CRON_SECRET.
+CRON_SECRET = (
+    os.environ.get("HAWK_CRON_SECRET", "").strip()
+    or os.environ.get("CRON_SECRET", "").strip()
+)
 
 # Plan limits
 PLAN_DOMAINS = {"trial": 1, "starter": 1, "pro": 3, "agency": 10}

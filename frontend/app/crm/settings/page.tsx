@@ -37,7 +37,7 @@ export default function CrmSettingsPage() {
           <li>NEXT_PUBLIC_API_URL</li>
           <li>SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (API)</li>
           <li>CRM_EMAIL_WEBHOOK_SECRET (API)</li>
-          <li>HAWK_CRM_CRON_SECRET or HAWK_CRON_SECRET (aging cron)</li>
+          <li>HAWK_CRM_CRON_SECRET, HAWK_CRON_SECRET, or CRON_SECRET (Railway alias — aging cron)</li>
         </ul>
       </section>
 

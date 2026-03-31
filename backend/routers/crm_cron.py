@@ -13,14 +13,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/crm/cron", tags=["crm-cron"])
 
-CRON_SECRET = os.environ.get("HAWK_CRM_CRON_SECRET", os.environ.get("HAWK_CRON_SECRET", ""))
+# Prefer CRM-specific secret, then HAWK_CRON_SECRET, then CRON_SECRET (Railway).
+CRON_SECRET = (
+    os.environ.get("HAWK_CRM_CRON_SECRET", "").strip()
+    or os.environ.get("HAWK_CRON_SECRET", "").strip()
+    or os.environ.get("CRON_SECRET", "").strip()
+)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 
 def _require_secret(x_cron_secret: str | None) -> None:
     if not CRON_SECRET:
-        logger.warning("HAWK_CRM_CRON_SECRET not set — rejecting cron")
+        logger.warning("Cron secret not set (HAWK_CRM_CRON_SECRET / HAWK_CRON_SECRET / CRON_SECRET) — rejecting")
         raise HTTPException(status_code=503, detail="Cron not configured")
     if x_cron_secret != CRON_SECRET:
         raise HTTPException(status_code=401, detail="Invalid cron secret")
