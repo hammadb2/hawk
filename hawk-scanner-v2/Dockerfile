@@ -2,19 +2,21 @@
 
 FROM python:3.12-slim-bookworm
 
-# Install ProjectDiscovery tools + WhatWeb (pinned releases — avoid GitHub /latest redirect in CI)
-RUN apt-get update && apt-get install -y --no-install-recommends wget unzip ca-certificates whatweb && \
-    wget -q https://github.com/projectdiscovery/subfinder/releases/download/v2.6.6/subfinder_2.6.6_linux_amd64.zip && \
-    unzip subfinder_2.6.6_linux_amd64.zip && mv subfinder /usr/local/bin/ && \
-    wget -q https://github.com/projectdiscovery/naabu/releases/download/v2.3.1/naabu_2.3.1_linux_amd64.zip && \
-    unzip naabu_2.3.1_linux_amd64.zip && mv naabu /usr/local/bin/ && \
-    wget -q https://github.com/projectdiscovery/httpx/releases/download/v1.6.8/httpx_1.6.8_linux_amd64.zip && \
-    unzip httpx_1.6.8_linux_amd64.zip && mv httpx /usr/local/bin/ && \
-    wget -q https://github.com/projectdiscovery/nuclei/releases/download/v3.3.2/nuclei_3.3.2_linux_amd64.zip && \
-    unzip nuclei_3.3.2_linux_amd64.zip && mv nuclei /usr/local/bin/ && \
+# Install Go and ProjectDiscovery tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    golang-go whatweb ca-certificates git && \
+    go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
+    go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    cp /root/go/bin/subfinder /usr/local/bin/ && \
+    cp /root/go/bin/naabu /usr/local/bin/ && \
+    cp /root/go/bin/httpx /usr/local/bin/ && \
+    cp /root/go/bin/nuclei /usr/local/bin/ && \
     chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/httpx /usr/local/bin/nuclei && \
-    rm -f *.zip && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get remove -y golang-go git && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /root/go/pkg /root/go/src
 
 WORKDIR /app
 COPY requirements.txt .
