@@ -67,7 +67,7 @@ h2 { font-size: 15px; margin-top: 20px; border-bottom: 1px solid #ddd; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
 .footer { margin-top: 24px; font-size: 11px; color: #888; }
-</style></head><body>",
+</style></head><body>""",
         f"<h1>HAWK — Monthly security summary</h1>",
         f'<p class="meta">{_escape(month_label)} · {_escape(company_name)} · {_escape(domain)}</p>',
     ]
