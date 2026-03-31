@@ -19,7 +19,7 @@ Or from `backend/`: `python main.py` (reload on port 8000).
 
 - `DATABASE_URL` — default `sqlite:///./hawk.db`; use PostgreSQL in prod.
 - `HAWK_SECRET_KEY` — JWT signing key.
-- `HAWK_SCANNER_RELAY_URL` — Ghost relay (default `http://178.104.27.211:8002`).
+- `HAWK_SCANNER_RELAY_URL` — Scanner service base URL (backend appends `/scan`). Default legacy Ghost; in production set on the Railway **main API** service to your **hawk-scanner-v2** Railway URL (HTTPS, no path).
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` — Stripe.
 - `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` — Ask HAWK (DeepSeek R1).
 - `HAWK_BASE_URL` — Frontend URL for Stripe redirects (default `https://securedbyhawk.com`).

@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+/** Vercel: allow this route to wait for upstream scan (30–60s). Requires Pro for >10s on some plans. */
+export const maxDuration = 60;
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const SCAN_FETCH_MS = 60_000;
 
 /** Parse FastAPI-style JSON error body: { "detail": "..." } or validation array */
 function parseUpstreamError(text: string): string {
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ domain }),
+      signal: AbortSignal.timeout(SCAN_FETCH_MS),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
