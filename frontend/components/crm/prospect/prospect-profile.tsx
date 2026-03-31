@@ -148,15 +148,26 @@ export function ProspectProfile({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prospectId: p.id }),
       });
-      const j = await res.json().catch(() => ({}));
+      const raw = await res.text();
+      let j: { error?: string; detail?: string; score?: number; grade?: string; findings_count?: number } = {};
+      try {
+        if (raw) j = JSON.parse(raw) as typeof j;
+      } catch {
+        /* Vercel/HTML 504 pages are not JSON */
+      }
       if (!res.ok) {
         const msg = [j.error, j.detail].filter(Boolean).join(" — ");
-        toast.error(msg || "Scan failed");
+        const snippet = raw && !raw.trim().startsWith("{") ? raw.replace(/\s+/g, " ").slice(0, 180) : "";
+        toast.error(
+          msg || `Scan failed (HTTP ${res.status})${snippet ? `: ${snippet}` : res.statusText ? ` — ${res.statusText}` : ""}`,
+        );
         return;
       }
       toast.success(`Scan complete — score ${j.score ?? "—"}`);
       await load();
       onUpdated?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Network error — could not reach scan service");
     } finally {
       setScanning(false);
     }
