@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getHawkCrmSupabaseAuthStorageKey } from "@/lib/supabase/auth-storage";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabase = createServerClient(url, key, {
+      cookieOptions: { name: getHawkCrmSupabaseAuthStorageKey(url) },
       cookies: {
         getAll() {
           return cookieStore.getAll();

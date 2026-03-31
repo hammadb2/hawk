@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { AuthChangeEvent, Session, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/crm/types";
 
@@ -8,7 +9,7 @@ type CrmAuthContextValue = {
   authReady: boolean;
   /** True after we finished loading `profiles` for the current session (or confirmed no session). */
   profileFetched: boolean;
-  session: import("@supabase/supabase-js").Session | null;
+  session: Session | null;
   profile: Profile | null;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -16,13 +17,40 @@ type CrmAuthContextValue = {
 
 const CrmAuthContext = createContext<CrmAuthContextValue | null>(null);
 
-const AUTH_READY_TIMEOUT_MS = 5000;
+const AUTH_READY_TIMEOUT_MS = 8000;
+
+/** Retries when Navigator Lock API reports stolen / released locks (parallel getSession races). */
+async function getSessionWithRetry(supabase: SupabaseClient) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      return { data, error: null as null };
+    } catch (e) {
+      const msg = String(e);
+      const retryable =
+        msg.includes("lock") ||
+        msg.includes("Lock") ||
+        msg.includes("stole") ||
+        msg.includes("NavigatorLock") ||
+        msg.includes("released");
+      if (attempt < maxAttempts && retryable) {
+        await new Promise((r) => setTimeout(r, 100 * attempt));
+        continue;
+      }
+      console.error("[CRM auth] getSession failed:", e);
+      return { data: { session: null as Session | null }, error: e as Error };
+    }
+  }
+  return { data: { session: null as Session | null }, error: null as null };
+}
 
 export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   const [authReady, setAuthReady] = useState(false);
   const [profileFetched, setProfileFetched] = useState(false);
-  const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const loadProfile = useCallback(
@@ -54,58 +82,56 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile, supabase]);
 
   useEffect(() => {
-    let done = false;
-    const t = window.setTimeout(() => {
-      if (!done) {
-        done = true;
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    timeoutId = window.setTimeout(() => {
+      if (!cancelled) {
         setAuthReady(true);
         setProfileFetched(true);
       }
     }, AUTH_READY_TIMEOUT_MS);
 
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session: s } }) => {
-        if (!done) {
-          done = true;
-          clearTimeout(t);
-          setSession(s);
-          setAuthReady(true);
-          if (s?.user) {
-            await loadProfile(s.user.id);
-            setProfileFetched(true);
-          } else {
-            setProfile(null);
-            setProfileFetched(true);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error("[CRM auth] getSession failed:", err);
-        if (!done) {
-          done = true;
-          clearTimeout(t);
-          setAuthReady(true);
-          setProfileFetched(true);
-        }
-      });
+    void (async () => {
+      const { data: sessionData } = await getSessionWithRetry(supabase);
+      if (cancelled) return;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, s) => {
-      setSession(s);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+
+      const s = sessionData.session;
+      setSession(s ?? null);
+      setAuthReady(true);
       if (s?.user) {
         await loadProfile(s.user.id);
-        setProfileFetched(true);
       } else {
         setProfile(null);
-        setProfileFetched(true);
       }
-    });
+      setProfileFetched(true);
+
+      const {
+        data: { subscription: sub },
+      } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, newSession: Session | null) => {
+        if (cancelled) return;
+        if (event === "INITIAL_SESSION") return;
+        setSession(newSession);
+        if (newSession?.user) {
+          await loadProfile(newSession.user.id);
+        } else {
+          setProfile(null);
+        }
+        setProfileFetched(true);
+      });
+      subscription = sub;
+    })();
 
     return () => {
-      clearTimeout(t);
-      subscription.unsubscribe();
+      cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      subscription?.unsubscribe();
     };
   }, [loadProfile, supabase]);
 

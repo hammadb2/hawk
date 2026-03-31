@@ -185,7 +185,9 @@ export function PipelinePage() {
       .from("profiles")
       .select("id, full_name, email")
       .in("role", ["sales_rep", "team_lead"])
-      .then(({ data }) => setReps(data ?? []));
+      .then(({ data }: { data: { id: string; full_name: string | null; email: string | null }[] | null }) =>
+        setReps(data ?? [])
+      );
   }, [profile, supabase]);
 
   const filtered = useMemo(() => {

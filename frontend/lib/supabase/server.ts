@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getHawkCrmSupabaseAuthStorageKey } from "./auth-storage";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -10,6 +11,7 @@ export async function createClient() {
   }
 
   return createServerClient(url, key, {
+    cookieOptions: { name: getHawkCrmSupabaseAuthStorageKey(url) },
     cookies: {
       getAll() {
         return cookieStore.getAll();

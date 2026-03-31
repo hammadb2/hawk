@@ -109,7 +109,7 @@ export function ProspectProfile({
     const peerList = peers ?? [];
     setDomainPeers(peerList);
     const day = 24 * 60 * 60 * 1000;
-    const recent = peerList.filter((row) => Date.now() - new Date(row.created_at).getTime() < day);
+    const recent = peerList.filter((row: { created_at: string }) => Date.now() - new Date(row.created_at).getTime() < day);
     setDuplicateHint(recent.length > 0 || !!(prospect as Prospect).duplicate_of);
 
     if (canReassign) {

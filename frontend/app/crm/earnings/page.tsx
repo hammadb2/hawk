@@ -43,7 +43,7 @@ export default function EarningsPage() {
       setLoading(false);
       return;
     }
-    const list: CommissionListRow[] = (data ?? []).map((row) => {
+    const list: CommissionListRow[] = (data ?? []).map((row: unknown) => {
       const r = row as CrmCommissionRow & {
         clients: { company_name: string | null; domain: string | null } | { company_name: string | null; domain: string | null }[] | null;
       };
