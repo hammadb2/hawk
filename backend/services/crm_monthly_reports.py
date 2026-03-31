@@ -159,7 +159,7 @@ def _report_month_year_mst() -> tuple[str, str]:
 
 def run_monthly_client_reports() -> dict[str, Any]:
     """
-    For each active client with a portal email, latest scan → PDF → storage → Resend.
+    For each active client with a portal email, latest scan -> PDF -> storage -> Resend.
     Idempotent via crm_monthly_report_log unique (client_id, month_year).
     """
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
