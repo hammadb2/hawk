@@ -1,22 +1,31 @@
 # HAWK Scanner 2.0 — Python API + worker (same image; Railway sets start command per service)
+#
+# ProjectDiscovery @latest requires a modern Go (toolchain in go.mod). Debian's golang-go
+# is too old; build tools in a golang image, then copy binaries into Python slim.
+
+FROM golang:1.24-bookworm AS pd-tools
+
+# naabu uses CGO + libpcap
+RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV CGO_ENABLED=1
+
+RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
+    go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# --- runtime image ---
 
 FROM python:3.12-slim-bookworm
 
-# Install Go and ProjectDiscovery tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    golang-go whatweb ca-certificates git && \
-    go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
-    go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
-    go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
-    cp /root/go/bin/subfinder /usr/local/bin/ && \
-    cp /root/go/bin/naabu /usr/local/bin/ && \
-    cp /root/go/bin/httpx /usr/local/bin/ && \
-    cp /root/go/bin/nuclei /usr/local/bin/ && \
-    chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/httpx /usr/local/bin/nuclei && \
-    apt-get remove -y golang-go git && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /root/go/pkg /root/go/src
+# whatweb + libpcap for naabu at runtime
+RUN apt-get update && apt-get install -y --no-install-recommends whatweb ca-certificates libpcap0.8 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=pd-tools /go/bin/subfinder /go/bin/naabu /go/bin/httpx /go/bin/nuclei /usr/local/bin/
+RUN chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/httpx /usr/local/bin/nuclei
 
 WORKDIR /app
 COPY requirements.txt .
