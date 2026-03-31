@@ -26,7 +26,9 @@ async def check_domain(domain: str, api_key: str) -> dict[str, Any]:
         return {"layer": "hibp_domain", "exposed_accounts": 0, "note": "none reported"}
     if r.status_code == 401:
         return {"layer": "hibp_domain", "error": "invalid_api_key"}
-    r.raise_for_status()
+    if r.status_code != 200:
+        logger.warning("hibp breacheddomain %s: status %s", domain, r.status_code)
+        return {"layer": "hibp_domain", "error": f"http_{r.status_code}", "exposed_accounts": 0}
     data = r.json()
     # API returns a list of email addresses — do not persist addresses
     count = len(data) if isinstance(data, list) else 0

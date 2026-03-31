@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from app.pipeline import tools
@@ -18,6 +19,7 @@ def _findings_from_jsonl(rows: list[dict[str, Any]], domain: str) -> list[dict[s
         matched = row.get("matched-at") or row.get("host") or domain
         out.append(
             {
+                "id": str(uuid.uuid4()),
                 "severity": sev,
                 "category": "Vulnerability",
                 "title": name,
