@@ -8,7 +8,7 @@ import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import type { Prospect } from "@/lib/crm/types";
 
 export default function CrmDashboardPage() {
-  const { authReady, session, profile } = useCrmAuth();
+  const { authReady, profileFetched, session, profile } = useCrmAuth();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [hotLeads, setHotLeads] = useState<Prospect[]>([]);
@@ -31,10 +31,34 @@ export default function CrmDashboardPage() {
     void loadHot();
   }, [loadHot]);
 
-  if (!authReady || !session || !profile) {
+  if (!authReady || !session) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  if (!profileFetched) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="space-y-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-6 text-sm text-amber-100">
+        <p className="font-medium text-amber-50">CRM profile not found</p>
+        <p className="text-zinc-400">
+          There is no row in <code className="text-zinc-300">public.profiles</code> for your signed-in user, or Supabase
+          blocked the read (RLS). Check the browser console for <code className="text-zinc-300">[CRM auth]</code> logs.
+        </p>
+        <p className="text-zinc-400">
+          Your auth user id is <code className="break-all text-emerald-400">{session.user.id}</code> — the{" "}
+          <code className="text-zinc-300">profiles.id</code> column must match exactly.
+        </p>
       </div>
     );
   }

@@ -6,6 +6,8 @@ import type { Profile } from "@/lib/crm/types";
 
 type CrmAuthContextValue = {
   authReady: boolean;
+  /** True after we finished loading `profiles` for the current session (or confirmed no session). */
+  profileFetched: boolean;
   session: import("@supabase/supabase-js").Session | null;
   profile: Profile | null;
   refreshProfile: () => Promise<void>;
@@ -19,13 +21,23 @@ const AUTH_READY_TIMEOUT_MS = 5000;
 export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   const [authReady, setAuthReady] = useState(false);
+  const [profileFetched, setProfileFetched] = useState(false);
   const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const loadProfile = useCallback(
     async (userId: string) => {
       const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-      if (error || !data) {
+      if (error) {
+        console.error("[CRM auth] profiles select failed:", error.message, error.code, error.details ?? "");
+        setProfile(null);
+        return;
+      }
+      if (!data) {
+        console.warn(
+          "[CRM auth] No row in public.profiles for this user. id must equal auth.users.id:",
+          userId
+        );
         setProfile(null);
         return;
       }
@@ -38,6 +50,7 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await supabase.auth.getUser();
     if (data.user) await loadProfile(data.user.id);
     else setProfile(null);
+    setProfileFetched(true);
   }, [loadProfile, supabase]);
 
   useEffect(() => {
@@ -46,34 +59,48 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
       if (!done) {
         done = true;
         setAuthReady(true);
+        setProfileFetched(true);
       }
     }, AUTH_READY_TIMEOUT_MS);
 
     supabase.auth
       .getSession()
-      .then(({ data: { session: s } }) => {
+      .then(async ({ data: { session: s } }) => {
         if (!done) {
           done = true;
           clearTimeout(t);
           setSession(s);
           setAuthReady(true);
-          if (s?.user) void loadProfile(s.user.id);
+          if (s?.user) {
+            await loadProfile(s.user.id);
+            setProfileFetched(true);
+          } else {
+            setProfile(null);
+            setProfileFetched(true);
+          }
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("[CRM auth] getSession failed:", err);
         if (!done) {
           done = true;
           clearTimeout(t);
           setAuthReady(true);
+          setProfileFetched(true);
         }
       });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
+    } = supabase.auth.onAuthStateChange(async (_event, s) => {
       setSession(s);
-      if (s?.user) void loadProfile(s.user.id);
-      else setProfile(null);
+      if (s?.user) {
+        await loadProfile(s.user.id);
+        setProfileFetched(true);
+      } else {
+        setProfile(null);
+        setProfileFetched(true);
+      }
     });
 
     return () => {
@@ -86,18 +113,20 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut({ scope: "local" });
     setSession(null);
     setProfile(null);
+    setProfileFetched(true);
     window.location.href = "/crm/login";
   }, [supabase]);
 
   const value = useMemo(
     () => ({
       authReady,
+      profileFetched,
       session,
       profile,
       refreshProfile,
       signOut,
     }),
-    [authReady, session, profile, refreshProfile, signOut]
+    [authReady, profileFetched, session, profile, refreshProfile, signOut]
   );
 
   return <CrmAuthContext.Provider value={value}>{children}</CrmAuthContext.Provider>;
