@@ -1,4 +1,7 @@
-/** Same dollar heuristic as pipeline Kanban (hawk score bands). */
+/**
+ * Same dollar heuristic as pipeline Kanban (hawk score bands).
+ * Used by CEO live dashboard and `pipeline-page` `stageValue` — keep in sync.
+ */
 export function estimatePipelineValueDollars(hawkScore: number): number {
   if (hawkScore >= 70) return 5000;
   if (hawkScore >= 40) return 2500;

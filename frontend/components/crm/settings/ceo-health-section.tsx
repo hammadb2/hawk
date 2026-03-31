@@ -1,5 +1,7 @@
 "use client";
 
+/** CRM Settings — CEO-only `system_health_log` monitor table (Phase 3). */
+
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
