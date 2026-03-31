@@ -16,6 +16,10 @@ B2B cybersecurity SaaS for Canadian SMBs. External attack-surface scans, finding
 | **frontend/** | Next.js app. Gate, onboarding, main dashboard, and **CRM** at `/crm/*`. |
 | **supabase/** | SQL migrations for CRM (Supabase: prospects, RLS, commissions, scoreboard, tickets). |
 
+### Vercel (frontend)
+
+The Next.js app lives under **`frontend/`**, not `crm/`. In the Vercel project: **Settings → General → Root Directory** → set to **`frontend`** (remove `crm`). Save and redeploy.
+
 ---
 
 ## Run locally (dev)

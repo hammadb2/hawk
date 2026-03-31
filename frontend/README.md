@@ -11,6 +11,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Set `NEXT_PUBLIC_API_URL` to your backend (default `http://localhost:8000`).
 
+## Deploy (Vercel)
+
+Set **Root Directory** to **`frontend`** (Project → Settings → General). The old `crm/` folder no longer exists; CRM routes are `frontend/app/crm/*`.
+
 ## Build
 
 ```bash
