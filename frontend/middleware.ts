@@ -1,8 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getHawkCrmSupabaseAuthStorageKey } from "@/lib/supabase/auth-storage";
 
 const AUTH_COOKIE = "hawk_auth";
+
+function crmCookieOptions(url: string) {
+  return { name: getHawkCrmSupabaseAuthStorageKey(url) };
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -17,6 +22,7 @@ export async function middleware(request: NextRequest) {
 
     let supabaseResponse = NextResponse.next({ request });
     const supabase = createServerClient(url, key, {
+      cookieOptions: crmCookieOptions(url),
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -35,6 +41,12 @@ export async function middleware(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (user && pathname.startsWith("/portal/login")) {
+      const next = request.nextUrl.searchParams.get("next") || "/portal";
+      const safe = next.startsWith("/") && !next.startsWith("//") && !next.includes("://") ? next : "/portal";
+      return NextResponse.redirect(new URL(safe, request.url));
+    }
 
     if (!isPublic && !user) {
       const login = new URL("/portal/login", request.url);
@@ -60,6 +72,7 @@ export async function middleware(request: NextRequest) {
     let supabaseResponse = NextResponse.next({ request });
 
     const supabase = createServerClient(url, key, {
+      cookieOptions: crmCookieOptions(url),
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -77,6 +90,12 @@ export async function middleware(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (user && pathname.startsWith("/crm/login")) {
+      const next = request.nextUrl.searchParams.get("next") || "/crm/dashboard";
+      const safe = next.startsWith("/") && !next.startsWith("//") && !next.includes("://") ? next : "/crm/dashboard";
+      return NextResponse.redirect(new URL(safe, request.url));
+    }
 
     if (!isPublic && !user) {
       const login = new URL("/crm/login", request.url);
