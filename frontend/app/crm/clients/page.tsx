@@ -1,110 +1,130 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/components/providers/auth-provider";
-import { crmClientsApi } from "@/lib/crm-api";
-import { ChurnRiskBadge } from "@/components/crm/churn-risk-badge";
-import type { Client } from "@/lib/crm-types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { createClient } from "@/lib/supabase/client";
+import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { formatUsd } from "@/lib/crm/format";
+import type { CrmClientRow } from "@/lib/crm/types";
+import { cn } from "@/lib/utils";
 
-function cents(n: number) {
-  return `$${(n / 100).toLocaleString("en-CA", { minimumFractionDigits: 0 })}`;
+function statusClass(s: string): string {
+  if (s === "active") return "text-emerald-400";
+  if (s === "past_due") return "text-amber-400";
+  if (s === "churned") return "text-rose-400";
+  return "text-zinc-400";
 }
 
 export default function ClientsPage() {
-  const { token } = useAuth();
-  const [clients, setClients] = useState<Client[]>([]);
+  const supabase = useMemo(() => createClient(), []);
+  const { authReady, session, profile } = useCrmAuth();
+  const [rows, setRows] = useState<CrmClientRow[]>([]);
+  const [repNames, setRepNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("active");
-  const [churnFilter, setChurnFilter] = useState("");
-  const [search, setSearch] = useState("");
 
-  const load = async () => {
-    if (!token) return;
-    try {
-      const data = await crmClientsApi.list(token, {
-        status: statusFilter || undefined,
-        churn_risk: churnFilter || undefined,
-        search: search || undefined,
-      });
-      setClients(data);
-    } finally {
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, prospect_id, company_name, domain, plan, mrr_cents, stripe_customer_id, closing_rep_id, status, close_date, created_at")
+      .order("close_date", { ascending: false });
+    if (error) {
+      toast.error(error.message);
+      setRows([]);
       setLoading(false);
+      return;
     }
-  };
+    const list = (data ?? []) as CrmClientRow[];
+    setRows(list);
+    const ids = Array.from(new Set(list.map((r) => r.closing_rep_id).filter(Boolean) as string[]));
+    if (ids.length === 0) {
+      setRepNames({});
+    } else {
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+      const map: Record<string, string> = {};
+      for (const p of profs ?? []) {
+        map[p.id] = p.full_name ?? p.email ?? p.id.slice(0, 8);
+      }
+      setRepNames(map);
+    }
+    setLoading(false);
+  }, [supabase]);
 
-  useEffect(() => { setLoading(true); load(); }, [token, statusFilter, churnFilter, search]);
+  useEffect(() => {
+    if (authReady && session) void load();
+  }, [authReady, session, load]);
 
-  const totalMRR = clients.reduce((sum, c) => sum + c.mrr, 0);
+  if (!authReady || !session || !profile) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="mx-auto max-w-6xl space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Clients</h1>
-          {!loading && (
-            <p className="text-sm text-text-secondary mt-0.5">
-              {clients.length} clients · MRR: {cents(totalMRR)}/mo
-            </p>
-          )}
+          <h1 className="text-2xl font-semibold text-zinc-50">Clients</h1>
+          <p className="mt-1 text-sm text-zinc-500">Accounts created when deals are marked closed won.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
-            className="border border-surface-3 rounded px-3 py-1.5 text-sm w-40"
-          />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-surface-3 rounded px-2 py-1.5 text-sm">
-            <option value="">All</option>
-            <option value="active">Active</option>
-            <option value="churned">Churned</option>
-          </select>
-          <select value={churnFilter} onChange={(e) => setChurnFilter(e.target.value)} className="border border-surface-3 rounded px-2 py-1.5 text-sm">
-            <option value="">All Risk</option>
-            <option value="high">High Risk</option>
-            <option value="medium">Medium Risk</option>
-            <option value="low">Low Risk</option>
-          </select>
-        </div>
+        <button
+          type="button"
+          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900"
+          onClick={() => void load()}
+        >
+          Refresh
+        </button>
       </div>
 
-      <div className="bg-white border border-surface-3 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b border-surface-3 bg-surface-2">
-            <tr>
-              <th className="text-left px-4 py-2.5 text-xs text-text-secondary font-medium">Company</th>
-              <th className="text-left px-4 py-2.5 text-xs text-text-secondary font-medium">MRR</th>
-              <th className="text-left px-4 py-2.5 text-xs text-text-secondary font-medium">Churn Risk</th>
-              <th className="text-left px-4 py-2.5 text-xs text-text-secondary font-medium">Status</th>
-              <th className="text-left px-4 py-2.5 text-xs text-text-secondary font-medium">Closed By</th>
-              <th className="text-left px-4 py-2.5 text-xs text-text-secondary font-medium">Closed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((c) => (
-              <tr key={c.id} className="border-b border-surface-3 last:border-0 hover:bg-surface-2">
-                <td className="px-4 py-2.5">
-                  <Link href={`/crm/clients/${c.id}`} className="font-medium hover:text-purple-600">{c.company_name}</Link>
-                  {c.domain && <p className="text-xs text-text-secondary">{c.domain}</p>}
-                </td>
-                <td className="px-4 py-2.5 font-medium">{cents(c.mrr)}</td>
-                <td className="px-4 py-2.5"><ChurnRiskBadge risk={c.churn_risk} /></td>
-                <td className="px-4 py-2.5">
-                  <span className={`text-xs px-2 py-0.5 rounded font-medium ${c.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                    {c.status}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-xs text-text-secondary">{c.closed_by_rep_name || "—"}</td>
-                <td className="px-4 py-2.5 text-xs text-text-secondary">{c.closed_at ? new Date(c.closed_at).toLocaleDateString() : "—"}</td>
+      {loading ? (
+        <div className="py-16 text-center text-zinc-500">Loading…</div>
+      ) : rows.length === 0 ? (
+        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-10 text-center text-sm text-zinc-500">
+          No clients yet. Win a deal from the pipeline to create one.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+          <table className="w-full min-w-[800px] text-left text-sm">
+            <thead className="border-b border-zinc-800 bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+              <tr>
+                <th className="px-3 py-2">Company</th>
+                <th className="px-3 py-2">Domain</th>
+                <th className="px-3 py-2">Plan</th>
+                <th className="px-3 py-2">MRR</th>
+                <th className="px-3 py-2">Closer</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Closed</th>
               </tr>
-            ))}
-            {!loading && clients.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-text-secondary">No clients found.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.id} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
+                  <td className="px-3 py-2">
+                    {c.prospect_id ? (
+                      <Link href={`/crm/prospects/${c.prospect_id}`} className="font-medium text-emerald-400 hover:underline">
+                        {c.company_name ?? "—"}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-zinc-100">{c.company_name ?? "—"}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-400">{c.domain ?? "—"}</td>
+                  <td className="px-3 py-2 capitalize text-zinc-300">{c.plan ?? "—"}</td>
+                  <td className="px-3 py-2 text-zinc-200">{formatUsd(c.mrr_cents)}</td>
+                  <td className="px-3 py-2 text-zinc-400">
+                    {c.closing_rep_id ? (repNames[c.closing_rep_id] ?? c.closing_rep_id.slice(0, 8)) : "—"}
+                  </td>
+                  <td className={cn("px-3 py-2 font-medium", statusClass(c.status))}>{c.status}</td>
+                  <td className="px-3 py-2 text-zinc-500">{new Date(c.close_date).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,8 @@ B2B cybersecurity SaaS for Canadian SMBs. External attack-surface scans, finding
 | **specter/** | Scanner engine (runs on Specter 10.0.0.2:8002). DNS, SSL, ports, headers, subdomains, grade. |
 | **ghost/** | Scanner relay (runs on Ghost 178.104.27.211:8002). Forwards scan requests to Specter. |
 | **backend/** | Core API (FastAPI). Auth, scans, findings, domains, reports, billing, Ask HAWK, agency, notifications. |
-| **frontend/** | Next.js 14 app. Gate, onboarding, dashboard, settings. |
+| **frontend/** | Next.js app. Gate, onboarding, main dashboard, and **CRM** at `/crm/*`. |
+| **supabase/** | SQL migrations for CRM (Supabase: prospects, RLS, commissions, scoreboard, tickets). |
 
 ---
 

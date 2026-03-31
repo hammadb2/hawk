@@ -1,0 +1,78 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import toast from "react-hot-toast";
+
+export function CrmLoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const err = searchParams.get("error");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { authReady, session } = useCrmAuth();
+  const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    if (authReady && session) router.replace("/crm/dashboard");
+  }, [authReady, session, router]);
+
+  async function sendLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setLoading(true);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const next = searchParams.get("next") ?? "/crm/dashboard";
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${origin}/crm/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Check your email for the magic link.");
+  }
+
+  return (
+    <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-xl">
+      <h1 className="text-2xl font-semibold tracking-tight">HAWK CRM</h1>
+      <p className="mt-2 text-sm text-zinc-400">Sign in with a magic link (invite required).</p>
+      {err && <p className="mt-4 text-sm text-rose-400">Authentication failed. Try again.</p>}
+      <form className="mt-8 space-y-4" onSubmit={sendLink}>
+        <div>
+          <Label htmlFor="email" className="text-zinc-300">
+            Work email
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 border-zinc-700 bg-zinc-950"
+            placeholder="you@company.com"
+          />
+        </div>
+        <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500" disabled={loading}>
+          {loading ? "Sending…" : "Send magic link"}
+        </Button>
+      </form>
+      <p className="mt-6 text-center text-xs text-zinc-500">
+        <Link href="/" className="underline hover:text-zinc-300">
+          Back to HAWK product site
+        </Link>
+      </p>
+    </div>
+  );
+}
