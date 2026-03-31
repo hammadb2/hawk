@@ -5,6 +5,9 @@
 
 FROM golang:1.24-bookworm AS pd-tools
 
+# httpx @latest can require a newer Go than the image (e.g. >= 1.25.7); download toolchain as needed
+ENV GOTOOLCHAIN=auto
+
 # naabu uses CGO + libpcap
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev && \
     rm -rf /var/lib/apt/lists/*
