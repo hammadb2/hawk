@@ -1,0 +1,839 @@
+-- =============================================================================
+-- HAWK CRM — run entire file in Supabase SQL Editor (or psql) in one go.
+-- Order matches supabase/migrations/*.sql timestamp order.
+-- If a statement fails (e.g. object already exists), fix or skip that block.
+-- =============================================================================
+
+
+-- >>> migrations/20260329000001_crm_phase1_core.sql <<<
+
+-- HAWK CRM Phase 1 — core tables + RLS (run in Supabase SQL editor or via CLI)
+
+-- Extensions
+create extension if not exists "pgcrypto";
+
+-- ---------------------------------------------------------------------------
+-- Profiles (1:1 with auth.users)
+-- ---------------------------------------------------------------------------
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  email text,
+  full_name text,
+  role text not null default 'sales_rep'
+    check (role in ('ceo', 'hos', 'team_lead', 'sales_rep')),
+  team_lead_id uuid references public.profiles (id),
+  avatar_url text,
+  whatsapp_number text,
+  status text not null default 'active' check (status in ('active', 'at_risk', 'inactive')),
+  last_close_at timestamptz,
+  monthly_close_target int default 10,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_profiles_team_lead on public.profiles (team_lead_id);
+create index if not exists idx_profiles_role on public.profiles (role);
+
+-- ---------------------------------------------------------------------------
+-- Prospects
+-- ---------------------------------------------------------------------------
+create table if not exists public.prospects (
+  id uuid primary key default gen_random_uuid(),
+  domain text not null,
+  company_name text,
+  industry text,
+  city text,
+  stage text not null default 'new'
+    check (stage in (
+      'new', 'scanned', 'loom_sent', 'replied', 'call_booked',
+      'proposal_sent', 'closed_won', 'lost'
+    )),
+  assigned_rep_id uuid references public.profiles (id),
+  hawk_score int not null default 0 check (hawk_score >= 0 and hawk_score <= 100),
+  source text not null default 'manual' check (source in ('charlotte', 'manual', 'inbound')),
+  created_at timestamptz not null default now(),
+  last_activity_at timestamptz not null default now(),
+  is_hot boolean not null default false,
+  duplicate_of uuid references public.prospects (id),
+  lost_reason text,
+  lost_notes text,
+  reactivate_on date,
+  consent_basis text default 'implied_published_email',
+  unique (domain)
+);
+
+create index if not exists idx_prospects_assigned on public.prospects (assigned_rep_id);
+create index if not exists idx_prospects_stage on public.prospects (stage);
+create index if not exists idx_prospects_created on public.prospects (created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Clients (minimal for Close Won in Phase 1)
+-- ---------------------------------------------------------------------------
+create table if not exists public.clients (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid references public.prospects (id),
+  company_name text,
+  domain text,
+  plan text,
+  mrr_cents int not null default 0,
+  stripe_customer_id text,
+  closing_rep_id uuid references public.profiles (id),
+  status text not null default 'active' check (status in ('active', 'past_due', 'churned')),
+  close_date timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_clients_closing_rep on public.clients (closing_rep_id);
+
+-- ---------------------------------------------------------------------------
+-- Activities (timeline / feed)
+-- ---------------------------------------------------------------------------
+create table if not exists public.activities (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid references public.prospects (id) on delete cascade,
+  client_id uuid references public.clients (id) on delete set null,
+  type text not null,
+  created_by uuid references public.profiles (id),
+  notes text,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_activities_prospect on public.activities (prospect_id);
+create index if not exists idx_activities_created on public.activities (created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Notifications (in-app bell)
+-- ---------------------------------------------------------------------------
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  title text not null,
+  message text not null,
+  type text not null default 'info' check (type in ('info', 'success', 'warning', 'error')),
+  read boolean not null default false,
+  link text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_notifications_user_unread on public.notifications (user_id, read);
+
+-- ---------------------------------------------------------------------------
+-- Suppressions (Charlotte / CASL — referenced in later phases)
+-- ---------------------------------------------------------------------------
+create table if not exists public.suppressions (
+  id uuid primary key default gen_random_uuid(),
+  domain text,
+  email text,
+  reason text not null check (reason in ('unsubscribe', 'bounce', 'manual')),
+  added_at timestamptz not null default now(),
+  added_by uuid references public.profiles (id),
+  constraint suppressions_domain_or_email check (domain is not null or email is not null)
+);
+
+-- ---------------------------------------------------------------------------
+-- Audit log (append-only; Phase 1 schema — service role writes from API later)
+-- ---------------------------------------------------------------------------
+create table if not exists public.audit_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles (id),
+  action text not null,
+  record_type text not null,
+  record_id uuid,
+  old_value jsonb,
+  new_value jsonb,
+  ip_address text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- Helper functions for RLS
+-- ---------------------------------------------------------------------------
+create or replace function public.crm_is_privileged()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select p.role in ('ceo', 'hos') from public.profiles p where p.id = auth.uid()),
+    false
+  );
+$$;
+
+create or replace function public.crm_is_team_member(rep uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select p.team_lead_id = auth.uid() from public.profiles p where p.id = rep),
+    false
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Row Level Security
+-- ---------------------------------------------------------------------------
+alter table public.profiles enable row level security;
+alter table public.prospects enable row level security;
+alter table public.clients enable row level security;
+alter table public.activities enable row level security;
+alter table public.notifications enable row level security;
+alter table public.suppressions enable row level security;
+alter table public.audit_log enable row level security;
+
+-- Profiles
+drop policy if exists "profiles_select_own_or_privileged" on public.profiles;
+create policy "profiles_select_own_or_privileged"
+  on public.profiles for select
+  using (
+    id = auth.uid()
+    or public.crm_is_privileged()
+    or exists (
+      select 1 from public.profiles me
+      where me.id = auth.uid() and me.role = 'team_lead' and public.profiles.team_lead_id = me.id
+    )
+  );
+
+drop policy if exists "profiles_update_self" on public.profiles;
+create policy "profiles_update_self"
+  on public.profiles for update
+  using (id = auth.uid())
+  with check (id = auth.uid());
+
+drop policy if exists "profiles_update_privileged" on public.profiles;
+create policy "profiles_update_privileged"
+  on public.profiles for update
+  using (public.crm_is_privileged())
+  with check (public.crm_is_privileged());
+
+-- Profile row is created by trigger on auth.users (no self-insert needed)
+
+-- Prospects
+drop policy if exists "prospects_select" on public.prospects;
+create policy "prospects_select"
+  on public.prospects for select
+  using (
+    public.crm_is_privileged()
+    or assigned_rep_id = auth.uid()
+    or public.crm_is_team_member(assigned_rep_id)
+  );
+
+drop policy if exists "prospects_insert" on public.prospects;
+create policy "prospects_insert"
+  on public.prospects for insert
+  with check (
+    public.crm_is_privileged()
+    or assigned_rep_id = auth.uid()
+  );
+
+drop policy if exists "prospects_update" on public.prospects;
+create policy "prospects_update"
+  on public.prospects for update
+  using (
+    public.crm_is_privileged()
+    or assigned_rep_id = auth.uid()
+    or public.crm_is_team_member(assigned_rep_id)
+  )
+  with check (
+    public.crm_is_privileged()
+    or assigned_rep_id = auth.uid()
+    or public.crm_is_team_member(assigned_rep_id)
+  );
+
+drop policy if exists "prospects_delete" on public.prospects;
+create policy "prospects_delete"
+  on public.prospects for delete
+  using (public.crm_is_privileged());
+
+-- Clients
+drop policy if exists "clients_select" on public.clients;
+create policy "clients_select"
+  on public.clients for select
+  using (
+    public.crm_is_privileged()
+    or closing_rep_id = auth.uid()
+    or public.crm_is_team_member(closing_rep_id)
+  );
+
+drop policy if exists "clients_insert" on public.clients;
+create policy "clients_insert"
+  on public.clients for insert
+  with check (
+    public.crm_is_privileged()
+    or closing_rep_id = auth.uid()
+  );
+
+drop policy if exists "clients_update" on public.clients;
+create policy "clients_update"
+  on public.clients for update
+  using (
+    public.crm_is_privileged()
+    or closing_rep_id = auth.uid()
+  );
+
+-- Activities
+drop policy if exists "activities_select" on public.activities;
+create policy "activities_select"
+  on public.activities for select
+  using (
+    public.crm_is_privileged()
+    or exists (
+      select 1 from public.prospects pr
+      where pr.id = activities.prospect_id
+        and (
+          pr.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(pr.assigned_rep_id)
+        )
+    )
+  );
+
+drop policy if exists "activities_insert" on public.activities;
+create policy "activities_insert"
+  on public.activities for insert
+  with check (
+    public.crm_is_privileged()
+    or created_by = auth.uid()
+  );
+
+-- Notifications: own rows only
+drop policy if exists "notifications_own" on public.notifications;
+create policy "notifications_select_own"
+  on public.notifications for select
+  using (user_id = auth.uid() or public.crm_is_privileged());
+
+drop policy if exists "notifications_update_own" on public.notifications;
+create policy "notifications_update_own"
+  on public.notifications for update
+  using (user_id = auth.uid());
+
+drop policy if exists "notifications_insert" on public.notifications;
+create policy "notifications_insert"
+  on public.notifications for insert
+  with check (public.crm_is_privileged() or user_id = auth.uid());
+
+-- Suppressions: CEO + HoS
+drop policy if exists "suppressions_select" on public.suppressions;
+create policy "suppressions_select"
+  on public.suppressions for select
+  using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('ceo', 'hos'))
+  );
+
+drop policy if exists "suppressions_write" on public.suppressions;
+create policy "suppressions_write"
+  on public.suppressions for all
+  using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('ceo', 'hos'))
+  );
+
+-- Audit log: CEO only read
+drop policy if exists "audit_select_ceo" on public.audit_log;
+create policy "audit_select_ceo"
+  on public.audit_log for select
+  using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'ceo')
+  );
+
+-- ---------------------------------------------------------------------------
+-- Trigger: new auth user → profile row
+-- ---------------------------------------------------------------------------
+create or replace function public.crm_handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name, role)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'crm_role', 'sales_rep')
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        full_name = coalesce(excluded.full_name, public.profiles.full_name);
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_crm on auth.users;
+create trigger on_auth_user_created_crm
+  after insert on auth.users
+  for each row execute function public.crm_handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- Realtime: prospect updates for pipeline (enable replication if needed)
+-- ---------------------------------------------------------------------------
+alter table public.prospects replica identity full;
+alter publication supabase_realtime add table public.prospects;
+
+
+-- >>> migrations/20260329000002_storage_reports_bucket.sql <<<
+
+-- Storage bucket for PDF reports (create via Dashboard if this fails on permissions)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'reports',
+  'reports',
+  false,
+  52428800,
+  array['application/pdf', 'image/png', 'image/jpeg']::text[]
+)
+on conflict (id) do nothing;
+
+
+-- >>> migrations/20260330000001_crm_phase2_prospect_profile.sql <<<
+
+-- Phase 2 — Prospect profile: notes, files, scans, email events stub, onboarding, contact fields
+
+alter table public.profiles
+  add column if not exists onboarding_checklist jsonb default '{"whatsapp":false,"video":false,"first_prospect":false,"profile":false}'::jsonb;
+
+alter table public.prospects
+  add column if not exists contact_name text,
+  add column if not exists contact_email text,
+  add column if not exists phone text;
+
+-- ---------------------------------------------------------------------------
+-- Prospect notes (timeline + notes tab)
+-- ---------------------------------------------------------------------------
+create table if not exists public.prospect_notes (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid not null references public.prospects (id) on delete cascade,
+  author_id uuid not null references public.profiles (id),
+  body text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_prospect_notes_prospect on public.prospect_notes (prospect_id);
+create index if not exists idx_prospect_notes_author on public.prospect_notes (author_id);
+
+-- ---------------------------------------------------------------------------
+-- Prospect files (URLs / attachments metadata)
+-- ---------------------------------------------------------------------------
+create table if not exists public.prospect_files (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid not null references public.prospects (id) on delete cascade,
+  title text not null,
+  file_url text not null,
+  kind text default 'link' check (kind in ('link', 'pdf', 'loom', 'other')),
+  created_by uuid references public.profiles (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_prospect_files_prospect on public.prospect_files (prospect_id);
+
+-- ---------------------------------------------------------------------------
+-- CRM prospect scans (HAWK scanner results per prospect)
+-- ---------------------------------------------------------------------------
+create table if not exists public.crm_prospect_scans (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid not null references public.prospects (id) on delete cascade,
+  hawk_score int,
+  grade text,
+  findings jsonb default '{}'::jsonb,
+  status text not null default 'complete' check (status in ('pending', 'complete', 'failed')),
+  triggered_by uuid references public.profiles (id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_crm_prospect_scans_prospect on public.crm_prospect_scans (prospect_id);
+
+-- ---------------------------------------------------------------------------
+-- Email events (Charlotte / Smartlead — populated in Phase 3)
+-- ---------------------------------------------------------------------------
+create table if not exists public.prospect_email_events (
+  id uuid primary key default gen_random_uuid(),
+  prospect_id uuid not null references public.prospects (id) on delete cascade,
+  subject text,
+  sent_at timestamptz,
+  opened_at timestamptz,
+  clicked_at timestamptz,
+  replied_at timestamptz,
+  sequence_step int,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_prospect_email_events_prospect on public.prospect_email_events (prospect_id);
+
+-- ---------------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------------
+alter table public.prospect_notes enable row level security;
+alter table public.prospect_files enable row level security;
+alter table public.crm_prospect_scans enable row level security;
+alter table public.prospect_email_events enable row level security;
+
+drop policy if exists "prospect_notes_select" on public.prospect_notes;
+create policy "prospect_notes_select"
+  on public.prospect_notes for select
+  using (
+    public.crm_is_privileged()
+    or (
+      author_id = auth.uid()
+      and exists (
+        select 1 from public.prospects p
+        where p.id = prospect_notes.prospect_id
+          and (
+            p.assigned_rep_id = auth.uid()
+            or public.crm_is_team_member(p.assigned_rep_id)
+          )
+      )
+    )
+  );
+
+drop policy if exists "prospect_notes_insert" on public.prospect_notes;
+create policy "prospect_notes_insert"
+  on public.prospect_notes for insert
+  with check (
+    author_id = auth.uid()
+    and exists (
+      select 1 from public.prospects p
+      where p.id = prospect_id
+        and (
+          public.crm_is_privileged()
+          or p.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(p.assigned_rep_id)
+        )
+    )
+  );
+
+drop policy if exists "prospect_notes_update" on public.prospect_notes;
+create policy "prospect_notes_update"
+  on public.prospect_notes for update
+  using (author_id = auth.uid())
+  with check (author_id = auth.uid());
+
+drop policy if exists "prospect_files_all" on public.prospect_files;
+create policy "prospect_files_select"
+  on public.prospect_files for select
+  using (
+    exists (
+      select 1 from public.prospects p
+      where p.id = prospect_files.prospect_id
+        and (
+          public.crm_is_privileged()
+          or p.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(p.assigned_rep_id)
+        )
+    )
+  );
+
+create policy "prospect_files_insert"
+  on public.prospect_files for insert
+  with check (
+    created_by = auth.uid()
+    and exists (
+      select 1 from public.prospects p
+      where p.id = prospect_id
+        and (
+          public.crm_is_privileged()
+          or p.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(p.assigned_rep_id)
+        )
+    )
+  );
+
+create policy "prospect_files_delete"
+  on public.prospect_files for delete
+  using (
+    created_by = auth.uid()
+    or public.crm_is_privileged()
+  );
+
+drop policy if exists "crm_scans_select" on public.crm_prospect_scans;
+create policy "crm_scans_select"
+  on public.crm_prospect_scans for select
+  using (
+    exists (
+      select 1 from public.prospects p
+      where p.id = crm_prospect_scans.prospect_id
+        and (
+          public.crm_is_privileged()
+          or p.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(p.assigned_rep_id)
+        )
+    )
+  );
+
+create policy "crm_scans_insert"
+  on public.crm_prospect_scans for insert
+  with check (
+    triggered_by = auth.uid()
+    and exists (
+      select 1 from public.prospects p
+      where p.id = prospect_id
+        and (
+          public.crm_is_privileged()
+          or p.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(p.assigned_rep_id)
+        )
+    )
+  );
+
+drop policy if exists "email_events_select" on public.prospect_email_events;
+create policy "email_events_select"
+  on public.prospect_email_events for select
+  using (
+    exists (
+      select 1 from public.prospects p
+      where p.id = prospect_email_events.prospect_id
+        and (
+          public.crm_is_privileged()
+          or p.assigned_rep_id = auth.uid()
+          or public.crm_is_team_member(p.assigned_rep_id)
+        )
+    )
+  );
+
+-- Service role / Phase 3 will insert email events via backend
+
+
+-- >>> migrations/20260330000002_prospect_notes_delete.sql <<<
+
+-- Allow authors to delete their own prospect notes (matches update policy)
+
+drop policy if exists "prospect_notes_delete" on public.prospect_notes;
+create policy "prospect_notes_delete"
+  on public.prospect_notes for delete
+  using (author_id = auth.uid());
+
+
+-- >>> migrations/20260331000001_crm_phase3_email_events_meta.sql <<<
+
+-- Phase 3 — Email event metadata, dedupe key, source
+
+alter table public.prospect_email_events
+  add column if not exists source text not null default 'webhook',
+  add column if not exists external_id text,
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+comment on column public.prospect_email_events.source is 'smartlead | charlotte | webhook | manual';
+comment on column public.prospect_email_events.external_id is 'Provider id for idempotent ingest (unique per prospect when set)';
+
+create unique index if not exists idx_prospect_email_events_external_dedupe
+  on public.prospect_email_events (prospect_id, external_id)
+  where external_id is not null and length(trim(external_id)) > 0;
+
+
+-- >>> migrations/20260401000001_crm_phase4_commissions.sql <<<
+
+-- Phase 4 — Commissions: one row per client (30% of MRR at close), auto-created on client insert
+
+create table if not exists public.crm_commissions (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients (id) on delete cascade,
+  rep_id uuid not null references public.profiles (id),
+  basis_mrr_cents int not null check (basis_mrr_cents >= 0),
+  amount_cents int not null check (amount_cents >= 0),
+  rate numeric(6,5) not null default 0.30,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'paid')),
+  created_at timestamptz not null default now(),
+  constraint crm_commissions_one_per_client unique (client_id)
+);
+
+create index if not exists idx_crm_commissions_rep on public.crm_commissions (rep_id);
+create index if not exists idx_crm_commissions_created on public.crm_commissions (created_at desc);
+
+alter table public.crm_commissions enable row level security;
+
+drop policy if exists "crm_commissions_select" on public.crm_commissions;
+create policy "crm_commissions_select"
+  on public.crm_commissions for select
+  using (
+    public.crm_is_privileged()
+    or rep_id = auth.uid()
+    or public.crm_is_team_member(rep_id)
+  );
+
+drop policy if exists "crm_commissions_update" on public.crm_commissions;
+create policy "crm_commissions_update"
+  on public.crm_commissions for update
+  using (public.crm_is_privileged())
+  with check (public.crm_is_privileged());
+
+drop policy if exists "crm_commissions_delete" on public.crm_commissions;
+create policy "crm_commissions_delete"
+  on public.crm_commissions for delete
+  using (public.crm_is_privileged());
+
+-- Matches Close Won modal: 30% of first-month MRR
+create or replace function public.crm_commission_from_client()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  amt int;
+begin
+  if new.closing_rep_id is null then
+    return new;
+  end if;
+  amt := (new.mrr_cents * 30) / 100;
+  insert into public.crm_commissions (client_id, rep_id, basis_mrr_cents, amount_cents, rate, status)
+  values (new.id, new.closing_rep_id, new.mrr_cents, amt, 0.30, 'pending')
+  on conflict (client_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_clients_create_commission on public.clients;
+create trigger trg_clients_create_commission
+  after insert on public.clients
+  for each row execute function public.crm_commission_from_client();
+
+
+-- >>> migrations/20260401000002_realtime_scoreboard_tables.sql <<<
+
+-- Realtime updates for live scoreboard (prospects already published in Phase 1)
+
+alter table public.clients replica identity full;
+alter table public.crm_commissions replica identity full;
+
+alter publication supabase_realtime add table public.clients;
+alter publication supabase_realtime add table public.crm_commissions;
+
+
+-- >>> migrations/20260402000001_crm_support_tickets.sql <<<
+
+-- Phase 8 — Internal support tickets (reps file; CEO/HoS triage via RLS + exec notifications)
+
+create table if not exists public.crm_support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  subject text not null,
+  body text not null default '',
+  status text not null default 'open' check (status in ('open', 'in_progress', 'resolved', 'closed')),
+  priority text not null default 'normal' check (priority in ('low', 'normal', 'high')),
+  requester_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_crm_support_tickets_status on public.crm_support_tickets (status);
+create index if not exists idx_crm_support_tickets_requester on public.crm_support_tickets (requester_id);
+create index if not exists idx_crm_support_tickets_created on public.crm_support_tickets (created_at desc);
+
+alter table public.crm_support_tickets enable row level security;
+
+drop policy if exists "crm_support_tickets_select" on public.crm_support_tickets;
+create policy "crm_support_tickets_select"
+  on public.crm_support_tickets for select
+  using (
+    requester_id = auth.uid()
+    or public.crm_is_privileged()
+  );
+
+drop policy if exists "crm_support_tickets_insert" on public.crm_support_tickets;
+create policy "crm_support_tickets_insert"
+  on public.crm_support_tickets for insert
+  with check (requester_id = auth.uid());
+
+drop policy if exists "crm_support_tickets_update" on public.crm_support_tickets;
+create policy "crm_support_tickets_update"
+  on public.crm_support_tickets for update
+  using (public.crm_is_privileged())
+  with check (public.crm_is_privileged());
+
+drop policy if exists "crm_support_tickets_delete" on public.crm_support_tickets;
+create policy "crm_support_tickets_delete"
+  on public.crm_support_tickets for delete
+  using (public.crm_is_privileged());
+
+create or replace function public.crm_support_tickets_set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_crm_support_tickets_updated on public.crm_support_tickets;
+create trigger trg_crm_support_tickets_updated
+  before update on public.crm_support_tickets
+  for each row execute function public.crm_support_tickets_set_updated_at();
+
+-- Notify CEO + HoS when any ticket is created
+create or replace function public.crm_notify_execs_new_ticket()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.notifications (user_id, title, message, type)
+  select p.id,
+         'New support ticket',
+         left(new.subject, 200),
+         'info'
+  from public.profiles p
+  where p.role in ('ceo', 'hos');
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_crm_support_ticket_notify on public.crm_support_tickets;
+create trigger trg_crm_support_ticket_notify
+  after insert on public.crm_support_tickets
+  for each row execute function public.crm_notify_execs_new_ticket();
+
+-- Live bell updates (ignore if already in publication)
+alter table public.notifications replica identity full;
+
+do $pub$
+begin
+  alter publication supabase_realtime add table public.notifications;
+exception
+  when duplicate_object then
+    null;
+end;
+$pub$;
+
+
+-- >>> migrations/20260403000001_clients_company_name.sql <<<
+
+-- Repair: legacy public.clients rows missing columns from phase1 (company_name, mrr_cents, etc.)
+
+alter table public.clients add column if not exists prospect_id uuid;
+alter table public.clients add column if not exists company_name text;
+alter table public.clients add column if not exists domain text;
+alter table public.clients add column if not exists plan text;
+alter table public.clients add column if not exists mrr_cents integer;
+alter table public.clients add column if not exists stripe_customer_id text;
+alter table public.clients add column if not exists closing_rep_id uuid;
+alter table public.clients add column if not exists status text;
+alter table public.clients add column if not exists close_date timestamptz;
+alter table public.clients add column if not exists created_at timestamptz;
+
+update public.clients set mrr_cents = coalesce(mrr_cents, 0);
+alter table public.clients alter column mrr_cents set default 0;
+alter table public.clients alter column mrr_cents set not null;
+
+update public.clients set status = coalesce(status, 'active');
+alter table public.clients alter column status set default 'active';
+
+update public.clients set close_date = coalesce(close_date, now());
+alter table public.clients alter column close_date set default now();
+alter table public.clients alter column close_date set not null;
+
+update public.clients set created_at = coalesce(created_at, now());
+alter table public.clients alter column created_at set default now();
+alter table public.clients alter column created_at set not null;
+
+
+-- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<
+
+select tablename, policyname, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public' and tablename in ('prospects', 'profiles', 'clients', 'activities')
+order by tablename, policyname;
