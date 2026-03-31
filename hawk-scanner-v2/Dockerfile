@@ -1,14 +1,20 @@
 # HAWK Scanner 2.0 — Python API + worker (same image; Railway sets start command per service)
-# Install ProjectDiscovery binaries (subfinder, naabu, httpx, nuclei) via your preferred method:
-#   - Pin releases in CI from https://github.com/projectdiscovery (linux_amd64 zip → /usr/local/bin), or
-#   - `go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest` (multi-stage with golang)
-# This image installs WhatWeb from apt; dnstwist can be `pip install dnstwist` or apt if available.
 
 FROM python:3.12-slim-bookworm
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates whatweb \
-    && rm -rf /var/lib/apt/lists/*
+# Install ProjectDiscovery tools + WhatWeb
+RUN apt-get update && apt-get install -y --no-install-recommends wget unzip ca-certificates whatweb && \
+    wget -qL https://github.com/projectdiscovery/subfinder/releases/latest/download/subfinder_linux_amd64.zip && \
+    unzip subfinder_linux_amd64.zip && mv subfinder /usr/local/bin/ && \
+    wget -qL https://github.com/projectdiscovery/naabu/releases/latest/download/naabu_linux_amd64.zip && \
+    unzip naabu_linux_amd64.zip && mv naabu /usr/local/bin/ && \
+    wget -qL https://github.com/projectdiscovery/httpx/releases/latest/download/httpx_linux_amd64.zip && \
+    unzip httpx_linux_amd64.zip && mv httpx /usr/local/bin/ && \
+    wget -qL https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_linux_amd64.zip && \
+    unzip nuclei_linux_amd64.zip && mv nuclei /usr/local/bin/ && \
+    chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/httpx /usr/local/bin/nuclei && \
+    rm -f *.zip && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
