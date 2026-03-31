@@ -150,7 +150,8 @@ export function ProspectProfile({
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(j.error ?? "Scan failed");
+        const msg = [j.error, j.detail].filter(Boolean).join(" — ");
+        toast.error(msg || "Scan failed");
         return;
       }
       toast.success(`Scan complete — score ${j.score ?? "—"}`);

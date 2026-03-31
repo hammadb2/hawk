@@ -3,6 +3,26 @@ import { createClient } from "@/lib/supabase/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/** Parse FastAPI-style JSON error body: { "detail": "..." } or validation array */
+function parseUpstreamError(text: string): string {
+  try {
+    const j = JSON.parse(text) as { detail?: unknown };
+    if (typeof j.detail === "string") return j.detail;
+    if (Array.isArray(j.detail)) {
+      return j.detail
+        .map((x) => (typeof x === "object" && x && "msg" in x ? String((x as { msg: string }).msg) : String(x)))
+        .join("; ");
+    }
+  } catch {
+    /* ignore */
+  }
+  return text.slice(0, 800);
+}
+
+/**
+ * CRM prospect scan: Supabase auth → POST {domain} to Railway /api/scan/public
+ * (see backend/services/scanner.py → HAWK_SCANNER_RELAY_URL, default Ghost http://178.104.27.211:8002/scan).
+ */
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -29,15 +49,32 @@ export async function POST(request: Request) {
   }
 
   const domain = String(prospect.domain).trim();
-  const scanRes = await fetch(`${API_URL.replace(/\/$/, "")}/api/scan/public`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ domain }),
-  });
+  const base = API_URL.replace(/\/$/, "");
+
+  let scanRes: Response;
+  try {
+    scanRes = await fetch(`${base}/api/scan/public`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      {
+        error: "Could not reach HAWK API",
+        detail: `Check NEXT_PUBLIC_API_URL (${base}) points to your Railway service. ${msg}`,
+      },
+      { status: 502 },
+    );
+  }
+
   if (!scanRes.ok) {
     const errText = await scanRes.text();
-    return NextResponse.json({ error: "Scanner failed", detail: errText }, { status: 502 });
+    const detail = parseUpstreamError(errText);
+    return NextResponse.json({ error: "Scanner failed", detail }, { status: 502 });
   }
+
   const scanJson = (await scanRes.json()) as {
     domain?: string;
     status?: string;
