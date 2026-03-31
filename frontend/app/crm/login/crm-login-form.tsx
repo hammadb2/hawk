@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import toast from "react-hot-toast";
+import { getEmailRedirectOrigin } from "@/lib/site-url";
 
 export function CrmLoginForm() {
   const router = useRouter();
@@ -27,12 +28,12 @@ export function CrmLoginForm() {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const site = getEmailRedirectOrigin();
     const next = searchParams.get("next") ?? "/crm/dashboard";
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${origin}/crm/auth/callback?next=${encodeURIComponent(next)}`,
+        emailRedirectTo: `${site}/crm/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
     setLoading(false);

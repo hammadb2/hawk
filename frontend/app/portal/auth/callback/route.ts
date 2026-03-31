@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const origin = getPublicSiteUrlFromRequest(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/crm/dashboard";
+  const next = searchParams.get("next") ?? "/portal";
 
   if (code) {
     const cookieStore = await cookies();
@@ -31,5 +31,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/crm/login?error=auth`);
+  return NextResponse.redirect(`${origin}/portal/login?error=auth`);
 }

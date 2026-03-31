@@ -1,9 +1,10 @@
 /**
  * HAWK API client. All requests use JSON and optional Bearer token.
- * Defaults to production; set NEXT_PUBLIC_API_URL=http://localhost:8000 for local dev.
+ * Set NEXT_PUBLIC_API_URL to your FastAPI base (e.g. Railway); defaults to http://localhost:8000.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://hawk.akbstudios.com";
+/** Backend API (Railway, etc.) — not the same as NEXT_PUBLIC_SITE_URL unless you proxy /api. */
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export type ApiError = { detail: string | { msg: string }[] };
 

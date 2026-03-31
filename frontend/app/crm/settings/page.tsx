@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CeoHealthSection } from "@/components/crm/settings/ceo-health-section";
 
 export default function CrmSettingsPage() {
   return (
@@ -34,12 +35,17 @@ export default function CrmSettingsPage() {
         <ul className="mt-3 space-y-1 font-mono text-xs text-zinc-400">
           <li>NEXT_PUBLIC_SUPABASE_URL</li>
           <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
+          <li>NEXT_PUBLIC_SITE_URL (canonical origin — magic links, auth callbacks)</li>
           <li>NEXT_PUBLIC_API_URL</li>
           <li>SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (API)</li>
+          <li>SUPABASE_JWT_SECRET (API — invite / verify-payment)</li>
+          <li>CRM_PUBLIC_BASE_URL, CRM_CEO_WHATSAPP_E164, Twilio vars (API)</li>
           <li>CRM_EMAIL_WEBHOOK_SECRET (API)</li>
           <li>HAWK_CRM_CRON_SECRET, HAWK_CRON_SECRET, or CRON_SECRET (Railway alias — aging cron)</li>
         </ul>
       </section>
+
+      <CeoHealthSection />
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-5">
         <h2 className="text-sm font-semibold text-zinc-200">Database</h2>

@@ -2,7 +2,7 @@
 
 B2B cybersecurity SaaS for Canadian SMBs. External attack-surface scans, findings dashboard, Ask HAWK (AI), compliance mapping, and billing.
 
-**Domain:** hawk.akbstudios.com · **Company:** [AKB Studios](https://akbstudios.com)
+**Domain:** securedbyhawk.com · **Company:** [AKB Studios](https://akbstudios.com)
 
 ---
 

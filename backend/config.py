@@ -37,8 +37,9 @@ DEEPSEEK_REASONER_MODEL = "deepseek-reasoner"
 CHARLOTTE_URL = os.environ.get("CHARLOTTE_URL", "http://46.225.168.75:8001/agent/charlotte")
 CHARLOTTE_API_KEY = os.environ.get("CHARLOTTE_API_KEY", "akb-revenue-ops-2026")
 
-# Frontend base URL (for Stripe redirects)
-BASE_URL = os.environ.get("HAWK_BASE_URL", "https://hawk.akbstudios.com")
+# Frontend / marketing site (Stripe redirects, email links — same host as Next.js when unified)
+DEFAULT_PUBLIC_SITE_URL = "https://securedbyhawk.com"
+BASE_URL = os.environ.get("HAWK_BASE_URL", DEFAULT_PUBLIC_SITE_URL).strip().rstrip("/")
 
 # HaveIBeenPwned (breach check)
 HIBP_API_KEY = os.environ.get("HIBP_API_KEY", "")
@@ -46,6 +47,26 @@ HIBP_API_KEY = os.environ.get("HIBP_API_KEY", "")
 # Optional — wire when used (CRM/AI integrations)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 SMARTLEAD_API_KEY = os.environ.get("SMARTLEAD_API_KEY", "")
+
+# CRM (Supabase Auth JWT for FastAPI — same as Dashboard > Settings > API > JWT Secret)
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+
+# CRM public URL for WhatsApp deep links (no trailing slash)
+CRM_PUBLIC_BASE_URL = (
+    os.environ.get("CRM_PUBLIC_BASE_URL", os.environ.get("HAWK_CRM_PUBLIC_URL", "")).strip().rstrip("/")
+    or DEFAULT_PUBLIC_SITE_URL
+)
+
+# Monitor self-check: public API base (e.g. https://api.example.com) — defaults to localhost PORT in health_monitor
+MONITOR_API_BASE_URL = os.environ.get("MONITOR_API_BASE_URL", "").strip().rstrip("/")
+
+# CEO WhatsApp for Charlotte hot-lead alerts (E.164, e.g. +15551234567)
+CRM_CEO_WHATSAPP_E164 = os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip()
+
+# Client portal — welcome / drip (Phase 2B)
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "HAWK <onboarding@securedbyhawk.com>").strip()
 
 # Cron (scheduled scans) — set to a secret; cron calls with X-Cron-Secret
 # Railway often uses CRON_SECRET; we accept that as an alias for HAWK_CRON_SECRET.

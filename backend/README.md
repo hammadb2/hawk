@@ -22,7 +22,7 @@ Or from `backend/`: `python main.py` (reload on port 8000).
 - `HAWK_SCANNER_RELAY_URL` — Ghost relay (default `http://178.104.27.211:8002`).
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` — Stripe.
 - `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` — Ask HAWK (DeepSeek R1).
-- `HAWK_BASE_URL` — Frontend URL for Stripe redirects (default `https://hawk.akbstudios.com`).
+- `HAWK_BASE_URL` — Frontend URL for Stripe redirects (default `https://securedbyhawk.com`).
 
 ## Endpoints
 

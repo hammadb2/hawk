@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import httpx
 
-from config import CHARLOTTE_URL, CHARLOTTE_API_KEY
+from config import BASE_URL, CHARLOTTE_URL, CHARLOTTE_API_KEY
 
 
 def send_email(to: str, subject: str, body: str) -> bool:
@@ -34,7 +34,7 @@ Next steps:
 • Run a scan to see your external attack surface
 • Check Findings and use Ask HAWK for fix guidance
 
-Log in at https://hawk.akbstudios.com/login
+Log in at {BASE_URL}/login
 
 — The HAWK team
 """
@@ -49,7 +49,7 @@ def critical_finding_alert(
     titles: list[str] | None = None,
 ) -> bool:
     subject = f"HAWK: {critical_count} critical finding(s) for {domain}"
-    lines = [f"We found {critical_count} critical finding(s) on {domain}.", "", "View details:", f"https://hawk.akbstudios.com/dashboard/findings?scan={scan_id}", ""]
+    lines = [f"We found {critical_count} critical finding(s) on {domain}.", "", "View details:", f"{BASE_URL}/dashboard/findings?scan={scan_id}", ""]
     if titles:
         lines.append("Findings:")
         for t in titles[:10]:
@@ -75,7 +75,7 @@ Your weekly HAWK digest for the past 7 days:
   Critical findings (total): {critical_total}
   Domains: {", ".join(domains[:10]) or "—"}
 
-View your dashboard: https://hawk.akbstudios.com/dashboard
+View your dashboard: {BASE_URL}/dashboard
 
 — The HAWK team
 """
@@ -105,7 +105,7 @@ def monthly_report_ready_email(to: str, first_name: str | None = None) -> bool:
 
 Your monthly security report is ready to view and download.
 
-Dashboard: https://hawk.akbstudios.com/dashboard/reports
+Dashboard: {BASE_URL}/dashboard/reports
 
 — The HAWK team
 """
@@ -119,7 +119,7 @@ def trial_expiry_tomorrow_email(to: str, first_name: str | None = None) -> bool:
 
 Your HAWK 7-day trial ends tomorrow. Upgrade to keep your scan history, unlimited Ask HAWK, and compliance reports.
 
-Manage billing: https://hawk.akbstudios.com/dashboard/settings
+Manage billing: {BASE_URL}/dashboard/settings
 
 — The HAWK team
 """
