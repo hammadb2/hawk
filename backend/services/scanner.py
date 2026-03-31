@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import httpx
 
-from backend.config import SCANNER_RELAY_URL, SCANNER_TIMEOUT
+from config import SCANNER_RELAY_URL, SCANNER_TIMEOUT
 
 
 def run_scan(domain: str, scan_id: str | None = None) -> dict:

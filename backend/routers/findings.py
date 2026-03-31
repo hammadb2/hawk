@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import uuid4
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User, Scan, IgnoredFinding
-from backend.schemas import FindingSchema, IgnoreFindingRequest
+from auth import get_current_user
+from database import get_db
+from models import User, Scan, IgnoredFinding
+from schemas import FindingSchema, IgnoreFindingRequest
 
 router = APIRouter(tags=["findings"])
 
@@ -101,7 +101,7 @@ def fix_finding(
             break
     if not domain_str:
         raise HTTPException(status_code=404, detail="Finding not found")
-    from backend.services.scanner import run_scan
+    from services.scanner import run_scan
     new_id = str(uuid4())
     result = run_scan(domain_str, scan_id=new_id)
     from datetime import datetime, timezone

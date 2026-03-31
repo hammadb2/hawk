@@ -8,11 +8,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User, AgencyClient, Scan, Report
-from backend.schemas import AgencyClientCreate
-from backend.services.report_pdf import render_report_pdf
+from auth import get_current_user
+from database import get_db
+from models import User, AgencyClient, Scan, Report
+from schemas import AgencyClientCreate
+from services.report_pdf import render_report_pdf
 
 router = APIRouter(prefix="/api/agency", tags=["agency"])
 

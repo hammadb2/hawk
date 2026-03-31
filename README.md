@@ -42,10 +42,9 @@ uvicorn scanner_relay:app --host 0.0.0.0 --port 8002
 
 ```bash
 cd backend
-# from repo root:
-cp backend/.env.example backend/.env   # edit with real keys
-pip install -r backend/requirements.txt
-PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port 8000
+cp .env.example .env   # edit with real keys
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Database: SQLite at `./hawk.db` by default. Set `DATABASE_URL` for PostgreSQL.

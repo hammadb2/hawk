@@ -6,7 +6,7 @@ import re
 
 import httpx
 
-from backend.config import (
+from config import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
     DEEPSEEK_REASONER_MODEL,

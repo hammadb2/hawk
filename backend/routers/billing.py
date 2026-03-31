@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User
-from backend.schemas import CheckoutRequest
-from backend.config import (
+from auth import get_current_user
+from database import get_db
+from models import User
+from schemas import CheckoutRequest
+from config import (
     STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_STARTER,

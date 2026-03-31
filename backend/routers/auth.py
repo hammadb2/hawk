@@ -7,16 +7,16 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.auth import (
+from auth import (
     hash_password,
     verify_password,
     create_access_token,
     get_current_user,
     user_to_response,
 )
-from backend.database import get_db
-from backend.models import User, PasswordResetToken
-from backend.schemas import (
+from database import get_db
+from models import User, PasswordResetToken
+from schemas import (
     RegisterRequest,
     LoginRequest,
     TokenResponse,
@@ -24,8 +24,8 @@ from backend.schemas import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
 )
-from backend.config import TRIAL_DAYS, BASE_URL
-from backend.services.charlotte import welcome_email, password_reset_email
+from config import TRIAL_DAYS, BASE_URL
+from services.charlotte import welcome_email, password_reset_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

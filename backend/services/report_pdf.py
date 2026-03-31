@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from backend.models import Scan
+from models import Scan
 
 
 def _escape(s: str) -> str:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import httpx
 
-from backend.config import CHARLOTTE_URL, CHARLOTTE_API_KEY
+from config import CHARLOTTE_URL, CHARLOTTE_API_KEY
 
 
 def send_email(to: str, subject: str, body: str) -> bool:

@@ -5,12 +5,12 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User, Scan, HawkMessage
-from backend.schemas import HawkChatRequest, HawkChatResponse
-from backend.services.hawk_chat import build_system_prompt, chat
-from backend.config import PLAN_ASK_HAWK_LIMIT
+from auth import get_current_user
+from database import get_db
+from models import User, Scan, HawkMessage
+from schemas import HawkChatRequest, HawkChatResponse
+from services.hawk_chat import build_system_prompt, chat
+from config import PLAN_ASK_HAWK_LIMIT
 
 router = APIRouter(prefix="/api/hawk", tags=["ask-hawk"])
 

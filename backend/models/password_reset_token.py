@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import Column, DateTime, String
 
-from backend.database import Base
+from database import Base
 
 
 class PasswordResetToken(Base):

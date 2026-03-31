@@ -10,14 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.config import CRON_SECRET
-from backend.database import get_db
-from backend.models import User, Scan, Domain, Report
-from backend.schemas import ScanStartRequest, ScanResponse, ScanListItem
-from backend.services.scanner import run_scan
-from backend.services.charlotte import critical_finding_alert, trial_expiry_tomorrow_email, weekly_digest_email, monthly_report_ready_email
-from backend.config import PLAN_DOMAINS
+from auth import get_current_user
+from config import CRON_SECRET
+from database import get_db
+from models import User, Scan, Domain, Report
+from schemas import ScanStartRequest, ScanResponse, ScanListItem
+from services.scanner import run_scan
+from services.charlotte import critical_finding_alert, trial_expiry_tomorrow_email, weekly_digest_email, monthly_report_ready_email
+from config import PLAN_DOMAINS
 
 router = APIRouter(tags=["scans"])
 

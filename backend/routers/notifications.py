@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User, Notification
+from auth import get_current_user
+from database import get_db
+from models import User, Notification
 
 router = APIRouter(tags=["notifications"])
 

@@ -10,12 +10,12 @@ from fastapi.responses import FileResponse
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User, Scan, Report
-from backend.schemas import ReportGenerateRequest
-from backend.config import PLAN_PDF_PER_MONTH
-from backend.services.report_pdf import render_report_pdf
+from auth import get_current_user
+from database import get_db
+from models import User, Scan, Report
+from schemas import ReportGenerateRequest
+from config import PLAN_PDF_PER_MONTH
+from services.report_pdf import render_report_pdf
 
 router = APIRouter(tags=["reports"])
 

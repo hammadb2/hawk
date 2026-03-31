@@ -5,7 +5,7 @@ import time
 
 import httpx
 
-from backend.config import HIBP_API_KEY
+from config import HIBP_API_KEY
 
 HIBP_BASE_URL = "https://haveibeenpwned.com/api/v3"
 HIBP_RATE_DELAY = 1.6  # seconds between requests (HIBP rate limit: ~1 req/1500ms)

@@ -4,10 +4,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, field_validator
 
-from backend.auth import get_current_user
-from backend.config import HIBP_API_KEY
-from backend.models import User
-from backend.services.hibp import check_domain_emails
+from auth import get_current_user
+from config import HIBP_API_KEY
+from models import User
+from services.hibp import check_domain_emails
 
 router = APIRouter(tags=["breach-check"])
 

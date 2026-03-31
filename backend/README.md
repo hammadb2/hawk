@@ -9,10 +9,11 @@ FastAPI backend: auth, scans, findings, domains, reports, billing, Ask HAWK, age
 python -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
-PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port 8000
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Or: `PYTHONPATH=. python backend/main.py` (reload on port 8000).
+Or from `backend/`: `python main.py` (reload on port 8000).
 
 ## Env
 

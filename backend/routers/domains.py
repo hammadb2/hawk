@@ -5,11 +5,11 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import User, Domain
-from backend.schemas import DomainCreate, DomainUpdate, DomainResponse
-from backend.config import PLAN_DOMAINS
+from auth import get_current_user
+from database import get_db
+from models import User, Domain
+from schemas import DomainCreate, DomainUpdate, DomainResponse
+from config import PLAN_DOMAINS
 
 router = APIRouter(tags=["domains"])
 
