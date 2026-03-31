@@ -18,7 +18,8 @@ CONNECT_ARGS = {} if DATABASE_URL.startswith("postgresql") else {"check_same_thr
 
 # Scanner relay (Ghost)
 SCANNER_RELAY_URL = os.environ.get("HAWK_SCANNER_RELAY_URL", "http://178.104.27.211:8002")
-SCANNER_TIMEOUT = float(os.environ.get("HAWK_SCANNER_TIMEOUT", "120"))
+# Must be >= longest expected hawk-scanner-v2 sync run (Vercel CRM calls wait up to ~295s)
+SCANNER_TIMEOUT = float(os.environ.get("HAWK_SCANNER_TIMEOUT", "300"))
 
 # Stripe
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")

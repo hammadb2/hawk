@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-/** Vercel: allow this route to wait for upstream scan (30–60s). Requires Pro for >10s on some plans. */
-export const maxDuration = 60;
+/**
+ * Vercel serverless limit for this route. Full scanner pipeline often runs 2–5+ minutes.
+ * Hobby caps lower; Pro/Enterprise supports up to 300s (see Vercel dashboard → Functions).
+ */
+export const maxDuration = 300;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-const SCAN_FETCH_MS = 60_000;
+/** Stay slightly under maxDuration so the fetch aborts before Vercel kills the function */
+const SCAN_FETCH_MS = 295_000;
 
 /** Parse FastAPI-style JSON error body: { "detail": "..." } or validation array */
 function parseUpstreamError(text: string): string {
