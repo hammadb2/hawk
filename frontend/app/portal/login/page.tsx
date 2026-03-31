@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import toast from "react-hot-toast";
-import { getEmailRedirectOrigin } from "@/lib/site-url";
+import { getPortalMagicLinkCallbackUrl } from "@/lib/site-url";
 
 function PortalLoginForm() {
   const searchParams = useSearchParams();
@@ -22,11 +22,10 @@ function PortalLoginForm() {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
-    const site = getEmailRedirectOrigin();
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
-        emailRedirectTo: `${site}/portal/auth/callback`,
+        emailRedirectTo: getPortalMagicLinkCallbackUrl(),
       },
     });
     setLoading(false);

@@ -1,8 +1,22 @@
 /**
  * Canonical public site origin (no trailing slash).
- * Set NEXT_PUBLIC_SITE_URL on Vercel (e.g. https://securedbyhawk.com) for magic links, redirects, and emails.
+ * Set NEXT_PUBLIC_SITE_URL in Vercel (e.g. https://securedbyhawk.com). Magic links must use this exact origin
+ * so Supabase does not fall back to the project Site URL (often "/" only).
  */
-const FALLBACK_PRODUCTION_SITE = "https://securedbyhawk.com";
+const FALLBACK_PRODUCTION_ORIGIN = "https://securedbyhawk.com";
+
+/** Production-safe origin: env wins; otherwise securedbyhawk.com (not window.location — avoids relative / wrong host). */
+export function getPublicSiteOrigin(): string {
+  const env = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (env) return env;
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return window.location.origin;
+    }
+  }
+  return FALLBACK_PRODUCTION_ORIGIN;
+}
 
 export function getPublicSiteUrlFromRequest(requestUrl: string): string {
   const env = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
@@ -11,12 +25,19 @@ export function getPublicSiteUrlFromRequest(requestUrl: string): string {
 }
 
 /**
- * Client-only: use env when set (matches production domain during local dev if you set .env.local),
- * otherwise current window origin.
+ * Full URL for CRM magic link return — must be absolute and listed in Supabase Auth → Redirect URLs.
+ * Example: https://securedbyhawk.com/crm/auth/callback?next=%2Fcrm%2Fdashboard
  */
-export function getEmailRedirectOrigin(): string {
-  if (typeof window !== "undefined") {
-    return process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") || window.location.origin;
-  }
-  return process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") || FALLBACK_PRODUCTION_SITE;
+export function getCrmMagicLinkCallbackUrl(nextPath: string): string {
+  const origin = getPublicSiteOrigin();
+  const path = nextPath.startsWith("/") ? nextPath : `/${nextPath}`;
+  const u = new URL(`${origin}/crm/auth/callback`);
+  u.searchParams.set("next", path);
+  return u.toString();
+}
+
+/** Portal magic link — absolute URL for emailRedirectTo. */
+export function getPortalMagicLinkCallbackUrl(): string {
+  const origin = getPublicSiteOrigin();
+  return `${origin}/portal/auth/callback`;
 }
