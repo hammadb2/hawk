@@ -12,6 +12,8 @@ export type ProspectStage =
 
 export type ProspectSource = "charlotte" | "manual" | "inbound";
 
+export type ProfileStatus = "invited" | "onboarding" | "active" | "at_risk" | "inactive";
+
 export type Profile = {
   id: string;
   email: string | null;
@@ -19,11 +21,14 @@ export type Profile = {
   role: CrmRole;
   team_lead_id: string | null;
   avatar_url: string | null;
-  status: string;
+  status: ProfileStatus | string;
   created_at: string;
   monthly_close_target?: number | null;
   last_close_at?: string | null;
   onboarding_checklist?: Record<string, boolean> | null;
+  onboarding_completed_at?: string | null;
+  last_assigned_at?: string | null;
+  whatsapp_number?: string | null;
 };
 
 export type Prospect = {
@@ -127,6 +132,16 @@ export type CrmNotificationRow = {
   created_at: string;
 };
 
+export type SystemHealthLogRow = {
+  id: string;
+  service: string;
+  status: "ok" | "degraded" | "failed";
+  response_ms: number | null;
+  checked_at: string;
+  detail: Record<string, unknown>;
+  alert_sent: boolean;
+};
+
 export type CrmClientRow = {
   id: string;
   prospect_id: string | null;
@@ -139,6 +154,7 @@ export type CrmClientRow = {
   status: "active" | "past_due" | "churned";
   close_date: string;
   created_at: string;
+  commission_deferred?: boolean;
 };
 
 export type ProspectFileRow = {

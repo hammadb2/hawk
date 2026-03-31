@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { CeoLiveDashboard } from "@/components/crm/dashboard/ceo-live-dashboard";
 import type { Prospect } from "@/lib/crm/types";
 
 export default function CrmDashboardPage() {
@@ -66,7 +67,8 @@ export default function CrmDashboardPage() {
   const roleLabel = profile.role.replace("_", " ");
   const checklist = profile.onboarding_checklist as Record<string, boolean> | null | undefined;
   const onboardingDone =
-    checklist && ["whatsapp", "video", "first_prospect", "profile"].every((k) => checklist[k]);
+    !!profile.onboarding_completed_at ||
+    (checklist && ["whatsapp", "video", "first_prospect", "profile"].every((k) => checklist[k]));
 
   return (
     <div className="space-y-6">
@@ -85,6 +87,10 @@ export default function CrmDashboardPage() {
             Continue onboarding
           </Link>
         </div>
+      )}
+
+      {["ceo", "hos"].includes(profile.role) && (
+        <CeoLiveDashboard supabase={supabase} profile={profile} />
       )}
 
       {["ceo", "hos"].includes(profile.role) && hotLeads.length > 0 && (

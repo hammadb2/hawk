@@ -752,7 +752,9 @@ export function ProspectProfile({
       <CloseWonModal
         open={wonOpen}
         onOpenChange={setWonOpen}
-        onConfirm={async ({ planId, mrrCents, stripeCustomerId }) => {
+        accessToken={session?.access_token ?? null}
+        prospectDomain={p.domain}
+        onConfirm={async ({ planId, mrrCents, stripeCustomerId, commissionDeferred }) => {
           if (!session?.user?.id) return;
           const fromStage = p.stage;
           await supabase.from("clients").insert({
@@ -764,10 +766,15 @@ export function ProspectProfile({
             stripe_customer_id: stripeCustomerId,
             closing_rep_id: p.assigned_rep_id ?? session.user.id,
             status: "active",
+            commission_deferred: commissionDeferred,
           });
           await supabase.from("prospects").update({ stage: "closed_won", last_activity_at: new Date().toISOString() }).eq("id", p.id);
           await logActivity("stage_changed", { from: fromStage, to: "closed_won", plan: planId });
-          toast.success("Client created — commission recorded (30% of MRR)");
+          toast.success(
+            commissionDeferred
+              ? "Client created — commission will post when Stripe payment clears"
+              : "Client created — commission recorded (30% of MRR)"
+          );
           await load();
           onUpdated?.();
         }}

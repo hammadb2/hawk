@@ -513,7 +513,9 @@ export function PipelinePage() {
       <CloseWonModal
         open={wonOpen}
         onOpenChange={setWonOpen}
-        onConfirm={async ({ planId, mrrCents, stripeCustomerId }) => {
+        accessToken={session?.access_token ?? null}
+        prospectDomain={pendingWon?.domain ?? ""}
+        onConfirm={async ({ planId, mrrCents, stripeCustomerId, commissionDeferred }) => {
           if (!pendingWon || !session?.user?.id) return;
           const planLabel = planId;
           const closer = pendingWon.assigned_rep_id ?? session.user.id;
@@ -526,13 +528,18 @@ export function PipelinePage() {
             stripe_customer_id: stripeCustomerId,
             closing_rep_id: closer,
             status: "active",
+            commission_deferred: commissionDeferred,
           });
           await supabase
             .from("prospects")
             .update({ stage: "closed_won", last_activity_at: new Date().toISOString() })
             .eq("id", pendingWon.id);
           await logActivity(pendingWon.id, "stage_changed", { from: pendingWon.stage, to: "closed_won", plan: planLabel });
-          toast.success("Client created — commission recorded (30% of MRR)");
+          toast.success(
+            commissionDeferred
+              ? "Client created — commission will post when Stripe payment clears"
+              : "Client created — commission recorded (30% of MRR)"
+          );
           setPendingWon(null);
           await load();
         }}
