@@ -1,13 +1,10 @@
-# Railway: provision Redis plugin, set REDIS_URL.
-# Service A (web): start command default from Dockerfile (uvicorn).
+# Web service can use /health; arq worker has no HTTP — disable deploy healthcheck for worker.
 # Service B (worker): start command `arq app.queue.worker.WorkerSettings`
-# Env: ANTHROPIC_API_KEY, HIBP_API_KEY, GITHUB_TOKEN, BREACHSENSE_* (optional), SUPABASE_* (optional)
 
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 30
-restartPolicyType = "on_failure"
+healthcheckPath = ""
+healthcheckTimeout = 0
