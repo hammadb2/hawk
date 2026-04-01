@@ -1347,6 +1347,14 @@ create policy "shield_events_select_privileged"
   );
 
 
+-- >>> migrations/20260410000001_profiles_role_closer.sql >>>
+
+alter table public.profiles drop constraint if exists profiles_role_check;
+
+alter table public.profiles
+  add constraint profiles_role_check
+  check (role in ('ceo', 'hos', 'team_lead', 'sales_rep', 'closer'));
+
 -- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<
 
 select tablename, policyname, cmd, qual, with_check

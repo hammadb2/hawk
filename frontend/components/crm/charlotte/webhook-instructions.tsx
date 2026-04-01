@@ -8,12 +8,17 @@ export function WebhookInstructions({ apiBase }: { apiBase: string }) {
   const base = apiBase.replace(/\/$/, "");
   const url = `${base}/api/crm/webhooks/email-events`;
   const example = `{
-  "domain": "example.com",
-  "subject": "Quick follow-up",
-  "sent_at": "2026-03-29T15:00:00Z",
-  "sequence_step": 2,
+  "contact_email": "alex@acmecorp.ca",
+  "domain": "acmecorp.ca",
+  "first_name": "Alex",
+  "company_name": "Acme Corp",
+  "industry": "Manufacturing",
+  "hawk_score": 64,
+  "subject": "re: acmecorp.ca scan",
+  "replied_at": "2026-03-31T18:00:00Z",
+  "sequence_step": 1,
   "source": "smartlead",
-  "external_id": "sl-msg-abc123"
+  "external_id": "sl-reply-abc123"
 }`;
 
   async function copy(text: string, key: string) {

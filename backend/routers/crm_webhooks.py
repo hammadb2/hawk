@@ -12,8 +12,12 @@ import httpx
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from config import CRM_CEO_WHATSAPP_E164, CRM_PUBLIC_BASE_URL
-from services.crm_twilio import format_hot_lead_message, send_whatsapp
+from config import CRM_PUBLIC_BASE_URL
+from services.crm_twilio import (
+    format_charlotte_reply_ceo_message,
+    format_charlotte_reply_rep_message,
+    send_whatsapp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,9 @@ router = APIRouter(prefix="/api/crm/webhooks", tags=["crm-webhooks"])
 WEBHOOK_SECRET = os.environ.get("CRM_EMAIL_WEBHOOK_SECRET", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+# Charlotte / CEO alert — defaults to spec number if env unset
+CRM_CEO_WHATSAPP_E164 = os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip() or "+18259458282"
 
 
 def _sb_headers() -> dict[str, str]:
@@ -48,10 +55,16 @@ def normalize_domain(raw: str) -> str:
 
 
 class EmailEventIn(BaseModel):
-    """Payload for POST /api/crm/webhooks/email-events — at least one of prospect_id or domain."""
+    """Payload for POST /api/crm/webhooks/email-events — at least one of prospect_id, domain, or contact_email."""
 
     prospect_id: Optional[str] = None
     domain: Optional[str] = None
+    contact_email: Optional[str] = Field(
+        default=None,
+        description="Prospect work email (used to derive domain and match CRM row)",
+    )
+    first_name: Optional[str] = None
+    hawk_score: Optional[int] = None
     subject: Optional[str] = None
     sent_at: Optional[datetime] = None
     opened_at: Optional[datetime] = None
@@ -91,36 +104,87 @@ def _require_webhook_secret(x_secret: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
 
-def _round_robin_rep_id() -> tuple[str | None, str | None]:
-    """Returns (rep_id, whatsapp_e164) for next active sales_rep."""
+def _round_robin_closer_rep_id() -> tuple[str | None, str | None, str | None]:
+    """Next active closer (preferred) or sales_rep. Returns (rep_id, full_name, whatsapp_e164)."""
     headers = _sb_headers()
+    for role in ("closer", "sales_rep"):
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=headers,
+            params={
+                "role": f"eq.{role}",
+                "status": "eq.active",
+                "select": "id,full_name,whatsapp_number,last_assigned_at",
+                "order": "last_assigned_at.asc.nullsfirst",
+                "limit": "1",
+            },
+            timeout=20.0,
+        )
+        r.raise_for_status()
+        rows = r.json()
+        if not rows:
+            continue
+        rid = str(rows[0]["id"])
+        name = str(rows[0].get("full_name") or rows[0].get("email") or "Rep")
+        wa = rows[0].get("whatsapp_number")
+        patch = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=headers,
+            params={"id": f"eq.{rid}"},
+            json={"last_assigned_at": datetime.now(timezone.utc).isoformat()},
+            timeout=20.0,
+        )
+        patch.raise_for_status()
+        return rid, name, (str(wa).strip() if wa else None)
+    return None, None, None
+
+
+def _get_prospect_row(prospect_id: str) -> dict[str, Any] | None:
     r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/profiles",
-        headers=headers,
+        f"{SUPABASE_URL}/rest/v1/prospects",
+        headers=_sb_headers(),
+        params={"id": f"eq.{prospect_id}", "select": "*", "limit": "1"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    return rows[0] if rows else None
+
+
+def _fetch_prospect_by_domain(nd: str) -> dict[str, Any] | None:
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/prospects",
+        headers=_sb_headers(),
         params={
-            "role": "eq.sales_rep",
-            "status": "eq.active",
-            "select": "id,whatsapp_number,last_assigned_at",
-            "order": "last_assigned_at.asc.nullsfirst",
+            "domain": f"eq.{nd}",
+            "select": "*",
+            "order": "created_at.desc",
             "limit": "1",
         },
         timeout=20.0,
     )
     r.raise_for_status()
     rows = r.json()
-    if not rows:
-        return None, None
-    rid = str(rows[0]["id"])
-    wa = rows[0].get("whatsapp_number")
-    patch = httpx.patch(
-        f"{SUPABASE_URL}/rest/v1/profiles",
-        headers=headers,
-        params={"id": f"eq.{rid}"},
-        json={"last_assigned_at": datetime.now(timezone.utc).isoformat()},
+    return rows[0] if rows else None
+
+
+def _fetch_prospect_by_contact_email(email: str) -> dict[str, Any] | None:
+    if not email or "@" not in email:
+        return None
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/prospects",
+        headers=_sb_headers(),
+        params={
+            "contact_email": f"eq.{email.strip()}",
+            "select": "*",
+            "order": "created_at.desc",
+            "limit": "1",
+        },
         timeout=20.0,
     )
-    patch.raise_for_status()
-    return rid, (str(wa).strip() if wa else None)
+    r.raise_for_status()
+    rows = r.json()
+    return rows[0] if rows else None
 
 
 def _create_prospect_charlotte(
@@ -130,18 +194,25 @@ def _create_prospect_charlotte(
     assigned_rep_id: str,
     company: str,
     industry: str | None,
-) -> dict:
+    contact_email: str | None,
+    contact_name: str | None,
+    hawk_score: int,
+) -> dict[str, Any]:
     headers = _sb_headers()
-    row = {
+    row: dict[str, Any] = {
         "domain": nd,
         "company_name": company,
         "industry": industry,
         "stage": stage,
         "source": "charlotte",
         "assigned_rep_id": assigned_rep_id,
-        "hawk_score": 0,
+        "hawk_score": hawk_score,
         "last_activity_at": datetime.now(timezone.utc).isoformat(),
     }
+    if contact_email:
+        row["contact_email"] = contact_email
+    if contact_name:
+        row["contact_name"] = contact_name
     r = httpx.post(f"{SUPABASE_URL}/rest/v1/prospects", headers=headers, json=row, timeout=20.0)
     if r.status_code == 409:
         raise HTTPException(status_code=409, detail="Duplicate domain")
@@ -150,20 +221,25 @@ def _create_prospect_charlotte(
     return out[0] if isinstance(out, list) and out else out
 
 
+def _resolve_domain(body: EmailEventIn) -> str:
+    if body.domain:
+        return normalize_domain(body.domain)
+    ce = body.contact_email or (body.metadata or {}).get("contact_email")
+    if isinstance(ce, str) and "@" in ce:
+        return normalize_domain(ce.split("@")[1])
+    return ""
+
+
 def _resolve_prospect_or_create(body: EmailEventIn) -> tuple[str, bool]:
-    """
-    Returns (prospect_id, created_new).
-    Charlotte auto-create: email_replied / email_opened with no existing prospect for domain.
-    """
+    """Returns (prospect_id, created_new)."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured on API")
 
     headers = _sb_headers()
 
     if body.prospect_id:
-        url = f"{SUPABASE_URL}/rest/v1/prospects"
         r = httpx.get(
-            url,
+            f"{SUPABASE_URL}/rest/v1/prospects",
             headers=headers,
             params={"id": f"eq.{body.prospect_id}", "select": "id", "limit": "1"},
             timeout=20.0,
@@ -174,79 +250,135 @@ def _resolve_prospect_or_create(body: EmailEventIn) -> tuple[str, bool]:
             raise HTTPException(status_code=404, detail="Prospect not found")
         return str(rows[0]["id"]), False
 
-    if not body.domain:
-        raise HTTPException(status_code=400, detail="Provide prospect_id or domain")
-
-    nd = normalize_domain(body.domain)
-    if not nd:
-        raise HTTPException(status_code=400, detail="Invalid domain")
-
-    r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/prospects",
-        headers=headers,
-        params={
-            "domain": f"eq.{nd}",
-            "select": "id",
-            "order": "created_at.desc",
-            "limit": "1",
-        },
-        timeout=20.0,
-    )
-    r.raise_for_status()
-    rows = r.json()
-    if rows:
-        return str(rows[0]["id"]), False
-
+    nd = _resolve_domain(body)
     md = body.metadata or {}
+    contact_email = body.contact_email or md.get("contact_email")
+    if isinstance(contact_email, str):
+        contact_email = contact_email.strip() or None
+
+    prospect: dict[str, Any] | None = None
+    if nd:
+        prospect = _fetch_prospect_by_domain(nd)
+    if not prospect and contact_email:
+        prospect = _fetch_prospect_by_contact_email(contact_email)
+
+    if prospect:
+        return str(prospect["id"]), False
+
     et = (body.event_type or md.get("event_type") or "").lower()
     is_reply = body.replied_at is not None or et in ("email_replied", "reply", "replied")
-    is_open = (
-        not is_reply
-        and (body.opened_at is not None or et in ("email_opened", "open", "opened"))
+    is_open = not is_reply and (
+        body.opened_at is not None or et in ("email_opened", "open", "opened")
     )
 
     if not is_reply and not is_open:
-        raise HTTPException(status_code=404, detail=f"No prospect for domain {nd}")
+        raise HTTPException(status_code=404, detail="No prospect for domain / email")
 
-    rep_id, rep_wa = _round_robin_rep_id()
+    if not nd:
+        raise HTTPException(status_code=400, detail="Provide prospect_id, domain, or contact_email")
+
+    rep_id, _rep_name, _rep_wa = _round_robin_closer_rep_id()
     if not rep_id:
-        raise HTTPException(status_code=503, detail="No active sales_rep for round-robin")
+        raise HTTPException(status_code=503, detail="No active closer or sales_rep for round-robin")
 
     stage = "replied" if is_reply else "scanned"
-    company = (body.company_name or md.get("company_name") or nd.split(".")[0].title())[:200]
+    company = (
+        body.company_name
+        or md.get("company_name")
+        or (nd.split(".")[0].replace("-", " ").title() if nd else "Prospect")
+    )[:200]
     industry = body.industry or md.get("industry")
+
+    hs = body.hawk_score if body.hawk_score is not None else md.get("hawk_score")
+    try:
+        hawk_score = int(hs) if hs is not None else 0
+    except (TypeError, ValueError):
+        hawk_score = 0
+
+    first = body.first_name or md.get("first_name")
+    contact_name = str(first).strip() if first else None
 
     pr = _create_prospect_charlotte(
         nd=nd,
         stage=stage,
         assigned_rep_id=rep_id,
         company=company,
-        industry=industry,
+        industry=str(industry) if industry else None,
+        contact_email=contact_email,
+        contact_name=contact_name,
+        hawk_score=hawk_score,
     )
-    pid = str(pr["id"])
+    return str(pr["id"]), True
 
-    base = CRM_PUBLIC_BASE_URL
-    prospect_url = f"{base}/crm/prospects/{pid}"
-    msg = format_hot_lead_message(
-        company=company,
-        domain=nd,
-        hawk_score=pr.get("hawk_score", 0) or 0,
-        industry=industry,
-        prospect_url=prospect_url,
-    )
+
+def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn) -> None:
+    """WhatsApp rep + CEO; timeline activity (reply events)."""
+    prospect = _get_prospect_row(prospect_id)
+    if not prospect:
+        return
+
+    md = body.metadata or {}
+    first = body.first_name or md.get("first_name") or prospect.get("contact_name")
+    company = prospect.get("company_name") or prospect.get("domain") or "Prospect"
+    score = prospect.get("hawk_score", 0) or 0
+    base = CRM_PUBLIC_BASE_URL or "https://securedbyhawk.com"
+
+    rep_id = prospect.get("assigned_rep_id")
+    rep_name = "Rep"
+    rep_wa: str | None = None
+    if rep_id:
+        pr = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=_sb_headers(),
+            params={"id": f"eq.{rep_id}", "select": "full_name,whatsapp_number", "limit": "1"},
+            timeout=15.0,
+        )
+        if pr.status_code == 200 and pr.json():
+            row = pr.json()[0]
+            rep_name = str(row.get("full_name") or "Rep")
+            w = row.get("whatsapp_number")
+            rep_wa = str(w).strip() if w else None
+
     if rep_wa:
         try:
+            msg = format_charlotte_reply_rep_message(
+                company=str(company),
+                first_name=str(first) if first else None,
+                crm_base_url=base,
+            )
             send_whatsapp(rep_wa, msg)
         except Exception:
-            logger.exception("WhatsApp to rep failed")
-    # CEO alert on positive reply only (spec: every reply, regardless of assignment)
-    if CRM_CEO_WHATSAPP_E164 and is_reply:
-        try:
-            send_whatsapp(CRM_CEO_WHATSAPP_E164, msg)
-        except Exception:
-            logger.exception("WhatsApp to CEO failed")
+            logger.exception("WhatsApp Charlotte rep alert failed prospect=%s", prospect_id)
 
-    return pid, True
+    if CRM_CEO_WHATSAPP_E164:
+        try:
+            ceo_msg = format_charlotte_reply_ceo_message(
+                company=str(company),
+                score=score,
+                rep_name=rep_name,
+            )
+            send_whatsapp(CRM_CEO_WHATSAPP_E164, ceo_msg)
+        except Exception:
+            logger.exception("WhatsApp Charlotte CEO alert failed")
+
+    try:
+        httpx.post(
+            f"{SUPABASE_URL}/rest/v1/activities",
+            headers=_sb_headers(),
+            json={
+                "prospect_id": prospect_id,
+                "type": "charlotte_reply",
+                "notes": "Charlotte reply received",
+                "metadata": {
+                    "source": body.source,
+                    "external_id": body.external_id,
+                    "subject": body.subject,
+                },
+            },
+            timeout=15.0,
+        ).raise_for_status()
+    except Exception:
+        logger.exception("Activity insert failed prospect=%s", prospect_id)
 
 
 @router.post("/email-events")
@@ -259,10 +391,10 @@ def ingest_email_event(
 
     **Auth:** header `X-CRM-Webhook-Secret` must match `CRM_EMAIL_WEBHOOK_SECRET`.
 
-    **Match prospect:** send `prospect_id` (uuid) **or** `domain` — if no prospect exists and the
-    event is a Charlotte reply/open, a prospect is auto-created (round-robin assign).
+    **Match prospect:** `prospect_id`, or `domain`, or derive domain from `contact_email`.
 
-    **Idempotency:** optional `external_id` (per prospect). Duplicate posts return the existing row.
+    **Charlotte / Smartlead reply:** if no prospect exists, creates one (round-robin closer),
+    then WhatsApp rep + CEO and logs timeline activity.
     """
     _require_webhook_secret(x_crm_webhook_secret)
 
@@ -313,6 +445,10 @@ def ingest_email_event(
     out = r.json()
     inserted = out[0] if isinstance(out, list) and out else out
     eid = inserted.get("id") if isinstance(inserted, dict) else None
+
+    if body.replied_at is not None:
+        _notify_charlotte_reply(prospect_id=pid, body=body)
+
     return {"ok": True, "id": eid, "prospect_id": pid}
 
 

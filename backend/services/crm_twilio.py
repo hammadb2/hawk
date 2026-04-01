@@ -90,3 +90,26 @@ def format_hot_lead_message(
         f"Industry: {ind}\n"
         f"View in CRM: {prospect_url}"
     )
+
+
+def format_charlotte_reply_rep_message(
+    *,
+    company: str,
+    first_name: str | None,
+    crm_base_url: str,
+) -> str:
+    fn = (first_name or "").strip() or "Someone"
+    base = crm_base_url.rstrip("/")
+    return (
+        f"New Charlotte reply. {company}. {fn} replied to your email. "
+        f"Login: {base}/crm"
+    )
+
+
+def format_charlotte_reply_ceo_message(
+    *,
+    company: str,
+    score: int | str,
+    rep_name: str,
+) -> str:
+    return f"Charlotte reply. {company} scored {score}/100. Assigned to {rep_name}."
