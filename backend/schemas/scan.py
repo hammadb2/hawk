@@ -4,8 +4,9 @@ from pydantic import BaseModel, Field
 
 
 class ScanStartRequest(BaseModel):
+    """Public scan body. full_result=True returns full scanner JSON for CRM/debug; default is slim."""
+
     domain: str = Field(..., min_length=1)
-    """When True, return full scanner JSON (findings, raw_layers, etc.). Default slim response for public gate."""
     full_result: bool = False
 
 
