@@ -7,6 +7,8 @@ from auth import get_current_user
 from database import get_db
 from models import User
 from schemas import CheckoutRequest
+import logging
+
 from config import (
     STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET,
@@ -15,6 +17,21 @@ from config import (
     STRIPE_PRICE_AGENCY,
     BASE_URL,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _stripe_event_to_dict(event) -> dict:
+    """Stripe SDK returns StripeObject; CRM helpers expect plain dicts."""
+    if isinstance(event, dict):
+        return event
+    to_d = getattr(event, "to_dict", None)
+    if callable(to_d):
+        return to_d()
+    try:
+        return dict(event)
+    except Exception:
+        return {"type": getattr(event, "type", None), "data": getattr(event, "data", None)}
 
 # Map Stripe price ID -> plan name for webhook
 def _plan_from_subscription(sub) -> str | None:
@@ -129,6 +146,21 @@ async def webhook(
             user.stripe_subscription_id = None
             user.plan = "trial"
             db.commit()
+    elif event["type"] == "checkout.session.completed":
+        evd = _stripe_event_to_dict(event)
+        # CRM Shield Day 0: portal, deep scan, WhatsApp, Resend — see services.crm_portal_stripe
+        try:
+            from services.crm_portal_stripe import provision_portal_from_checkout
+
+            provision_portal_from_checkout(evd)
+        except Exception:
+            logger.exception("checkout.session.completed CRM provision failed")
+        try:
+            from services.crm_stripe_crm import fulfill_deferred_commission_for_stripe_event
+
+            fulfill_deferred_commission_for_stripe_event(evd)
+        except Exception:
+            logger.exception("checkout.session.completed commission fulfill failed")
     return {"received": True}
 
 
