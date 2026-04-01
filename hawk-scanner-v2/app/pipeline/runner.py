@@ -9,7 +9,7 @@ from typing import Any
 
 from app.analysis import email_security, ssl_deep
 from app.breach_cost import build_estimate
-from app.integrations import breachsense, claude_interpret, github_search, hibp_domain
+from app.integrations import attack_paths, breach_monitoring, claude_interpret, github_search
 from app.models import Finding, ScanResponse
 from app.pipeline.layers import dnstwist, httpx_whatweb, naabu, nuclei, subfinder
 from app.scoring import compute_score
@@ -82,6 +82,7 @@ async def run_scan(
     *,
     scan_id: str | None = None,
     industry: str | None = None,
+    company_name: str | None = None,
     settings: Settings | None = None,
 ) -> ScanResponse:
     settings = settings or get_settings()
@@ -97,25 +98,25 @@ async def run_scan(
     l5_task = dnstwist.run(domain, settings)
     l7_task = email_security.analyze(domain)
     l8_task = ssl_deep.analyze(domain)
-    l6a_task = hibp_domain.check_domain(domain, settings.hibp_api_key)
-    l6b_task = breachsense.check_domain(
-        domain, settings.breachsense_api_key, settings.breachsense_base_url
-    )
+    l6_task = breach_monitoring.run_breach_layers(domain, settings)
     l9_task = github_search.search_domain(domain, settings.github_token)
 
-    l2, l5, l7, l8, hibp_sum, breachsense_sum, gh_sum = await asyncio.gather(
-        l2_task, l5_task, l7_task, l8_task, l6a_task, l6b_task, l9_task
+    l2, l5, l7, l8, breach_summaries, gh_sum = await asyncio.gather(
+        l2_task, l5_task, l7_task, l8_task, l6_task, l9_task
     )
     raw_layers["naabu"] = l2
     raw_layers["dnstwist"] = l5
-    raw_layers["hibp_domain"] = hibp_sum
-    raw_layers["breachsense"] = breachsense_sum
+    raw_layers["breach_monitoring"] = breach_summaries
     raw_layers["github"] = gh_sum
 
     all_findings: list[dict[str, Any]] = []
     all_findings.extend(l7)
     all_findings.extend(l8)
-    all_findings.extend(hibp_domain.findings_from_hibp(domain, hibp_sum))
+    all_findings.extend(
+        breach_monitoring.build_breach_monitoring_findings(
+            domain, breach_summaries, company_name=company_name
+        )
+    )
     all_findings.extend(github_search.findings_from_github(domain, gh_sum))
     all_findings.extend(_dnstwist_findings(domain, l5))
 
@@ -147,6 +148,15 @@ async def run_scan(
     raw_layers["interpreted_count"] = len(interpreted)
     _merge_interpretations(all_findings, interpreted)
 
+    paths = await attack_paths.compute_attack_paths(
+        domain=domain,
+        industry=industry,
+        company_name=company_name,
+        findings=all_findings,
+        settings=settings,
+    )
+    raw_layers["attack_paths_count"] = len(paths)
+
     score, grade, mult = compute_score(all_findings, industry)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)
@@ -169,4 +179,5 @@ async def run_scan(
         raw_layers=raw_layers,
         interpreted_findings=interpreted,
         breach_cost_estimate=breach_est,
+        attack_paths=paths,
     )

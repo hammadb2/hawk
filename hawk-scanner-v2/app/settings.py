@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     hibp_api_key: str = ""
     breachsense_api_key: str = ""
     breachsense_base_url: str = ""
+    # Breach monitoring stack (A–E + optional F Breachsense)
+    dehashed_email: str = ""
+    dehashed_api_key: str = ""
+    oathnet_api_key: str = ""
+    ransomwatch_api_token: str = ""
     github_token: str = ""
 
     # Optional: persist from worker

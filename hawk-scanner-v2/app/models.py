@@ -16,6 +16,10 @@ class Finding(BaseModel):
     remediation: str = ""
     compliance: list[str] = Field(default_factory=list)
     layer: str | None = None
+    breach_source: str | None = Field(
+        default=None,
+        description="Sub-source when layer is breach_monitoring (hudson_rock, ransomwatch, …)",
+    )
     raw_ref: str | None = None
     interpretation: str | None = None
     fix_guide: str | None = None
@@ -37,9 +41,11 @@ class ScanResponse(BaseModel):
     raw_layers: dict = Field(default_factory=dict)
     interpreted_findings: list[dict] = Field(default_factory=list)
     breach_cost_estimate: dict = Field(default_factory=dict)
+    attack_paths: list[dict] = Field(default_factory=list)
 
 
 class ScanRequest(BaseModel):
     domain: str = Field(..., min_length=1)
     scan_id: str | None = None
     industry: str | None = Field(None, description="Prospect industry for risk multiplier")
+    company_name: str | None = Field(None, description="Display name for narrative features (attack paths)")
