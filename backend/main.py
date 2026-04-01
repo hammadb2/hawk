@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications, breach_check
-from routers import crm_cron, crm_webhooks
+from routers import crm_cron, crm_portal_api, crm_webhooks, monitor
 
 if os.environ.get("SENTRY_DSN"):
     try:
@@ -58,6 +58,8 @@ app.include_router(notifications.router)
 app.include_router(breach_check.router)
 app.include_router(crm_cron.router)
 app.include_router(crm_webhooks.router)
+app.include_router(crm_portal_api.router)
+app.include_router(monitor.router)
 
 
 @app.get("/health")
