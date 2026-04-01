@@ -40,6 +40,7 @@ async def _maybe_supabase_insert(prospect_id: str | None, payload: dict[str, Any
         "raw_layers": payload.get("raw_layers"),
         "interpreted_findings": payload.get("interpreted_findings"),
         "breach_cost_estimate": payload.get("breach_cost_estimate"),
+        "attack_paths": payload.get("attack_paths") or [],
         "external_job_id": payload.get("job_id"),
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -54,11 +55,18 @@ async def run_scan_task(
     industry: str | None = None,
     prospect_id: str | None = None,
     scan_id: str | None = None,
+    company_name: str | None = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     job_id = str(ctx.get("job_id", ""))
     try:
-        result = await run_scan(domain, scan_id=scan_id, industry=industry, settings=settings)
+        result = await run_scan(
+            domain,
+            scan_id=scan_id,
+            industry=industry,
+            company_name=company_name,
+            settings=settings,
+        )
     except Exception as e:
         logger.exception("scan failed: %s", e)
         raise

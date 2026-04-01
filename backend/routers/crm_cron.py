@@ -12,6 +12,7 @@ from fastapi import APIRouter, Header, HTTPException
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_monthly_reports import run_monthly_client_reports
 from services.crm_portal_sequence_worker import process_due_onboarding_sequences
+from services.crm_shield_daily import run_daily_shield_rescans
 from services.crm_twilio import format_stale_deal_message, send_whatsapp
 
 logger = logging.getLogger(__name__)
@@ -174,16 +175,17 @@ def daily_shield_rescan(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
     """
-    2A — Daily Shield client rescan + new-finding alerts (6am MST).
-    TODO: list active Shield clients + domains, async scan, diff vs prior snapshot, WhatsApp + email.
+    2A — Daily Shield client rescan (schedule ~6am America/Denver on Railway cron).
+    Rescans each active Shield client domain, diffs finding fingerprints vs last snapshot,
+    alerts only on NEW critical/high via WhatsApp (prospect phone) + email (portal profile).
+    First run per client records baseline only (no alert).
     """
     _require_secret(x_cron_secret)
-    return {
-        "ok": True,
-        "phase": "2A",
-        "implemented": False,
-        "message": "Schedule this route; next: query clients by plan, enqueue scans, store snapshots, alert on new critical/high.",
-    }
+    try:
+        return run_daily_shield_rescans()
+    except Exception as e:
+        logger.exception("daily shield rescan failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.post("/weekly-threat-digest")

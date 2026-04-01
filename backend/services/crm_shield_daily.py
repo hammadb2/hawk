@@ -159,7 +159,7 @@ def _normalize_phone(raw: str | None) -> str | None:
 
 def run_daily_shield_rescans() -> dict[str, Any]:
     if not SUPABASE_URL or not SERVICE_KEY:
-        return {"ok": False, "error": "supabase not configured", "processed": 0}
+        return {"ok": False, "implemented": False, "error": "supabase not configured", "processed": 0}
 
     r = httpx.get(
         f"{SUPABASE_URL}/rest/v1/clients",
@@ -317,6 +317,7 @@ def run_daily_shield_rescans() -> dict[str, Any]:
 
     return {
         "ok": True,
+        "implemented": True,
         "shield_clients": len(shield_clients),
         "processed": processed,
         "alerts_whatsapp": alerts_whatsapp,

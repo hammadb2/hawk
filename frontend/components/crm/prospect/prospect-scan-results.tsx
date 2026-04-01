@@ -23,6 +23,14 @@ type ScanFinding = {
   fix_guide?: string;
   remediation?: string;
   layer?: string;
+  verified_at?: string;
+};
+
+type AttackPath = {
+  name?: string;
+  steps?: string[];
+  likelihood?: string;
+  impact?: string;
 };
 
 function extractFindings(findingsJson: Record<string, unknown> | null): ScanFinding[] {
@@ -63,21 +71,33 @@ function objectionTemplates(industry: string | null): { objection: string; respo
   const isFin = /financial|bank|wealth|invest|accounting|cpa/.test(t);
   if (isHealth) {
     return [
-      { objection: "We already have IT / our EMR vendor handles security.", response: "Vendors secure their product — not your email domain, exposed ports, or stolen passwords in breaches. HAWK looks at what attackers see from the outside, where most clinics get hit first." },
+      {
+        objection: "Our patient data is already protected by our systems.",
+        response:
+          "Patient data lives in more than the EMR — email, portals, and staff devices are where most healthcare breaches start. HAWK shows what criminals can see from the outside before they ever touch your charting system.",
+      },
       { objection: "We're too small to be a target.", response: "SMBs are the majority of ransomware victims because defenses are lighter. Automated scans find you the same way they find enterprises — size doesn't matter to a bot." },
       { objection: "This sounds expensive for what we get.", response: "Compare to one privacy incident: PIPEDA notification, downtime, and reputation damage typically dwarf preventive monitoring. Starter is $199/mo to see value before Shield." },
     ];
   }
   if (isLegal) {
     return [
-      { objection: "Client confidentiality is already covered by our processes.", response: "Processes help — but exposed services and weak email auth are what breach confidentiality technically. We show exactly what's visible to an attacker today." },
+      {
+        objection: "Solicitor–client privilege protects our communications.",
+        response:
+          "Privilege protects certain communications legally — it does not stop exposed email, weak passwords, or stolen credentials from being abused technically. HAWK shows the attack surface that can bypass policy controls.",
+      },
       { objection: "Our firm uses a managed IT provider.", response: "Great — HAWK is an independent outside-in view. Many firms use us to validate MSP coverage and catch gaps in DNS, certificates, and third-party exposure." },
       { objection: "We don't have time for another tool.", response: "Reports are plain English with fix guides — built so partners can forward tasks to IT in minutes, not hours." },
     ];
   }
   if (isFin) {
     return [
-      { objection: "We're already regulated / audited.", response: "Compliance checks a point in time; HAWK monitors what changes week to week — new open ports, leaked creds, and misconfigurations that audits can miss between cycles." },
+      {
+        objection: "We're already meeting regulatory requirements.",
+        response:
+          "Regulators expect reasonable safeguards — not just paperwork. HAWK shows live exposure (email, credentials, perimeter) that compliance reviews and point-in-time audits often miss between cycles.",
+      },
       { objection: "Clients trust us already.", response: "Trust is easier when you can show a verified score and ongoing monitoring — especially for wealth and mortgage data." },
       { objection: "Is this going to flag false alarms?", response: "We severity-rank findings and explain impact in plain English so you focus on what actually increases breach risk." },
     ];
@@ -102,17 +122,24 @@ function passingHighlights(findings: ScanFinding[]): string[] {
 
 export function ProspectScanResultsPanel({
   scan,
-  companyName,
+  scanId,
+  prospectId,
+  companyName: _companyName,
   domain,
   industry,
+  onVerified,
 }: {
   scan: CrmProspectScanRow;
+  scanId: string;
+  prospectId: string;
   companyName: string | null;
   domain: string;
   industry: string | null;
+  onVerified?: () => void;
 }) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideText, setGuideText] = useState("");
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   const score = scan.hawk_score ?? 0;
   const findings = useMemo(() => extractFindings(scan.findings), [scan.findings]);
@@ -127,11 +154,23 @@ export function ProspectScanResultsPanel({
       const id = String(row.id ?? "");
       if (id) byId.set(id, row);
     }
-    return findings.map((f) => {
+    return findings.map((f, idx) => {
       const id = String(f.id ?? "");
-      const interp = id ? byId.get(id) : undefined;
-      const plain = (interp?.plain_english as string) || f.interpretation;
-      const fix = (interp?.fix_guide as string) || f.fix_guide;
+      let interp = id ? byId.get(id) : undefined;
+      if (
+        !interp &&
+        interpreted.length > 0 &&
+        interpreted.length === findings.length &&
+        interpreted[idx]
+      ) {
+        interp = interpreted[idx] as Record<string, unknown>;
+      }
+      const plain =
+        (interp?.plain_english as string) ||
+        (interp?.plainEnglish as string) ||
+        f.interpretation ||
+        f.description;
+      const fix = (interp?.fix_guide as string) || (interp?.fixGuide as string) || f.fix_guide;
       return { ...f, interpretation: plain, fix_guide: fix };
     });
   }, [findings, interpreted]);
@@ -159,11 +198,55 @@ export function ProspectScanResultsPanel({
         ? parseInt(breach.baseline_usd, 10)
         : null;
 
-  const topTitle = criticalHigh[0]?.title || medLow[0]?.title || sorted[0]?.title || "several exposure areas";
-  const who = (companyName || "").trim() || domain;
-  const openingLine = `I ran a scan on ${who} (${domain}) and found ${topTitle.toLowerCase()} — their overall HAWK score is ${score}/100 (grade ${scan.grade ?? "—"}).`;
+  const topTitle =
+    criticalHigh[0]?.title || medLow[0]?.title || sorted[0]?.title || "several exposure areas";
+  const gradeLabel = scan.grade ?? "—";
+  const openingLine = `I ran a scan on ${domain} and found ${topTitle}. Your score is ${score}/100 — Grade ${gradeLabel}.`;
 
   const objections = objectionTemplates(industry);
+  const topObjection = objections[0];
+
+  const attackPaths = useMemo((): AttackPath[] => {
+    const raw = scan.attack_paths;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((x): x is AttackPath => x != null && typeof x === "object");
+  }, [scan.attack_paths]);
+
+  async function verifyFinding(f: ScanFinding) {
+    const fid = f.id;
+    if (!fid) {
+      toast.error("Finding has no id — run a new scan.");
+      return;
+    }
+    setVerifyingId(fid);
+    try {
+      const res = await fetch("/api/crm/finding-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospectId, scanId, findingId: fid }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        verified?: boolean;
+        message?: string;
+        error?: string;
+        detail?: string;
+      };
+      if (!res.ok) {
+        toast.error([j.error, j.detail].filter(Boolean).join(" — ") || "Verify failed");
+        return;
+      }
+      if (j.verified) {
+        toast.success(j.message || "Marked verified — exposure not seen on rescan.");
+        onVerified?.();
+      } else {
+        toast(j.message || "Still present — keep working the fix guide.", { icon: "ℹ️" });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Verify request failed");
+    } finally {
+      setVerifyingId(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -185,14 +268,46 @@ export function ProspectScanResultsPanel({
           {breach?.summary != null && typeof breach.summary === "string" && (
             <p className="text-zinc-300">{breach.summary}</p>
           )}
-          {baselineUsd != null && !Number.isNaN(baselineUsd) && (
-            <p className="text-zinc-200">
-              Estimated breach cost context: sector-style average around{" "}
-              <span className="font-semibold text-amber-200/90">{formatMoneyUsd(baselineUsd)}</span> USD (illustrative).
-            </p>
-          )}
         </div>
       </div>
+
+      {attackPaths.length > 0 && (
+        <section>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-violet-400/90">Attack paths</h3>
+          <div className="space-y-5">
+            {attackPaths.map((p, pi) => (
+              <div
+                key={pi}
+                className="rounded-lg border border-violet-900/40 bg-violet-950/20 px-3 py-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-violet-100">{p.name || `Path ${pi + 1}`}</span>
+                  {p.likelihood && (
+                    <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] uppercase text-zinc-300">
+                      {p.likelihood} likelihood
+                    </span>
+                  )}
+                </div>
+                {p.impact && <p className="mt-2 text-sm text-zinc-400">{p.impact}</p>}
+                {p.steps && p.steps.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-start gap-1 text-xs text-zinc-300">
+                    {p.steps.map((step, si) => (
+                      <div key={si} className="flex items-center gap-1">
+                        {si > 0 && (
+                          <span className="px-1 text-violet-500" aria-hidden>
+                            →
+                          </span>
+                        )}
+                        <span className="rounded-md border border-zinc-700 bg-zinc-900/80 px-2 py-1">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {criticalHigh.length > 0 && (
         <section>
@@ -208,6 +323,9 @@ export function ProspectScanResultsPanel({
                     {f.severity || "unknown"}
                   </span>
                   <span className="font-medium text-zinc-100">{f.title || "Finding"}</span>
+                  {f.verified_at && (
+                    <span className="rounded bg-emerald-900/50 px-2 py-0.5 text-[10px] text-emerald-300">Verified</span>
+                  )}
                 </div>
                 <p className="mt-1 text-sm text-zinc-300">
                   {f.interpretation || f.description || "—"}
@@ -235,11 +353,12 @@ export function ProspectScanResultsPanel({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    className="bg-zinc-800 text-zinc-400"
-                    disabled
-                    title="Micro-rescan per finding — shipping next"
+                    className="bg-zinc-800 text-zinc-200"
+                    disabled={!f.id || !!f.verified_at || verifyingId === f.id}
+                    title="Re-scans the domain; marks verified if this exposure no longer appears at the same severity."
+                    onClick={() => void verifyFinding(f)}
                   >
-                    Verify fix
+                    {verifyingId === f.id ? "Checking…" : "Verify fix"}
                   </Button>
                 </div>
               </li>
@@ -264,20 +383,32 @@ export function ProspectScanResultsPanel({
                   <span className="text-sm font-medium text-zinc-200">{f.title || "Finding"}</span>
                 </div>
                 <p className="mt-1 text-xs text-zinc-400">{f.interpretation || f.description || "—"}</p>
-                {(f.fix_guide || f.remediation) && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(f.fix_guide || f.remediation) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-emerald-400"
+                      onClick={() => {
+                        setGuideText(String(f.fix_guide || f.remediation));
+                        setGuideOpen(true);
+                      }}
+                    >
+                      Fix guide
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="mt-1 h-7 px-2 text-xs text-emerald-400"
-                    onClick={() => {
-                      setGuideText(String(f.fix_guide || f.remediation));
-                      setGuideOpen(true);
-                    }}
+                    className="h-7 px-2 text-xs text-zinc-400"
+                    disabled={!f.id || !!f.verified_at || verifyingId === f.id}
+                    onClick={() => void verifyFinding(f)}
                   >
-                    Fix guide
+                    {verifyingId === f.id ? "Checking…" : "Verify fix"}
                   </Button>
-                )}
+                </div>
               </li>
             ))}
           </ul>
@@ -304,25 +435,48 @@ export function ProspectScanResultsPanel({
         </section>
       )}
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+      <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 shadow-inner shadow-black/40 ring-1 ring-zinc-900/80">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-teal-400/90">Closer prep</h3>
-        <div className="space-y-3 text-sm text-zinc-300">
+        <div className="space-y-4 text-sm text-zinc-300">
           <div>
             <div className="text-xs font-medium text-zinc-500">Opening line</div>
-            <p className="mt-1 text-zinc-200">&quot;{openingLine}&quot;</p>
+            <p className="mt-1 text-zinc-100">&quot;{openingLine}&quot;</p>
           </div>
+          {baselineUsd != null && !Number.isNaN(baselineUsd) && (
+            <div className="rounded-lg border border-amber-900/40 bg-amber-950/25 px-3 py-2">
+              <p className="text-sm font-medium text-amber-100/95">
+                Estimated breach cost for a business like yours:{" "}
+                <span className="text-amber-200">{formatMoneyUsd(baselineUsd)}</span>
+                <span className="font-normal text-zinc-400">
+                  {" "}
+                  — source: IBM 2025 Cost of Data Breach Report
+                </span>
+              </p>
+            </div>
+          )}
           <div>
-            <div className="text-xs font-medium text-zinc-500">Top objections ({industry || "general SMB"})</div>
-            <ol className="mt-2 list-decimal space-y-2 pl-4">
-              {objections.map((o, i) => (
-                <li key={i} className="text-zinc-300">
-                  <span className="font-medium text-zinc-200">{o.objection}</span>
-                  <span className="text-zinc-500"> — </span>
-                  {o.response}
-                </li>
-              ))}
-            </ol>
+            <div className="text-xs font-medium text-zinc-500">
+              Top objection ({industry || "general SMB"})
+            </div>
+            <p className="mt-2 text-zinc-200">
+              <span className="font-medium text-zinc-100">{topObjection.objection}</span>
+            </p>
+            <p className="mt-1 text-zinc-400">{topObjection.response}</p>
           </div>
+          {objections.length > 1 && (
+            <div>
+              <div className="text-xs font-medium text-zinc-500">More objections</div>
+              <ol className="mt-2 list-decimal space-y-2 pl-4 text-zinc-400">
+                {objections.slice(1).map((o, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-zinc-300">{o.objection}</span>
+                    <span className="text-zinc-600"> — </span>
+                    {o.response}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       </section>
 

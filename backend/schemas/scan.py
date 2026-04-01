@@ -13,6 +13,7 @@ class ScanStartRequest(BaseModel):
 class ScanEnqueueRequest(BaseModel):
     domain: str = Field(..., min_length=1)
     industry: str | None = None
+    company_name: str | None = None
 
 
 class ScanListItem(BaseModel):

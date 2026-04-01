@@ -426,6 +426,18 @@ async def run_breach_layers(domain: str, settings: Settings) -> dict[str, Any]:
     }
 
 
+def _breachsense_findings_list(domain: str, summary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Call Breachsense → findings helper; tolerate older worker images without this symbol."""
+    fn = getattr(breachsense, "findings_from_breachsense", None)
+    if callable(fn):
+        return fn(domain, summary)
+    logger.warning(
+        "breachsense.findings_from_breachsense missing — upgrade hawk-scanner-v2 so "
+        "app/integrations/breachsense.py includes findings_from_breachsense (Breachsense F layer skipped)."
+    )
+    return []
+
+
 def build_breach_monitoring_findings(
     domain: str,
     summaries: dict[str, Any],
@@ -436,7 +448,7 @@ def build_breach_monitoring_findings(
     findings: list[dict[str, Any]] = []
 
     # F — Breachsense (highest priority when active)
-    sense_raw = breachsense.findings_from_breachsense(domain, summaries.get("breachsense") or {})
+    sense_raw = _breachsense_findings_list(domain, summaries.get("breachsense") or {})
     findings.extend(_breachsense_to_breach_monitoring_findings(domain, sense_raw))
 
     findings.extend(_findings_hudson(domain, summaries.get("hudson_rock") or {}))

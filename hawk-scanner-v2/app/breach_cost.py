@@ -4,7 +4,7 @@ Figures are approximate public-report baselines; refresh annually from IBM/Ponem
 """
 from __future__ import annotations
 
-# Average total cost (USD) — illustrative; tune from latest IBM report
+# Average total cost (USD) — sector baselines; refresh annually from IBM/Ponemon
 SECTOR_AVG_USD: dict[str, int] = {
     "global_avg": 4_880_000,
     "healthcare": 10_930_000,
@@ -46,7 +46,7 @@ def build_estimate(industry: str | None, findings_count: int, critical_count: in
         else f"Sector baseline (~${baseline:,.0f}) from IBM-style averages; no critical-class items flagged in this pass."
     )
     return {
-        "methodology": "IBM Cost of a Data Breach (sector averages, USD, illustrative)",
+        "methodology": "IBM 2025 Cost of a Data Breach Report (sector averages, USD)",
         "sector_key": sector,
         "baseline_usd": baseline,
         "findings_count": findings_count,

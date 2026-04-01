@@ -73,7 +73,7 @@ def scan_enqueue(req: ScanEnqueueRequest):
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
     try:
-        job_id = enqueue_async_scan(domain_clean, req.industry)
+        job_id = enqueue_async_scan(domain_clean, req.industry, req.company_name)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Scanner enqueue error: {e}") from e
     return {"job_id": job_id}

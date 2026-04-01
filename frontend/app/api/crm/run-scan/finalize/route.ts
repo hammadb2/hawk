@@ -16,7 +16,60 @@ type ScanResult = {
   raw_layers?: Record<string, unknown>;
   interpreted_findings?: unknown[];
   breach_cost_estimate?: Record<string, unknown>;
+  attack_paths?: unknown[];
 };
+
+function asFindingRecord(f: unknown): Record<string, unknown> | null {
+  if (!f || typeof f !== "object") return null;
+  return f as Record<string, unknown>;
+}
+
+/** Persist Claude rows even if the job payload nests them under raw_layers or only merged into findings[]. */
+function resolveInterpretedFindings(r: ScanResult, findingsList: unknown[]): unknown[] {
+  const direct = r.interpreted_findings;
+  if (Array.isArray(direct) && direct.length > 0) return direct;
+
+  const raw = r.raw_layers;
+  const nested =
+    raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>).interpreted_findings)
+      ? ((raw as Record<string, unknown>).interpreted_findings as unknown[])
+      : [];
+  if (nested.length > 0) return nested;
+
+  const rebuilt: unknown[] = [];
+  for (const f of findingsList) {
+    const o = asFindingRecord(f);
+    if (!o) continue;
+    const id = o.id;
+    const plain =
+      (typeof o.interpretation === "string" && o.interpretation) ||
+      (typeof o.plain_english === "string" && o.plain_english) ||
+      (typeof o.description === "string" && o.description) ||
+      "";
+    const fix =
+      (typeof o.fix_guide === "string" && o.fix_guide) ||
+      (typeof o.remediation === "string" && o.remediation) ||
+      "";
+    if (!plain && !fix && id == null) continue;
+    rebuilt.push({
+      id,
+      plain_english: plain,
+      fix_guide: fix || undefined,
+    });
+  }
+  return rebuilt;
+}
+
+function resolveAttackPaths(r: ScanResult): unknown[] {
+  const direct = r.attack_paths;
+  if (Array.isArray(direct) && direct.length > 0) return direct;
+  const raw = r.raw_layers;
+  if (raw && typeof raw === "object") {
+    const ap = (raw as Record<string, unknown>).attack_paths;
+    if (Array.isArray(ap) && ap.length > 0) return ap;
+  }
+  return Array.isArray(direct) ? direct : [];
+}
 
 /** Persist completed async scan to Supabase (idempotent by external_job_id). */
 export async function POST(request: Request) {
@@ -79,6 +132,8 @@ export async function POST(request: Request) {
 
   const r = job.result;
   const findingsList = Array.isArray(r.findings) ? r.findings : [];
+  const interpretedPersisted = resolveInterpretedFindings(r, findingsList);
+  const attackPathsPersisted = resolveAttackPaths(r);
   const score = typeof r.score === "number" ? r.score : 0;
 
   const { data: prospect, error: pe } = await supabase.from("prospects").select("id, hawk_score, industry").eq("id", prospectId).single();
@@ -104,8 +159,9 @@ export async function POST(request: Request) {
       scan_version: r.scan_version ?? "2.0",
       industry: industryStored,
       raw_layers: (r.raw_layers ?? {}) as Record<string, unknown>,
-      interpreted_findings: (r.interpreted_findings ?? []) as unknown[],
+      interpreted_findings: interpretedPersisted,
       breach_cost_estimate: (r.breach_cost_estimate ?? {}) as Record<string, unknown>,
+      attack_paths: attackPathsPersisted,
       external_job_id: jobId,
     })
     .select("id")

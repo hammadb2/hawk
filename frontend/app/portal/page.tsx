@@ -35,6 +35,7 @@ export default function PortalHomePage() {
   const [portal, setPortal] = useState<PortalProfile | null>(null);
   const [client, setClient] = useState<ClientRow | null>(null);
   const [scan, setScan] = useState<ScanRow | null>(null);
+  const [pipedaBusy, setPipedaBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,6 +125,29 @@ export default function PortalHomePage() {
       ? String((findingsRaw as { critical?: unknown }).critical)
       : null;
 
+  async function downloadPipedaPdf() {
+    setPipedaBusy(true);
+    try {
+      const res = await fetch("/api/portal/pipeda-report");
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        window.alert(j.error || "Could not generate the report. Try again later.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "hawk-pipeda-overview.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.alert("Download failed. Check your connection and try again.");
+    } finally {
+      setPipedaBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -169,7 +193,21 @@ export default function PortalHomePage() {
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Reports</h2>
-          <p className="mt-2 text-sm text-zinc-400">Monthly PDF download will appear here when generated.</p>
+          <p className="mt-2 text-sm text-zinc-400">
+            PIPEDA-oriented overview from your latest scan: which issues map to privacy duties, rough risk framing, and
+            remediation themes.
+          </p>
+          <Button
+            type="button"
+            className="mt-3 bg-zinc-100 text-zinc-900 hover:bg-white"
+            disabled={pipedaBusy || !scan}
+            onClick={() => void downloadPipedaPdf()}
+          >
+            {pipedaBusy ? "Preparing PDF…" : "Download PIPEDA overview (PDF)"}
+          </Button>
+          {!scan && (
+            <p className="mt-2 text-xs text-zinc-600">Run or complete a scan first — then this button enables.</p>
+          )}
         </div>
       </section>
 

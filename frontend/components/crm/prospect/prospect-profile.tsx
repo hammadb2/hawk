@@ -638,9 +638,12 @@ export function ProspectProfile({
             <div key={s.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
               <ProspectScanResultsPanel
                 scan={s}
+                scanId={s.id}
+                prospectId={prospectId}
                 companyName={p?.company_name ?? null}
                 domain={p?.domain ?? ""}
                 industry={p?.industry ?? s.industry ?? null}
+                onVerified={() => void load()}
               />
             </div>
           ))}

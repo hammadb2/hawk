@@ -52,7 +52,12 @@ def health() -> dict[str, str]:
 async def scan_specter_compat(req: ScanRequest) -> dict[str, Any]:
     """Drop-in compatible with Specter `POST /scan` (used by HAWK API relay)."""
     try:
-        result = await run_scan(req.domain, scan_id=req.scan_id, industry=req.industry)
+        result = await run_scan(
+            req.domain,
+            scan_id=req.scan_id,
+            industry=req.industry,
+            company_name=req.company_name,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan failed: {e}") from e
     return result.model_dump(mode="json")
@@ -61,6 +66,7 @@ async def scan_specter_compat(req: ScanRequest) -> dict[str, Any]:
 class AsyncScanBody(BaseModel):
     domain: str = Field(..., min_length=1)
     industry: str | None = None
+    company_name: str | None = None
     prospect_id: str | None = Field(None, description="If set + Supabase env, worker inserts crm_prospect_scans")
     scan_id: str | None = None
 
@@ -75,6 +81,7 @@ async def enqueue_scan(body: AsyncScanBody) -> dict[str, str]:
         body.industry,
         body.prospect_id,
         body.scan_id,
+        body.company_name,
     )
     if job is None:
         raise HTTPException(status_code=409, detail="Job id conflict or duplicate enqueue")
@@ -103,7 +110,12 @@ async def job_result(job_id: str) -> dict[str, Any]:
 async def sync_scan(req: ScanRequest) -> dict[str, Any]:
     """Synchronous full scan (may run several minutes — use async for CRM at scale)."""
     try:
-        result = await run_scan(req.domain, scan_id=req.scan_id, industry=req.industry)
+        result = await run_scan(
+            req.domain,
+            scan_id=req.scan_id,
+            industry=req.industry,
+            company_name=req.company_name,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan failed: {e}") from e
     return result.model_dump(mode="json")

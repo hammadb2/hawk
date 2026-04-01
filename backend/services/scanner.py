@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 
@@ -10,12 +11,18 @@ from config import SCANNER_RELAY_URL, SCANNER_TIMEOUT
 logger = logging.getLogger(__name__)
 
 
-def enqueue_async_scan(domain: str, industry: str | None = None) -> str:
+def enqueue_async_scan(
+    domain: str,
+    industry: str | None = None,
+    company_name: str | None = None,
+) -> str:
     """POST /v1/scan/async — returns job_id (do not pass prospect_id; CRM persists via finalize)."""
     url = f"{SCANNER_RELAY_URL.rstrip('/')}/v1/scan/async"
     body: dict = {"domain": domain}
     if industry and industry.strip():
         body["industry"] = industry.strip()
+    if company_name and company_name.strip():
+        body["company_name"] = company_name.strip()
     with httpx.Client(timeout=30.0) as client:
         r = client.post(url, json=body)
         r.raise_for_status()
@@ -33,6 +40,30 @@ def get_async_job(job_id: str) -> dict:
         r = client.get(url)
         r.raise_for_status()
         return r.json()
+
+
+def poll_scan_job(
+    job_id: str,
+    *,
+    timeout_sec: float = 720.0,
+    interval_sec: float = 3.0,
+) -> dict:
+    """Block until job completes or times out. Returns scanner result dict (same shape as /scan)."""
+    deadline = time.monotonic() + timeout_sec
+    last_status = None
+    while time.monotonic() < deadline:
+        j = get_async_job(job_id)
+        st = j.get("status")
+        last_status = st
+        if st == "complete":
+            result = j.get("result")
+            if not isinstance(result, dict):
+                raise RuntimeError("scan complete but no result payload")
+            return result
+        if st == "failed":
+            raise RuntimeError(str(j.get("error") or "scan job failed"))
+        time.sleep(interval_sec)
+    raise TimeoutError(f"scan job {job_id} timed out after {timeout_sec}s (last={last_status})")
 
 
 def run_scan(domain: str, scan_id: str | None = None) -> dict:

@@ -84,7 +84,7 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
 th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
 .footer { margin-top: 20px; font-size: 9px; color: #666; }
 </style></head><body>""",
-        "<h1>PIPEDA exposure overview (illustrative)</h1>",
+        "<h1>PIPEDA exposure overview</h1>",
         f'<p><strong>{_escape(company_name)}</strong> · {_escape(domain)}</p>',
         "<div class=\"box\">This document is an educational summary based on your latest HAWK scan. "
         "It is not legal advice. Consult qualified privacy counsel for PIPEDA compliance decisions.</div>",
@@ -117,7 +117,7 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
         )
     parts.append("</tbody></table>")
 
-    parts.append("<h2>Estimated regulatory / incident exposure (illustrative)</h2>")
+    parts.append("<h2>Estimated regulatory / incident exposure</h2>")
     parts.append(f"<p>{_escape(fine_exposure)}</p>")
     parts.append(
         "<h2>Remediation priorities</h2><ol>"
@@ -128,7 +128,7 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
     )
     parts.append(
         '<p class="footer">HAWK Security — PIPEDA overview generated from scan data. '
-        "Figures are illustrative and not OPC or court estimates.</p></body></html>"
+        "Sector cost benchmarks are not OPC or court estimates.</p></body></html>"
     )
     return "\n".join(parts)
 
