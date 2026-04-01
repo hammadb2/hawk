@@ -7,6 +7,7 @@ from schemas.auth import (
     ResetPasswordRequest,
 )
 from schemas.scan import (
+    ScanEnqueueRequest,
     ScanStartRequest,
     ScanResponse,
     ScanListItem,

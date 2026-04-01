@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from datetime import timedelta
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -14,8 +15,8 @@ from auth import get_current_user
 from config import CRON_SECRET
 from database import get_db
 from models import User, Scan, Domain, Report
-from schemas import ScanStartRequest, ScanResponse, ScanListItem
-from services.scanner import run_scan
+from schemas import ScanEnqueueRequest, ScanStartRequest, ScanResponse, ScanListItem
+from services.scanner import enqueue_async_scan, get_async_job, run_scan
 from services.charlotte import critical_finding_alert, trial_expiry_tomorrow_email, weekly_digest_email, monthly_report_ready_email
 from config import PLAN_DOMAINS
 
@@ -46,7 +47,7 @@ def _scan_to_item(scan: Scan) -> dict:
 
 @router.post("/api/scan/public")
 def start_scan_public(req: ScanStartRequest):
-    """Run a real scan without auth. Returns score, grade, findings. No DB save. For gate/lead capture."""
+    """Run a real scan without auth. Slim JSON by default; set full_result=true for CRM-sized payload."""
     domain_clean = _normalize_domain(req.domain)
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
@@ -54,6 +55,8 @@ def start_scan_public(req: ScanStartRequest):
         result = run_scan(domain_clean, scan_id=None)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Scanner error: {e}") from e
+    if req.full_result:
+        return result
     return {
         "domain": result.get("domain", domain_clean),
         "status": result.get("status", "completed"),
@@ -61,6 +64,30 @@ def start_scan_public(req: ScanStartRequest):
         "grade": result.get("grade"),
         "findings_count": len(result.get("findings", [])),
     }
+
+
+@router.post("/api/scan/enqueue")
+def scan_enqueue(req: ScanEnqueueRequest):
+    """Queue async scan on hawk-scanner-v2 (Redis/arq). Returns job_id for polling."""
+    domain_clean = _normalize_domain(req.domain)
+    if not domain_clean:
+        raise HTTPException(status_code=400, detail="Invalid domain")
+    try:
+        job_id = enqueue_async_scan(domain_clean, req.industry)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Scanner enqueue error: {e}") from e
+    return {"job_id": job_id}
+
+
+@router.get("/api/scan/job/{job_id}")
+def scan_job_status(job_id: str):
+    """Proxy job status/result from scanner worker."""
+    try:
+        return get_async_job(job_id)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=e.response.text[:800]) from e
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Scanner job error: {e}") from e
 
 
 @router.post("/api/scan")

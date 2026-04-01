@@ -5,6 +5,13 @@ from pydantic import BaseModel, Field
 
 class ScanStartRequest(BaseModel):
     domain: str = Field(..., min_length=1)
+    """When True, return full scanner JSON (findings, raw_layers, etc.). Default slim response for public gate."""
+    full_result: bool = False
+
+
+class ScanEnqueueRequest(BaseModel):
+    domain: str = Field(..., min_length=1)
+    industry: str | None = None
 
 
 class ScanListItem(BaseModel):

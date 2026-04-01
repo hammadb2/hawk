@@ -81,6 +81,14 @@ export type CrmProspectScanRow = {
   findings: Record<string, unknown> | null;
   status: string;
   created_at: string;
+  triggered_by?: string | null;
+  scan_version?: string | null;
+  industry?: string | null;
+  raw_layers?: Record<string, unknown> | null;
+  interpreted_findings?: unknown[] | null;
+  breach_cost_estimate?: Record<string, unknown> | null;
+  external_job_id?: string | null;
+  attack_paths?: unknown[] | null;
 };
 
 export type ProspectEmailEventRow = {

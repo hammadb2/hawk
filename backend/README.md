@@ -19,7 +19,8 @@ Or from `backend/`: `python main.py` (reload on port 8000).
 
 - `DATABASE_URL` — default `sqlite:///./hawk.db`; use PostgreSQL in prod.
 - `HAWK_SECRET_KEY` — JWT signing key.
-- `HAWK_SCANNER_RELAY_URL` — Scanner service base URL (backend appends `/scan`). Default legacy Ghost; in production set on the Railway **main API** service to your **hawk-scanner-v2** Railway URL (HTTPS, no path).
+- `HAWK_SCANNER_RELAY_URL` — Scanner service base URL (backend appends `/scan`, `/v1/scan/async`, `/v1/jobs/{id}`). Set on Railway **hawk-production** to your **hawk-scanner-v2** URL (HTTPS, no path).
+- `HAWK_SCANNER_TIMEOUT` — **Set `300` on Railway hawk-production** (seconds) so sync `/scan` calls used by legacy paths don’t abort before the worker finishes; CRM uses async queue + short API calls.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` — Stripe.
 - `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` — Ask HAWK (DeepSeek R1).
 - `HAWK_BASE_URL` — Frontend URL for Stripe redirects (default `https://securedbyhawk.com`).
@@ -27,7 +28,7 @@ Or from `backend/`: `python main.py` (reload on port 8000).
 ## Endpoints
 
 - **Auth:** `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/forgot-password`
-- **Scans:** `POST /api/scan`, `GET /api/scan/:id`, `GET /api/scans`, `POST /api/scan/:id/rescan`
+- **Scans:** `POST /api/scan`, `POST /api/scan/public` (optional `full_result`), `POST /api/scan/enqueue`, `GET /api/scan/job/{job_id}`, `GET /api/scan/:id`, `GET /api/scans`, `POST /api/scan/:id/rescan`
 - **Findings:** `GET /api/findings/:scan_id`, `POST /api/findings/:id/ignore`, `POST /api/findings/:id/fix`
 - **Domains:** `GET/POST/PUT/DELETE /api/domains`
 - **Reports:** `GET /api/reports`, `POST /api/reports/generate`, `GET /api/reports/:id/pdf`

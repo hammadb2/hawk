@@ -167,3 +167,38 @@ def monthly_reports_pdf(
     """
     _require_secret(x_cron_secret)
     return run_monthly_client_reports()
+
+
+@router.post("/daily-shield-rescan")
+def daily_shield_rescan(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    2A — Daily Shield client rescan + new-finding alerts (6am MST).
+    TODO: list active Shield clients + domains, async scan, diff vs prior snapshot, WhatsApp + email.
+    """
+    _require_secret(x_cron_secret)
+    return {
+        "ok": True,
+        "phase": "2A",
+        "implemented": False,
+        "message": "Schedule this route; next: query clients by plan, enqueue scans, store snapshots, alert on new critical/high.",
+    }
+
+
+@router.post("/weekly-threat-digest")
+def weekly_threat_digest_stub(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """4B — Weekly AI threat briefing per industry. TODO: Claude + web search + Resend."""
+    _require_secret(x_cron_secret)
+    return {"ok": True, "phase": "4B", "implemented": False}
+
+
+@router.post("/rep-health-score")
+def rep_health_score_stub(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """4C — Daily rep health scoring. TODO: activity + pipeline metrics → profiles.health_score."""
+    _require_secret(x_cron_secret)
+    return {"ok": True, "phase": "4C", "implemented": False}

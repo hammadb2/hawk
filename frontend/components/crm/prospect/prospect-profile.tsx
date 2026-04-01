@@ -16,6 +16,7 @@ import type {
 import { STAGE_META, STAGE_ORDER } from "@/lib/crm/types";
 import { activityColor, activityLabel } from "@/lib/crm/activity-types";
 import { HawkScoreRing } from "@/components/crm/prospect/hawk-score-ring";
+import { ProspectScanResultsPanel } from "@/components/crm/prospect/prospect-scan-results";
 import { LogCallModal } from "@/components/crm/prospect/log-call-modal";
 import { BookCallModal } from "@/components/crm/prospect/book-call-modal";
 import { LostReasonModal } from "@/components/crm/pipeline/lost-modal";
@@ -57,6 +58,7 @@ export function ProspectProfile({
   const [emailEvents, setEmailEvents] = useState<ProspectEmailEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [scanPhase, setScanPhase] = useState<string | null>(null);
   const [duplicateHint, setDuplicateHint] = useState(false);
   const [duplicateLinkTarget, setDuplicateLinkTarget] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -142,34 +144,99 @@ export function ProspectProfile({
   async function runScan() {
     if (!p) return;
     setScanning(true);
+    setScanPhase("Starting…");
     try {
-      const res = await fetch("/api/crm/run-scan", {
+      const startRes = await fetch("/api/crm/run-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prospectId: p.id }),
       });
-      const raw = await res.text();
-      let j: { error?: string; detail?: string; score?: number; grade?: string; findings_count?: number } = {};
+      const startRaw = await startRes.text();
+      let startJson: { error?: string; detail?: string; job_id?: string } = {};
       try {
-        if (raw) j = JSON.parse(raw) as typeof j;
+        if (startRaw) startJson = JSON.parse(startRaw) as typeof startJson;
       } catch {
-        /* Vercel/HTML 504 pages are not JSON */
+        /* ignore */
       }
-      if (!res.ok) {
-        const msg = [j.error, j.detail].filter(Boolean).join(" — ");
-        const snippet = raw && !raw.trim().startsWith("{") ? raw.replace(/\s+/g, " ").slice(0, 180) : "";
+      if (!startRes.ok) {
+        const msg = [startJson.error, startJson.detail].filter(Boolean).join(" — ");
+        const snippet =
+          startRaw && !startRaw.trim().startsWith("{") ? startRaw.replace(/\s+/g, " ").slice(0, 180) : "";
         toast.error(
-          msg || `Scan failed (HTTP ${res.status})${snippet ? `: ${snippet}` : res.statusText ? ` — ${res.statusText}` : ""}`,
+          msg ||
+            `Scan failed (HTTP ${startRes.status})${snippet ? `: ${snippet}` : startRes.statusText ? ` — ${startRes.statusText}` : ""}`,
         );
         return;
       }
-      toast.success(`Scan complete — score ${j.score ?? "—"}`);
-      await load();
-      onUpdated?.();
+      const jobId = startJson.job_id;
+      if (!jobId) {
+        toast.error("No job_id returned — check API /api/scan/enqueue");
+        return;
+      }
+
+      setScanPhase("Queued…");
+      const maxPolls = 400;
+      for (let i = 0; i < maxPolls; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        setScanPhase(`Scanning… (~${(i + 1) * 3}s)`);
+
+        const pollRes = await fetch(`/api/crm/scan-job/${encodeURIComponent(jobId)}`);
+        const pollRaw = await pollRes.text();
+        let poll: {
+          status?: string;
+          error?: string;
+          result?: Record<string, unknown>;
+        } = {};
+        try {
+          if (pollRaw) poll = JSON.parse(pollRaw) as typeof poll;
+        } catch {
+          toast.error("Invalid response while polling scan status");
+          return;
+        }
+
+        if (!pollRes.ok) {
+          toast.error([poll.error, (poll as { detail?: string }).detail].filter(Boolean).join(" — ") || "Poll failed");
+          return;
+        }
+
+        if (poll.status === "failed") {
+          toast.error(typeof poll.error === "string" ? poll.error : "Scan job failed");
+          return;
+        }
+
+        if (poll.status === "complete") {
+          setScanPhase("Saving results…");
+          const finRes = await fetch("/api/crm/run-scan/finalize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobId, prospectId: p.id }),
+          });
+          const finRaw = await finRes.text();
+          let fin: { error?: string; detail?: string; score?: number; duplicate?: boolean } = {};
+          try {
+            if (finRaw) fin = JSON.parse(finRaw) as typeof fin;
+          } catch {
+            /* ignore */
+          }
+          if (!finRes.ok) {
+            toast.error([fin.error, fin.detail].filter(Boolean).join(" — ") || "Could not save scan");
+            return;
+          }
+          toast.success(
+            fin.duplicate ? "Scan already saved" : `Scan complete — score ${fin.score ?? "—"}`,
+          );
+          await load();
+          onUpdated?.();
+          return;
+        }
+      }
+
+      toast.error("Scan timed out — worker may be busy. Try again or check Railway scanner worker.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Network error — could not reach scan service");
     } finally {
       setScanning(false);
+      setScanPhase(null);
     }
   }
 
@@ -444,9 +511,14 @@ export function ProspectProfile({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" className="bg-emerald-600" onClick={() => runScan()} disabled={scanning}>
-            {scanning ? "Scanning…" : "Run scan"}
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button size="sm" className="bg-emerald-600" onClick={() => void runScan()} disabled={scanning}>
+              {scanning ? "Scanning…" : "Run scan"}
+            </Button>
+            {scanning && scanPhase && (
+              <span className="max-w-[200px] text-right text-[10px] text-zinc-500">{scanPhase}</span>
+            )}
+          </div>
           <Button size="sm" variant="outline" className="border-zinc-700" onClick={() => setLogOpen(true)}>
             Log call
           </Button>
@@ -560,15 +632,16 @@ export function ProspectProfile({
           ))}
         </TabsContent>
 
-        <TabsContent value="scans" className="min-h-[200px] space-y-2 text-sm">
+        <TabsContent value="scans" className="min-h-[200px] space-y-4 text-sm">
           {scans.length === 0 && <p className="text-zinc-500">No scans yet. Run a scan from the header.</p>}
           {scans.map((s) => (
-            <div key={s.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-              <div className="flex justify-between text-zinc-200">
-                <span>Score {s.hawk_score ?? "—"}</span>
-                <span className="text-zinc-500">{new Date(s.created_at).toLocaleString()}</span>
-              </div>
-              <pre className="mt-2 max-h-40 overflow-auto text-[11px] text-zinc-400">{JSON.stringify(s.findings, null, 2)}</pre>
+            <div key={s.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+              <ProspectScanResultsPanel
+                scan={s}
+                companyName={p?.company_name ?? null}
+                domain={p?.domain ?? ""}
+                industry={p?.industry ?? s.industry ?? null}
+              />
             </div>
           ))}
         </TabsContent>

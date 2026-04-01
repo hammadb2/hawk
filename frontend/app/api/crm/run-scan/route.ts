@@ -1,36 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Vercel serverless limit for this route. Full scanner pipeline often runs 2–5+ minutes.
- * Hobby caps lower; Pro/Enterprise supports up to 300s (see Vercel dashboard → Functions).
- */
-export const maxDuration = 300;
+/** Enqueue only — scan runs on Railway worker; no long Vercel wait (Rule 9). */
+export const maxDuration = 30;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/** Stay slightly under maxDuration so the fetch aborts before Vercel kills the function */
-const SCAN_FETCH_MS = 295_000;
-
-/** Parse FastAPI-style JSON error body: { "detail": "..." } or validation array */
-function parseUpstreamError(text: string): string {
-  try {
-    const j = JSON.parse(text) as { detail?: unknown };
-    if (typeof j.detail === "string") return j.detail;
-    if (Array.isArray(j.detail)) {
-      return j.detail
-        .map((x) => (typeof x === "object" && x && "msg" in x ? String((x as { msg: string }).msg) : String(x)))
-        .join("; ");
-    }
-  } catch {
-    /* ignore */
-  }
-  return text.slice(0, 800);
-}
-
 /**
- * CRM prospect scan: Supabase auth → POST {domain} to Railway /api/scan/public
- * (see backend/services/scanner.py → HAWK_SCANNER_RELAY_URL, default Ghost http://178.104.27.211:8002/scan).
+ * Start async CRM scan: returns job_id. Client polls GET /api/crm/scan-job/[jobId] then POST finalize.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -52,79 +29,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "prospectId required" }, { status: 400 });
   }
 
-  const { data: prospect, error: pe } = await supabase.from("prospects").select("id, domain").eq("id", prospectId).single();
+  const { data: prospect, error: pe } = await supabase
+    .from("prospects")
+    .select("id, domain, industry")
+    .eq("id", prospectId)
+    .single();
   if (pe || !prospect) {
     return NextResponse.json({ error: "Prospect not found" }, { status: 404 });
   }
 
   const domain = String(prospect.domain).trim();
   const base = API_URL.replace(/\/$/, "");
+  const industry = prospect.industry != null ? String(prospect.industry).trim() || null : null;
 
-  let scanRes: Response;
+  let enq: Response;
   try {
-    scanRes = await fetch(`${base}/api/scan/public`, {
+    enq = await fetch(`${base}/api/scan/enqueue`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain }),
-      signal: AbortSignal.timeout(SCAN_FETCH_MS),
+      body: JSON.stringify({ domain, industry }),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
-      {
-        error: "Could not reach HAWK API",
-        detail: `Check NEXT_PUBLIC_API_URL (${base}) points to your Railway service. ${msg}`,
-      },
+      { error: "Could not reach HAWK API", detail: `Check NEXT_PUBLIC_API_URL (${base}). ${msg}` },
       { status: 502 },
     );
   }
 
-  if (!scanRes.ok) {
-    const errText = await scanRes.text();
-    const detail = parseUpstreamError(errText);
-    return NextResponse.json({ error: "Scanner failed", detail }, { status: 502 });
+  if (!enq.ok) {
+    const t = await enq.text();
+    return NextResponse.json({ error: "Enqueue failed", detail: t.slice(0, 800) }, { status: 502 });
   }
 
-  const scanJson = (await scanRes.json()) as {
-    domain?: string;
-    status?: string;
-    score?: number;
-    grade?: string;
-    findings_count?: number;
-  };
-
-  const findings = {
-    source: "hawk_public_scan",
-    grade: scanJson.grade ?? null,
-    findings_count: scanJson.findings_count ?? null,
-  };
-
-  const score = typeof scanJson.score === "number" ? scanJson.score : 0;
-
-  const { error: insErr } = await supabase.from("crm_prospect_scans").insert({
-    prospect_id: prospectId,
-    hawk_score: score,
-    grade: scanJson.grade ?? null,
-    findings: findings as unknown as Record<string, unknown>,
-    status: "complete",
-    triggered_by: user.id,
-  });
-  if (insErr) {
-    return NextResponse.json({ error: insErr.message }, { status: 500 });
+  const j = (await enq.json()) as { job_id?: string };
+  if (!j.job_id) {
+    return NextResponse.json({ error: "No job_id from API" }, { status: 502 });
   }
 
-  await supabase
-    .from("prospects")
-    .update({ hawk_score: score, last_activity_at: new Date().toISOString() })
-    .eq("id", prospectId);
-
-  await supabase.from("activities").insert({
-    prospect_id: prospectId,
-    type: "scan_run",
-    created_by: user.id,
-    notes: null,
-    metadata: { score_before: null, score_after: score, grade: scanJson.grade },
-  });
-
-  return NextResponse.json({ ok: true, score, grade: scanJson.grade, findings_count: scanJson.findings_count });
+  return NextResponse.json({ job_id: j.job_id, prospect_id: prospectId });
 }

@@ -191,19 +191,19 @@ drop policy if exists "profiles_select_own_or_privileged" on public.profiles;
 create policy "profiles_select_own_or_privileged"
   on public.profiles for select
   using (
-    id = auth.uid()
+    (select auth.uid()) = id
     or public.crm_is_privileged()
     or exists (
       select 1 from public.profiles me
-      where me.id = auth.uid() and me.role = 'team_lead' and public.profiles.team_lead_id = me.id
+      where me.id = (select auth.uid()) and me.role = 'team_lead' and public.profiles.team_lead_id = me.id
     )
   );
 
 drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self"
   on public.profiles for update
-  using (id = auth.uid())
-  with check (id = auth.uid());
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
 
 drop policy if exists "profiles_update_privileged" on public.profiles;
 create policy "profiles_update_privileged"
@@ -301,7 +301,7 @@ create policy "activities_insert"
   );
 
 -- Notifications: own rows only
-drop policy if exists "notifications_own" on public.notifications;
+drop policy if exists "notifications_select_own" on public.notifications;
 create policy "notifications_select_own"
   on public.notifications for select
   using (user_id = auth.uid() or public.crm_is_privileged());
@@ -372,7 +372,32 @@ create trigger on_auth_user_created_crm
 -- Realtime: prospect updates for pipeline (enable replication if needed)
 -- ---------------------------------------------------------------------------
 alter table public.prospects replica identity full;
-alter publication supabase_realtime add table public.prospects;
+do $realtime$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'prospects'
+  ) then
+    alter publication supabase_realtime add table public.prospects;
+  end if;
+end;
+$realtime$;
+
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';
 
 
 -- >>> migrations/20260329000002_storage_reports_bucket.sql <<<
@@ -512,7 +537,9 @@ create policy "prospect_notes_update"
   using (author_id = auth.uid())
   with check (author_id = auth.uid());
 
-drop policy if exists "prospect_files_all" on public.prospect_files;
+drop policy if exists "prospect_files_select" on public.prospect_files;
+drop policy if exists "prospect_files_insert" on public.prospect_files;
+drop policy if exists "prospect_files_delete" on public.prospect_files;
 create policy "prospect_files_select"
   on public.prospect_files for select
   using (
@@ -550,6 +577,7 @@ create policy "prospect_files_delete"
   );
 
 drop policy if exists "crm_scans_select" on public.crm_prospect_scans;
+drop policy if exists "crm_scans_insert" on public.crm_prospect_scans;
 create policy "crm_scans_select"
   on public.crm_prospect_scans for select
   using (
@@ -595,6 +623,20 @@ create policy "email_events_select"
   );
 
 -- Service role / Phase 3 will insert email events via backend
+
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';
 
 
 -- >>> migrations/20260330000002_prospect_notes_delete.sql <<<
@@ -699,8 +741,26 @@ create trigger trg_clients_create_commission
 alter table public.clients replica identity full;
 alter table public.crm_commissions replica identity full;
 
-alter publication supabase_realtime add table public.clients;
-alter publication supabase_realtime add table public.crm_commissions;
+do $realtime$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'clients'
+  ) then
+    alter publication supabase_realtime add table public.clients;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'crm_commissions'
+  ) then
+    alter publication supabase_realtime add table public.crm_commissions;
+  end if;
+end;
+$realtime$;
 
 
 -- >>> migrations/20260402000001_crm_support_tickets.sql <<<
@@ -787,17 +847,21 @@ create trigger trg_crm_support_ticket_notify
   after insert on public.crm_support_tickets
   for each row execute function public.crm_notify_execs_new_ticket();
 
--- Live bell updates (ignore if already in publication)
+-- Live bell updates (idempotent: skip if already in publication)
 alter table public.notifications replica identity full;
 
-do $pub$
+do $realtime$
 begin
-  alter publication supabase_realtime add table public.notifications;
-exception
-  when duplicate_object then
-    null;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'notifications'
+  ) then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
 end;
-$pub$;
+$realtime$;
 
 
 -- >>> migrations/20260403000001_clients_company_name.sql <<<
@@ -829,6 +893,411 @@ alter table public.clients alter column close_date set not null;
 update public.clients set created_at = coalesce(created_at, now());
 alter table public.clients alter column created_at set default now();
 alter table public.clients alter column created_at set not null;
+
+
+-- >>> migrations/20260404000001_crm_phase1_invite_rr_stripe.sql <<<
+
+-- Phase 1 — Rep invite lifecycle, round-robin, Stripe commission deferral
+
+-- Profiles: assignment + onboarding gate + health score (health used in later phases)
+alter table public.profiles
+  add column if not exists last_assigned_at timestamptz,
+  add column if not exists onboarding_completed_at timestamptz,
+  add column if not exists health_score int check (health_score is null or (health_score >= 0 and health_score <= 100));
+
+-- Extend CRM lifecycle status (invited → onboarding → active)
+alter table public.profiles drop constraint if exists profiles_status_check;
+alter table public.profiles
+  add constraint profiles_status_check
+  check (status in ('invited', 'onboarding', 'active', 'at_risk', 'inactive'));
+
+-- Clients: defer commission until Stripe webhook when payment not verified at close
+alter table public.clients
+  add column if not exists commission_deferred boolean not null default false;
+
+-- Existing active reps: treat as onboarded (avoid blocking pipeline after migration)
+update public.profiles
+set onboarding_completed_at = coalesce(onboarding_completed_at, now())
+where status = 'active'
+  and role in ('sales_rep', 'team_lead')
+  and onboarding_completed_at is null;
+
+-- Commission trigger: skip when deferred (webhook creates row later)
+create or replace function public.crm_commission_from_client()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  amt int;
+begin
+  if new.closing_rep_id is null then
+    return new;
+  end if;
+  if coalesce(new.commission_deferred, false) then
+    return new;
+  end if;
+  amt := (new.mrr_cents * 30) / 100;
+  insert into public.crm_commissions (client_id, rep_id, basis_mrr_cents, amount_cents, rate, status)
+  values (new.id, new.closing_rep_id, new.mrr_cents, amt, 0.30, 'pending')
+  on conflict (client_id) do nothing;
+  return new;
+end;
+$$;
+
+-- New auth users: honor CEO invite metadata (status + whatsapp prefilled)
+create or replace function public.crm_handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  initial_status text;
+  wa text;
+  tl uuid;
+begin
+  initial_status := nullif(trim(lower(coalesce(new.raw_user_meta_data->>'crm_initial_status', ''))), '');
+  wa := nullif(trim(coalesce(new.raw_user_meta_data->>'whatsapp_number', '')), '');
+  begin
+    tl := (new.raw_user_meta_data->>'crm_team_lead_id')::uuid;
+  exception when others then
+    tl := null;
+  end;
+
+  insert into public.profiles (id, email, full_name, role, status, whatsapp_number, team_lead_id)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'crm_role', 'sales_rep'),
+    case
+      when initial_status in ('invited', 'onboarding') then initial_status
+      else 'active'
+    end,
+    wa,
+    tl
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        full_name = coalesce(excluded.full_name, public.profiles.full_name);
+  return new;
+end;
+$$;
+
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';
+
+
+-- >>> migrations/20260405000001_crm_phase2_client_portal.sql <<<
+
+-- Phase 2 — Client portal accounts, onboarding sequences, portal RLS
+
+-- ---------------------------------------------------------------------------
+-- clients: portal link + sequence tracking
+-- ---------------------------------------------------------------------------
+alter table public.clients
+  add column if not exists portal_user_id uuid references auth.users (id) on delete set null,
+  add column if not exists onboarding_sequence_status text not null default 'pending'
+    check (onboarding_sequence_status in ('pending', 'in_progress', 'completed', 'paused')),
+  add column if not exists last_portal_login_at timestamptz;
+
+create index if not exists idx_clients_portal_user on public.clients (portal_user_id);
+
+-- ---------------------------------------------------------------------------
+-- Portal identity (1:1 auth user ↔ CRM client)
+-- ---------------------------------------------------------------------------
+create table if not exists public.client_portal_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  client_id uuid not null references public.clients (id) on delete cascade,
+  email text not null,
+  company_name text,
+  domain text,
+  created_at timestamptz not null default now(),
+  unique (user_id),
+  unique (client_id)
+);
+
+create index if not exists idx_client_portal_profiles_client on public.client_portal_profiles (client_id);
+
+-- ---------------------------------------------------------------------------
+-- Drip / onboarding emails (Phase 2B)
+-- ---------------------------------------------------------------------------
+create table if not exists public.client_onboarding_sequences (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients (id) on delete cascade,
+  step text not null,
+  status text not null default 'pending' check (status in ('pending', 'sent', 'skipped', 'failed')),
+  sent_at timestamptz,
+  opened_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_client_onboarding_sequences_client on public.client_onboarding_sequences (client_id, step);
+create index if not exists idx_client_onboarding_sequences_pending
+  on public.client_onboarding_sequences (status, created_at)
+  where status = 'pending';
+
+-- ---------------------------------------------------------------------------
+-- Trigger: skip CRM profiles row for client-portal-only auth users
+-- ---------------------------------------------------------------------------
+create or replace function public.crm_handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  initial_status text;
+  wa text;
+  tl uuid;
+  portal_cid text;
+begin
+  portal_cid := nullif(trim(coalesce(new.raw_user_meta_data->>'portal_client_id', '')), '');
+  if portal_cid is not null and portal_cid <> '' then
+    return new;
+  end if;
+
+  initial_status := nullif(trim(lower(coalesce(new.raw_user_meta_data->>'crm_initial_status', ''))), '');
+  wa := nullif(trim(coalesce(new.raw_user_meta_data->>'whatsapp_number', '')), '');
+  begin
+    tl := (new.raw_user_meta_data->>'crm_team_lead_id')::uuid;
+  exception when others then
+    tl := null;
+  end;
+
+  insert into public.profiles (id, email, full_name, role, status, whatsapp_number, team_lead_id)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'crm_role', 'sales_rep'),
+    case
+      when initial_status in ('invited', 'onboarding') then initial_status
+      else 'active'
+    end,
+    wa,
+    tl
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        full_name = coalesce(excluded.full_name, public.profiles.full_name);
+  return new;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------------
+alter table public.client_portal_profiles enable row level security;
+alter table public.client_onboarding_sequences enable row level security;
+
+drop policy if exists "client_portal_profiles_select_own" on public.client_portal_profiles;
+create policy "client_portal_profiles_select_own"
+  on public.client_portal_profiles for select
+  using (user_id = auth.uid());
+
+drop policy if exists "client_onboarding_sequences_select_portal" on public.client_onboarding_sequences;
+create policy "client_onboarding_sequences_select_portal"
+  on public.client_onboarding_sequences for select
+  using (
+    exists (
+      select 1 from public.client_portal_profiles cpp
+      where cpp.client_id = client_onboarding_sequences.client_id
+        and cpp.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "clients_select_portal" on public.clients;
+create policy "clients_select_portal"
+  on public.clients for select
+  using (
+    exists (
+      select 1 from public.client_portal_profiles cpp
+      where cpp.client_id = clients.id
+        and cpp.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "prospects_select_portal" on public.prospects;
+create policy "prospects_select_portal"
+  on public.prospects for select
+  using (
+    exists (
+      select 1
+      from public.client_portal_profiles cpp
+      join public.clients c on c.id = cpp.client_id
+      where cpp.user_id = auth.uid()
+        and c.prospect_id = prospects.id
+    )
+  );
+
+drop policy if exists "crm_prospect_scans_select_portal" on public.crm_prospect_scans;
+create policy "crm_prospect_scans_select_portal"
+  on public.crm_prospect_scans for select
+  using (
+    exists (
+      select 1
+      from public.client_portal_profiles cpp
+      join public.clients c on c.id = cpp.client_id
+      where cpp.user_id = auth.uid()
+        and c.prospect_id = crm_prospect_scans.prospect_id
+    )
+  );
+
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';
+
+
+-- >>> migrations/20260406000001_crm_phase3_monitor_reports.sql <<<
+
+-- Phase 3 — Self-healing monitor log, monthly report audit, Realtime on activities (CEO feed)
+
+-- ---------------------------------------------------------------------------
+-- system_health_log — monitor cron writes via service role; CEO reads in app
+-- ---------------------------------------------------------------------------
+create table if not exists public.system_health_log (
+  id uuid primary key default gen_random_uuid(),
+  service text not null,
+  status text not null check (status in ('ok', 'degraded', 'failed')),
+  response_ms int,
+  checked_at timestamptz not null default now(),
+  detail jsonb not null default '{}'::jsonb,
+  alert_sent boolean not null default false
+);
+
+create index if not exists idx_system_health_log_service_checked on public.system_health_log (service, checked_at desc);
+
+alter table public.system_health_log enable row level security;
+
+drop policy if exists "system_health_log_select_ceo" on public.system_health_log;
+create policy "system_health_log_select_ceo"
+  on public.system_health_log for select
+  using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'ceo')
+  );
+
+-- ---------------------------------------------------------------------------
+-- Monthly PDF deliveries (audit trail for Phase 3C)
+-- ---------------------------------------------------------------------------
+create table if not exists public.crm_monthly_report_log (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients (id) on delete cascade,
+  month_year text not null,
+  storage_path text,
+  sent_to_email text,
+  status text not null default 'sent' check (status in ('pending', 'sent', 'failed')),
+  created_at timestamptz not null default now(),
+  unique (client_id, month_year)
+);
+
+create index if not exists idx_crm_monthly_report_log_month on public.crm_monthly_report_log (month_year desc);
+
+alter table public.crm_monthly_report_log enable row level security;
+
+drop policy if exists "crm_monthly_report_log_select_ceo" on public.crm_monthly_report_log;
+create policy "crm_monthly_report_log_select_ceo"
+  on public.crm_monthly_report_log for select
+  using (
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('ceo', 'hos'))
+  );
+
+-- ---------------------------------------------------------------------------
+-- Realtime: activities for CEO live feed (idempotent)
+-- ---------------------------------------------------------------------------
+do $realtime$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'activities'
+  ) then
+    alter publication supabase_realtime add table public.activities;
+  end if;
+end;
+$realtime$;
+
+
+-- >>> migrations/20260407000001_crm_prospect_scans_scanner_v2.sql <<<
+
+-- HAWK Scanner 2.0 — extended prospect scan payload (Railway pipeline + scoring)
+
+alter table public.crm_prospect_scans
+  add column if not exists scan_version text default '1.0',
+  add column if not exists industry text,
+  add column if not exists raw_layers jsonb not null default '{}'::jsonb,
+  add column if not exists interpreted_findings jsonb not null default '[]'::jsonb,
+  add column if not exists breach_cost_estimate jsonb not null default '{}'::jsonb,
+  add column if not exists external_job_id text;
+
+
+-- >>> migrations/20260408000001_profiles_rls_ceo_anchor.sql <<<
+
+drop policy if exists "profiles_select_own_or_privileged" on public.profiles;
+create policy "profiles_select_own_or_privileged"
+  on public.profiles for select
+  using (
+    (select auth.uid()) = id
+    or public.crm_is_privileged()
+    or exists (
+      select 1 from public.profiles me
+      where me.id = (select auth.uid()) and me.role = 'team_lead' and public.profiles.team_lead_id = me.id
+    )
+  );
+
+drop policy if exists "profiles_update_self" on public.profiles;
+create policy "profiles_update_self"
+  on public.profiles for update
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
+
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';
+
+
+-- >>> migrations/20260408000002_crm_scan_attack_paths_placeholder.sql <<<
+
+alter table public.crm_prospect_scans
+  add column if not exists attack_paths jsonb not null default '[]'::jsonb;
+
+comment on column public.crm_prospect_scans.attack_paths is 'Top attack paths narrative (2B); JSON array of {name, steps, likelihood, impact}';
 
 
 -- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<

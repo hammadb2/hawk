@@ -119,7 +119,9 @@ create policy "prospect_notes_update"
   using (author_id = auth.uid())
   with check (author_id = auth.uid());
 
-drop policy if exists "prospect_files_all" on public.prospect_files;
+drop policy if exists "prospect_files_select" on public.prospect_files;
+drop policy if exists "prospect_files_insert" on public.prospect_files;
+drop policy if exists "prospect_files_delete" on public.prospect_files;
 create policy "prospect_files_select"
   on public.prospect_files for select
   using (
@@ -157,6 +159,7 @@ create policy "prospect_files_delete"
   );
 
 drop policy if exists "crm_scans_select" on public.crm_prospect_scans;
+drop policy if exists "crm_scans_insert" on public.crm_prospect_scans;
 create policy "crm_scans_select"
   on public.crm_prospect_scans for select
   using (
@@ -202,3 +205,18 @@ create policy "email_events_select"
   );
 
 -- Service role / Phase 3 will insert email events via backend
+
+-- CEO profile anchor
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';

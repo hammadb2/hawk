@@ -182,19 +182,19 @@ drop policy if exists "profiles_select_own_or_privileged" on public.profiles;
 create policy "profiles_select_own_or_privileged"
   on public.profiles for select
   using (
-    id = auth.uid()
+    (select auth.uid()) = id
     or public.crm_is_privileged()
     or exists (
       select 1 from public.profiles me
-      where me.id = auth.uid() and me.role = 'team_lead' and public.profiles.team_lead_id = me.id
+      where me.id = (select auth.uid()) and me.role = 'team_lead' and public.profiles.team_lead_id = me.id
     )
   );
 
 drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self"
   on public.profiles for update
-  using (id = auth.uid())
-  with check (id = auth.uid());
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
 
 drop policy if exists "profiles_update_privileged" on public.profiles;
 create policy "profiles_update_privileged"
@@ -292,7 +292,7 @@ create policy "activities_insert"
   );
 
 -- Notifications: own rows only
-drop policy if exists "notifications_own" on public.notifications;
+drop policy if exists "notifications_select_own" on public.notifications;
 create policy "notifications_select_own"
   on public.notifications for select
   using (user_id = auth.uid() or public.crm_is_privileged());
@@ -363,4 +363,32 @@ create trigger on_auth_user_created_crm
 -- Realtime: prospect updates for pipeline (enable replication if needed)
 -- ---------------------------------------------------------------------------
 alter table public.prospects replica identity full;
-alter publication supabase_realtime add table public.prospects;
+do $realtime$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'prospects'
+  ) then
+    alter publication supabase_realtime add table public.prospects;
+  end if;
+end;
+$realtime$;
+
+-- ---------------------------------------------------------------------------
+-- CEO profile anchor (repeat in any migration that touches profiles)
+-- ---------------------------------------------------------------------------
+insert into public.profiles (id, email, full_name, role, status, created_at)
+values (
+  'f04140d6-5f9c-4d93-94b9-5df24555496b',
+  'hammadmkac@gmail.com',
+  'Hammad Bhatti',
+  'ceo',
+  'active',
+  now()
+)
+on conflict (id) do update set
+  role = 'ceo',
+  status = 'active',
+  full_name = 'Hammad Bhatti';
