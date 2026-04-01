@@ -12,6 +12,7 @@ from fastapi import APIRouter, Header, HTTPException
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_monthly_reports import run_monthly_client_reports
 from services.crm_portal_sequence_worker import process_due_onboarding_sequences
+from services.crm_charlotte_run import run_charlotte_daily
 from services.crm_shield_daily import run_daily_shield_rescans
 from services.crm_twilio import format_stale_deal_message, send_whatsapp
 
@@ -168,6 +169,25 @@ def monthly_reports_pdf(
     """
     _require_secret(x_cron_secret)
     return run_monthly_client_reports()
+
+
+@router.post("/charlotte-run")
+def charlotte_daily_run(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    Charlotte automation — daily ~8am MST via cron-job.org:
+    Apollo (200) → ZeroBounce → suppressions + CRM dedupe → Scanner (10 concurrent) → Claude → Smartlead → charlotte_runs + CEO WhatsApp.
+
+    Header: X-Cron-Secret (same as other CRM crons: HAWK_CRM_CRON_SECRET / HAWK_CRON_SECRET / CRON_SECRET).
+    Set CHARLOTTE_AUTOMATION_DRY_RUN=1 on the API to skip external calls (smoke test).
+    """
+    _require_secret(x_cron_secret)
+    try:
+        return run_charlotte_daily()
+    except Exception as e:
+        logger.exception("charlotte run failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.post("/daily-shield-rescan")
