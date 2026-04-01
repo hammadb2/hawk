@@ -187,6 +187,13 @@ def charlotte_daily_run(
         return run_charlotte_daily()
     except Exception as e:
         logger.exception("charlotte run failed: %s", e)
+        try:
+            send_whatsapp(
+                os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip() or "+18259458282",
+                f"Charlotte run failed: {e!s}"[:1500],
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
@@ -224,3 +231,6 @@ def rep_health_score_stub(
     """4C — Daily rep health scoring. TODO: activity + pipeline metrics → profiles.health_score."""
     _require_secret(x_cron_secret)
     return {"ok": True, "phase": "4C", "implemented": False}
+
+
+# scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
