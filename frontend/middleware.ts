@@ -43,6 +43,16 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (user && pathname.startsWith("/portal/login")) {
+      // If this auth user has no portal profile, keep them on login (e.g. ?error=not_linked).
+      // Otherwise: /portal → login → /portal → login … (ERR_TOO_MANY_REDIRECTS).
+      const { data: cppAtLogin } = await supabase
+        .from("client_portal_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cppAtLogin) {
+        return supabaseResponse;
+      }
       const next = request.nextUrl.searchParams.get("next") || "/portal";
       const safe = next.startsWith("/") && !next.startsWith("//") && !next.includes("://") ? next : "/portal";
       return NextResponse.redirect(new URL(safe, request.url));
