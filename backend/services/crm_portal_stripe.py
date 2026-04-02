@@ -360,6 +360,9 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     if shield:
         patch["onboarded_at"] = now.isoformat()
         patch["certification_eligible_at"] = cert_at.isoformat()
+        hs0 = prospect.get("hawk_score") if prospect else None
+        if isinstance(hs0, int) and hs0 >= 0:
+            patch["week_one_score_start"] = hs0
 
     patch_req = httpx.patch(
         f"{SUPABASE_URL}/rest/v1/clients",

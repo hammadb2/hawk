@@ -1468,6 +1468,7 @@ insert into public.crm_settings (key, value)
 values ('charlotte_estimated_reply_rate', '0.02')
 on conflict (key) do nothing;
 
+drop policy if exists "scanner_health_logs_ceo_select" on public.scanner_health_logs;
 create policy "scanner_health_logs_ceo_select"
   on public.scanner_health_logs for select
   to authenticated
@@ -1478,6 +1479,7 @@ create policy "scanner_health_logs_ceo_select"
     )
   );
 
+drop policy if exists "scanner_failures_ceo_select" on public.scanner_failures;
 create policy "scanner_failures_ceo_select"
   on public.scanner_failures for select
   to authenticated
@@ -1488,6 +1490,7 @@ create policy "scanner_failures_ceo_select"
     )
   );
 
+drop policy if exists "charlotte_emails_ceo_select" on public.charlotte_emails;
 create policy "charlotte_emails_ceo_select"
   on public.charlotte_emails for select
   to authenticated
@@ -1498,6 +1501,7 @@ create policy "charlotte_emails_ceo_select"
     )
   );
 
+drop policy if exists "scanner_cache_ceo_select" on public.scanner_cache;
 create policy "scanner_cache_ceo_select"
   on public.scanner_cache for select
   to authenticated
@@ -1525,6 +1529,17 @@ alter table public.clients
   add column if not exists certification_eligible_at timestamptz;
 
 comment on column public.clients.certification_eligible_at is 'onboarded_at + 90 days — eligibility date for HAWK Certified';
+
+-- >>> migrations/20260415000001_onboarding_sequence_tracking.sql >>>
+
+alter table public.clients
+  add column if not exists onboarding_day1_sent_at timestamptz,
+  add column if not exists onboarding_day3_sent_at timestamptz,
+  add column if not exists onboarding_day7_sent_at timestamptz;
+
+comment on column public.clients.onboarding_day1_sent_at is '24h+ reminder: call booking + first findings email';
+comment on column public.clients.onboarding_day3_sent_at is '72h progress WhatsApp';
+comment on column public.clients.onboarding_day7_sent_at is 'Week one summary WhatsApp + email';
 
 -- >>> migrations/20260410000001_profiles_role_closer.sql >>>
 

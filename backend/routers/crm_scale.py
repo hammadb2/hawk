@@ -16,6 +16,7 @@ from routers.crm_auth import require_supabase_uid
 from services.crm_charlotte_quality import run_charlotte_quality_check
 from services.crm_twilio import send_whatsapp
 from services.crm_va_escalation import run_va_reply_escalation
+from services.crm_onboarding_sequences import run_shield_onboarding_sequences
 from services.scanner_health_service import run_scanner_health_check
 
 logger = logging.getLogger(__name__)
@@ -243,3 +244,12 @@ def cron_charlotte_quality(
     """Charlotte email QA metrics; alert CEO if out of range."""
     _require_cron_secret(x_cron_secret)
     return run_charlotte_quality_check()
+
+
+@cron_routes.post("/onboarding-sequences")
+def cron_onboarding_sequences(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Shield Day 1 / 3 / 7 — schedule daily ~14:00 UTC (cron-job.org)."""
+    _require_cron_secret(x_cron_secret)
+    return run_shield_onboarding_sequences()
