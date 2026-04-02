@@ -18,6 +18,13 @@ type ClientRow = {
   prospect_id: string | null;
   mrr_cents: number;
   onboarding_sequence_status: string | null;
+  hawk_readiness_score: number | null;
+  guarantee_status: string | null;
+  certification_eligible_at: string | null;
+  certified_at: string | null;
+  guarantee_checklist_critical_ok: boolean | null;
+  guarantee_checklist_high_ok: boolean | null;
+  guarantee_checklist_subscription_ok: boolean | null;
 };
 
 type ScanRow = {
@@ -64,7 +71,13 @@ export default function PortalHomePage() {
 
     setPortal(cpp as PortalProfile);
 
-    const { data: cl, error: e2 } = await supabase.from("clients").select("id,prospect_id,mrr_cents,onboarding_sequence_status").eq("id", cpp.client_id).single();
+    const { data: cl, error: e2 } = await supabase
+      .from("clients")
+      .select(
+        "id,prospect_id,mrr_cents,onboarding_sequence_status,hawk_readiness_score,guarantee_status,certification_eligible_at,certified_at,guarantee_checklist_critical_ok,guarantee_checklist_high_ok,guarantee_checklist_subscription_ok",
+      )
+      .eq("id", cpp.client_id)
+      .single();
 
     if (e2 || !cl) {
       setClient(null);
@@ -117,8 +130,36 @@ export default function PortalHomePage() {
     );
   }
 
-  const score = scan?.hawk_score ?? 0;
+  const scanScore = scan?.hawk_score ?? 0;
+  const readiness = client.hawk_readiness_score ?? scanScore;
   const grade = scan?.grade ?? "—";
+
+  const guaranteeBadge =
+    client.guarantee_status === "suspended"
+      ? { label: "SUSPENDED", className: "bg-red-500/20 text-red-200 ring-red-500/40" }
+      : client.guarantee_status === "at_risk"
+        ? { label: "AT RISK", className: "bg-amber-500/20 text-amber-100 ring-amber-500/40" }
+        : { label: "ACTIVE", className: "bg-emerald-500/15 text-emerald-200 ring-emerald-500/35" };
+
+  let certLabel: "Earned" | "At Risk" | "Pending" = "Pending";
+  if (client.certified_at) certLabel = "Earned";
+  else if (
+    client.guarantee_status === "at_risk" ||
+    client.guarantee_status === "suspended" ||
+    (typeof client.hawk_readiness_score === "number" && client.hawk_readiness_score < 85)
+  ) {
+    certLabel = "At Risk";
+  }
+
+  let daysUntilCert = 0;
+  if (client.certification_eligible_at && !client.certified_at) {
+    const end = new Date(client.certification_eligible_at).getTime();
+    const now = Date.now();
+    daysUntilCert = Math.max(0, Math.ceil((end - now) / (86400 * 1000)));
+  }
+
+  const ringColor = readiness >= 85 ? "#16a34a" : readiness >= 70 ? "#d97706" : "#dc2626";
+  const ringPct = Math.min(100, Math.max(0, readiness));
   const findingsRaw = scan?.findings;
   const criticalPreview =
     findingsRaw && typeof findingsRaw === "object" && "critical" in findingsRaw
@@ -157,9 +198,9 @@ export default function PortalHomePage() {
 
       <section className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 lg:col-span-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">HAWK score</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Attack surface score</p>
           <div className="mt-4 flex items-end gap-2">
-            <span className="text-5xl font-bold tabular-nums text-[#00C48C]">{score}</span>
+            <span className="text-5xl font-bold tabular-nums text-[#00C48C]">{scanScore}</span>
             <span className="pb-2 text-2xl text-zinc-400">/100</span>
           </div>
           <p className="mt-2 text-sm text-zinc-400">
@@ -176,6 +217,82 @@ export default function PortalHomePage() {
               Live surface monitoring active
             </li>
             <li>Onboarding: {client.onboarding_sequence_status ?? "—"}</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Breach response guarantee</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${guaranteeBadge.className}`}>
+                {guaranteeBadge.label}
+              </span>
+              <span className="text-sm text-zinc-400">
+                Certification: <span className="font-medium text-zinc-100">{certLabel}</span>
+              </span>
+            </div>
+            {client.certification_eligible_at && !client.certified_at && (
+              <p className="mt-3 text-sm text-zinc-400">
+                Days until HAWK Certified eligibility:{" "}
+                <span className="font-semibold tabular-nums text-zinc-100">{daysUntilCert}</span>
+              </p>
+            )}
+            {client.certified_at && (
+              <p className="mt-3 text-sm text-emerald-400/90">You are HAWK Certified — badge and certificate are available in your account.</p>
+            )}
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">HAWK readiness</p>
+            <div className="relative h-36 w-36">
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgb(39 39 42)" strokeWidth="10" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke={ringColor}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(ringPct / 100) * 264} 264`}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold tabular-nums text-zinc-50">{readiness}</span>
+                <span className="text-xs text-zinc-500">/ 100</span>
+              </div>
+            </div>
+            <p className="max-w-[14rem] text-center text-xs text-zinc-500">
+              SLA-based score — updated after each Shield scan. Keep critical &amp; high items within the window to stay
+              certified.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-zinc-800 pt-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Guarantee conditions</p>
+          <ul className="mt-4 space-y-3">
+            <li className="flex items-start gap-3 text-sm">
+              <span className={client.guarantee_checklist_critical_ok !== false ? "text-emerald-400" : "text-red-400"}>
+                {client.guarantee_checklist_critical_ok !== false ? "✓" : "✕"}
+              </span>
+              <span className="text-zinc-300">Critical findings resolved within 24–48 hours of notification</span>
+            </li>
+            <li className="flex items-start gap-3 text-sm">
+              <span className={client.guarantee_checklist_high_ok !== false ? "text-emerald-400" : "text-red-400"}>
+                {client.guarantee_checklist_high_ok !== false ? "✓" : "✕"}
+              </span>
+              <span className="text-zinc-300">High findings resolved within 48 hours</span>
+            </li>
+            <li className="flex items-start gap-3 text-sm">
+              <span className={client.guarantee_checklist_subscription_ok !== false ? "text-emerald-400" : "text-red-400"}>
+                {client.guarantee_checklist_subscription_ok !== false ? "✓" : "✕"}
+              </span>
+              <span className="text-zinc-300">Subscription active</span>
+            </li>
           </ul>
         </div>
       </section>

@@ -10,6 +10,7 @@ import httpx
 
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_portal_email import send_resend
+from services.crm_readiness_guarantee import process_shield_client_post_scan
 from services.crm_twilio import send_whatsapp
 from services.scanner import enqueue_async_scan, poll_scan_job
 
@@ -251,6 +252,18 @@ def run_daily_shield_rescans() -> dict[str, Any]:
                 "new_critical_high": len(new_alertable),
             },
         )
+
+        try:
+            process_shield_client_post_scan(
+                client_id=cid,
+                domain=domain,
+                company_name=company,
+                prospect_id=str(pid) if pid else None,
+                findings=findings,
+                phone=phone,
+            )
+        except Exception:
+            logger.exception("readiness/guarantee post-scan failed client=%s", cid)
 
         processed += 1
 
