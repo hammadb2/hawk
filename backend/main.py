@@ -5,15 +5,18 @@ SQLite (dev) / PostgreSQL (prod). JWT auth. Stripe webhooks. Scanner via Ghost r
 
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications, breach_check
-from routers import crm_cron, crm_portal_api, crm_scale, crm_webhooks, monitor
+from routers import crm_client_portal, crm_cron, crm_enterprise, crm_portal_api, crm_scale, crm_webhooks, monitor, portal_phase2
 
 if os.environ.get("SENTRY_DSN"):
     try:
@@ -26,7 +29,12 @@ if os.environ.get("SENTRY_DSN"):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    # Do not block deploy: Railway healthcheck hits /health only after lifespan startup returns.
+    # A slow or misconfigured DATABASE_URL would otherwise exceed the healthcheck window.
+    try:
+        init_db()
+    except Exception:
+        logger.exception("init_db failed — API will start degraded until DB is fixed")
     yield
     # shutdown if needed
 
@@ -59,6 +67,9 @@ app.include_router(breach_check.router)
 app.include_router(crm_cron.router)
 app.include_router(crm_webhooks.router)
 app.include_router(crm_portal_api.router)
+app.include_router(crm_client_portal.router)
+app.include_router(crm_enterprise.router)
+app.include_router(portal_phase2.router)
 app.include_router(crm_scale.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(monitor.router)

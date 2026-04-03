@@ -5,4 +5,5 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+# Uvicorn runs lifespan (init_db) before accepting connections; 30s was too tight for cold start + DB.
+healthcheckTimeout = 120
