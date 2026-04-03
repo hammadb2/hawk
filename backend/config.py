@@ -13,8 +13,16 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "sqlite:///./hawk.db",
 )
-# SQLite needs connect_args for foreign keys
-CONNECT_ARGS = {} if DATABASE_URL.startswith("postgresql") else {"check_same_thread": False}
+# Railway / Heroku often use postgres:// — SQLAlchemy expects postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://") :]
+
+_d = DATABASE_URL.lower()
+# SQLite needs connect_args for foreign keys; Postgres needs connect_timeout so startup cannot hang forever
+if _d.startswith("postgresql"):
+    CONNECT_ARGS = {"connect_timeout": 10}
+else:
+    CONNECT_ARGS = {"check_same_thread": False}
 
 # Scanner relay (Ghost)
 SCANNER_RELAY_URL = os.environ.get("HAWK_SCANNER_RELAY_URL", "http://178.104.27.211:8002")

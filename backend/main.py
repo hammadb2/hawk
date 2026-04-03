@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
-from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications, breach_check
@@ -29,12 +30,15 @@ if os.environ.get("SENTRY_DSN"):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Do not block deploy: Railway healthcheck hits /health only after lifespan startup returns.
-    # A slow or misconfigured DATABASE_URL would otherwise exceed the healthcheck window.
-    try:
-        init_db()
-    except Exception:
-        logger.exception("init_db failed — API will start degraded until DB is fixed")
+    # Uvicorn does not accept HTTP until lifespan startup finishes. init_db() can hang on DB TCP
+    # (try/except does not help). Run DB setup in a daemon thread so /health is reachable immediately.
+    def _init_db_bg() -> None:
+        try:
+            init_db()
+        except Exception:
+            logger.exception("init_db failed — API is degraded until DB is fixed")
+
+    threading.Thread(target=_init_db_bg, name="init_db", daemon=True).start()
     yield
     # shutdown if needed
 
