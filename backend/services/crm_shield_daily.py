@@ -11,7 +11,7 @@ import httpx
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_portal_email import send_resend
 from services.crm_readiness_guarantee import process_shield_client_post_scan
-from services.crm_twilio import send_whatsapp
+from services.crm_openphone import send_sms
 from services.scanner import enqueue_async_scan, poll_scan_job
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,26 @@ def _findings_list(raw: Any) -> list[dict[str, Any]]:
         if isinstance(inner, list):
             return [x for x in inner if isinstance(x, dict)]
     return []
+
+
+def _is_lookalike_finding(f: dict[str, Any]) -> bool:
+    layer = str(f.get("layer") or "").lower()
+    title = str(f.get("title") or "").lower()
+    cat = str(f.get("category") or "").lower()
+    return (
+        "dnstwist" in layer
+        or "lookalike" in title
+        or "typosquat" in title
+        or "lookalike" in cat
+        or "permutation" in title
+    )
+
+
+def _new_findings_vs_snapshot(
+    prev_keys: set[str],
+    findings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [f for f in findings if _finding_key(f) not in prev_keys]
 
 
 def _alertable_new(
@@ -181,6 +201,7 @@ def run_daily_shield_rescans() -> dict[str, Any]:
     processed = 0
     alerts_whatsapp = 0
     alerts_email = 0
+    alerts_lookalike_whatsapp = 0
     errors: list[str] = []
 
     for c in shield_clients:
@@ -238,6 +259,8 @@ def run_daily_shield_rescans() -> dict[str, Any]:
         grade = result.get("grade")
 
         new_alertable = _alertable_new(prev_keys, findings)
+        new_vs_prev = _new_findings_vs_snapshot(prev_keys, findings) if not baseline_only else []
+        new_lookalikes = [f for f in new_vs_prev if _is_lookalike_finding(f)]
 
         _insert_snapshot(
             cid,
@@ -267,16 +290,61 @@ def run_daily_shield_rescans() -> dict[str, Any]:
 
         processed += 1
 
-        if baseline_only or not new_alertable:
+        if not baseline_only and new_lookalikes:
+            lk_titles = [str(f.get("title") or "Lookalike signal") for f in new_lookalikes[:3]]
+            lk_summary = (
+                f"New lookalike / typosquat signal on {domain}: {lk_titles[0]}"
+                + (f" (+{len(lk_titles) - 1} more)" if len(lk_titles) > 1 else "")
+            )
+            if phone:
+                try:
+                    body = (
+                        f"HAWK — Lookalike domain alert\n"
+                        f"{company}\n"
+                        f"We detected new domains or permutations that could be used to impersonate you.\n"
+                        f"Top item: {lk_titles[0]}\n"
+                        f"Review in your portal: {base}/portal/findings"
+                    )
+                    out = send_sms(phone, body)
+                    if not out.get("skipped"):
+                        alerts_lookalike_whatsapp += 1
+                        alerts_whatsapp += 1
+                except Exception:
+                    logger.exception("whatsapp lookalike alert failed client=%s", cid)
+            if portal_email:
+                try:
+                    send_resend(
+                        to_email=str(portal_email),
+                        subject=f"HAWK — Lookalike domain signal for {domain}",
+                        html=(
+                            f"<p>Hi,</p><p>During Shield monitoring we detected <strong>new</strong> lookalike or "
+                            f"typosquat-related signals for <strong>{_html_escape(domain)}</strong>.</p>"
+                            f"<p><strong>First item:</strong> {_html_escape(lk_titles[0])}</p>"
+                            f"<p><a href=\"{base}/portal/findings\">Open findings</a> in your portal.</p>"
+                        ),
+                    )
+                    alerts_email += 1
+                except Exception:
+                    logger.exception("email lookalike alert failed client=%s", cid)
             _insert_event(
                 cid,
-                channel="none",
-                summary="Daily scan complete — no new critical/high vs prior snapshot."
-                if not baseline_only
-                else "Initial Shield baseline snapshot recorded (no alert).",
-                keys=[],
-                detail={"domain": domain, "baseline_only": baseline_only},
+                channel="whatsapp" if phone else "email",
+                summary=lk_summary,
+                keys=[_finding_key(f) for f in new_lookalikes],
+                detail={"domain": domain, "kind": "lookalike", "titles": lk_titles},
             )
+
+        if baseline_only or not new_alertable:
+            if baseline_only or not new_lookalikes:
+                _insert_event(
+                    cid,
+                    channel="none",
+                    summary="Daily scan complete — no new critical/high vs prior snapshot."
+                    if not baseline_only
+                    else "Initial Shield baseline snapshot recorded (no alert).",
+                    keys=[],
+                    detail={"domain": domain, "baseline_only": baseline_only},
+                )
             continue
 
         titles = [str(f.get("title") or "Finding") for f in new_alertable[:5]]
@@ -294,7 +362,7 @@ def run_daily_shield_rescans() -> dict[str, Any]:
                 f"Log in to see details and fix steps: {base}/portal"
             )
             try:
-                out = send_whatsapp(phone, body)
+                out = send_sms(phone, body)
                 wa_sent = not out.get("skipped")
                 if wa_sent:
                     alerts_whatsapp += 1
@@ -335,6 +403,7 @@ def run_daily_shield_rescans() -> dict[str, Any]:
         "processed": processed,
         "alerts_whatsapp": alerts_whatsapp,
         "alerts_email": alerts_email,
+        "alerts_lookalike_whatsapp": alerts_lookalike_whatsapp,
         "errors": errors[:20],
     }
 

@@ -13,10 +13,10 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from config import CRM_PUBLIC_BASE_URL
-from services.crm_twilio import (
+from services.crm_openphone import (
     format_charlotte_reply_ceo_message,
     format_charlotte_reply_rep_message,
-    send_whatsapp,
+    send_sms,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,8 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 # Charlotte / CEO alert — defaults to spec number if env unset
-CRM_CEO_WHATSAPP_E164 = os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip() or "+18259458282"
+CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip() or "+18259458282"
+VA_PHONE_NUMBER = os.environ.get("VA_PHONE_NUMBER", "").strip()
 
 
 def _sb_headers() -> dict[str, str]:
@@ -346,20 +347,43 @@ def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn) -> None:
                 first_name=str(first) if first else None,
                 crm_base_url=base,
             )
-            send_whatsapp(rep_wa, msg)
+            send_sms(rep_wa, msg)
         except Exception:
-            logger.exception("WhatsApp Charlotte rep alert failed prospect=%s", prospect_id)
+            logger.exception("SMS Charlotte rep alert failed prospect=%s", prospect_id)
 
-    if CRM_CEO_WHATSAPP_E164:
+    if CRM_CEO_PHONE_E164:
         try:
             ceo_msg = format_charlotte_reply_ceo_message(
                 company=str(company),
                 score=score,
                 rep_name=rep_name,
             )
-            send_whatsapp(CRM_CEO_WHATSAPP_E164, ceo_msg)
+            send_sms(CRM_CEO_PHONE_E164, ceo_msg)
         except Exception:
-            logger.exception("WhatsApp Charlotte CEO alert failed")
+            logger.exception("SMS Charlotte CEO alert failed")
+
+    if VA_PHONE_NUMBER:
+        try:
+            send_sms(
+                VA_PHONE_NUMBER,
+                "New reply — "
+                f"{company} — "
+                f"{first or 'Prospect'} — "
+                f"Login to handle: securedbyhawk.com/crm/charlotte/replies",
+            )
+        except Exception:
+            logger.exception("SMS VA alert failed")
+
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={"id": f"eq.{prospect_id}"},
+            json={"reply_received_at": datetime.now(timezone.utc).isoformat()},
+            timeout=15.0,
+        ).raise_for_status()
+    except Exception:
+        logger.exception("prospect reply_received_at patch failed")
 
     try:
         httpx.post(

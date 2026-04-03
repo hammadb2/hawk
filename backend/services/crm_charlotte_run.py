@@ -27,7 +27,7 @@ SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.
 ZEROBOUNCE_VALIDATE = "https://api.zerobounce.net/v2/validate"
 
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
-SCAN_TIMEOUT = 90.0
+SCAN_TIMEOUT = 120.0
 MAX_TOKENS = 500
 SCAN_CONCURRENCY = 10
 
@@ -185,6 +185,155 @@ def _breach_info(findings: list[dict[str, Any]]) -> tuple[bool, str]:
         if any(x in blob for x in ("breach", "hibp", "stealer", "credential", "pwned")):
             return True, (_finding_plain(f) or title)[:500]
     return False, ""
+
+
+def _begin_charlotte_run_row(supabase_url: str, industry: str | None) -> str | None:
+    run_d = date.today()
+    try:
+        run_d = datetime.now(MST).date()
+    except Exception:
+        pass
+    body = {
+        "run_date": str(run_d),
+        "industry": industry,
+        "leads_pulled": 0,
+        "emails_verified": 0,
+        "emails_suppressed": 0,
+        "domains_scanned": 0,
+        "scan_failures": 0,
+        "scan_skipped": 0,
+        "email_failed": 0,
+        "upload_failed": 0,
+        "emails_written": 0,
+        "leads_uploaded": 0,
+    }
+    try:
+        r = httpx.post(
+            f"{supabase_url}/rest/v1/charlotte_runs",
+            headers=_sb_headers(),
+            json=body,
+            timeout=25.0,
+        )
+        r.raise_for_status()
+        rows = r.json()
+        if isinstance(rows, list) and rows:
+            return str(rows[0].get("id") or "")
+    except Exception as e:
+        logger.exception("begin charlotte_runs: %s", e)
+    return None
+
+
+def _finalize_charlotte_run(supabase_url: str, run_id: str | None, stats: dict[str, Any]) -> None:
+    if not run_id:
+        return
+    patch = {
+        "leads_pulled": stats.get("leads_pulled", 0),
+        "emails_verified": stats.get("emails_verified", 0),
+        "emails_suppressed": stats.get("emails_suppressed", 0),
+        "domains_scanned": stats.get("domains_scanned", 0),
+        "scan_failures": stats.get("scan_failures", 0),
+        "scan_skipped": stats.get("scan_skipped", 0),
+        "email_failed": stats.get("email_failed", 0),
+        "upload_failed": stats.get("upload_failed", 0),
+        "emails_written": stats.get("emails_written", 0),
+        "leads_uploaded": stats.get("leads_uploaded", 0),
+    }
+    try:
+        httpx.patch(
+            f"{supabase_url}/rest/v1/charlotte_runs",
+            headers=_sb_headers(),
+            params={"id": f"eq.{run_id}"},
+            json=patch,
+            timeout=25.0,
+        ).raise_for_status()
+    except Exception as e:
+        logger.exception("finalize charlotte_runs: %s", e)
+
+
+def _insert_charlotte_email_row(
+    supabase_url: str,
+    *,
+    run_id: str | None,
+    row: dict[str, Any],
+    scan: dict[str, Any],
+    email_body: dict[str, str],
+    smartlead_lead_id: str | None,
+) -> None:
+    findings_raw = scan.get("findings") or []
+    findings = [dict(f) for f in findings_raw if isinstance(f, dict)]
+    findings.sort(key=lambda x: _rank_sev(str(x.get("severity", ""))))
+    top_plain = _finding_plain(findings[0]) if findings else ""
+    body = email_body.get("body") or ""
+    subj = email_body.get("subject") or ""
+    wc = len(body.split()) if body else 0
+    has_dash = "-" in body or "-" in subj
+    has_bul = "•" in body or "\n1." in body or "\n- " in body
+    dom = row.get("domain") or ""
+    score_v = scan.get("score")
+    payload = {
+        "run_id": run_id,
+        "prospect_domain": dom,
+        "prospect_email": row.get("email"),
+        "prospect_industry": (row.get("industry") or "")[:500],
+        "hawk_score": int(score_v) if score_v is not None else None,
+        "top_finding": (top_plain or "")[:4000],
+        "email_subject": subj[:2000],
+        "email_body": body[:16000],
+        "word_count": wc,
+        "has_dashes": has_dash,
+        "has_bullets": has_bul,
+        "contains_domain": dom.lower() in body.lower() or dom.lower() in subj.lower(),
+        "contains_score": (str(score_v) in body or str(score_v) in subj) if score_v is not None else False,
+        "smartlead_lead_id": smartlead_lead_id,
+    }
+    try:
+        httpx.post(
+            f"{supabase_url}/rest/v1/charlotte_emails",
+            headers=_sb_headers(),
+            json=payload,
+            timeout=20.0,
+        ).raise_for_status()
+    except Exception as e:
+        logger.exception("charlotte_emails insert: %s", e)
+
+
+def _validate_email_content(
+    email_body: dict[str, str],
+    row: dict[str, Any],
+    scan: dict[str, Any],
+) -> bool:
+    subj = (email_body.get("subject") or "").strip()
+    body = (email_body.get("body") or "").strip()
+    if not subj or not body:
+        return False
+    if len(body.split()) > 150:
+        return False
+    if "-" in body or "-" in subj:
+        return False
+    fn = (row.get("first_name") or "").strip()
+    dom = (row.get("domain") or "").strip().lower()
+    if fn and fn.lower() not in body.lower():
+        return False
+    if dom and dom not in body.lower() and dom not in subj.lower():
+        return False
+    score = scan.get("score")
+    if score is not None and str(int(score)) not in body and str(int(score)) not in subj:
+        return False
+    findings_raw = scan.get("findings") or []
+    findings = [dict(f) for f in findings_raw if isinstance(f, dict)]
+    if not findings:
+        return "no major" in body.lower() or "finding" in body.lower()
+    hit = False
+    for f in findings[:8]:
+        plain = _finding_plain(f)
+        if plain and len(plain) > 12 and plain[:24].lower() in body.lower():
+            hit = True
+            break
+        t = str(f.get("title") or "")
+        if len(t) > 8 and t[:20].lower() in body.lower():
+            hit = True
+            break
+    return hit
 
 
 def _sanitize_no_hyphens(text: str) -> str:
@@ -475,17 +624,36 @@ Return ONLY this JSON:
 
 
 async def _scan_one(
-    client: httpx.AsyncClient, sem: asyncio.Semaphore, domain: str, industry: str | None
+    client: httpx.AsyncClient,
+    sem: asyncio.Semaphore,
+    domain: str,
+    industry: str | None,
 ) -> dict[str, Any] | None:
+    from services.scan_cache import get_cached_scan, set_cached_scan
+
     async with sem:
+        cached = get_cached_scan(domain, "fast")
+        if cached and cached.get("score") is not None:
+            return cached
         try:
             r = await client.post(
                 f"{SCANNER_URL}/v1/scan/sync",
-                json={"domain": domain.strip(), "industry": industry or None},
+                json={
+                    "domain": domain.strip(),
+                    "industry": industry or None,
+                    "scan_depth": "fast",
+                },
                 timeout=SCAN_TIMEOUT,
             )
             r.raise_for_status()
-            return r.json()
+            data = r.json()
+            if isinstance(data, dict) and data.get("message") == "scan_timeout":
+                return data
+            if isinstance(data, dict) and data.get("score") is None:
+                return data
+            if isinstance(data, dict) and data.get("score") is not None:
+                set_cached_scan(domain, "fast", data)
+            return data if isinstance(data, dict) else None
         except Exception as e:
             logger.warning("scan failed domain=%s err=%s", domain, e)
             return None
@@ -626,15 +794,19 @@ async def _process_pipeline_async(
     leads: list[dict[str, Any]],
     vertical_label: str,
     anthropic_key: str,
-) -> tuple[list[dict[str, Any]], int, int, int]:
-    """Scan up to SCAN_CONCURRENCY in parallel; then Claude per successful scan."""
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Scan up to SCAN_CONCURRENCY in parallel; then Claude + validation per successful scan."""
     import anthropic
 
     ac = anthropic.AsyncAnthropic(api_key=anthropic_key)
     sem = asyncio.Semaphore(SCAN_CONCURRENCY)
-    scanned = 0
-    scan_fail = 0
-    written = 0
+    counts = {
+        "domains_scanned": 0,
+        "scan_failures": 0,
+        "scan_skipped": 0,
+        "email_failed": 0,
+        "emails_written": 0,
+    }
     out_rows: list[dict[str, Any]] = []
 
     async with httpx.AsyncClient() as hc:
@@ -647,18 +819,25 @@ async def _process_pipeline_async(
 
         for row, scan in scan_results:
             if not scan:
-                scan_fail += 1
+                counts["scan_failures"] += 1
                 continue
-            scanned += 1
+            if scan.get("message") == "scan_timeout" or scan.get("score") is None:
+                counts["scan_skipped"] += 1
+                continue
+            counts["domains_scanned"] += 1
             ce = await _claude_one(ac, row, scan, vertical_label)
             if not ce:
+                counts["email_failed"] += 1
                 continue
-            written += 1
+            if not _validate_email_content(ce, row, scan):
+                counts["email_failed"] += 1
+                continue
+            counts["emails_written"] += 1
             sender = os.environ.get("CHARLOTTE_SENDER_NAME", "Charlotte").strip()
             payload = _smartlead_lead_payload(row, scan, ce, sender)
-            out_rows.append({"row": row, "scan": scan, "smartlead": payload})
+            out_rows.append({"row": row, "scan": scan, "smartlead": payload, "email_body": ce})
 
-    return out_rows, scanned, scan_fail, written
+    return out_rows, counts
 
 
 def run_charlotte_daily() -> dict[str, Any]:
@@ -679,9 +858,13 @@ def run_charlotte_daily() -> dict[str, Any]:
         "emails_suppressed": 0,
         "domains_scanned": 0,
         "scan_failures": 0,
+        "scan_skipped": 0,
+        "email_failed": 0,
+        "upload_failed": 0,
         "emails_written": 0,
         "leads_uploaded": 0,
     }
+    run_row_id: str | None = None
 
     if not supabase_url:
         return {**stats, "ok": False, "error": "SUPABASE_URL not set"}
@@ -695,8 +878,7 @@ def run_charlotte_daily() -> dict[str, Any]:
     stats["industry"] = industry_cfg["label"]
 
     if dry:
-        _log_run(supabase_url, stats)
-        _ceo_whatsapp(stats)
+        _ceo_sms_summary(stats)
         return stats
 
     if not apollo_key or not zb_key or not sl_key or not anthropic_key:
@@ -710,6 +892,8 @@ def run_charlotte_daily() -> dict[str, Any]:
         sl_cid = _get_setting(supabase_url, "smartlead_campaign_id", "").strip()
     if not sl_cid:
         return {**stats, "ok": False, "error": "SMARTLEAD_CAMPAIGN_ID or crm_settings smartlead_campaign_id required"}
+
+    run_row_id = _begin_charlotte_run_row(supabase_url, industry_cfg["label"])
 
     # --- Apollo: 2 pages x 100
     pulled: list[dict[str, Any]] = []
@@ -769,45 +953,72 @@ def run_charlotte_daily() -> dict[str, Any]:
     stats["emails_suppressed"] = sup_count
 
     # Scan + Claude (async)
-    enriched, scanned, scan_fail, written = asyncio.run(
+    enriched, counts = asyncio.run(
         _process_pipeline_async(ready, industry_cfg["label"], anthropic_key)
     )
-    stats["domains_scanned"] = scanned
-    stats["scan_failures"] = scan_fail
-    stats["emails_written"] = written
+    stats["domains_scanned"] = counts["domains_scanned"]
+    stats["scan_failures"] = counts["scan_failures"]
+    stats["scan_skipped"] = counts["scan_skipped"]
+    stats["email_failed"] = counts["email_failed"]
+    stats["emails_written"] = counts["emails_written"]
 
-    # Smartlead
+    # Smartlead (retry once per batch; per-lead charlotte_emails on success)
     uploaded = 0
+    upload_fail = 0
     if enriched:
-        lead_list = [x["smartlead"] for x in enriched]
         with httpx.Client(timeout=120.0) as client:
-            for i in range(0, len(lead_list), 100):
-                chunk = lead_list[i : i + 100]
-                r = client.post(
-                    f"{SMARTLEAD_BASE}/campaigns/{sl_cid}/leads",
-                    params={"api_key": sl_key},
-                    json={
-                        "lead_list": chunk,
-                        "settings": {
-                            "ignore_duplicate_leads_in_other_campaign": True,
-                            "return_lead_ids": True,
-                        },
-                    },
-                    timeout=120.0,
-                )
-                if r.status_code >= 400:
-                    logger.error("Smartlead error: %s %s", r.status_code, r.text[:800])
-                    continue
-                try:
-                    data = r.json()
-                    uploaded += int(data.get("added_count") or data.get("upload_count") or len(chunk))
-                except Exception:
-                    uploaded += len(chunk)
+            for item in enriched:
+                payload = item["smartlead"]
+                chunk = [payload]
+                ok_chunk = False
+                lead_id = None
+                for attempt in range(2):
+                    try:
+                        r = client.post(
+                            f"{SMARTLEAD_BASE}/campaigns/{sl_cid}/leads",
+                            params={"api_key": sl_key},
+                            json={
+                                "lead_list": chunk,
+                                "settings": {
+                                    "ignore_duplicate_leads_in_other_campaign": True,
+                                    "return_lead_ids": True,
+                                },
+                            },
+                            timeout=120.0,
+                        )
+                        if r.status_code >= 400:
+                            logger.error("Smartlead error: %s %s", r.status_code, r.text[:800])
+                            if attempt == 1:
+                                upload_fail += 1
+                            continue
+                        data = r.json()
+                        uploaded += int(data.get("added_count") or data.get("upload_count") or 1)
+                        ok_chunk = True
+                        lids = data.get("lead_ids") or data.get("ids") or []
+                        if isinstance(lids, list) and lids:
+                            lead_id = str(lids[0])
+                        break
+                    except Exception as e:
+                        logger.warning("Smartlead post attempt %s: %s", attempt + 1, e)
+                        if attempt == 1:
+                            upload_fail += 1
+                if ok_chunk:
+                    _insert_charlotte_email_row(
+                        supabase_url,
+                        run_id=run_row_id,
+                        row=item["row"],
+                        scan=item["scan"],
+                        email_body=item["email_body"],
+                        smartlead_lead_id=lead_id,
+                    )
+                else:
+                    _smartlead_upload_failed_ceo_alert(item["row"])
 
     stats["leads_uploaded"] = uploaded
+    stats["upload_failed"] = upload_fail
 
-    _log_run(supabase_url, stats)
-    _ceo_whatsapp(stats)
+    _finalize_charlotte_run(supabase_url, run_row_id, stats)
+    _ceo_sms_summary(stats, supabase_url)
 
     next_idx = (day_idx + 1) % len(INDUSTRY_DAYS)
     _set_setting(supabase_url, "charlotte_industry_day_index", str(next_idx))
@@ -815,49 +1026,46 @@ def run_charlotte_daily() -> dict[str, Any]:
     return stats
 
 
-def _log_run(supabase_url: str, stats: dict[str, Any]) -> None:
-    run_d = date.today()
-    try:
-        run_d = datetime.now(MST).date()
-    except Exception:
-        pass
-    row = {
-        "industry": stats.get("industry"),
-        "leads_pulled": stats.get("leads_pulled", 0),
-        "emails_verified": stats.get("emails_verified", 0),
-        "emails_suppressed": stats.get("emails_suppressed", 0),
-        "domains_scanned": stats.get("domains_scanned", 0),
-        "scan_failures": stats.get("scan_failures", 0),
-        "emails_written": stats.get("emails_written", 0),
-        "leads_uploaded": stats.get("leads_uploaded", 0),
-        "run_date": str(run_d),
-    }
-    try:
-        httpx.post(
-            f"{supabase_url}/rest/v1/charlotte_runs",
-            headers=_sb_headers(),
-            json=row,
-            timeout=20.0,
-        ).raise_for_status()
-    except Exception as e:
-        logger.exception("charlotte_runs insert failed: %s", e)
+def _smartlead_upload_failed_ceo_alert(row: dict[str, Any]) -> None:
+    from services.crm_openphone import send_sms
 
-
-def _ceo_whatsapp(stats: dict[str, Any]) -> None:
-    from services.crm_twilio import send_whatsapp
-
-    num = os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip() or "+18259458282"
+    num = os.environ.get("CRM_CEO_PHONE_E164", "").strip() or "+18259458282"
     msg = (
-        "Charlotte run complete.\n"
-        f"Industry: {stats.get('industry') or '—'}\n"
-        f"Leads pulled: {stats.get('leads_pulled', 0)}\n"
-        f"Verified: {stats.get('emails_verified', 0)}\n"
-        f"Scanned: {stats.get('domains_scanned', 0)}\n"
-        f"Emails written: {stats.get('emails_written', 0)}\n"
-        f"Uploaded to Smartlead: {stats.get('leads_uploaded', 0)}\n"
-        f"Failures: {stats.get('scan_failures', 0)}"
+        "Charlotte Smartlead upload failed after retry.\n"
+        f"Domain: {row.get('domain')}\n"
+        f"Email: {row.get('email')}\n"
+        "Check logs and re-push lead manually."
     )
     try:
-        send_whatsapp(num, msg)
+        send_sms(num, msg)
     except Exception:
-        logger.exception("CEO WhatsApp Charlotte summary failed")
+        logger.exception("CEO SMS Smartlead failure alert")
+
+
+def _ceo_sms_summary(stats: dict[str, Any], supabase_url: str = "") -> None:
+    from services.crm_openphone import send_sms
+
+    num = os.environ.get("CRM_CEO_PHONE_E164", "").strip() or "+18259458282"
+    rate = 0.02
+    if supabase_url:
+        try:
+            rate = float(_get_setting(supabase_url, "charlotte_estimated_reply_rate", "0.02"))
+        except ValueError:
+            rate = 0.02
+    uploaded = int(stats.get("leads_uploaded", 0))
+    est = int(round(uploaded * rate))
+    msg = (
+        "Charlotte daily run complete.\n"
+        f"Industry: {stats.get('industry') or '—'}\n"
+        f"Domains found: {stats.get('leads_pulled', 0)}\n"
+        f"Emails verified: {stats.get('emails_verified', 0)}\n"
+        f"Scans completed: {stats.get('domains_scanned', 0)}\n"
+        f"Emails written: {stats.get('emails_written', 0)}\n"
+        f"Uploaded to Smartlead: {uploaded}\n"
+        f"Failures: {stats.get('scan_failures', 0) + stats.get('scan_skipped', 0) + stats.get('email_failed', 0) + stats.get('upload_failed', 0)}\n"
+        f"Estimated replies today: {est}"
+    )
+    try:
+        send_sms(num, msg)
+    except Exception:
+        logger.exception("CEO SMS Charlotte summary failed")

@@ -11,7 +11,7 @@ import httpx
 
 from config import CAL_COM_BOOKING_URL, CRM_PUBLIC_BASE_URL
 from services.crm_portal_email import shield_day1_findings_email, shield_day7_week_summary_email
-from services.crm_twilio import send_whatsapp
+from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +289,7 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                         top_findings=tops,
                     )
                     if not c.get("onboarding_call_booked_at") and phone:
-                        send_whatsapp(
+                        send_sms(
                             phone,
                             f"Hi {first} your onboarding call with HAWK is not booked yet. "
                             "This is where we walk you through your findings and fix plan. "
@@ -345,7 +345,7 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                         )
 
                 if phone:
-                    send_whatsapp(phone, body)
+                    send_sms(phone, body)
                 httpx.patch(
                     f"{SUPABASE_URL}/rest/v1/clients",
                     headers=_headers(),
@@ -381,7 +381,7 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                     f"Days until HAWK Certified: {days_left}"
                 )
                 if phone:
-                    send_whatsapp(phone, wa)
+                    send_sms(phone, wa)
 
                 if email:
                     shield_day7_week_summary_email(

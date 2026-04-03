@@ -39,7 +39,7 @@ export default function CrmSettingsPage() {
           <li>NEXT_PUBLIC_API_URL</li>
           <li>SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (API)</li>
           <li>SUPABASE_JWT_SECRET (API — invite / verify-payment)</li>
-          <li>CRM_PUBLIC_BASE_URL, CRM_CEO_WHATSAPP_E164, Twilio vars (API)</li>
+          <li>CRM_PUBLIC_BASE_URL, OPENPHONE_API_KEY, OPENPHONE_FROM_NUMBER, CRM_CEO_PHONE_E164, VA_PHONE_NUMBER (API)</li>
           <li>CRM_EMAIL_WEBHOOK_SECRET (API)</li>
           <li>HAWK_CRM_CRON_SECRET, HAWK_CRON_SECRET, or CRON_SECRET (Railway alias — aging cron)</li>
         </ul>

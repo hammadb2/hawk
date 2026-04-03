@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from config import CRM_CEO_WHATSAPP_E164
-from services.crm_twilio import send_whatsapp
+from config import CRM_CEO_PHONE_E164
+from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +54,12 @@ def run_va_reply_escalation() -> dict:
         except Exception:
             continue
     n = 0
-    ceo = CRM_CEO_WHATSAPP_E164 or "+18259458282"
+    ceo = CRM_CEO_PHONE_E164 or "+18259458282"
     for row in rows:
         pid = row["id"]
         co = row.get("company_name") or row.get("domain") or "Prospect"
         try:
-            send_whatsapp(
+            send_sms(
                 ceo,
                 "Unhandled reply — "
                 f"{co} — "

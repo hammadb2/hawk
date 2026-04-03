@@ -11,8 +11,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from config import CRM_CEO_WHATSAPP_E164, MONITOR_API_BASE_URL, SMARTLEAD_API_KEY, STRIPE_SECRET_KEY, SUPABASE_URL
-from services.crm_twilio import send_whatsapp
+from config import CRM_CEO_PHONE_E164, MONITOR_API_BASE_URL, SMARTLEAD_API_KEY, STRIPE_SECRET_KEY, SUPABASE_URL
+from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +106,9 @@ def _patch_alert_sent(log_id: str, alert_sent: bool = True) -> None:
         logger.exception("patch alert_sent: %s", e)
 
 
-def _maybe_whatsapp(*, service: str, status: str, prev: dict[str, Any] | None, new_row: dict[str, Any] | None) -> None:
-    if not CRM_CEO_WHATSAPP_E164 or not new_row:
+def _maybe_ceo_sms(*, service: str, status: str, prev: dict[str, Any] | None, new_row: dict[str, Any] | None) -> None:
+    ceo = CRM_CEO_PHONE_E164 or "+18259458282"
+    if not new_row:
         return
     nid = new_row.get("id")
     if not nid:
@@ -115,13 +116,13 @@ def _maybe_whatsapp(*, service: str, status: str, prev: dict[str, Any] | None, n
 
     if status == "failed" and prev and prev.get("status") == "failed" and not prev.get("alert_sent"):
         msg = f"HAWK monitor: {service} failed twice in a row. Check system_health_log in CRM Settings."
-        send_whatsapp(CRM_CEO_WHATSAPP_E164, msg)
+        send_sms(ceo, msg)
         _patch_alert_sent(str(nid), True)
         return
 
     if status == "ok" and prev and prev.get("status") == "failed" and prev.get("alert_sent"):
         msg = f"HAWK monitor: {service} recovered after failure."
-        send_whatsapp(CRM_CEO_WHATSAPP_E164, msg)
+        send_sms(ceo, msg)
 
 
 def _timed_request(method: str, url: str, **kwargs: Any) -> tuple[str, int, dict[str, Any]]:
@@ -239,6 +240,6 @@ def run_health_monitor() -> dict[str, Any]:
         prev = _fetch_previous_log(name)
         status, ms, detail = fn()
         row = _insert_log(service=name, status=status, response_ms=ms, detail=detail)
-        _maybe_whatsapp(service=name, status=status, prev=prev, new_row=row)
+        _maybe_ceo_sms(service=name, status=status, prev=prev, new_row=row)
         results.append({"service": name, "status": status, "response_ms": ms, "detail": detail})
     return {"ok": True, "checked_at": datetime.now(timezone.utc).isoformat(), "results": results}

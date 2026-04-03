@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 from config import CRM_PUBLIC_BASE_URL
 from routers.crm_auth import require_supabase_uid
 from services.crm_charlotte_quality import run_charlotte_quality_check
-from services.crm_twilio import send_whatsapp
 from services.crm_va_escalation import run_va_reply_escalation
 from services.crm_onboarding_sequences import run_shield_onboarding_sequences
 from services.scanner_health_service import run_scanner_health_check
@@ -25,8 +24,6 @@ router = APIRouter(prefix="/api/crm", tags=["crm-scale"])
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-CRM_CEO_WHATSAPP_E164 = os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip() or "+18259458282"
-VA_WHATSAPP_NUMBER = os.environ.get("VA_WHATSAPP_NUMBER", "").strip()
 CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "https://cal.com/hawk").strip()
 
 

@@ -1,4 +1,16 @@
-"""Stripe checkout.session.completed → provision client portal user + Shield Day 0 onboarding."""
+"""Stripe checkout.session.completed → provision client portal user + Shield Day 0 onboarding.
+
+Go-live verification (run today with Stripe CLI `stripe trigger checkout.session.completed` or real test checkout):
+
+1. Webhook delivered to POST /api/billing/webhook (or your mounted Stripe route) with `checkout.session.completed`.
+2. Matching `clients` row found; for Shield: `onboarded_at` and `certification_eligible_at` set on client.
+3. `enqueue_async_scan` runs (full depth) when Shield + domain — confirm scanner job completes (Redis + relay).
+4. Welcome SMS to prospect phone when `prospects.phone` set; CEO SMS when `CRM_CEO_PHONE_E164` / OpenPhone configured.
+5. `shield_day0_welcome_email` / Resend when `RESEND_*` configured.
+6. Idempotent: second webhook for same client skips if `onboarded_at` already set (Shield).
+
+Do not skip this flow before production.
+"""
 
 from __future__ import annotations
 
@@ -11,13 +23,13 @@ import httpx
 
 from config import (
     CAL_COM_BOOKING_URL,
-    CRM_CEO_WHATSAPP_E164,
+    CRM_CEO_PHONE_E164,
     CRM_PUBLIC_BASE_URL,
     STRIPE_PRICE_SHIELD,
     SUPABASE_URL,
 )
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
-from services.crm_twilio import send_whatsapp
+from services.crm_openphone import send_sms
 from services.scanner import enqueue_async_scan
 
 logger = logging.getLogger(__name__)
@@ -423,11 +435,11 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
         phone = str(phone).strip()
         if phone:
             try:
-                send_whatsapp(phone, wa_client)
+                send_sms(phone, wa_client)
             except Exception:
                 logger.exception("Shield Day 0: client WhatsApp failed")
 
-        if CRM_CEO_WHATSAPP_E164:
+        if CRM_CEO_PHONE_E164:
             ceo_body = (
                 "New Shield client. "
                 f"Company: {company} Industry: {industry} "
@@ -435,7 +447,7 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
                 "Guarantee: ACTIVE Day 1 of 90."
             )
             try:
-                send_whatsapp(CRM_CEO_WHATSAPP_E164, ceo_body)
+                send_sms(CRM_CEO_PHONE_E164, ceo_body)
             except Exception:
                 logger.exception("Shield Day 0: CEO WhatsApp failed")
     else:

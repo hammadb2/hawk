@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 
 import httpx
 
-from config import CRM_CEO_WHATSAPP_E164
-from services.crm_twilio import send_whatsapp
+from config import CRM_CEO_PHONE_E164
+from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def run_charlotte_quality_check() -> dict:
             f"Domain in copy: {dom_pct:.0f}% Score in copy: {score_pct:.0f}%"
         )
         try:
-            send_whatsapp(CRM_CEO_WHATSAPP_E164 or "+18259458282", msg)
+            send_sms(CRM_CEO_PHONE_E164 or "+18259458282", msg)
         except Exception:
             logger.exception("CEO quality WhatsApp")
 

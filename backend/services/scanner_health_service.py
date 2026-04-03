@@ -9,8 +9,8 @@ from typing import Any
 
 import httpx
 
-from config import CRM_CEO_WHATSAPP_E164
-from services.crm_twilio import send_whatsapp
+from config import CRM_CEO_PHONE_E164
+from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def run_scanner_health_check() -> dict[str, Any]:
     fail_pct = _failure_rate_last_hour()
     alert = False
     ceo_msg = ""
-    num = CRM_CEO_WHATSAPP_E164 or "+18259458282"
+    num = CRM_CEO_PHONE_E164 or "+18259458282"
 
     if depth is not None and depth > QUEUE_ALERT:
         alert = True
@@ -101,7 +101,7 @@ def run_scanner_health_check() -> dict[str, Any]:
 
     if alert and ceo_msg:
         try:
-            send_whatsapp(num, "HAWK Scanner health\n" + ceo_msg)
+            send_sms(num, "HAWK Scanner health\n" + ceo_msg)
         except Exception:
             logger.exception("CEO scanner health WhatsApp")
 

@@ -9,8 +9,8 @@ from typing import Any
 
 import httpx
 
-from config import CRM_CEO_WHATSAPP_E164, CRM_PUBLIC_BASE_URL
-from services.crm_twilio import send_whatsapp
+from config import CRM_CEO_PHONE_E164, CRM_PUBLIC_BASE_URL
+from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -351,12 +351,12 @@ def process_shield_client_post_scan(
         )
         if new_status == "active" and old_status in ("at_risk", "suspended") and phone:
             try:
-                send_whatsapp(
+                send_sms(
                     phone,
                     "Your HAWK guarantee is reinstated. Coverage is active. Well done.",
                 )
             except Exception:
-                logger.exception("reinstate whatsapp failed client=%s", client_id)
+                logger.exception("reinstate sms failed client=%s", client_id)
 
     # P3c — critical finding age alerts (per open critical row)
     for row in open_rows:
@@ -371,33 +371,32 @@ def process_shield_client_post_scan(
         if age >= timedelta(hours=20) and age < timedelta(hours=24) and not row.get("alert_20h_sent_at"):
             if phone:
                 try:
-                    send_whatsapp(
+                    send_sms(
                         phone,
                         f"HAWK Alert — {company_name} — critical security issue must be fixed within 4 hours "
                         f"to maintain guarantee coverage. Login: {portal.replace('https://', '')}",
                     )
                 except Exception:
-                    logger.exception("20h alert wa failed")
+                    logger.exception("20h alert sms failed")
             _patch_sla(rid, {"alert_20h_sent_at": now.isoformat()})
 
         if age >= timedelta(hours=24) and not row.get("alert_24h_sent_at"):
             if phone:
                 try:
-                    send_whatsapp(
+                    send_sms(
                         phone,
                         "Your breach response guarantee is now suspended due to an unresolved critical finding. "
                         "Fix it immediately to reinstate coverage.",
                     )
                 except Exception:
-                    logger.exception("24h client wa failed")
-            if CRM_CEO_WHATSAPP_E164:
-                try:
-                    send_whatsapp(
-                        CRM_CEO_WHATSAPP_E164,
-                        f"Guarantee at risk — {company_name} — critical finding unresolved 24h+. Portal: {portal}",
-                    )
-                except Exception:
-                    logger.exception("24h ceo wa failed")
+                    logger.exception("24h client sms failed")
+            try:
+                send_sms(
+                    CRM_CEO_PHONE_E164 or "+18259458282",
+                    f"Guarantee at risk — {company_name} — critical finding unresolved 24h+. Portal: {portal}",
+                )
+            except Exception:
+                logger.exception("24h ceo sms failed")
             _patch_sla(rid, {"alert_24h_sent_at": now.isoformat()})
 
     return {

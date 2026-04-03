@@ -67,8 +67,8 @@ CRM_PUBLIC_BASE_URL = (
 # Monitor self-check: public API base (e.g. https://api.example.com) — defaults to localhost PORT in health_monitor
 MONITOR_API_BASE_URL = os.environ.get("MONITOR_API_BASE_URL", "").strip().rstrip("/")
 
-# CEO WhatsApp for Charlotte hot-lead alerts (E.164, e.g. +15551234567)
-CRM_CEO_WHATSAPP_E164 = os.environ.get("CRM_CEO_WHATSAPP_E164", "").strip()
+# CEO SMS (OpenPhone) — E.164, e.g. +15551234567
+CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip()
 
 # Client portal — welcome / drip (Phase 2B)
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
