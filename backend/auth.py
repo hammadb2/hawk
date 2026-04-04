@@ -69,6 +69,33 @@ def get_current_user(
     return user
 
 
+def get_guarantee_doc_email(
+    credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),
+) -> str:
+    """JWT from POST /api/guarantee/verify — not a dashboard user session."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("typ") != "guarantee_doc":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    email = payload.get("email")
+    if not email or not isinstance(email, str):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return email.strip().lower()
+
+
 def get_optional_user(
     db: Session = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),

@@ -108,6 +108,19 @@ export const breachApi = {
     request<BreachCheckResponse>("/api/breach-check", { method: "POST", body: JSON.stringify(body), token }),
 };
 
+/** Gated Breach Response Guarantee document (email code + JWT). */
+export const guaranteeApi = {
+  requestCode: (body: { email: string; name: string; company: string }) =>
+    request<{ ok: string }>("/api/guarantee/request-code", { method: "POST", body: JSON.stringify(body) }),
+  verify: (body: { email: string; code: string }) =>
+    request<{ access_token: string; token_type: string }>("/api/guarantee/verify", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getDocument: (accessToken: string) =>
+    request<{ markdown: string }>("/api/guarantee/document", { token: accessToken }),
+};
+
 /** Homepage lead — always treat as success in UI; errors logged only. */
 export const marketingApi = {
   homepageLead: async (body: {

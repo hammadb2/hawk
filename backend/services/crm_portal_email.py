@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from config import RESEND_API_KEY, RESEND_FROM_EMAIL
+from config import RESEND_API_KEY, RESEND_FROM_EMAIL, RESEND_GUARANTEE_FROM
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ def send_resend(
     subject: str,
     html: str,
     tags: list[dict[str, str]] | None = None,
+    from_email: str | None = None,
 ) -> dict[str, Any]:
     """POST https://api.resend.com/emails — returns JSON or raises."""
     if not RESEND_API_KEY:
@@ -27,7 +28,7 @@ def send_resend(
         return {"skipped": True}
 
     body: dict[str, Any] = {
-        "from": RESEND_FROM_EMAIL,
+        "from": from_email or RESEND_FROM_EMAIL,
         "to": [to_email],
         "subject": subject,
         "html": html,
@@ -201,4 +202,44 @@ def send_homepage_scan_followup_email(
         subject=f"Your HAWK security report — {domain}",
         html=html,
         tags=[{"name": "category", "value": "homepage_scan_followup"}],
+    )
+
+
+def send_guarantee_verification_code_email(*, to_email: str, code: str, full_name: str) -> dict[str, Any]:
+    """Branded 6-digit code for gated Breach Response Guarantee PDF page — from noreply@securedbyhawk.com."""
+    esc = html_module.escape
+    name = esc(full_name.strip() or "there")
+    accent = "#00C48C"
+    bg = "#07060C"
+    html = f"""
+    <div style="margin:0;padding:0;background:{bg};font-family:system-ui,-apple-system,sans-serif">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{bg};padding:24px 16px">
+        <tr><td align="center">
+          <table role="presentation" width="100%" style="max-width:520px;background:#0D0B14;border-radius:12px;border:1px solid #1A1727;overflow:hidden">
+            <tr><td style="padding:24px 28px 8px 28px">
+              <p style="margin:0;font-size:11px;letter-spacing:0.12em;color:{accent};font-weight:700">HAWK SECURITY</p>
+              <p style="margin:8px 0 0 0;font-size:20px;font-weight:700;color:#F2F0FA">Verify your email</p>
+              <p style="margin:12px 0 0 0;font-size:14px;line-height:1.5;color:#9B98B4">Hi {name}, use this code to view the <strong style="color:#F2F0FA">Breach Response Guarantee</strong> document on securedbyhawk.com.</p>
+            </td></tr>
+            <tr><td style="padding:8px 28px 24px 28px" align="center">
+              <div style="display:inline-block;padding:16px 28px;border-radius:10px;background:#13111E;border:1px solid #1A1727">
+                <p style="margin:0;font-size:11px;color:#5C5876;letter-spacing:0.06em">YOUR CODE</p>
+                <p style="margin:8px 0 0 0;font-size:32px;font-weight:800;letter-spacing:0.25em;color:{accent};font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace">{esc(code)}</p>
+              </div>
+              <p style="margin:16px 0 0 0;font-size:12px;color:#5C5876">Expires in 15 minutes. If you did not request this, you can ignore this email.</p>
+            </td></tr>
+            <tr><td style="padding:16px 28px;border-top:1px solid #1A1727;background:#0a0910">
+              <p style="margin:0;font-size:11px;color:#5C5876;text-align:center">HAWK Security · AKB Studios · Calgary · <a href="https://securedbyhawk.com" style="color:{accent};text-decoration:none">securedbyhawk.com</a></p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </div>
+    """
+    return send_resend(
+        to_email=to_email,
+        subject="Your HAWK verification code",
+        html=html,
+        tags=[{"name": "category", "value": "guarantee_doc_verify"}],
+        from_email=RESEND_GUARANTEE_FROM,
     )

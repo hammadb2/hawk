@@ -1617,6 +1617,23 @@ alter table public.prospects drop constraint if exists prospects_source_check;
 alter table public.prospects add constraint prospects_source_check
   check (source in ('charlotte', 'manual', 'inbound', 'homepage_scanner'));
 
+-- >>> migrations/20260404000001_guarantee_verification_codes.sql <<<
+
+create table if not exists public.guarantee_verification_codes (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  full_name text not null,
+  company text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_guarantee_ver_email_created
+  on public.guarantee_verification_codes (lower(email), created_at desc);
+
+alter table public.guarantee_verification_codes enable row level security;
+
 -- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<
 
 select tablename, policyname, cmd, qual, with_check
