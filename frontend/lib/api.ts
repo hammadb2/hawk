@@ -46,9 +46,9 @@ export const authApi = {
 export const scansApi = {
   start: (body: { domain: string }, token: string) =>
     request<{ scan_id: string; domain: string; status: string; score?: number; grade?: string }>("/api/scan", { method: "POST", body: JSON.stringify(body), token }),
-  /** Public scan (no auth). For gate/lead capture. Returns real grade/score. */
-  startPublic: (body: { domain: string }) =>
-    request<{ domain: string; status: string; score?: number; grade?: string; findings_count?: number }>("/api/scan/public", { method: "POST", body: JSON.stringify(body) }),
+  /** Public scan (no auth). Use scan_depth: "fast" on homepage (~10–15s). */
+  startPublic: (body: { domain: string; scan_depth?: "fast" | "full" }) =>
+    request<PublicScanResult>("/api/scan/public", { method: "POST", body: JSON.stringify(body) }),
   get: (scanId: string, token: string) =>
     request<Scan>("/api/scan/" + scanId, { token }),
   list: (token: string) =>
@@ -108,6 +108,28 @@ export const breachApi = {
     request<BreachCheckResponse>("/api/breach-check", { method: "POST", body: JSON.stringify(body), token }),
 };
 
+/** Homepage lead — always treat as success in UI; errors logged only. */
+export const marketingApi = {
+  homepageLead: async (body: {
+    email: string;
+    domain: string;
+    hawk_score?: number | null;
+    grade?: string | null;
+    top_finding?: string | null;
+    findings_plain?: string[];
+  }) => {
+    try {
+      return await request<{ ok: string }>("/api/marketing/homepage-lead", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      console.error("marketing homepage-lead", e);
+      return { ok: "true" };
+    }
+  },
+};
+
 // Notifications
 export const notificationsApi = {
   list: (token: string) =>
@@ -152,6 +174,16 @@ export interface ScanListItem {
   grade: string | null;
   started_at: string | null;
   completed_at: string | null;
+}
+
+export interface PublicScanResult {
+  domain: string;
+  status: string;
+  score?: number;
+  grade?: string;
+  findings_count?: number;
+  issues_count?: number;
+  findings_plain?: string[];
 }
 
 export interface Finding {

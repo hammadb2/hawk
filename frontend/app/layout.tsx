@@ -15,8 +15,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HAWK — External Attack Surface | AKB Studios",
-  description: "B2B cybersecurity for Canadian SMBs. Scan your domain, see findings, stay compliant.",
+  title: "HAWK Security — See what attackers see | Canadian SMBs",
+  description:
+    "Scan your domain in seconds. Plain-English security findings, monitoring, and a financially backed guarantee for Canadian small businesses.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },

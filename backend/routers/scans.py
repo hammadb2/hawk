@@ -23,6 +23,70 @@ from config import PLAN_DOMAINS
 router = APIRouter(tags=["scans"])
 
 
+def _severity_rank(severity: str | None) -> int:
+    order = {"critical": 0, "high": 1, "medium": 2, "warning": 2, "low": 3, "info": 4, "ok": 99}
+    return order.get((severity or "").lower(), 50)
+
+
+def _finding_plain_english(f: dict, interpreted_row: dict | None) -> str:
+    """Plain English for homepage / CRM — no raw technical strings."""
+    if interpreted_row:
+        plain = interpreted_row.get("plain_english") or interpreted_row.get("plainEnglish")
+        if isinstance(plain, str) and plain.strip():
+            return plain.strip()
+    interp = f.get("interpretation")
+    if isinstance(interp, str) and interp.strip():
+        return interp.strip()
+    desc = (f.get("description") or "").strip()
+    if desc:
+        return desc
+    return (f.get("title") or "").strip()
+
+
+def _public_scan_findings_plain(result: dict) -> tuple[list[str], int]:
+    """Top 3 plain-English lines + count of non-ok issues (for homepage)."""
+    findings = result.get("findings") or []
+    interpreted = result.get("interpreted_findings") or []
+    merged: list[tuple[dict, str]] = []
+    for idx, f in enumerate(findings):
+        if not isinstance(f, dict):
+            continue
+        ir: dict | None = None
+        if idx < len(interpreted) and isinstance(interpreted[idx], dict):
+            ir = interpreted[idx]
+        text = _finding_plain_english(f, ir)
+        if text:
+            merged.append((f, text))
+    merged.sort(key=lambda x: _severity_rank(x[0].get("severity")))
+    issues = sum(1 for f, _ in merged if (f.get("severity") or "").lower() != "ok")
+    top: list[str] = []
+    for f, text in merged:
+        if (f.get("severity") or "").lower() == "ok":
+            continue
+        if text not in top:
+            top.append(text)
+        if len(top) >= 3:
+            break
+    if len(top) < 3:
+        for f, text in merged:
+            if (f.get("severity") or "").lower() != "ok":
+                continue
+            if text not in top:
+                top.append(text)
+            if len(top) >= 3:
+                break
+    fillers = [
+        "Your full report translates every check into plain English — no raw technical dumps.",
+        "We prioritize what real attackers look for first on domains like yours.",
+        "Enter your email below and we will send the complete analysis shortly.",
+    ]
+    i = 0
+    while len(top) < 3:
+        top.append(fillers[i % len(fillers)])
+        i += 1
+    return top[:3], issues
+
+
 def _normalize_domain(domain: str) -> str:
     d = domain.lower().strip()
     if d.startswith("http"):
@@ -51,18 +115,24 @@ def start_scan_public(req: ScanStartRequest):
     domain_clean = _normalize_domain(req.domain)
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
+    depth = (req.scan_depth or "fast").strip().lower()
+    if depth not in ("fast", "full"):
+        depth = "fast"
     try:
-        result = run_scan(domain_clean, scan_id=None)
+        result = run_scan(domain_clean, scan_id=None, scan_depth=depth)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Scanner error: {e}") from e
     if req.full_result:
         return result
+    plain, issues_count = _public_scan_findings_plain(result)
     return {
         "domain": result.get("domain", domain_clean),
         "status": result.get("status", "completed"),
         "score": result.get("score"),
         "grade": result.get("grade"),
         "findings_count": len(result.get("findings", [])),
+        "issues_count": issues_count,
+        "findings_plain": plain,
     }
 
 
@@ -73,7 +143,12 @@ def scan_enqueue(req: ScanEnqueueRequest):
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
     try:
-        job_id = enqueue_async_scan(domain_clean, req.industry, req.company_name)
+        job_id = enqueue_async_scan(
+            domain_clean,
+            req.industry,
+            req.company_name,
+            scan_depth=req.scan_depth or "full",
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Scanner enqueue error: {e}") from e
     return {"job_id": job_id}
@@ -111,8 +186,11 @@ def start_scan(
     db.add(scan)
     db.commit()
 
+    depth = (req.scan_depth or "full").strip().lower()
+    if depth not in ("fast", "full"):
+        depth = "full"
     try:
-        result = run_scan(domain_clean, scan_id=scan_id)
+        result = run_scan(domain_clean, scan_id=scan_id, scan_depth=depth)
     except Exception as e:
         scan.status = "failed"
         db.commit()

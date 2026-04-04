@@ -162,3 +162,43 @@ def shield_day7_week_summary_email(
         html=html,
         tags=[{"name": "category", "value": "shield_day7_summary"}],
     )
+
+
+def send_homepage_scan_followup_email(
+    *,
+    to_email: str,
+    domain: str,
+    hawk_score: int | None,
+    grade: str | None,
+    findings_plain: list[str],
+) -> dict[str, Any]:
+    """After homepage email capture — full report promise (Resend). Charlotte/deep analysis may follow ops-side."""
+    esc = html_module.escape
+    d = esc(domain)
+    score_s = f"{hawk_score}/100" if hawk_score is not None else "—"
+    grade_s = esc(grade) if grade else "—"
+    bullets = ""
+    for line in findings_plain[:5]:
+        if line.strip():
+            bullets += f"<li>{esc(line)}</li>"
+    if not bullets:
+        bullets = "<li>Your personalized report is being prepared.</li>"
+    accent = "#00C48C"
+    html = f"""
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;color:#e8e6f0">
+      <p>Hi,</p>
+      <p>Thanks for scanning <strong>{d}</strong> with HAWK.</p>
+      <p style="margin:12px 0"><span style="color:{accent};font-weight:700">Quick scan snapshot:</span> Grade <strong>{grade_s}</strong>, score <strong>{score_s}</strong></p>
+      <p>Here is what we flagged in plain English (quick scan):</p>
+      <ul style="padding-left:1.2em">{bullets}</ul>
+      <p>Your <strong>full 60-point analysis</strong> is running. We will follow up with the complete report and fix priorities shortly — same plain-English format, built for Canadian SMBs.</p>
+      <p style="font-size:13px;color:#9b98b4">Questions: <a href="mailto:hello@akbstudios.com" style="color:{accent}">hello@akbstudios.com</a></p>
+      <p style="font-size:12px;color:#5c5876">HAWK Security · AKB Studios · Calgary</p>
+    </div>
+    """
+    return send_resend(
+        to_email=to_email,
+        subject=f"Your HAWK security report — {domain}",
+        html=html,
+        tags=[{"name": "category", "value": "homepage_scan_followup"}],
+    )

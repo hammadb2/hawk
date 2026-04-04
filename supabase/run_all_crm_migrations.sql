@@ -1608,6 +1608,15 @@ alter table public.profiles
   add constraint profiles_role_check
   check (role in ('ceo', 'hos', 'team_lead', 'sales_rep', 'closer'));
 
+-- >>> migrations/20260403000002_prospects_homepage_scanner.sql <<<
+
+alter table public.prospects
+  add column if not exists top_finding text;
+
+alter table public.prospects drop constraint if exists prospects_source_check;
+alter table public.prospects add constraint prospects_source_check
+  check (source in ('charlotte', 'manual', 'inbound', 'homepage_scanner'));
+
 -- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<
 
 select tablename, policyname, cmd, qual, with_check

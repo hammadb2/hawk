@@ -8,12 +8,17 @@ class ScanStartRequest(BaseModel):
 
     domain: str = Field(..., min_length=1)
     full_result: bool = False
+    scan_depth: str | None = Field(
+        default=None,
+        description="fast (~10–15s) or full. Omitted: /api/scan/public uses fast; /api/scan uses full.",
+    )
 
 
 class ScanEnqueueRequest(BaseModel):
     domain: str = Field(..., min_length=1)
     industry: str | None = None
     company_name: str | None = None
+    scan_depth: str = Field(default="full", description="full | fast (Charlotte tier)")
 
 
 class ScanListItem(BaseModel):
