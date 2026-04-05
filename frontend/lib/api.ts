@@ -55,22 +55,6 @@ async function guaranteeRequest<T>(
   return data as T;
 }
 
-/** Same-origin POST (Next.js → FastAPI proxy) for public Stripe checkout. */
-async function sameOriginPost<T>(path: string, body: unknown): Promise<T> {
-  const base = typeof window !== "undefined" ? "" : API_URL;
-  const res = await fetch(`${base}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const detail = typeof data.detail === "string" ? data.detail : data.detail?.[0]?.msg || "Request failed";
-    throw new Error(detail);
-  }
-  return data as T;
-}
-
 // Auth
 export const authApi = {
   register: (body: { email: string; password: string; first_name?: string; last_name?: string; company?: string; industry?: string; province?: string }) =>
@@ -130,9 +114,12 @@ export const reportsApi = {
 
 // Billing
 export const billingApi = {
-  /** Public marketing checkout — no auth. Opens Stripe hosted page. */
+  /**
+   * Public marketing checkout — no auth. Calls FastAPI directly (same as /api/scan/public),
+   * so it works without relying on the Next.js /api/billing/checkout-public proxy or HAWK_API_URL on Vercel.
+   */
   checkoutPublic: (body: { hawk_product: "starter" | "shield" }) =>
-    sameOriginPost<{ url: string }>("/api/billing/checkout-public", body),
+    request<{ url: string }>("/api/billing/checkout-public", { method: "POST", body: JSON.stringify(body) }),
   checkout: (body: { plan: string }, token: string) =>
     request<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify(body), token }),
   portal: (token: string) =>

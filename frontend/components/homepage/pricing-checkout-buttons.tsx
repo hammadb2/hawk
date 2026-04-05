@@ -14,7 +14,12 @@ function useCheckout() {
       if (url) window.location.href = url;
     } catch (e) {
       console.error(e);
-      alert(e instanceof Error ? e.message : "Checkout unavailable. Contact hello@akbstudios.com.");
+      const raw = e instanceof Error ? e.message : "";
+      const msg =
+        raw === "Not Found"
+          ? "Payment checkout could not reach the billing API. Redeploy the Hawk API with /api/billing/checkout-public, and set NEXT_PUBLIC_API_URL on Vercel to your Railway API URL."
+          : raw || "Checkout unavailable. Contact hello@akbstudios.com.";
+      alert(msg);
     } finally {
       setLoading(false);
     }
