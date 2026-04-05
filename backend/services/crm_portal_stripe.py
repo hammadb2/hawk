@@ -26,6 +26,7 @@ from config import (
     CRM_CEO_PHONE_E164,
     CRM_PUBLIC_BASE_URL,
     STRIPE_PRICE_SHIELD,
+    STRIPE_PRICE_SHIELD_TEST,
     SUPABASE_URL,
 )
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
@@ -104,6 +105,8 @@ def _is_shield_client(client_row: dict[str, Any], session_obj: dict[str, Any]) -
             price = li.get("price") or {}
             pid = price.get("id") if isinstance(price, dict) else None
             if STRIPE_PRICE_SHIELD and pid == STRIPE_PRICE_SHIELD:
+                return True
+            if STRIPE_PRICE_SHIELD_TEST and pid == STRIPE_PRICE_SHIELD_TEST:
                 return True
     return False
 

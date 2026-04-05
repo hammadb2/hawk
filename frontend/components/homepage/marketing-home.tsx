@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { HomeScanner } from "./home-scanner";
-import { EnterpriseBookingLink, ShieldCheckoutButton, StarterCheckoutButton } from "./pricing-checkout-buttons";
+import {
+  EnterpriseBookingLink,
+  ShieldCheckoutButton,
+  StarterCheckoutButton,
+  StripeTestModeBanner,
+} from "./pricing-checkout-buttons";
 
 const HAWK = "#00C48C";
 
@@ -205,6 +210,7 @@ export function MarketingHome() {
         {/* Pricing */}
         <section id="pricing" className="scroll-mt-24 border-b border-surface-3 px-4 py-16 sm:px-6 sm:py-20">
           <h2 className="text-center text-2xl font-extrabold text-text-primary sm:text-3xl">Pricing</h2>
+          <StripeTestModeBanner />
           <div className="mx-auto mt-12 grid max-w-6xl gap-6 lg:grid-cols-3">
             <div className="rounded-xl border border-surface-3 bg-surface-1 p-6">
               <h3 className="text-lg font-bold text-text-primary">HAWK Starter</h3>

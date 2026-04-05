@@ -11,11 +11,15 @@ import logging
 
 from config import (
     STRIPE_SECRET_KEY,
+    STRIPE_SECRET_KEY_TEST,
     STRIPE_WEBHOOK_SECRET,
+    STRIPE_WEBHOOK_SECRET_TEST,
     STRIPE_PRICE_STARTER,
+    STRIPE_PRICE_STARTER_TEST,
     STRIPE_PRICE_PRO,
     STRIPE_PRICE_AGENCY,
     STRIPE_PRICE_SHIELD,
+    STRIPE_PRICE_SHIELD_TEST,
     BASE_URL,
     DEFAULT_PUBLIC_SITE_URL,
 )
@@ -43,7 +47,7 @@ def _plan_from_subscription(sub) -> str | None:
         return None
     price = data[0].get("price") or {}
     pid = price.get("id")
-    if pid == STRIPE_PRICE_STARTER:
+    if pid == STRIPE_PRICE_STARTER or (STRIPE_PRICE_STARTER_TEST and pid == STRIPE_PRICE_STARTER_TEST):
         return "starter"
     if pid == STRIPE_PRICE_PRO:
         return "pro"
@@ -71,9 +75,44 @@ def _stripe():
     return stripe
 
 
+def _checkout_public_session_url(
+    *,
+    api_key: str,
+    price_id: str,
+    hawk_product: str,
+    site: str,
+    extra_meta: dict[str, str] | None = None,
+) -> str:
+    """Create a Stripe Checkout Session; StripeClient isolates live vs test API keys (SDK v8+)."""
+    from stripe import StripeClient
+
+    meta: dict[str, str] = {"hawk_product": hawk_product}
+    sub_meta: dict[str, str] = {"hawk_product": hawk_product}
+    if extra_meta:
+        meta.update(extra_meta)
+        sub_meta.update(extra_meta)
+    success_url = f"{site}/portal?welcome=1"
+    if extra_meta and extra_meta.get("hawk_checkout_mode") == "test":
+        success_url = f"{site}/portal?welcome=1&test_checkout=1"
+    cancel_url = f"{site}/#pricing"
+    client = StripeClient(api_key)
+    session = client.v1.checkout.sessions.create(
+        {
+            "mode": "subscription",
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "metadata": meta,
+            "subscription_data": {"metadata": sub_meta},
+            "allow_promotion_codes": True,
+        }
+    )
+    return session.url
+
+
 @router.post("/checkout-public")
 def checkout_public(req: PublicCheckoutRequest):
-    """Stripe Checkout for homepage pricing — no account. Metadata hawk_product for webhook."""
+    """Stripe Checkout for homepage pricing — no account. Metadata hawk_product for webhook (live mode)."""
     s = _stripe()
     if not s or not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Billing not configured")
@@ -85,22 +124,51 @@ def checkout_public(req: PublicCheckoutRequest):
         raise HTTPException(status_code=503, detail="Shield price not configured")
     hp = req.hawk_product
     site = _SITE.rstrip("/")
-    success_url = f"{site}/portal?welcome=1"
-    cancel_url = f"{site}/#pricing"
     try:
-        session = s.checkout.Session.create(
-            mode="subscription",
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={"hawk_product": hp},
-            subscription_data={"metadata": {"hawk_product": hp}},
-            allow_promotion_codes=True,
-        )
+        url = _checkout_public_session_url(api_key=STRIPE_SECRET_KEY, price_id=price_id, hawk_product=hp, site=site)
     except Exception as e:
         logger.exception("checkout-public Stripe error")
         raise HTTPException(status_code=502, detail=str(e)[:200]) from e
-    return {"url": session.url}
+    return {"url": url}
+
+
+@router.post("/checkout-public-test")
+def checkout_public_test(req: PublicCheckoutRequest):
+    """
+    Same as checkout-public but uses Stripe test API key and test price IDs.
+    Configure STRIPE_SECRET_KEY_TEST, STRIPE_PRICE_STARTER_TEST, STRIPE_PRICE_SHIELD_TEST (Dashboard test mode).
+    Webhook: add a test-mode endpoint in Stripe pointing to the same URL, or use STRIPE_WEBHOOK_SECRET_TEST
+    with stripe listen / Stripe CLI.
+    """
+    s = _stripe()
+    if not s:
+        raise HTTPException(status_code=503, detail="Stripe SDK not available")
+    if not STRIPE_SECRET_KEY_TEST:
+        raise HTTPException(status_code=503, detail="Test checkout not configured (STRIPE_SECRET_KEY_TEST)")
+    if req.hawk_product == "starter":
+        price_id = STRIPE_PRICE_STARTER_TEST
+    else:
+        price_id = STRIPE_PRICE_SHIELD_TEST
+    if not price_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Test price IDs not configured (STRIPE_PRICE_STARTER_TEST / STRIPE_PRICE_SHIELD_TEST)",
+        )
+    hp = req.hawk_product
+    site = _SITE.rstrip("/")
+    extra = {"hawk_checkout_mode": "test"}
+    try:
+        url = _checkout_public_session_url(
+            api_key=STRIPE_SECRET_KEY_TEST,
+            price_id=price_id,
+            hawk_product=hp,
+            site=site,
+            extra_meta=extra,
+        )
+    except Exception as e:
+        logger.exception("checkout-public-test Stripe error")
+        raise HTTPException(status_code=502, detail=str(e)[:200]) from e
+    return {"url": url, "mode": "test"}
 
 
 @router.post("/checkout")
@@ -156,16 +224,27 @@ async def webhook(
     stripe_signature: str | None = Header(None, alias="Stripe-Signature"),
     db: Session = Depends(get_db),
 ):
-    if not STRIPE_WEBHOOK_SECRET:
-        raise HTTPException(status_code=503, detail="Webhook not configured")
+    if not STRIPE_WEBHOOK_SECRET and not STRIPE_WEBHOOK_SECRET_TEST:
+        raise HTTPException(status_code=503, detail="Webhook not configured (live and/or test signing secret)")
     payload = await request.body()
     s = _stripe()
     if not s:
         raise HTTPException(status_code=503, detail="Stripe not configured")
-    try:
-        event = s.Webhook.construct_event(payload, stripe_signature or "", STRIPE_WEBHOOK_SECRET)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Webhook signature invalid: {e}") from e
+    event = None
+    last_err: Exception | None = None
+    for secret in (STRIPE_WEBHOOK_SECRET, STRIPE_WEBHOOK_SECRET_TEST):
+        if not (secret or "").strip():
+            continue
+        try:
+            event = s.Webhook.construct_event(payload, stripe_signature or "", secret)
+            break
+        except Exception as e:
+            last_err = e
+    if event is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Webhook signature invalid (neither live nor test secret matched): {last_err}",
+        ) from last_err
     if event["type"] == "customer.subscription.updated":
         sub = event["data"]["object"]
         cust_id = sub.get("customer")

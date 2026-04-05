@@ -46,7 +46,12 @@ function PortalWelcomeToast() {
     if (welcomeToast.current) return;
     if (searchParams.get("welcome") === "1") {
       welcomeToast.current = true;
-      toast.success("Welcome to HAWK — your subscription is active. Check your email for onboarding.");
+      const test = searchParams.get("test_checkout") === "1";
+      toast.success(
+        test
+          ? "Test checkout complete — Stripe test mode. No real charge. Webhook should have fired; check CRM and email."
+          : "Welcome to HAWK — your subscription is active. Check your email for onboarding.",
+      );
       router.replace("/portal", { scroll: false });
     }
   }, [searchParams, router]);

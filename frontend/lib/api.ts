@@ -3,8 +3,14 @@
  * Set NEXT_PUBLIC_API_URL to your FastAPI base (e.g. Railway); defaults to http://localhost:8000.
  */
 
+import { isStripeCheckoutTestMode } from "@/lib/stripe-checkout-mode";
+
 /** Backend API (Railway, etc.) — not the same as NEXT_PUBLIC_SITE_URL unless you proxy /api. */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function publicCheckoutPath(): string {
+  return isStripeCheckoutTestMode() ? "/api/billing/checkout-public-test" : "/api/billing/checkout-public";
+}
 
 /** Guarantee endpoints: in the browser use same-origin `/api/guarantee/*` (Next.js proxies to FastAPI). Supabase only sends Auth emails; codes are sent by the API. */
 function guaranteeApiUrl(): string {
@@ -115,11 +121,11 @@ export const reportsApi = {
 // Billing
 export const billingApi = {
   /**
-   * Public marketing checkout — no auth. Calls FastAPI directly (same as /api/scan/public),
-   * so it works without relying on the Next.js /api/billing/checkout-public proxy or HAWK_API_URL on Vercel.
+   * Public marketing checkout — no auth. Calls FastAPI directly (same as /api/scan/public).
+   * Set NEXT_PUBLIC_STRIPE_CHECKOUT_TEST_MODE=true to use test keys/prices (Railway STRIPE_*_TEST).
    */
   checkoutPublic: (body: { hawk_product: "starter" | "shield" }) =>
-    request<{ url: string }>("/api/billing/checkout-public", { method: "POST", body: JSON.stringify(body) }),
+    request<{ url: string; mode?: string }>(publicCheckoutPath(), { method: "POST", body: JSON.stringify(body) }),
   checkout: (body: { plan: string }, token: string) =>
     request<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify(body), token }),
   portal: (token: string) =>

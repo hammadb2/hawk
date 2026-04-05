@@ -29,7 +29,7 @@ SCANNER_RELAY_URL = os.environ.get("HAWK_SCANNER_RELAY_URL", "http://178.104.27.
 # Must be >= longest expected hawk-scanner-v2 sync run (Vercel CRM calls wait up to ~295s)
 SCANNER_TIMEOUT = float(os.environ.get("HAWK_SCANNER_TIMEOUT", "300"))
 
-# Stripe
+# Stripe (live / default)
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "price_starter")
@@ -40,6 +40,12 @@ STRIPE_PRICE_SHIELD = os.environ.get(
     "STRIPE_PRICE_SHIELD",
     "price_1THYpWRVvrqiS5j4rFdQclsd",
 ).strip()
+
+# Stripe test mode — separate Dashboard products/prices; webhook signing secret from test-mode endpoint
+STRIPE_SECRET_KEY_TEST = os.environ.get("STRIPE_SECRET_KEY_TEST", "").strip()
+STRIPE_WEBHOOK_SECRET_TEST = os.environ.get("STRIPE_WEBHOOK_SECRET_TEST", "").strip()
+STRIPE_PRICE_STARTER_TEST = os.environ.get("STRIPE_PRICE_STARTER_TEST", "").strip()
+STRIPE_PRICE_SHIELD_TEST = os.environ.get("STRIPE_PRICE_SHIELD_TEST", "").strip()
 
 # Shield onboarding — booking link in WhatsApp / email (Cal.com or similar)
 CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "https://cal.com").strip().rstrip("/")
