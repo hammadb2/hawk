@@ -23,6 +23,10 @@ class Finding(BaseModel):
     raw_ref: str | None = None
     interpretation: str | None = None
     fix_guide: str | None = None
+    screenshot_data_url: str | None = Field(
+        default=None,
+        description="JPEG data URL for exposure_screenshot layer (portal/CRM display)",
+    )
 
 
 class ScanResponse(BaseModel):
@@ -49,3 +53,7 @@ class ScanRequest(BaseModel):
     scan_id: str | None = None
     industry: str | None = Field(None, description="Prospect industry for risk multiplier")
     company_name: str | None = Field(None, description="Display name for narrative features (attack paths)")
+    scan_depth: str = Field(
+        default="full",
+        description="full = all pipeline layers; fast = Charlotte tier (email, TLS, breach, subdomains)",
+    )

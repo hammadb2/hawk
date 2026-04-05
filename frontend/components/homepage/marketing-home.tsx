@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "@/components/providers/auth-provider";
 import { HomeScanner } from "./home-scanner";
+import { EnterpriseBookingLink, ShieldCheckoutButton, StarterCheckoutButton } from "./pricing-checkout-buttons";
 
 const HAWK = "#00C48C";
 
@@ -18,9 +18,10 @@ function NavScanButton({ className }: { className?: string }) {
   );
 }
 
-export function MarketingHome() {
-  const { user } = useAuth();
+const ENTERPRISE_BOOKING =
+  process.env.NEXT_PUBLIC_CAL_COM_BOOKING_URL || "https://cal.com";
 
+export function MarketingHome() {
   return (
     <div className="min-h-screen bg-background text-text-primary">
       <header className="sticky top-0 z-40 border-b border-surface-3/80 bg-background/95 backdrop-blur-sm">
@@ -31,15 +32,9 @@ export function MarketingHome() {
             </Link>
             <div className="flex items-center gap-2 sm:gap-3">
               <NavScanButton className="rounded-lg px-3 py-2 text-xs font-semibold sm:px-4 sm:text-sm" />
-              {user ? (
-                <Link href="/dashboard" className="whitespace-nowrap text-xs text-text-dim hover:text-text-secondary sm:text-sm">
-                  Dashboard
-                </Link>
-              ) : (
-                <Link href="/login" className="whitespace-nowrap text-xs text-text-dim hover:text-text-secondary sm:text-sm">
-                  Log In
-                </Link>
-              )}
+              <Link href="/portal/login" className="whitespace-nowrap text-xs text-text-dim hover:text-text-secondary sm:text-sm">
+                Log In
+              </Link>
             </div>
           </div>
           <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-text-secondary sm:justify-end sm:gap-x-8 sm:text-sm">
@@ -220,13 +215,7 @@ export function MarketingHome() {
                 Monthly scan and findings report. Plain English fix guides. Email alerts.
               </p>
               <p className="mt-2 text-xs text-text-dim">Best for businesses that want to know their risk.</p>
-              <Link
-                href="/login?register=1"
-                className="mt-6 block w-full rounded-lg py-3 text-center text-sm font-semibold text-[#07060C]"
-                style={{ backgroundColor: HAWK }}
-              >
-                Get Started
-              </Link>
+              <StarterCheckoutButton />
             </div>
             <div className="relative rounded-xl border-2 p-6" style={{ borderColor: HAWK, background: "#0D0B14" }}>
               <span
@@ -243,13 +232,7 @@ export function MarketingHome() {
                 Daily monitoring. Weekly attacker simulation. Real-time alerts. HAWK Certified after 90 days. Financially backed guarantee. Onboarding call.
               </p>
               <p className="mt-2 text-xs text-text-dim">Best for businesses that want to be protected.</p>
-              <Link
-                href="/login?register=1"
-                className="mt-6 block w-full rounded-lg py-3 text-center text-sm font-semibold text-[#07060C]"
-                style={{ backgroundColor: HAWK }}
-              >
-                Get Started — Most Popular
-              </Link>
+              <ShieldCheckoutButton />
             </div>
             <div className="rounded-xl border border-surface-3 bg-surface-1 p-6">
               <h3 className="text-lg font-bold text-text-primary">HAWK Enterprise</h3>
@@ -260,12 +243,7 @@ export function MarketingHome() {
                 Everything in Shield plus dedicated advisor, up to 5 domains, enhanced guarantee coverage, PIPEDA compliance reporting.
               </p>
               <p className="mt-2 text-xs text-text-dim">Best for multi-location practices.</p>
-              <a
-                href="mailto:hello@akbstudios.com?subject=HAWK%20Enterprise"
-                className="mt-6 block w-full rounded-lg border border-surface-3 py-3 text-center text-sm font-semibold text-text-primary hover:bg-surface-2"
-              >
-                Contact Us
-              </a>
+              <EnterpriseBookingLink href={ENTERPRISE_BOOKING} />
             </div>
           </div>
         </section>
@@ -313,7 +291,7 @@ export function MarketingHome() {
             </Link>
           </div>
           <div className="mt-4 flex flex-col items-center gap-2">
-            <Link href="/login" className="text-xs hover:text-text-secondary">
+            <Link href="/portal/login" className="text-xs hover:text-text-secondary">
               Log In
             </Link>
             <a href="https://securedbyhawk.com" className="text-xs hover:text-text-secondary">

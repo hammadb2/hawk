@@ -35,8 +35,11 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "price_starter")
 STRIPE_PRICE_PRO = os.environ.get("STRIPE_PRICE_PRO", "price_pro")
 STRIPE_PRICE_AGENCY = os.environ.get("STRIPE_PRICE_AGENCY", "price_agency")
-# Optional: Shield subscription price id (checkout.session line_items) — used with metadata fallback
-STRIPE_PRICE_SHIELD = os.environ.get("STRIPE_PRICE_SHIELD", "").strip()
+# HAWK Shield — $997/mo (set in Stripe Dashboard; override via env in production)
+STRIPE_PRICE_SHIELD = os.environ.get(
+    "STRIPE_PRICE_SHIELD",
+    "price_1THYpWRVvrqiS5j4rFdQclsd",
+).strip()
 
 # Shield onboarding — booking link in WhatsApp / email (Cal.com or similar)
 CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "https://cal.com").strip().rstrip("/")

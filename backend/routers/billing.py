@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from auth import get_current_user
 from database import get_db
 from models import User
-from schemas import CheckoutRequest
+from schemas import CheckoutRequest, PublicCheckoutRequest
 import logging
 
 from config import (
@@ -15,7 +15,9 @@ from config import (
     STRIPE_PRICE_STARTER,
     STRIPE_PRICE_PRO,
     STRIPE_PRICE_AGENCY,
+    STRIPE_PRICE_SHIELD,
     BASE_URL,
+    DEFAULT_PUBLIC_SITE_URL,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,9 @@ def _plan_from_subscription(sub) -> str | None:
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
+# Public marketing checkout (no JWT) — success/cancel on securedbyhawk.com
+_SITE = BASE_URL or DEFAULT_PUBLIC_SITE_URL
+
 stripe = None
 
 
@@ -64,6 +69,38 @@ def _stripe():
         except ImportError:
             pass
     return stripe
+
+
+@router.post("/checkout-public")
+def checkout_public(req: PublicCheckoutRequest):
+    """Stripe Checkout for homepage pricing — no account. Metadata hawk_product for webhook."""
+    s = _stripe()
+    if not s or not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Billing not configured")
+    if req.hawk_product == "starter":
+        price_id = STRIPE_PRICE_STARTER
+    else:
+        price_id = STRIPE_PRICE_SHIELD
+    if not price_id:
+        raise HTTPException(status_code=503, detail="Shield price not configured")
+    hp = req.hawk_product
+    site = _SITE.rstrip("/")
+    success_url = f"{site}/portal?welcome=1"
+    cancel_url = f"{site}/#pricing"
+    try:
+        session = s.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={"hawk_product": hp},
+            subscription_data={"metadata": {"hawk_product": hp}},
+            allow_promotion_codes=True,
+        )
+    except Exception as e:
+        logger.exception("checkout-public Stripe error")
+        raise HTTPException(status_code=502, detail=str(e)[:200]) from e
+    return {"url": session.url}
 
 
 @router.post("/checkout")
@@ -144,7 +181,7 @@ async def webhook(
         user = db.query(User).filter(User.stripe_customer_id == sub.get("customer")).first()
         if user:
             user.stripe_subscription_id = None
-            user.plan = "trial"
+            user.plan = "starter"
             db.commit()
     elif event["type"] == "checkout.session.completed":
         evd = _stripe_event_to_dict(event)

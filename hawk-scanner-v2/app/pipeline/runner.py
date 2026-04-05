@@ -9,7 +9,7 @@ from typing import Any
 
 from app.analysis import email_security, ssl_deep
 from app.breach_cost import build_estimate
-from app.integrations import attack_paths, breach_monitoring, claude_interpret, github_search
+from app.integrations import attack_paths, breach_monitoring, claude_interpret, exposure_screenshot, github_search, internetdb, nvd_cves
 from app.models import Finding, ScanResponse
 from app.pipeline.layers import dnstwist, httpx_whatweb, naabu, nuclei, subfinder
 from app.scoring import compute_score
@@ -125,11 +125,42 @@ async def run_scan(
     if not targets:
         targets = [f"https://{domain}", f"http://{domain}"]
 
+    try:
+        idb_fs = await internetdb.internetdb_findings(naabu_results, domain)
+        all_findings.extend(idb_fs)
+        raw_layers["internetdb_findings"] = len(idb_fs)
+    except Exception:
+        logger.exception("InternetDB layer failed")
+        raw_layers["internetdb_findings"] = 0
+
     l3a_task = httpx_whatweb.run_httpx(targets, settings)
     l3b_task = httpx_whatweb.run_whatweb([u for u in targets[:15]], settings)
     l3a, l3b = await asyncio.gather(l3a_task, l3b_task)
     raw_layers["httpx"] = l3a
     raw_layers["whatweb"] = l3b
+
+    try:
+        nvd_fs = await nvd_cves.nvd_findings_from_whatweb(
+            l3b.get("lines") or [],
+            domain,
+            settings,
+        )
+        all_findings.extend(nvd_fs)
+        raw_layers["nvd_supply_chain_findings"] = len(nvd_fs)
+    except Exception:
+        logger.exception("NVD supply-chain layer failed")
+        raw_layers["nvd_supply_chain_findings"] = 0
+
+    try:
+        shot_fs = await exposure_screenshot.capture_exposure_screenshots(
+            l3a.get("jsonl") or [],
+            domain,
+        )
+        all_findings.extend(shot_fs)
+        raw_layers["exposure_screenshots"] = len(shot_fs)
+    except Exception:
+        logger.exception("exposure screenshots failed")
+        raw_layers["exposure_screenshots"] = 0
 
     httpx_urls: list[str] = []
     for row in l3a.get("jsonl") or []:
@@ -180,4 +211,122 @@ async def run_scan(
         interpreted_findings=interpreted,
         breach_cost_estimate=breach_est,
         attack_paths=paths,
+    )
+
+
+async def run_scan_fast(
+    domain: str,
+    *,
+    scan_id: str | None = None,
+    industry: str | None = None,
+    company_name: str | None = None,
+    settings: Settings | None = None,
+) -> ScanResponse:
+    """
+    Tier 1 fast path for Charlotte: email auth + TLS + breach stack + subdomains only.
+    Target ~10–20s wall clock (no nuclei/naabu/httpx/dnstwist/github/Claude interpret).
+    """
+    settings = settings or get_settings()
+    domain = _normalize_domain(domain)
+    started = _iso_now()
+    raw_layers: dict[str, Any] = {}
+
+    l_sub = await subfinder.run(domain, settings)
+    raw_layers["subfinder"] = l_sub
+    hosts = list(dict.fromkeys([domain] + (l_sub.get("hosts") or [])))
+
+    l7_task = email_security.analyze(domain)
+    l8_task = ssl_deep.analyze(domain)
+    l6_task = breach_monitoring.run_breach_layers(domain, settings)
+
+    l7, l8, breach_summaries = await asyncio.gather(l7_task, l8_task, l6_task)
+    raw_layers["breach_monitoring"] = breach_summaries
+
+    all_findings: list[dict[str, Any]] = []
+    all_findings.extend(l7)
+    all_findings.extend(l8)
+    all_findings.extend(
+        breach_monitoring.build_breach_monitoring_findings(
+            domain, breach_summaries, company_name=company_name
+        )
+    )
+    if len(hosts) > 2:
+        all_findings.append(
+            {
+                "id": str(uuid.uuid4()),
+                "severity": "info",
+                "category": "Attack surface",
+                "title": "Subdomain footprint",
+                "description": (
+                    f"Quick pass found {len(hosts)} hostnames for this domain. "
+                    "A wider footprint usually means more ways in for attackers."
+                ),
+                "technical_detail": str(hosts[:40])[:4000],
+                "affected_asset": domain,
+                "remediation": "Review DNS and retire unused hosts.",
+                "layer": "subfinder",
+            }
+        )
+
+    score, grade, mult = compute_score(all_findings, industry)
+    crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
+    breach_est = build_estimate(industry, len(all_findings), crit)
+    completed = _iso_now()
+    findings_models = [Finding.model_validate(f) for f in all_findings]
+
+    return ScanResponse(
+        scan_id=scan_id,
+        domain=domain,
+        status="completed",
+        score=score,
+        grade=grade,
+        findings=findings_models,
+        started_at=started,
+        completed_at=completed,
+        scan_version="2.0-fast",
+        industry=industry,
+        industry_risk_multiplier=mult,
+        raw_layers=raw_layers,
+        interpreted_findings=[],
+        breach_cost_estimate=breach_est,
+        attack_paths=[],
+    )
+
+
+async def run_dnstwist_only(
+    domain: str,
+    *,
+    scan_id: str | None = None,
+    industry: str | None = None,
+    company_name: str | None = None,
+    settings: Settings | None = None,
+) -> ScanResponse:
+    """Lightweight job: dnstwist only (Shield daily lookalike pass)."""
+    settings = settings or get_settings()
+    domain = _normalize_domain(domain)
+    started = _iso_now()
+    l5 = await dnstwist.run(domain, settings)
+    raw_layers: dict[str, Any] = {"dnstwist": l5}
+    all_findings = _dnstwist_findings(domain, l5)
+    score, grade, mult = compute_score(all_findings, industry)
+    crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
+    breach_est = build_estimate(industry, len(all_findings), crit)
+    completed = _iso_now()
+    findings_models = [Finding.model_validate(f) for f in all_findings]
+    return ScanResponse(
+        scan_id=scan_id,
+        domain=domain,
+        status="completed",
+        score=score,
+        grade=grade,
+        findings=findings_models,
+        started_at=started,
+        completed_at=completed,
+        scan_version="2.0-dnstwist",
+        industry=industry,
+        industry_risk_multiplier=mult,
+        raw_layers=raw_layers,
+        interpreted_findings=[],
+        breach_cost_estimate=breach_est,
+        attack_paths=[],
     )

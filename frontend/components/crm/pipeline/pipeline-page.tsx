@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { bottleneckStage } from "@/lib/crm/pipeline-utils";
 import toast from "react-hot-toast";
+import { provisionClientPortalAfterCloseWon } from "@/lib/crm/provision-portal";
 import { cn } from "@/lib/utils";
 
 function Column({
@@ -519,27 +520,46 @@ export function PipelinePage() {
           if (!pendingWon || !session?.user?.id) return;
           const planLabel = planId;
           const closer = pendingWon.assigned_rep_id ?? session.user.id;
-          await supabase.from("clients").insert({
-            prospect_id: pendingWon.id,
-            company_name: pendingWon.company_name,
-            domain: pendingWon.domain,
-            plan: planLabel,
-            mrr_cents: mrrCents,
-            stripe_customer_id: stripeCustomerId,
-            closing_rep_id: closer,
-            status: "active",
-            commission_deferred: commissionDeferred,
-          });
+          const { data: newClient, error: clientErr } = await supabase
+            .from("clients")
+            .insert({
+              prospect_id: pendingWon.id,
+              company_name: pendingWon.company_name,
+              domain: pendingWon.domain,
+              plan: planLabel,
+              mrr_cents: mrrCents,
+              stripe_customer_id: stripeCustomerId,
+              closing_rep_id: closer,
+              status: "active",
+              commission_deferred: commissionDeferred,
+            })
+            .select("id")
+            .single();
+          if (clientErr || !newClient?.id) {
+            toast.error(clientErr?.message ?? "Could not create client");
+            return;
+          }
           await supabase
             .from("prospects")
             .update({ stage: "closed_won", last_activity_at: new Date().toISOString() })
             .eq("id", pendingWon.id);
           await logActivity(pendingWon.id, "stage_changed", { from: pendingWon.stage, to: "closed_won", plan: planLabel });
-          toast.success(
-            commissionDeferred
-              ? "Client created — commission will post when Stripe payment clears"
-              : "Client created — commission recorded (30% of MRR)"
-          );
+          const baseMsg = commissionDeferred
+            ? "Client created — commission will post when Stripe payment clears"
+            : "Client created — commission recorded (30% of MRR)";
+          const prov = await provisionClientPortalAfterCloseWon(newClient.id);
+          if (prov.ok) {
+            const portalNote =
+              prov.idempotent && !prov.invited_email
+                ? " Portal already linked."
+                : prov.invited_email
+                  ? ` Portal invite sent to ${prov.invited_email}.`
+                  : " Portal invite sent.";
+            toast.success(baseMsg + portalNote);
+          } else {
+            toast.success(baseMsg);
+            toast.error(`Portal setup: ${prov.detail}`);
+          }
           setPendingWon(null);
           await load();
         }}

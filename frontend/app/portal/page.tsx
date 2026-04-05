@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
+import { findingsListFromScanPayload, summarizeSeverity } from "@/lib/portal/findings-parse";
+import { ReadinessSparkline } from "@/components/portal/readiness-sparkline";
 import { Button } from "@/components/ui/button";
 
 type PortalProfile = {
@@ -35,7 +38,22 @@ type ScanRow = {
   created_at: string;
 };
 
-export default function PortalHomePage() {
+function PortalWelcomeToast() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const welcomeToast = useRef(false);
+  useEffect(() => {
+    if (welcomeToast.current) return;
+    if (searchParams.get("welcome") === "1") {
+      welcomeToast.current = true;
+      toast.success("Welcome to HAWK — your subscription is active. Check your email for onboarding.");
+      router.replace("/portal", { scroll: false });
+    }
+  }, [searchParams, router]);
+  return null;
+}
+
+function PortalHomeContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -43,6 +61,12 @@ export default function PortalHomePage() {
   const [client, setClient] = useState<ClientRow | null>(null);
   const [scan, setScan] = useState<ScanRow | null>(null);
   const [pipedaBusy, setPipedaBusy] = useState(false);
+  const [remediation, setRemediation] = useState<{
+    fixedThisMonth: number;
+    inProgress: number;
+    openTracked: number;
+  } | null>(null);
+  const [readinessHistory, setReadinessHistory] = useState<{ score: number; at: string }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +89,8 @@ export default function PortalHomePage() {
       setPortal(null);
       setClient(null);
       setScan(null);
+      setRemediation(null);
+      setReadinessHistory([]);
       setLoading(false);
       return;
     }
@@ -82,23 +108,62 @@ export default function PortalHomePage() {
     if (e2 || !cl) {
       setClient(null);
       setScan(null);
+      setRemediation(null);
+      setReadinessHistory([]);
       setLoading(false);
       return;
     }
 
     setClient(cl as ClientRow);
 
-    if (cl.prospect_id) {
-      const { data: scans } = await supabase
-        .from("crm_prospect_scans")
-        .select("id,hawk_score,grade,findings,created_at")
-        .eq("prospect_id", cl.prospect_id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      setScan((scans?.[0] as ScanRow) ?? null);
-    } else {
-      setScan(null);
+    const cid = cpp.client_id as string;
+    const prospectId = cl.prospect_id as string | null;
+
+    const [scansRes, stRes, evRes] = await Promise.all([
+      prospectId
+        ? supabase
+            .from("crm_prospect_scans")
+            .select("id,hawk_score,grade,findings,created_at")
+            .eq("prospect_id", prospectId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("portal_finding_status").select("status,updated_at").eq("client_id", cid),
+      supabase
+        .from("hawk_guarantee_events")
+        .select("readiness_score,created_at")
+        .eq("client_id", cid)
+        .not("readiness_score", "is", null)
+        .order("created_at", { ascending: true })
+        .limit(40),
+    ]);
+
+    setScan((scansRes.data?.[0] as ScanRow) ?? null);
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const ms = monthStart.getTime();
+    let fixedThisMonth = 0;
+    let inProgress = 0;
+    let openTracked = 0;
+    for (const r of stRes.data || []) {
+      const row = r as { status: string; updated_at: string };
+      if (row.status === "in_progress") inProgress += 1;
+      if (row.status === "open") openTracked += 1;
+      if (row.status === "fixed") {
+        const t = new Date(row.updated_at).getTime();
+        if (!Number.isNaN(t) && t >= ms) fixedThisMonth += 1;
+      }
     }
+    setRemediation({ fixedThisMonth, inProgress, openTracked });
+
+    const evRows = (evRes.data ?? []) as { readiness_score: number | null; created_at: string }[];
+    setReadinessHistory(
+      evRows
+        .filter((r) => typeof r.readiness_score === "number")
+        .map((r) => ({ score: r.readiness_score as number, at: r.created_at })),
+    );
 
     setLoading(false);
   }, [router, supabase]);
@@ -161,10 +226,16 @@ export default function PortalHomePage() {
   const ringColor = readiness >= 85 ? "#16a34a" : readiness >= 70 ? "#d97706" : "#dc2626";
   const ringPct = Math.min(100, Math.max(0, readiness));
   const findingsRaw = scan?.findings;
+  const list = findingsListFromScanPayload(
+    findingsRaw && typeof findingsRaw === "object" ? (findingsRaw as Record<string, unknown>) : null,
+  );
+  const sev = summarizeSeverity(list);
   const criticalPreview =
-    findingsRaw && typeof findingsRaw === "object" && "critical" in findingsRaw
-      ? String((findingsRaw as { critical?: unknown }).critical)
-      : null;
+    sev.criticalCount > 0
+      ? `${sev.criticalCount} critical: ${sev.criticalTitles[0] ?? "see Findings"}${sev.criticalCount > 1 ? "…" : ""}`
+      : sev.highCount > 0
+        ? `${sev.highCount} high-severity finding(s) in the latest scan — open Findings to prioritize.`
+        : null;
 
   async function downloadPipedaPdf() {
     setPipedaBusy(true);
@@ -196,6 +267,29 @@ export default function PortalHomePage() {
         <p className="text-sm text-zinc-500">{portal.domain}</p>
       </div>
 
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+        {[
+          { href: "/portal/ask", label: "Ask HAWK AI", sub: "Claude + your scan context" },
+          { href: "/portal/briefing", label: "Weekly briefing", sub: "Sector threat digest" },
+          { href: "/portal/findings", label: "Findings", sub: "Status & verify fixes" },
+          { href: "/portal/journey", label: "Journey", sub: "Scores & badges" },
+          { href: "/portal/benchmark", label: "Benchmark", sub: "Peer comparison" },
+          { href: "/portal/attack-paths", label: "Attack paths", sub: "Breach scenarios" },
+          { href: "/portal/enterprise", label: "Enterprise", sub: "Multi-domain rollup" },
+          { href: "/portal/attacker-simulation", label: "Attacker sim", sub: "Weekly narrative" },
+          { href: "/portal/compliance", label: "C-27 primer", sub: "Canada privacy reform" },
+        ].map((x) => (
+          <Link
+            key={x.href}
+            href={x.href}
+            className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 transition hover:border-[#00C48C]/40"
+          >
+            <p className="text-sm font-medium text-zinc-100">{x.label}</p>
+            <p className="mt-1 text-xs text-zinc-500">{x.sub}</p>
+          </Link>
+        ))}
+      </section>
+
       <section className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 lg:col-span-1">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Attack surface score</p>
@@ -205,7 +299,6 @@ export default function PortalHomePage() {
           </div>
           <p className="mt-2 text-sm text-zinc-400">
             Grade <span className="font-medium text-zinc-200">{grade}</span>
-            <span className="ml-2 text-emerald-500/80">↑</span> trend (coming soon)
           </p>
         </div>
 
@@ -269,6 +362,11 @@ export default function PortalHomePage() {
               SLA-based score — updated after each Shield scan. Keep critical &amp; high items within the window to stay
               certified.
             </p>
+            {readinessHistory.length >= 2 && (
+              <div className="w-full max-w-[14rem]">
+                <ReadinessSparkline points={readinessHistory} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -299,14 +397,32 @@ export default function PortalHomePage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
-          <h2 className="text-sm font-semibold text-rose-200">Critical issues</h2>
+          <h2 className="text-sm font-semibold text-rose-200">Critical &amp; high issues</h2>
           <p className="mt-2 text-sm text-zinc-400">
-            {criticalPreview ? criticalPreview.slice(0, 280) : "No critical findings in the latest scan payload. Full guided view ships in the next iteration."}
+            {criticalPreview
+              ? criticalPreview.slice(0, 320)
+              : "No critical or high items in the latest scan payload. Open Findings for the full list."}
           </p>
+          <Link href="/portal/findings" className="mt-2 inline-block text-xs font-medium text-[#00C48C] hover:underline">
+            Open findings →
+          </Link>
         </div>
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <h2 className="text-sm font-semibold text-emerald-200">Fixed this month</h2>
-          <p className="mt-2 text-sm text-zinc-400">Track resolved items here after you mark fixes (Phase 2+).</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-100">
+            {remediation?.fixedThisMonth ?? 0}
+          </p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Items marked <strong className="text-zinc-400">fixed</strong> this calendar month.{" "}
+            {remediation !== null && (
+              <>
+                In progress: {remediation.inProgress} · Open (tracked): {remediation.openTracked}.
+              </>
+            )}
+          </p>
+          <Link href="/portal/findings" className="mt-2 inline-block text-xs font-medium text-[#00C48C] hover:underline">
+            Update status →
+          </Link>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Reports</h2>
@@ -331,10 +447,24 @@ export default function PortalHomePage() {
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6">
         <h2 className="text-lg font-semibold text-zinc-100">Ask HAWK</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Personalised security Q&amp;A from your scan context is planned for Phase 4. You&apos;ll chat here with streaming
+          Get personalised security Q&amp;A grounded in your latest scan context — open the full chat with streaming
           answers.
         </p>
+        <Button asChild className="mt-4 bg-zinc-100 text-zinc-900 hover:bg-white">
+          <Link href="/portal/ask">Open Ask HAWK</Link>
+        </Button>
       </section>
     </div>
+  );
+}
+
+export default function PortalHomePage() {
+  return (
+    <>
+      <Suspense fallback={null}>
+        <PortalWelcomeToast />
+      </Suspense>
+      <PortalHomeContent />
+    </>
   );
 }

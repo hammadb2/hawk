@@ -3,6 +3,7 @@
   "buildCommand": "next build",
   "devCommand": "next dev",
   "installCommand": "npm install",
+  "crons": [],
   "headers": [
     {
       "source": "/(.*)",

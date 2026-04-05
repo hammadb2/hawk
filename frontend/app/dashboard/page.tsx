@@ -47,15 +47,16 @@ export default function DashboardOverviewPage() {
   }, [token]);
 
   const latest = scans[0];
-  const planLabel = user?.plan === "trial" && user?.trial_ends_at
-    ? `Trial · ends ${new Date(user.trial_ends_at).toLocaleDateString()}`
-    : user?.plan === "starter"
-    ? "Starter"
-    : user?.plan === "pro"
-    ? "Pro"
-    : user?.plan === "agency"
-    ? "Agency"
-    : (user?.plan || "Trial");
+  const planLabel =
+    user?.plan === "starter"
+      ? "Starter"
+      : user?.plan === "pro"
+        ? "Pro"
+        : user?.plan === "agency"
+          ? "Agency"
+          : user?.plan
+            ? String(user.plan).replace(/_/g, " ")
+            : "—";
 
   return (
     <div className="space-y-8">
@@ -113,7 +114,7 @@ export default function DashboardOverviewPage() {
             </CardHeader>
             <CardContent>
               <span className="text-lg font-semibold text-text-primary capitalize">{planLabel}</span>
-              <p className="text-xs text-text-dim mt-1">{user?.plan === "trial" ? "Upgrade in Settings" : "Active plan"}</p>
+              <p className="text-xs text-text-dim mt-1">Active plan</p>
             </CardContent>
           </Card>
         </motion.div>

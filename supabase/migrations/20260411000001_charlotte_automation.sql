@@ -16,7 +16,7 @@ on conflict (key) do nothing;
 
 create table if not exists public.charlotte_runs (
   id uuid primary key default gen_random_uuid(),
-  run_date date not null default ((timezone('America/Edmonton', now())))::date),
+  run_date date not null default ((timezone('America/Edmonton', now()))::date),
   industry text,
   leads_pulled integer not null default 0,
   emails_verified integer not null default 0,

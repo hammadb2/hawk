@@ -59,5 +59,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(login);
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (profile?.role === "client") {
+      return NextResponse.redirect(new URL("/portal", origin).toString());
+    }
+  }
+
   return NextResponse.redirect(new URL(next, origin).toString());
 }

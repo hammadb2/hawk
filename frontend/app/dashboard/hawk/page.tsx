@@ -10,7 +10,7 @@ import { hawkApi, scansApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export default function AskHawkPage() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState<{ role: string; content: string }[]>([]);
   const [reply, setReply] = useState("");
@@ -61,15 +61,12 @@ export default function AskHawkPage() {
     }
   };
 
-  const isTrial = user?.plan === "trial";
-
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Ask HAWK</h1>
         <p className="text-text-secondary mt-1">
-          Get step-by-step fix instructions, PIPEDA / Bill C-26 mapping, and rescan suggestions.{" "}
-          {isTrial && "Trial: 5 messages — upgrade for unlimited."}
+          Get step-by-step fix instructions, PIPEDA / Bill C-26 mapping, and rescan suggestions.
         </p>
       </div>
 

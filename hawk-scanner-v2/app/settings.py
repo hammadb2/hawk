@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     oathnet_api_key: str = ""
     ransomwatch_api_token: str = ""
     github_token: str = ""
+    nvd_api_key: str = ""
 
     # Optional: persist from worker
     supabase_url: str = ""

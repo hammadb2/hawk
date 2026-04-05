@@ -199,6 +199,80 @@ def _find_client_row(headers: dict[str, str], session_obj: dict[str, Any]) -> di
     return None
 
 
+def _create_client_from_public_checkout(headers: dict[str, str], session_obj: dict[str, Any]) -> dict[str, Any] | None:
+    """Marketing site paid before sales created a CRM client — insert minimal clients row."""
+    meta = session_obj.get("metadata") or {}
+    hp = str(meta.get("hawk_product", "")).lower()
+    if hp not in ("starter", "shield"):
+        return None
+    email = (session_obj.get("customer_email") or "").strip().lower()
+    if not email and session_obj.get("customer_details"):
+        cd0 = session_obj.get("customer_details") or {}
+        if isinstance(cd0, dict):
+            email = (cd0.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return None
+    domain = email.split("@", 1)[1].strip().lower()
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/clients",
+            headers=headers,
+            params={"domain": f"eq.{domain}", "select": "*", "limit": "1"},
+            timeout=20.0,
+        )
+        r.raise_for_status()
+        rows = r.json()
+        if rows:
+            return rows[0]
+    except Exception:
+        logger.exception("create client: domain lookup failed")
+
+    cust = session_obj.get("customer")
+    if isinstance(cust, dict):
+        cust = cust.get("id")
+    cust_id = str(cust).strip() if cust else None
+    cd = session_obj.get("customer_details") or {}
+    name = (cd.get("name") or "").strip() if isinstance(cd, dict) else ""
+    company = (name or domain.split(".")[0].replace("-", " ").title())[:200]
+    mrr = 19900 if hp == "starter" else 99700
+    plan = "hawk_starter" if hp == "starter" else "hawk_shield"
+    row = {
+        "company_name": company,
+        "domain": domain,
+        "plan": plan,
+        "mrr_cents": mrr,
+        "stripe_customer_id": cust_id,
+        "status": "active",
+    }
+    try:
+        ins = httpx.post(
+            f"{SUPABASE_URL}/rest/v1/clients",
+            headers=headers,
+            params={"select": "*"},
+            json=row,
+            timeout=20.0,
+        )
+        if ins.status_code >= 400:
+            logger.warning("create client from checkout: %s %s", ins.status_code, ins.text[:400])
+            r2 = httpx.get(
+                f"{SUPABASE_URL}/rest/v1/clients",
+                headers=headers,
+                params={"domain": f"eq.{domain}", "select": "*", "limit": "1"},
+                timeout=20.0,
+            )
+            r2.raise_for_status()
+            rows2 = r2.json()
+            return rows2[0] if rows2 else None
+        out = ins.json()
+        if isinstance(out, list) and out:
+            return out[0]
+        if isinstance(out, dict) and out.get("id"):
+            return out
+    except Exception:
+        logger.exception("create client from checkout insert failed")
+    return None
+
+
 def _invite_portal_user(*, email: str, company_name: str, client_id: str) -> str | None:
     """Supabase Auth invite; returns new auth user id."""
     if not SUPABASE_URL or not SERVICE_KEY:
@@ -302,10 +376,19 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     headers = _sb_headers()
     client_row = _find_client_row(headers, session_obj)
     if not client_row:
+        client_row = _create_client_from_public_checkout(headers, session_obj)
+    if not client_row:
         logger.info("portal provision: no matching CRM client for checkout session")
         return False
 
-    shield = _is_shield_client(client_row, session_obj)
+    meta = session_obj.get("metadata") or {}
+    hp = str(meta.get("hawk_product", "")).lower()
+    if hp == "shield":
+        shield = True
+    elif hp == "starter":
+        shield = False
+    else:
+        shield = _is_shield_client(client_row, session_obj)
 
     if client_row.get("onboarded_at"):
         logger.info("portal provision: client %s already onboarded — idempotent skip", client_row.get("id"))

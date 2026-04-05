@@ -11,13 +11,18 @@ from arq.jobs import Job, JobStatus
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+import asyncio
+
 from app.models import ScanRequest, ScanResponse
-from app.pipeline.runner import run_scan
+from app.pipeline.runner import run_dnstwist_only, run_scan, run_scan_fast
 from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 redis_pool: ArqRedis | None = None
+
+SCAN_JOB_TIMEOUT_FAST_SEC = 120.0
+SCAN_JOB_TIMEOUT_FULL_SEC = 300.0
 
 
 @asynccontextmanager
@@ -37,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HAWK Scanner 2.0",
-    description="Attack-surface pipeline: subfinder, naabu, httpx, whatweb, nuclei, dnstwist, HIBP, GitHub, Claude.",
+    description="Attack-surface pipeline: subfinder, naabu, httpx, whatweb, NVD supply-chain, nuclei, dnstwist, HIBP, GitHub, Claude.",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -51,15 +56,24 @@ def health() -> dict[str, str]:
 @app.post("/scan", response_model=None)
 async def scan_specter_compat(req: ScanRequest) -> dict[str, Any]:
     """Drop-in compatible with Specter `POST /scan` (used by HAWK API relay)."""
+    return await _sync_scan_body(req)
+
+
+@app.post("/v1/scan/dnstwist", response_model=None)
+async def scan_dnstwist_only(req: ScanRequest) -> dict[str, Any]:
+    """Registered-domain / lookalike pass only — for daily Shield typosquat monitoring."""
     try:
-        result = await run_scan(
-            req.domain,
-            scan_id=req.scan_id,
-            industry=req.industry,
-            company_name=req.company_name,
+        result = await asyncio.wait_for(
+            run_dnstwist_only(
+                req.domain,
+                scan_id=req.scan_id,
+                industry=req.industry,
+                company_name=req.company_name,
+            ),
+            timeout=180.0,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scan failed: {e}") from e
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="dnstwist_timeout") from None
     return result.model_dump(mode="json")
 
 
@@ -69,6 +83,7 @@ class AsyncScanBody(BaseModel):
     company_name: str | None = None
     prospect_id: str | None = Field(None, description="If set + Supabase env, worker inserts crm_prospect_scans")
     scan_id: str | None = None
+    scan_depth: str = Field(default="full", description="full | fast")
 
 
 @app.post("/v1/scan/async")
@@ -82,6 +97,7 @@ async def enqueue_scan(body: AsyncScanBody) -> dict[str, str]:
         body.prospect_id,
         body.scan_id,
         body.company_name,
+        body.scan_depth or "full",
     )
     if job is None:
         raise HTTPException(status_code=409, detail="Job id conflict or duplicate enqueue")
@@ -106,16 +122,41 @@ async def job_result(job_id: str) -> dict[str, Any]:
     return {"job_id": job_id, "status": "complete", "result": info.result}
 
 
-@app.post("/v1/scan/sync", response_model=None)
-async def sync_scan(req: ScanRequest) -> dict[str, Any]:
-    """Synchronous full scan (may run several minutes — use async for CRM at scale)."""
-    try:
-        result = await run_scan(
+async def _sync_scan_body(req: ScanRequest) -> dict[str, Any]:
+    depth = (req.scan_depth or "full").strip().lower()
+    budget = SCAN_JOB_TIMEOUT_FAST_SEC if depth == "fast" else SCAN_JOB_TIMEOUT_FULL_SEC
+    if depth == "fast":
+        coro = run_scan_fast(
             req.domain,
             scan_id=req.scan_id,
             industry=req.industry,
             company_name=req.company_name,
         )
+    else:
+        coro = run_scan(
+            req.domain,
+            scan_id=req.scan_id,
+            industry=req.industry,
+            company_name=req.company_name,
+        )
+    try:
+        result = await asyncio.wait_for(coro, timeout=budget)
+    except asyncio.TimeoutError:
+        return {
+            "domain": req.domain.strip().lower(),
+            "status": "timed_out",
+            "score": None,
+            "grade": None,
+            "findings": [],
+            "message": "scan_timeout",
+            "scan_version": "2.0" if depth != "fast" else "2.0-fast",
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan failed: {e}") from e
     return result.model_dump(mode="json")
+
+
+@app.post("/v1/scan/sync", response_model=None)
+async def sync_scan(req: ScanRequest) -> dict[str, Any]:
+    """Synchronous scan: fast (~15s target) or full pipeline. Hard timeout 120s with minimal payload on timeout."""
+    return await _sync_scan_body(req)

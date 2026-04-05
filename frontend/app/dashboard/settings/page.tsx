@@ -56,9 +56,6 @@ export default function DashboardSettingsPage() {
         <CardContent className="space-y-2 text-sm">
           <p><span className="text-text-dim">Email:</span> {user?.email}</p>
           <p><span className="text-text-dim">Plan:</span> <span className="capitalize">{user?.plan}</span></p>
-          {user?.trial_ends_at && (
-            <p><span className="text-text-dim">Trial ends:</span> {new Date(user.trial_ends_at).toLocaleDateString()}</p>
-          )}
         </CardContent>
       </Card>
 

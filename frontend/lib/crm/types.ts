@@ -29,6 +29,7 @@ export type Profile = {
   onboarding_completed_at?: string | null;
   last_assigned_at?: string | null;
   whatsapp_number?: string | null;
+  health_score?: number | null;
 };
 
 export type Prospect = {
@@ -163,6 +164,7 @@ export type CrmClientRow = {
   close_date: string;
   created_at: string;
   commission_deferred?: boolean;
+  monitored_domains?: string[] | null;
 };
 
 export type ProspectFileRow = {

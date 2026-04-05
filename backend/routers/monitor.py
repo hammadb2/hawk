@@ -8,6 +8,7 @@ import os
 from fastapi import APIRouter, Header, HTTPException
 
 from services.health_monitor import run_health_monitor
+from services.scanner_health_service import run_scanner_health_check
 
 logger = logging.getLogger(__name__)
 
@@ -35,3 +36,12 @@ def monitor_health_check(
     """Run all integration checks, log to system_health_log, alert CEO on consecutive failures."""
     _require_secret(x_cron_secret)
     return run_health_monitor()
+
+
+@router.post("/scanner-health")
+def monitor_scanner_health(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Queue depth, failure rate, log to scanner_health_logs, WhatsApp CEO if thresholds exceeded."""
+    _require_secret(x_cron_secret)
+    return run_scanner_health_check()

@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     enq = await fetch(`${base}/api/scan/enqueue`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain, industry }),
+      body: JSON.stringify({ domain, industry, scan_depth: "full" }),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

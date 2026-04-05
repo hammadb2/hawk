@@ -20,6 +20,8 @@ const icons: Record<string, string> = {
   "My Earnings": "$",
   Settings: "⚙",
   "Support Tickets": "🎫",
+  Replies: "↩",
+  Health: "◆",
 };
 
 export function CrmSidebar() {

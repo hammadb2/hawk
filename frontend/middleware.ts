@@ -12,6 +12,19 @@ function crmCookieOptions(url: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/login") {
+    if (request.nextUrl.searchParams.get("register") === "1") {
+      return NextResponse.redirect(new URL("/#pricing", request.url));
+    }
+    return NextResponse.redirect(new URL("/portal/login", request.url));
+  }
+  if (pathname === "/forgot-password" || pathname === "/reset-password") {
+    return NextResponse.redirect(new URL("/portal/login", request.url));
+  }
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -102,6 +115,14 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (user && pathname.startsWith("/crm/login")) {
+      const { data: loginProf } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (loginProf?.role === "client") {
+        return NextResponse.redirect(new URL("/portal", request.url));
+      }
       const next = request.nextUrl.searchParams.get("next") || "/crm/dashboard";
       const safe = next.startsWith("/") && !next.startsWith("//") && !next.includes("://") ? next : "/crm/dashboard";
       return NextResponse.redirect(new URL(safe, request.url));
@@ -114,7 +135,14 @@ export async function middleware(request: NextRequest) {
     }
 
     if (user && !isPublic) {
-      const { data: prof } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id,role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (prof?.role === "client") {
+        return NextResponse.redirect(new URL("/portal", request.url));
+      }
       if (!prof?.id) {
         const { data: cpp } = await supabase.from("client_portal_profiles").select("id").eq("user_id", user.id).maybeSingle();
         if (cpp) {
@@ -142,10 +170,10 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) {
+  if (pathname.startsWith("/dashboard")) {
     const auth = request.cookies.get(AUTH_COOKIE)?.value;
     if (!auth) {
-      const login = new URL("/login", request.url);
+      const login = new URL("/portal/login", request.url);
       login.searchParams.set("next", pathname);
       return NextResponse.redirect(login);
     }
@@ -155,5 +183,17 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/crm", "/crm/:path*", "/portal", "/portal/:path*", "/dashboard/:path*", "/onboarding"],
+  matcher: [
+    "/login",
+    "/forgot-password",
+    "/reset-password",
+    "/onboarding",
+    "/onboarding/:path*",
+    "/crm",
+    "/crm/:path*",
+    "/portal",
+    "/portal/:path*",
+    "/dashboard",
+    "/dashboard/:path*",
+  ],
 };

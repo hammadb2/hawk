@@ -27,7 +27,7 @@ export default function ClientsPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("clients")
-      .select("id, prospect_id, company_name, domain, plan, mrr_cents, stripe_customer_id, closing_rep_id, status, close_date, created_at")
+      .select("id, prospect_id, company_name, domain, plan, mrr_cents, stripe_customer_id, closing_rep_id, status, close_date, created_at, monitored_domains")
       .order("close_date", { ascending: false });
     if (error) {
       toast.error(error.message);
@@ -97,6 +97,7 @@ export default function ClientsPage() {
                 <th className="px-3 py-2">Closer</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Closed</th>
+                <th className="px-3 py-2">Enterprise</th>
               </tr>
             </thead>
             <tbody>
@@ -119,6 +120,16 @@ export default function ClientsPage() {
                   </td>
                   <td className={cn("px-3 py-2 font-medium", statusClass(c.status))}>{c.status}</td>
                   <td className="px-3 py-2 text-zinc-500">{new Date(c.close_date).toLocaleDateString()}</td>
+                  <td className="px-3 py-2">
+                    <Link
+                      href={`/crm/clients/${c.id}/enterprise`}
+                      className="text-emerald-400/90 hover:underline"
+                    >
+                      {(c.monitored_domains?.length ?? 0) > 0
+                        ? `${c.monitored_domains?.length} extra`
+                        : "Add domains"}
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

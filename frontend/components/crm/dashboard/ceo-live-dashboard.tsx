@@ -18,6 +18,8 @@ type Kpis = {
 
 type LeaderRow = { repId: string; name: string; closes: number; mrrCents: number };
 
+type RepHealthRow = { repId: string; name: string; healthScore: number | null };
+
 function localStartOfDayIso(): string {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -43,13 +45,14 @@ export function CeoLiveDashboard({
   const [activities, setActivities] = useState<CrmActivityRow[]>([]);
   const [activityFilter, setActivityFilter] = useState<string>("all");
   const [prospectsCache, setProspectsCache] = useState<Prospect[]>([]);
+  const [repHealth, setRepHealth] = useState<RepHealthRow[]>([]);
 
   const loadAll = useCallback(async () => {
     const startDay = localStartOfDayIso();
     const startMonth = localStartOfMonthIso();
     const staleCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
 
-    const [evRes, actRes, clientsRes, prospectsRes] = await Promise.all([
+    const [evRes, actRes, clientsRes, prospectsRes, healthRes] = await Promise.all([
       supabase.from("prospect_email_events").select("id,sent_at,replied_at,created_at").gte("created_at", startDay).limit(2000),
       supabase
         .from("activities")
@@ -58,6 +61,11 @@ export function CeoLiveDashboard({
         .limit(80),
       supabase.from("clients").select("id,closing_rep_id,mrr_cents,close_date,status").eq("status", "active").limit(500),
       supabase.from("prospects").select("*").limit(800),
+      supabase
+        .from("profiles")
+        .select("id,full_name,email,health_score,role")
+        .in("role", ["sales_rep", "closer", "team_lead"])
+        .limit(100),
     ]);
 
     const events = evRes.data ?? [];
@@ -120,6 +128,26 @@ export function CeoLiveDashboard({
           mrrCents: byRep.get(id)?.mrrCents ?? 0,
         }))
         .sort((a, b) => b.mrrCents - a.mrrCents),
+    );
+
+    const hpRows = (healthRes.data ?? []) as {
+      id: string;
+      full_name: string | null;
+      email: string | null;
+      health_score: number | null;
+    }[];
+    setRepHealth(
+      hpRows
+        .map((r) => ({
+          repId: r.id,
+          name: r.full_name || r.email || r.id.slice(0, 8),
+          healthScore: typeof r.health_score === "number" ? r.health_score : null,
+        }))
+        .sort((a, b) => {
+          const av = a.healthScore ?? -1;
+          const bv = b.healthScore ?? -1;
+          return av - bv;
+        }),
     );
   }, [supabase]);
 
@@ -189,7 +217,7 @@ export function CeoLiveDashboard({
         <KpiCard label="Active client MRR" value={`$${(kpis.activeMrrCents / 100).toLocaleString()}`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
           <h3 className="text-sm font-medium text-zinc-200">Rep leaderboard (MTD)</h3>
           <p className="text-xs text-zinc-500">By revenue closed this month</p>
@@ -202,6 +230,28 @@ export function CeoLiveDashboard({
                 </span>
                 <span className="text-zinc-500">
                   {row.closes} deal{row.closes === 1 ? "" : "s"} · ${(row.mrrCents / 100).toLocaleString()} MRR
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+          <h3 className="text-sm font-medium text-zinc-200">Rep health (0–100)</h3>
+          <p className="text-xs text-zinc-500">Daily score from pipeline hygiene; under 50 alerts CEO via WhatsApp when configured.</p>
+          <ul className="mt-3 max-h-[220px] space-y-2 overflow-y-auto text-sm">
+            {repHealth.length === 0 && <li className="text-zinc-500">No sales roles loaded.</li>}
+            {repHealth.map((row) => (
+              <li key={row.repId} className="flex justify-between gap-2 text-zinc-300">
+                <span>{row.name}</span>
+                <span
+                  className={
+                    row.healthScore !== null && row.healthScore < 50
+                      ? "font-medium text-rose-400"
+                      : "text-zinc-500"
+                  }
+                >
+                  {row.healthScore ?? "—"}
                 </span>
               </li>
             ))}
