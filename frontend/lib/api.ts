@@ -6,6 +6,12 @@
 /** Backend API (Railway, etc.) — not the same as NEXT_PUBLIC_SITE_URL unless you proxy /api. */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/** Guarantee endpoints: in the browser use same-origin `/api/guarantee/*` (Next.js proxies to FastAPI). Supabase only sends Auth emails; codes are sent by the API. */
+function guaranteeApiUrl(): string {
+  if (typeof window !== "undefined") return "";
+  return API_URL;
+}
+
 export type ApiError = { detail: string | { msg: string }[] };
 
 async function request<T>(
@@ -22,6 +28,26 @@ async function request<T>(
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
   const data = await res.json().catch(() => ({}));
 
+  if (!res.ok) {
+    const detail = typeof data.detail === "string" ? data.detail : data.detail?.[0]?.msg || "Request failed";
+    throw new Error(detail);
+  }
+  return data as T;
+}
+
+async function guaranteeRequest<T>(
+  path: string,
+  options: RequestInit & { token?: string | null } = {},
+): Promise<T> {
+  const { token, ...init } = options;
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const base = guaranteeApiUrl();
+  const res = await fetch(`${base}${path}`, { ...init, headers });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = typeof data.detail === "string" ? data.detail : data.detail?.[0]?.msg || "Request failed";
     throw new Error(detail);
@@ -111,14 +137,14 @@ export const breachApi = {
 /** Gated Breach Response Guarantee document (email code + JWT). */
 export const guaranteeApi = {
   requestCode: (body: { email: string; name: string; company: string }) =>
-    request<{ ok: string }>("/api/guarantee/request-code", { method: "POST", body: JSON.stringify(body) }),
+    guaranteeRequest<{ ok: string }>("/api/guarantee/request-code", { method: "POST", body: JSON.stringify(body) }),
   verify: (body: { email: string; code: string }) =>
-    request<{ access_token: string; token_type: string }>("/api/guarantee/verify", {
+    guaranteeRequest<{ access_token: string; token_type: string }>("/api/guarantee/verify", {
       method: "POST",
       body: JSON.stringify(body),
     }),
   getDocument: (accessToken: string) =>
-    request<{ markdown: string }>("/api/guarantee/document", { token: accessToken }),
+    guaranteeRequest<{ markdown: string }>("/api/guarantee/document", { token: accessToken }),
 };
 
 /** Homepage lead — always treat as success in UI; errors logged only. */
