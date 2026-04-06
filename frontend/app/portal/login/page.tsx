@@ -13,6 +13,8 @@ import { getPortalMagicLinkCallbackUrl } from "@/lib/site-url";
 function PortalLoginForm() {
   const searchParams = useSearchParams();
   const err = searchParams.get("error");
+  const postCheckout = searchParams.get("welcome") === "1";
+  const testCheckout = searchParams.get("test_checkout") === "1";
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,16 @@ function PortalLoginForm() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#00C48C]">HAWK Client</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-50">Portal sign in</h1>
           <p className="mt-1 text-sm text-zinc-500">Security score, findings, and guidance for your organization.</p>
+          {postCheckout && (
+            <p className="mt-3 rounded-lg border border-[#00C48C]/30 bg-[#00C48C]/10 px-3 py-3 text-left text-xs leading-relaxed text-zinc-200">
+              <strong className="text-[#00C48C]">Payment confirmed.</strong> You aren&apos;t signed in yet — that&apos;s
+              normal. Use the <strong>same email you entered in Stripe</strong>. Check your inbox for the HAWK portal invite
+              (magic link), or enter that email below and we&apos;ll send a new link.
+              {testCheckout && (
+                <span className="mt-2 block text-zinc-400">Stripe test mode: no real charge.</span>
+              )}
+            </p>
+          )}
           {err === "not_linked" && (
             <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
               This account isn&apos;t linked to a client portal yet. Use the email from your welcome message after checkout,

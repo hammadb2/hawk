@@ -55,9 +55,16 @@ function PortalWelcomeToast() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const welcomeToast = useRef(false);
+  const supabase = useMemo(() => createClient(), []);
   useEffect(() => {
-    if (welcomeToast.current) return;
-    if (searchParams.get("welcome") === "1") {
+    if (searchParams.get("welcome") !== "1") return;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      // Only toast after Stripe when already signed in — otherwise /portal redirects to login with ?welcome=1
+      if (!user) return;
+      if (welcomeToast.current) return;
       welcomeToast.current = true;
       const test = searchParams.get("test_checkout") === "1";
       toast.success(
@@ -66,14 +73,15 @@ function PortalWelcomeToast() {
           : "Welcome to HAWK — your subscription is active. Check your email for onboarding.",
       );
       router.replace("/portal", { scroll: false });
-    }
-  }, [searchParams, router]);
+    })();
+  }, [searchParams, router, supabase]);
   return null;
 }
 
 function PortalHomeContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [portal, setPortal] = useState<PortalProfile | null>(null);
   const [client, setClient] = useState<ClientRow | null>(null);
@@ -93,7 +101,11 @@ function PortalHomeContent() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      router.replace("/portal/login");
+      const q = new URLSearchParams();
+      q.set("next", "/portal");
+      if (searchParams.get("welcome") === "1") q.set("welcome", "1");
+      if (searchParams.get("test_checkout") === "1") q.set("test_checkout", "1");
+      router.replace(`/portal/login?${q.toString()}`);
       setLoading(false);
       return;
     }
@@ -185,7 +197,7 @@ function PortalHomeContent() {
     );
 
     setLoading(false);
-  }, [router, supabase]);
+  }, [router, supabase, searchParams]);
 
   useEffect(() => {
     void load();
@@ -550,7 +562,15 @@ export default function PortalHomePage() {
       <Suspense fallback={null}>
         <PortalWelcomeToast />
       </Suspense>
-      <PortalHomeContent />
+      <Suspense
+        fallback={
+          <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+          </div>
+        }
+      >
+        <PortalHomeContent />
+      </Suspense>
     </>
   );
 }
