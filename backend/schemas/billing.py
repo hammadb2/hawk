@@ -15,6 +15,12 @@ class PublicCheckoutRequest(BaseModel):
     hawk_product: Literal["starter", "shield"] = Field(..., description="starter ($199) or shield ($997)")
 
 
+class CheckoutCompleteRequest(BaseModel):
+    """After Stripe redirects with session_id — server verifies session and returns Supabase magic link."""
+
+    session_id: str = Field(..., min_length=14, description="Stripe Checkout Session id (cs_...)")
+
+
 class InvoiceItem(BaseModel):
     id: str
     amount_due: int

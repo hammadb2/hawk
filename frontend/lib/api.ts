@@ -134,6 +134,12 @@ export const billingApi = {
     const payload = path === "/api/billing/checkout-public-test" ? "{}" : JSON.stringify(body);
     return request<{ url: string; mode?: string; product?: string }>(path, { method: "POST", body: payload });
   },
+  /** After Stripe success_url → /portal/return?session_id=… — server verifies session, provisions CRM, returns Supabase magic link. */
+  completeCheckoutSession: (sessionId: string) =>
+    request<{ redirect_url: string }>("/api/billing/checkout-complete", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId }),
+    }),
   checkout: (body: { plan: string }, token: string) =>
     request<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify(body), token }),
   portal: (token: string) =>

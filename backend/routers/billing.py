@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import logging
+import os
+from urllib.parse import quote
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from database import get_db
 from models import User
-from schemas import CheckoutRequest, PublicCheckoutRequest
-import logging
+from schemas import CheckoutRequest, CheckoutCompleteRequest, PublicCheckoutRequest
 
 from config import (
     STRIPE_SECRET_KEY,
@@ -21,7 +25,9 @@ from config import (
     STRIPE_PRICE_SHIELD,
     STRIPE_PRICE_SHIELD_TEST,
     BASE_URL,
+    CRM_PUBLIC_BASE_URL,
     DEFAULT_PUBLIC_SITE_URL,
+    SUPABASE_URL,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,9 +103,10 @@ def _checkout_public_session_url(
     if success_url_override:
         success_url = success_url_override
     else:
-        success_url = f"{site}/portal?welcome=1"
+        # Stripe replaces {CHECKOUT_SESSION_ID}; /portal/return exchanges session server-side → Supabase session
+        success_url = site + "/portal/return?session_id={CHECKOUT_SESSION_ID}&welcome=1"
         if extra_meta and extra_meta.get("hawk_checkout_mode") == "test":
-            success_url = f"{site}/portal?welcome=1&test_checkout=1"
+            success_url = site + "/portal/return?session_id={CHECKOUT_SESSION_ID}&welcome=1&test_checkout=1"
     cancel_url = f"{site}/#pricing"
     client = StripeClient(api_key)
     session = client.v1.checkout.sessions.create(
@@ -160,7 +167,7 @@ def checkout_public_test():
     if not price_id:
         raise HTTPException(status_code=503, detail="Test Shield price not configured (STRIPE_PRICE_SHIELD_TEST)")
     site = MARKETING_PUBLIC_SITE
-    success_url = f"{site}/portal?welcome=1"
+    success_url = site + "/portal/return?session_id={CHECKOUT_SESSION_ID}&welcome=1&test_checkout=1"
     extra = {"hawk_checkout_mode": "test"}
     try:
         url = _checkout_public_session_url(
@@ -175,6 +182,138 @@ def checkout_public_test():
         logger.exception("checkout-public-test Stripe error")
         raise HTTPException(status_code=502, detail=str(e)[:200]) from e
     return {"url": url, "mode": "test", "product": "shield"}
+
+
+def _public_site_origin() -> str:
+    return (CRM_PUBLIC_BASE_URL or DEFAULT_PUBLIC_SITE_URL).rstrip("/")
+
+
+def _stripe_obj_to_dict(obj) -> dict:
+    if isinstance(obj, dict):
+        return obj
+    to_d = getattr(obj, "to_dict", None)
+    if callable(to_d):
+        return to_d()
+    raise HTTPException(status_code=502, detail="Could not read Stripe session")
+
+
+def _retrieve_checkout_session_dict(session_id: str) -> dict:
+    import stripe as stripe_mod
+
+    last_err: Exception | None = None
+    for api_key in (STRIPE_SECRET_KEY, STRIPE_SECRET_KEY_TEST):
+        if not (api_key or "").strip():
+            continue
+        try:
+            stripe_mod.api_key = api_key
+            sess = stripe_mod.checkout.Session.retrieve(
+                session_id,
+                expand=["line_items.data.price", "customer"],
+            )
+            return _stripe_obj_to_dict(sess)
+        except Exception as e:
+            last_err = e
+    logger.warning("Stripe retrieve session failed: %s", last_err)
+    raise HTTPException(status_code=404, detail="Checkout session not found") from last_err
+
+
+def _portal_next_path_from_session(session_obj: dict) -> str:
+    meta = session_obj.get("metadata") or {}
+    if str(meta.get("hawk_checkout_mode", "")).lower() == "test":
+        return "/portal?welcome=1&test_checkout=1"
+    return "/portal?welcome=1"
+
+
+def _magic_link_redirect_url(email: str, next_path: str) -> str:
+    """Supabase Admin: one-time magic link → /portal/auth/callback exchanges code for session."""
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if not SUPABASE_URL or not service_key:
+        raise HTTPException(status_code=503, detail="Supabase not configured on API")
+
+    origin = _public_site_origin()
+    redirect_to = f"{origin}/portal/auth/callback?next={quote(next_path, safe='')}"
+
+    r = httpx.post(
+        f"{SUPABASE_URL}/auth/v1/admin/generate_link",
+        headers={
+            "apikey": service_key,
+            "Authorization": f"Bearer {service_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "type": "magiclink",
+            "email": email.lower().strip(),
+            "options": {"redirect_to": redirect_to},
+        },
+        timeout=30.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("generate_link failed: %s %s", r.status_code, r.text[:400])
+        raise HTTPException(status_code=502, detail="Could not create portal sign-in link") from None
+
+    data = r.json()
+    props = data.get("properties") if isinstance(data, dict) else {}
+    if not isinstance(props, dict):
+        props = {}
+    link = props.get("action_link") or (data.get("action_link") if isinstance(data, dict) else None)
+    if not link:
+        raise HTTPException(status_code=502, detail="Sign-in provider returned no action link")
+    return str(link)
+
+
+@router.post("/checkout-complete")
+def checkout_complete(body: CheckoutCompleteRequest):
+    """
+    After Stripe redirects to /portal/return?session_id=… — verify the session, run the same CRM provision
+    as the webhook, then return a Supabase magic link so the browser can establish a session (PKCE callback).
+    """
+    sid = body.session_id.strip()
+    if not sid.startswith("cs_"):
+        raise HTTPException(status_code=400, detail="Invalid session id")
+
+    session_obj = _retrieve_checkout_session_dict(sid)
+
+    if session_obj.get("status") != "complete":
+        raise HTTPException(status_code=400, detail="Checkout session is not complete")
+
+    payment_status = session_obj.get("payment_status")
+    if payment_status not in ("paid", "no_payment_required"):
+        raise HTTPException(status_code=400, detail="Payment not completed")
+
+    email = (session_obj.get("customer_email") or "").strip().lower()
+    if not email and session_obj.get("customer_details"):
+        cd = session_obj["customer_details"]
+        if isinstance(cd, dict):
+            email = (cd.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="No customer email on checkout session")
+
+    ev = {"type": "checkout.session.completed", "data": {"object": session_obj}}
+    try:
+        from services.crm_portal_stripe import provision_portal_from_checkout
+
+        ok = provision_portal_from_checkout(ev)
+    except Exception:
+        logger.exception("checkout-complete provision failed")
+        raise HTTPException(status_code=502, detail="Could not finish account setup") from None
+
+    if not ok:
+        logger.error("checkout-complete: provision returned false for session %s", sid)
+        raise HTTPException(
+            status_code=502,
+            detail="Could not finish account setup. Try again shortly or contact hello@securedbyhawk.com.",
+        )
+
+    next_path = _portal_next_path_from_session(session_obj)
+    try:
+        redirect_url = _magic_link_redirect_url(email, next_path)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("checkout-complete magic link failed")
+        raise HTTPException(status_code=502, detail="Could not create sign-in link") from None
+
+    return {"redirect_url": redirect_url}
 
 
 @router.post("/checkout")

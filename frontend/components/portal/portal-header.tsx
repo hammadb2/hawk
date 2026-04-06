@@ -6,7 +6,10 @@ import { usePathname } from "next/navigation";
 /** Full app nav only when authenticated area; login stays minimal (no feature links). */
 export function PortalHeader() {
   const pathname = usePathname() || "";
-  const isLoginOrPublic = pathname === "/portal/login" || pathname.startsWith("/portal/auth/");
+  const isLoginOrPublic =
+    pathname === "/portal/login" ||
+    pathname === "/portal/return" ||
+    pathname.startsWith("/portal/auth/");
 
   if (isLoginOrPublic) {
     return (
