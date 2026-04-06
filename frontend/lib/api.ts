@@ -8,8 +8,12 @@ import { isStripeCheckoutTestMode } from "@/lib/stripe-checkout-mode";
 /** Backend API (Railway, etc.) — not the same as NEXT_PUBLIC_SITE_URL unless you proxy /api. */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-function publicCheckoutPath(): string {
-  return isStripeCheckoutTestMode() ? "/api/billing/checkout-public-test" : "/api/billing/checkout-public";
+/** Test mode (NEXT_PUBLIC_TEST_MODE): only Shield uses /checkout-public-test; Starter stays on live checkout-public. */
+function publicCheckoutPath(product: "starter" | "shield"): string {
+  if (isStripeCheckoutTestMode() && product === "shield") {
+    return "/api/billing/checkout-public-test";
+  }
+  return "/api/billing/checkout-public";
 }
 
 /** Guarantee endpoints: in the browser use same-origin `/api/guarantee/*` (Next.js proxies to FastAPI). Supabase only sends Auth emails; codes are sent by the API. */
@@ -122,11 +126,14 @@ export const reportsApi = {
 export const billingApi = {
   /**
    * Public marketing checkout — no auth. Calls FastAPI directly (same as /api/scan/public).
-   * Set NEXT_PUBLIC_TEST_MODE=true (or NEXT_PUBLIC_STRIPE_CHECKOUT_TEST_MODE) to use
-   * /api/billing/checkout-public-test with Railway STRIPE_SECRET_KEY_TEST and test price IDs.
+   * When NEXT_PUBLIC_TEST_MODE=true, Shield uses /api/billing/checkout-public-test (Shield-only, test keys + price).
+   * Starter always uses /api/billing/checkout-public (live Stripe).
    */
-  checkoutPublic: (body: { hawk_product: "starter" | "shield" }) =>
-    request<{ url: string; mode?: string }>(publicCheckoutPath(), { method: "POST", body: JSON.stringify(body) }),
+  checkoutPublic: (body: { hawk_product: "starter" | "shield" }) => {
+    const path = publicCheckoutPath(body.hawk_product);
+    const payload = path === "/api/billing/checkout-public-test" ? "{}" : JSON.stringify(body);
+    return request<{ url: string; mode?: string; product?: string }>(path, { method: "POST", body: payload });
+  },
   checkout: (body: { plan: string }, token: string) =>
     request<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify(body), token }),
   portal: (token: string) =>

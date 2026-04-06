@@ -1,5 +1,8 @@
 """Stripe checkout.session.completed → provision client portal user + Shield Day 0 onboarding.
 
+Public marketing checkout has no crm_client_id: we insert `clients`, invite Supabase user (magic link),
+set profiles.role=client, welcome email, CEO SMS, enqueue scan — idempotent when onboarded_at set.
+
 Go-live verification (run today with Stripe CLI `stripe trigger checkout.session.completed` or real test checkout):
 
 1. Webhook delivered to POST /api/billing/webhook (or your mounted Stripe route) with `checkout.session.completed`.

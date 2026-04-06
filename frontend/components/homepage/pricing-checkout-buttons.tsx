@@ -13,7 +13,8 @@ export function StripeTestModeBanner() {
     <div className="mx-auto mt-8 max-w-3xl rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
       <strong className="font-semibold text-amber-50">Test mode</strong> — use card{" "}
       <span className="font-mono">4242 4242 4242 4242</span>. Checkout uses Stripe test keys and{" "}
-      <code className="rounded bg-black/30 px-1 font-mono text-xs">/api/billing/checkout-public-test</code>. Clear{" "}
+      <code className="rounded bg-black/30 px-1 font-mono text-xs">/api/billing/checkout-public-test</code> (Shield
+      only). Clear{" "}
       <code className="rounded bg-black/30 px-1 font-mono text-xs">NEXT_PUBLIC_TEST_MODE</code> on Vercel for live cards.
     </div>
   );

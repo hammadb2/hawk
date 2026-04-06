@@ -59,6 +59,8 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 # Public marketing checkout (no JWT) — success/cancel on securedbyhawk.com
 _SITE = BASE_URL or DEFAULT_PUBLIC_SITE_URL
+# Test-mode Shield checkout always returns here (not HAWK_BASE_URL / preview hosts)
+MARKETING_PUBLIC_SITE = DEFAULT_PUBLIC_SITE_URL.rstrip("/")
 
 stripe = None
 
@@ -82,6 +84,7 @@ def _checkout_public_session_url(
     hawk_product: str,
     site: str,
     extra_meta: dict[str, str] | None = None,
+    success_url_override: str | None = None,
 ) -> str:
     """Create a Stripe Checkout Session; StripeClient isolates live vs test API keys (SDK v8+)."""
     from stripe import StripeClient
@@ -91,9 +94,12 @@ def _checkout_public_session_url(
     if extra_meta:
         meta.update(extra_meta)
         sub_meta.update(extra_meta)
-    success_url = f"{site}/portal?welcome=1"
-    if extra_meta and extra_meta.get("hawk_checkout_mode") == "test":
-        success_url = f"{site}/portal?welcome=1&test_checkout=1"
+    if success_url_override:
+        success_url = success_url_override
+    else:
+        success_url = f"{site}/portal?welcome=1"
+        if extra_meta and extra_meta.get("hawk_checkout_mode") == "test":
+            success_url = f"{site}/portal?welcome=1&test_checkout=1"
     cancel_url = f"{site}/#pricing"
     client = StripeClient(api_key)
     session = client.v1.checkout.sessions.create(
@@ -134,41 +140,40 @@ def checkout_public(req: PublicCheckoutRequest):
 
 
 @router.post("/checkout-public-test")
-def checkout_public_test(req: PublicCheckoutRequest):
+def checkout_public_test():
     """
-    Same as checkout-public but uses STRIPE_SECRET_KEY_TEST and test price IDs
-    (STRIPE_PRICE_STARTER_TEST / STRIPE_PRICE_SHIELD_TEST from Stripe Dashboard test mode).
-    Webhook signatures are verified with STRIPE_WEBHOOK_SECRET_TEST (set the test-mode signing secret on Railway).
+    Stripe test mode — HAWK Shield only (no Starter on this route).
+
+    Uses STRIPE_SECRET_KEY_TEST, STRIPE_PRICE_SHIELD_TEST; success redirect is always
+    https://securedbyhawk.com/portal?welcome=1 (see MARKETING_PUBLIC_SITE).
+
+    Webhook: POST /api/billing/webhook verifies signatures with STRIPE_WEBHOOK_SECRET_TEST
+    (and live secret) — configure the test signing secret on Railway.
     """
     s = _stripe()
     if not s:
         raise HTTPException(status_code=503, detail="Stripe SDK not available")
     if not STRIPE_SECRET_KEY_TEST:
         raise HTTPException(status_code=503, detail="Test checkout not configured (STRIPE_SECRET_KEY_TEST)")
-    if req.hawk_product == "starter":
-        price_id = STRIPE_PRICE_STARTER_TEST
-    else:
-        price_id = STRIPE_PRICE_SHIELD_TEST
+    price_id = STRIPE_PRICE_SHIELD_TEST
     if not price_id:
-        raise HTTPException(
-            status_code=503,
-            detail="Test price IDs not configured (STRIPE_PRICE_STARTER_TEST / STRIPE_PRICE_SHIELD_TEST)",
-        )
-    hp = req.hawk_product
-    site = _SITE.rstrip("/")
+        raise HTTPException(status_code=503, detail="Test Shield price not configured (STRIPE_PRICE_SHIELD_TEST)")
+    site = MARKETING_PUBLIC_SITE
+    success_url = f"{site}/portal?welcome=1"
     extra = {"hawk_checkout_mode": "test"}
     try:
         url = _checkout_public_session_url(
             api_key=STRIPE_SECRET_KEY_TEST,
             price_id=price_id,
-            hawk_product=hp,
+            hawk_product="shield",
             site=site,
             extra_meta=extra,
+            success_url_override=success_url,
         )
     except Exception as e:
         logger.exception("checkout-public-test Stripe error")
         raise HTTPException(status_code=502, detail=str(e)[:200]) from e
-    return {"url": url, "mode": "test"}
+    return {"url": url, "mode": "test", "product": "shield"}
 
 
 @router.post("/checkout")
@@ -245,6 +250,7 @@ async def webhook(
         raise HTTPException(status_code=503, detail="Stripe not configured")
     event = None
     last_err: Exception | None = None
+    # Try live secret first, then STRIPE_WEBHOOK_SECRET_TEST (Stripe CLI / test-mode endpoint).
     for secret in (STRIPE_WEBHOOK_SECRET, STRIPE_WEBHOOK_SECRET_TEST):
         if not (secret or "").strip():
             continue
@@ -277,7 +283,8 @@ async def webhook(
             db.commit()
     elif event["type"] == "checkout.session.completed":
         evd = _stripe_event_to_dict(event)
-        # CRM Shield Day 0: portal, deep scan, WhatsApp, Resend — see services.crm_portal_stripe
+        # No crm_client_id: create clients row, Supabase invite (magic link), profiles.role=client,
+        # welcome email, CEO SMS, enqueue scan — see services.crm_portal_stripe.provision_portal_from_checkout
         try:
             from services.crm_portal_stripe import provision_portal_from_checkout
 
