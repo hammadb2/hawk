@@ -11,6 +11,7 @@ from fastapi import HTTPException
 
 from config import SUPABASE_URL
 from services.crm_portal_stripe import _invite_portal_user, _lookup_user_id_by_email
+from services.crm_profile_sync import ensure_client_profile, profile_role, staff_roles
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +25,6 @@ def _headers() -> dict[str, str]:
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
-
-
-def _staff_roles() -> frozenset[str]:
-    return frozenset({"ceo", "hos", "team_lead", "sales_rep", "closer"})
 
 
 def assert_crm_staff_can_provision(actor_uid: str) -> None:
@@ -46,22 +43,8 @@ def assert_crm_staff_can_provision(actor_uid: str) -> None:
     role = (rows[0].get("role") or "").lower()
     if role == "client":
         raise HTTPException(status_code=403, detail="Client accounts cannot provision portal")
-    if role not in _staff_roles():
+    if role not in staff_roles():
         raise HTTPException(status_code=403, detail="Insufficient role to provision portal")
-
-
-def _profile_role(uid: str) -> str | None:
-    r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/profiles",
-        headers=_headers(),
-        params={"id": f"eq.{uid}", "select": "role", "limit": "1"},
-        timeout=20.0,
-    )
-    r.raise_for_status()
-    rows = r.json()
-    if not rows:
-        return None
-    return (rows[0].get("role") or "").lower() or None
 
 
 def provision_portal_for_client(client_id: str) -> dict[str, Any]:
@@ -109,13 +92,13 @@ def provision_portal_for_client(client_id: str) -> dict[str, Any]:
 
     if client.get("portal_user_id"):
         uid = str(client["portal_user_id"])
-        role = _profile_role(uid)
-        if role and role in _staff_roles():
+        role = profile_role(uid)
+        if role and role in staff_roles():
             raise HTTPException(
                 status_code=409,
                 detail="Portal user id is linked to a CRM staff profile — fix profiles.role or portal linkage manually.",
             )
-        _ensure_profile_client(uid, email, company)
+        ensure_client_profile(uid, email, company)
         _ensure_cpp_and_patch(uid, client_id, email, company, client.get("domain") or pros[0].get("domain"))
         return {"ok": True, "idempotent": True, "portal_user_id": uid}
 
@@ -125,44 +108,17 @@ def provision_portal_for_client(client_id: str) -> dict[str, Any]:
     if not uid:
         raise HTTPException(status_code=502, detail="Could not create or resolve auth user for portal invite")
 
-    role = _profile_role(uid)
-    if role and role in _staff_roles():
+    role = profile_role(uid)
+    if role and role in staff_roles():
         raise HTTPException(
             status_code=409,
             detail="This contact email is already a CRM team account. Use a client-only email for the portal.",
         )
 
-    _ensure_profile_client(uid, email, company)
+    ensure_client_profile(uid, email, company)
     _ensure_cpp_and_patch(uid, client_id, email, company, client.get("domain") or pros[0].get("domain"))
 
     return {"ok": True, "portal_user_id": uid, "invited_email": email}
-
-
-def _ensure_profile_client(uid: str, email: str, company: str) -> None:
-    r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/profiles",
-        headers=_headers(),
-        params={"id": f"eq.{uid}", "select": "id,role", "limit": "1"},
-        timeout=20.0,
-    )
-    r.raise_for_status()
-    rows = r.json()
-    body = {"role": "client", "status": "active", "email": email, "full_name": company[:120]}
-    if not rows:
-        httpx.post(
-            f"{SUPABASE_URL}/rest/v1/profiles",
-            headers=_headers(),
-            json={"id": uid, **body},
-            timeout=20.0,
-        ).raise_for_status()
-    else:
-        httpx.patch(
-            f"{SUPABASE_URL}/rest/v1/profiles",
-            headers=_headers(),
-            params={"id": f"eq.{uid}"},
-            json=body,
-            timeout=20.0,
-        ).raise_for_status()
 
 
 def _ensure_cpp_and_patch(

@@ -31,6 +31,7 @@ from config import (
 )
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
 from services.crm_openphone import send_sms
+from services.crm_profile_sync import ensure_client_profile, profile_role, staff_roles
 from services.scanner import enqueue_async_scan
 
 logger = logging.getLogger(__name__)
@@ -424,17 +425,25 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
         cust = cust.get("id")
     cust = str(cust).strip() if cust else None
 
-    # First deep scan (async) for Shield — full depth
-    if shield and domain:
+    # First scan (async): Shield = full depth; Starter = fast queue
+    if domain:
         try:
-            enqueue_async_scan(
-                domain,
-                industry if industry != "—" else None,
-                str(company) if company != "there" else None,
-                scan_depth="full",
-            )
+            if shield:
+                enqueue_async_scan(
+                    domain,
+                    industry if industry != "—" else None,
+                    str(company) if company != "there" else None,
+                    scan_depth="full",
+                )
+            elif hp == "starter":
+                enqueue_async_scan(
+                    domain,
+                    industry if industry != "—" else None,
+                    str(company) if company != "there" else None,
+                    scan_depth="fast",
+                )
         except Exception:
-            logger.exception("Shield Day 0: enqueue deep scan failed for %s", domain)
+            logger.exception("checkout: enqueue first scan failed for %s", domain)
 
     uid_existing = client_row.get("portal_user_id")
     uid = str(uid_existing).strip() if uid_existing else None
@@ -444,6 +453,20 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
         uid = _lookup_user_id_by_email(email)
     if not uid:
         logger.error("portal provision: could not create or resolve auth user for %s", email)
+        return False
+
+    role = profile_role(uid)
+    if role and role in staff_roles():
+        logger.error(
+            "portal provision: email %s maps to CRM staff profile — refusing client portal role",
+            email,
+        )
+        return False
+
+    try:
+        ensure_client_profile(uid, email, str(company))
+    except Exception:
+        logger.exception("portal provision: ensure_client_profile failed for %s", email)
         return False
 
     now = datetime.now(timezone.utc)

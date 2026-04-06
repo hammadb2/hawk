@@ -122,7 +122,8 @@ export const reportsApi = {
 export const billingApi = {
   /**
    * Public marketing checkout — no auth. Calls FastAPI directly (same as /api/scan/public).
-   * Set NEXT_PUBLIC_STRIPE_CHECKOUT_TEST_MODE=true to use test keys/prices (Railway STRIPE_*_TEST).
+   * Set NEXT_PUBLIC_TEST_MODE=true (or NEXT_PUBLIC_STRIPE_CHECKOUT_TEST_MODE) to use
+   * /api/billing/checkout-public-test with Railway STRIPE_SECRET_KEY_TEST and test price IDs.
    */
   checkoutPublic: (body: { hawk_product: "starter" | "shield" }) =>
     request<{ url: string; mode?: string }>(publicCheckoutPath(), { method: "POST", body: JSON.stringify(body) }),

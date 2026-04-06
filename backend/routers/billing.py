@@ -105,7 +105,7 @@ def _checkout_public_session_url(
             "metadata": meta,
             # 0 overrides any trial configured on the Stripe Price (no free period at checkout).
             "subscription_data": {"metadata": sub_meta, "trial_period_days": 0},
-            "allow_promotion_codes": True,
+            "allow_promotion_codes": False,
         }
     )
     return session.url
@@ -136,10 +136,9 @@ def checkout_public(req: PublicCheckoutRequest):
 @router.post("/checkout-public-test")
 def checkout_public_test(req: PublicCheckoutRequest):
     """
-    Same as checkout-public but uses Stripe test API key and test price IDs.
-    Configure STRIPE_SECRET_KEY_TEST, STRIPE_PRICE_STARTER_TEST, STRIPE_PRICE_SHIELD_TEST (Dashboard test mode).
-    Webhook: add a test-mode endpoint in Stripe pointing to the same URL, or use STRIPE_WEBHOOK_SECRET_TEST
-    with stripe listen / Stripe CLI.
+    Same as checkout-public but uses STRIPE_SECRET_KEY_TEST and test price IDs
+    (STRIPE_PRICE_STARTER_TEST / STRIPE_PRICE_SHIELD_TEST from Stripe Dashboard test mode).
+    Webhook signatures are verified with STRIPE_WEBHOOK_SECRET_TEST (set the test-mode signing secret on Railway).
     """
     s = _stripe()
     if not s:
@@ -187,8 +186,16 @@ def checkout(
         raise HTTPException(status_code=400, detail="Invalid plan")
     customer_id = user.stripe_customer_id
     if not customer_id:
-        cust = s.Customer.create(email=user.email, name=f"{user.first_name or ''} {user.last_name or ''}".strip() or None)
-        customer_id = cust.id
+        existing = s.Customer.list(email=user.email, limit=1)
+        ex_data = getattr(existing, "data", None) or []
+        if ex_data:
+            customer_id = ex_data[0].id
+        else:
+            cust = s.Customer.create(
+                email=user.email,
+                name=f"{user.first_name or ''} {user.last_name or ''}".strip() or None,
+            )
+            customer_id = cust.id
         user.stripe_customer_id = customer_id
         db.commit()
     session = s.checkout.Session.create(
@@ -202,6 +209,7 @@ def checkout(
             "metadata": {"user_id": str(user.id), "plan": req.plan},
             "trial_period_days": 0,
         },
+        allow_promotion_codes=False,
     )
     return {"url": session.url}
 
