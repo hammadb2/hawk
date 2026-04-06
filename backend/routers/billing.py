@@ -103,7 +103,8 @@ def _checkout_public_session_url(
             "success_url": success_url,
             "cancel_url": cancel_url,
             "metadata": meta,
-            "subscription_data": {"metadata": sub_meta},
+            # 0 overrides any trial configured on the Stripe Price (no free period at checkout).
+            "subscription_data": {"metadata": sub_meta, "trial_period_days": 0},
             "allow_promotion_codes": True,
         }
     )
@@ -196,7 +197,11 @@ def checkout(
         line_items=[{"price": price_id, "quantity": 1}],
         success_url=f"{BASE_URL}/dashboard/settings?billing=success",
         cancel_url=f"{BASE_URL}/dashboard/settings?billing=cancel",
-        metadata={"user_id": user.id, "plan": req.plan},
+        metadata={"user_id": str(user.id), "plan": req.plan},
+        subscription_data={
+            "metadata": {"user_id": str(user.id), "plan": req.plan},
+            "trial_period_days": 0,
+        },
     )
     return {"url": session.url}
 
