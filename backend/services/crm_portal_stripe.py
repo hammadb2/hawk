@@ -501,12 +501,17 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     portal_login = f"{base.rstrip('/')}/portal/login"
 
     if shield:
+        fn = "there"
+        if prospect and (prospect.get("contact_name") or "").strip():
+            fn = str(prospect.get("contact_name")).strip().split()[0]
+        elif company and str(company) != "there":
+            fn = str(company).strip().split()[0]
         try:
             shield_day0_welcome_email(
                 to_email=email,
-                company_name=str(company),
-                portal_url=portal_login,
-                booking_url=CAL_COM_BOOKING_URL,
+                first_name=fn,
+                domain=domain or "your domain",
+                cal_url=CAL_COM_BOOKING_URL,
             )
         except Exception:
             logger.exception("Shield Day 0 welcome email failed")

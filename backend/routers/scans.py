@@ -17,7 +17,7 @@ from database import get_db
 from models import User, Scan, Domain, Report
 from schemas import ScanEnqueueRequest, ScanStartRequest, ScanResponse, ScanListItem
 from services.scanner import enqueue_async_scan, get_async_job, run_scan
-from services.charlotte import critical_finding_alert, trial_expiry_tomorrow_email, weekly_digest_email, monthly_report_ready_email
+from services.charlotte import critical_finding_alert, weekly_digest_email, monthly_report_ready_email
 from config import PLAN_DOMAINS
 
 router = APIRouter(tags=["scans"])
@@ -354,23 +354,10 @@ def run_scheduled_scans(
 @router.post("/api/cron/trial-expiry")
 def run_trial_expiry_emails(
     x_cron_secret: str | None = Header(None),
-    db: Session = Depends(get_db),
     _: bool = Depends(_cron_verified),
 ):
-    """Call daily from cron. Sends trial-expiry email to users whose trial ends in ~24h."""
-    now = datetime.now(timezone.utc)
-    tomorrow_start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    tomorrow_end = tomorrow_start + timedelta(days=1)
-    users = db.query(User).filter(
-        User.plan == "trial",
-        User.trial_ends_at >= tomorrow_start,
-        User.trial_ends_at < tomorrow_end,
-    ).all()
-    sent = 0
-    for u in users:
-        if trial_expiry_tomorrow_email(u.email, u.first_name):
-            sent += 1
-    return {"sent": sent, "users": [u.email for u in users]}
+    """Legacy cron hook: product trials are not offered — no emails sent."""
+    return {"sent": 0, "skipped": True, "reason": "trial_expiry_emails_disabled"}
 
 
 @router.post("/api/cron/weekly-digest")

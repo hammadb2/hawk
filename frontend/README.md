@@ -33,7 +33,7 @@ npm start
 - **/dashboard/history** — Scan history table
 - **/dashboard/reports** — Generate PDF, list and download
 - **/dashboard/domains** — Add/remove domains
-- **/dashboard/hawk** — Ask HAWK: chat with scan context, DeepSeek R1 (trial: 5 messages)
+- **/dashboard/hawk** — Ask HAWK: chat with scan context, DeepSeek R1
 - **/dashboard/compliance** — PIPEDA §4.7, Bill C-26 S.7, NIST mapping (Pro+)
 - **/dashboard/agency** — Client list, ROI calculator, white-label report (Agency)
 - **/dashboard/notifications** — Inbox, mark all read

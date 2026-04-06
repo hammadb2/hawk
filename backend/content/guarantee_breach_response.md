@@ -393,7 +393,7 @@ Subscriber acceptance is recorded electronically via the HAWK portal at the time
 
 HAWK Security  ·  AKB Studios  ·  Calgary, Alberta, Canada
 
-hello@akbstudios.com  ·  securedbyhawk.com  ·  +1 (825) 945-8282
+hello@securedbyhawk.com  ·  securedbyhawk.com  ·  +1 (825) 945-8282
 
 HAWK Breach Response Guarantee Version 1.0 · Effective April 2026
 

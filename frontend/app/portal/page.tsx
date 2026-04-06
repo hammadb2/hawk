@@ -5,15 +5,28 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
-import { findingsListFromScanPayload, summarizeSeverity } from "@/lib/portal/findings-parse";
+import {
+  findingsListFromScanPayload,
+  summarizeSeverity,
+  topFindingsPlainEnglish,
+} from "@/lib/portal/findings-parse";
 import { ReadinessSparkline } from "@/components/portal/readiness-sparkline";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type PortalProfile = {
   id: string;
   client_id: string;
   company_name: string | null;
   domain: string | null;
+  guarantee_terms_accepted_at: string | null;
 };
 
 type ClientRow = {
@@ -72,6 +85,7 @@ function PortalHomeContent() {
     openTracked: number;
   } | null>(null);
   const [readinessHistory, setReadinessHistory] = useState<{ score: number; at: string }[]>([]);
+  const [acceptBusy, setAcceptBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,7 +100,7 @@ function PortalHomeContent() {
 
     const { data: cpp, error: e1 } = await supabase
       .from("client_portal_profiles")
-      .select("id,client_id,company_name,domain")
+      .select("id,client_id,company_name,domain,guarantee_terms_accepted_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -177,6 +191,25 @@ function PortalHomeContent() {
     void load();
   }, [load]);
 
+  async function acceptGuaranteeSummary() {
+    if (!portal) return;
+    setAcceptBusy(true);
+    try {
+      const { error } = await supabase
+        .from("client_portal_profiles")
+        .update({ guarantee_terms_accepted_at: new Date().toISOString() })
+        .eq("id", portal.id);
+      if (error) {
+        toast.error("Could not save acceptance. Try again or contact support.");
+        return;
+      }
+      setPortal((p) => (p ? { ...p, guarantee_terms_accepted_at: new Date().toISOString() } : p));
+      toast.success("Welcome to your HAWK dashboard.");
+    } finally {
+      setAcceptBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
@@ -221,7 +254,7 @@ function PortalHomeContent() {
     certLabel = "At Risk";
   }
 
-  let daysUntilCert = 0;
+  let daysUntilCert: number | null = null;
   if (client.certification_eligible_at && !client.certified_at) {
     const end = new Date(client.certification_eligible_at).getTime();
     const now = Date.now();
@@ -235,12 +268,15 @@ function PortalHomeContent() {
     findingsRaw && typeof findingsRaw === "object" ? (findingsRaw as Record<string, unknown>) : null,
   );
   const sev = summarizeSeverity(list);
+  const topPlain = topFindingsPlainEnglish(list, 3);
   const criticalPreview =
     sev.criticalCount > 0
       ? `${sev.criticalCount} critical: ${sev.criticalTitles[0] ?? "see Findings"}${sev.criticalCount > 1 ? "…" : ""}`
       : sev.highCount > 0
         ? `${sev.highCount} high-severity finding(s) in the latest scan — open Findings to prioritize.`
         : null;
+
+  const showGuaranteeGate = !portal.guarantee_terms_accepted_at;
 
   async function downloadPipedaPdf() {
     setPipedaBusy(true);
@@ -265,12 +301,149 @@ function PortalHomeContent() {
     }
   }
 
+  const guaranteeDashboard = (
+    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Breach response guarantee</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${guaranteeBadge.className}`}>
+              {guaranteeBadge.label}
+            </span>
+            <span className="text-sm text-zinc-400">
+              Certification: <span className="font-medium text-zinc-100">{certLabel}</span>
+            </span>
+          </div>
+          {client.certification_eligible_at && !client.certified_at && daysUntilCert !== null && (
+            <p className="mt-3 text-sm text-zinc-400">
+              Days until HAWK Certified eligibility:{" "}
+              <span className="font-semibold tabular-nums text-zinc-100">{daysUntilCert}</span>
+            </p>
+          )}
+          {!client.certification_eligible_at && !client.certified_at && (
+            <p className="mt-3 text-sm text-zinc-500">
+              HAWK Certified countdown appears once your 90-day certification window is set (after Shield onboarding).
+            </p>
+          )}
+          {client.certified_at && (
+            <p className="mt-3 text-sm text-emerald-400/90">You are HAWK Certified — badge and certificate are available in your account.</p>
+          )}
+        </div>
+
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">HAWK Readiness Score</p>
+          <div className="relative h-36 w-36">
+            <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="rgb(39 39 42)" strokeWidth="10" />
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke={ringColor}
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray={`${(ringPct / 100) * 264} 264`}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-bold tabular-nums text-zinc-50">{readiness}</span>
+              <span className="text-xs text-zinc-500">/ 100</span>
+            </div>
+          </div>
+          <p className="max-w-[14rem] text-center text-xs text-zinc-500">
+            SLA-based score — updated after each Shield scan. Keep critical &amp; high items within the window to stay
+            certified.
+          </p>
+          {readinessHistory.length >= 2 && (
+            <div className="w-full max-w-[14rem]">
+              <ReadinessSparkline points={readinessHistory} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-8 border-t border-zinc-800 pt-6">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Guarantee conditions</p>
+        <ul className="mt-4 space-y-3">
+          <li className="flex items-start gap-3 text-sm">
+            <span className={client.guarantee_checklist_critical_ok !== false ? "text-emerald-400" : "text-red-400"}>
+              {client.guarantee_checklist_critical_ok !== false ? "✓" : "✕"}
+            </span>
+            <span className="text-zinc-300">Critical findings resolved within 24–48 hours of notification</span>
+          </li>
+          <li className="flex items-start gap-3 text-sm">
+            <span className={client.guarantee_checklist_high_ok !== false ? "text-emerald-400" : "text-red-400"}>
+              {client.guarantee_checklist_high_ok !== false ? "✓" : "✕"}
+            </span>
+            <span className="text-zinc-300">High findings resolved within 48 hours</span>
+          </li>
+          <li className="flex items-start gap-3 text-sm">
+            <span className={client.guarantee_checklist_subscription_ok !== false ? "text-emerald-400" : "text-red-400"}>
+              {client.guarantee_checklist_subscription_ok !== false ? "✓" : "✕"}
+            </span>
+            <span className="text-zinc-300">Subscription active</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+        <h2 className="text-sm font-semibold text-rose-200">Top findings (plain English)</h2>
+        {topPlain.length > 0 ? (
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-zinc-300">
+            {topPlain.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-2 text-sm text-zinc-400">
+            {criticalPreview
+              ? criticalPreview.slice(0, 320)
+              : "No critical or high items in the latest scan payload. Open Findings for the full list."}
+          </p>
+        )}
+        <Link href="/portal/findings" className="mt-2 inline-block text-xs font-medium text-[#00C48C] hover:underline">
+          Open findings →
+        </Link>
+      </div>
+    </section>
+  );
+
   return (
     <div className="space-y-8">
+      <Dialog open={showGuaranteeGate}>
+        <DialogContent hideClose className="max-w-lg border-[#00C48C]/25 bg-[#0a0910] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-zinc-50">Breach Response Guarantee</DialogTitle>
+            <DialogDescription className="text-left text-sm leading-relaxed text-zinc-400">
+              HAWK Shield includes a financially backed breach response guarantee when you meet the conditions in your
+              agreement. Critical and high findings must be remediated within the stated windows, your subscription must
+              stay active, and incidents must be reported as required. Review the{" "}
+              <Link href="/guarantee-terms" className="font-medium text-[#00C48C] hover:underline">
+                full guarantee terms
+              </Link>{" "}
+              for exclusions and limits.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              className="w-full bg-[#00C48C] text-[#07060C] hover:bg-[#00e6a8] sm:w-auto"
+              disabled={acceptBusy}
+              onClick={() => void acceptGuaranteeSummary()}
+            >
+              {acceptBusy ? "Saving…" : "I understand and accept"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div>
         <h1 className="text-2xl font-semibold text-zinc-50">{portal.company_name ?? portal.domain ?? "Your organization"}</h1>
         <p className="text-sm text-zinc-500">{portal.domain}</p>
       </div>
+
+      {guaranteeDashboard}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {[
@@ -319,99 +492,7 @@ function PortalHomeContent() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Breach response guarantee</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${guaranteeBadge.className}`}>
-                {guaranteeBadge.label}
-              </span>
-              <span className="text-sm text-zinc-400">
-                Certification: <span className="font-medium text-zinc-100">{certLabel}</span>
-              </span>
-            </div>
-            {client.certification_eligible_at && !client.certified_at && (
-              <p className="mt-3 text-sm text-zinc-400">
-                Days until HAWK Certified eligibility:{" "}
-                <span className="font-semibold tabular-nums text-zinc-100">{daysUntilCert}</span>
-              </p>
-            )}
-            {client.certified_at && (
-              <p className="mt-3 text-sm text-emerald-400/90">You are HAWK Certified — badge and certificate are available in your account.</p>
-            )}
-          </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">HAWK readiness</p>
-            <div className="relative h-36 w-36">
-              <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgb(39 39 42)" strokeWidth="10" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke={ringColor}
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(ringPct / 100) * 264} 264`}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold tabular-nums text-zinc-50">{readiness}</span>
-                <span className="text-xs text-zinc-500">/ 100</span>
-              </div>
-            </div>
-            <p className="max-w-[14rem] text-center text-xs text-zinc-500">
-              SLA-based score — updated after each Shield scan. Keep critical &amp; high items within the window to stay
-              certified.
-            </p>
-            {readinessHistory.length >= 2 && (
-              <div className="w-full max-w-[14rem]">
-                <ReadinessSparkline points={readinessHistory} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-8 border-t border-zinc-800 pt-6">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Guarantee conditions</p>
-          <ul className="mt-4 space-y-3">
-            <li className="flex items-start gap-3 text-sm">
-              <span className={client.guarantee_checklist_critical_ok !== false ? "text-emerald-400" : "text-red-400"}>
-                {client.guarantee_checklist_critical_ok !== false ? "✓" : "✕"}
-              </span>
-              <span className="text-zinc-300">Critical findings resolved within 24–48 hours of notification</span>
-            </li>
-            <li className="flex items-start gap-3 text-sm">
-              <span className={client.guarantee_checklist_high_ok !== false ? "text-emerald-400" : "text-red-400"}>
-                {client.guarantee_checklist_high_ok !== false ? "✓" : "✕"}
-              </span>
-              <span className="text-zinc-300">High findings resolved within 48 hours</span>
-            </li>
-            <li className="flex items-start gap-3 text-sm">
-              <span className={client.guarantee_checklist_subscription_ok !== false ? "text-emerald-400" : "text-red-400"}>
-                {client.guarantee_checklist_subscription_ok !== false ? "✓" : "✕"}
-              </span>
-              <span className="text-zinc-300">Subscription active</span>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
-          <h2 className="text-sm font-semibold text-rose-200">Critical &amp; high issues</h2>
-          <p className="mt-2 text-sm text-zinc-400">
-            {criticalPreview
-              ? criticalPreview.slice(0, 320)
-              : "No critical or high items in the latest scan payload. Open Findings for the full list."}
-          </p>
-          <Link href="/portal/findings" className="mt-2 inline-block text-xs font-medium text-[#00C48C] hover:underline">
-            Open findings →
-          </Link>
-        </div>
+      <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <h2 className="text-sm font-semibold text-emerald-200">Fixed this month</h2>
           <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-100">

@@ -74,7 +74,7 @@ Call these with **header** `X-Cron-Secret: <secret>`. The secret is read from `H
 | Endpoint | Schedule | Purpose |
 |----------|----------|--------|
 | `POST /api/cron/scheduled-scans` | e.g. daily | Run weekly/daily scans for domains that are due. |
-| `POST /api/cron/trial-expiry` | daily | Email users whose trial ends tomorrow. |
+| `POST /api/cron/trial-expiry` | daily | Legacy no-op — no expiry emails sent. |
 | `POST /api/cron/weekly-digest` | weekly | Email digest (scan count, criticals) to users with recent scans. |
 | `POST /api/cron/monthly-report` | monthly | Email "report ready" to users who have reports in the past 30 days. |
 
@@ -106,7 +106,6 @@ See **backend/.env.example**. Main ones:
 
 | Plan | Domains | Ask HAWK | PDFs | Notes |
 |------|---------|----------|------|--------|
-| Trial | 1 | 5 msgs | 0 | 7 days |
 | Starter | 1 | unlimited | 1/mo | Weekly scans |
 | Pro | 3 | unlimited | unlimited | Daily, PIPEDA/C-26 |
 | Agency | 10 | unlimited | unlimited | White-label, client report, API |

@@ -89,12 +89,10 @@ CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip()
 
 # Client portal — welcome / drip (Phase 2B)
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "HAWK <onboarding@securedbyhawk.com>").strip()
-# Gated guarantee document — must match verified domain in Resend (securedbyhawk.com)
-RESEND_GUARANTEE_FROM = os.environ.get(
-    "RESEND_GUARANTEE_FROM",
-    "HAWK Security <noreply@securedbyhawk.com>",
-).strip()
+# Client-facing mail — verify securedbyhawk.com in Resend; Railway: RESEND_FROM_EMAIL=noreply@securedbyhawk.com
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "HAWK Security <noreply@securedbyhawk.com>").strip()
+# Optional override; defaults to RESEND_FROM_EMAIL when empty
+RESEND_GUARANTEE_FROM = os.environ.get("RESEND_GUARANTEE_FROM", "").strip() or RESEND_FROM_EMAIL
 
 # Cron (scheduled scans) — set to a secret; cron calls with X-Cron-Secret
 # Railway often uses CRON_SECRET; we accept that as an alias for HAWK_CRON_SECRET.

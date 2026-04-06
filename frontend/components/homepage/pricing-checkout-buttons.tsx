@@ -32,7 +32,7 @@ function useCheckout() {
       const msg =
         raw === "Not Found"
           ? "Payment checkout could not reach the billing API. Redeploy the Hawk API with /api/billing/checkout-public, and set NEXT_PUBLIC_API_URL on Vercel to your Railway API URL."
-          : raw || "Checkout unavailable. Contact hello@akbstudios.com.";
+          : raw || "Checkout unavailable. Contact hello@securedbyhawk.com.";
       alert(msg);
     } finally {
       setLoading(false);

@@ -1,0 +1,30 @@
+<!--
+  Paste into Supabase Dashboard → Authentication → Email Templates → Magic Link.
+  Subject (suggested): Your HAWK Security login link
+-->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0;padding:0;background:#07060C;font-family:system-ui,-apple-system,sans-serif">
+  <tr>
+    <td align="center" style="padding:28px 16px">
+      <table role="presentation" width="100%" style="max-width:520px;background:#0D0B14;border-radius:12px;border:1px solid #1A1727;overflow:hidden">
+        <tr>
+          <td style="padding:28px 28px 12px 28px">
+            <p style="margin:0;font-size:11px;letter-spacing:0.12em;color:#00C48C;font-weight:700">HAWK SECURITY</p>
+            <p style="margin:10px 0 0 0;font-size:20px;font-weight:700;color:#F2F0FA">Sign in to your portal</p>
+            <p style="margin:12px 0 0 0;font-size:14px;line-height:1.55;color:#9B98B4">Click the button below to sign in securely. This link expires shortly.</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:8px 28px 28px 28px">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;border-radius:10px;background:#00C48C;color:#07060C;font-weight:700;font-size:15px;text-decoration:none">Login to HAWK Security</a>
+            <p style="margin:20px 0 0 0;font-size:12px;color:#5C5876">If you did not request this email, you can ignore it.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px;border-top:1px solid #1A1727;background:#0a0910">
+            <p style="margin:0;font-size:11px;color:#5C5876;text-align:center">HAWK Security · <a href="https://securedbyhawk.com" style="color:#00C48C;text-decoration:none">securedbyhawk.com</a></p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

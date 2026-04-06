@@ -1,4 +1,8 @@
-export type CrmRole = "ceo" | "hos" | "team_lead" | "sales_rep";
+/** CRM seat / org role (profiles.role). */
+export type CrmRole = "ceo" | "hos" | "team_lead" | "sales_rep" | "closer" | "client";
+
+/** Functional access bucket — VA system, CSM, etc. (profiles.role_type). */
+export type ProfileRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | "csm" | "client";
 
 export type ProspectStage =
   | "new"
@@ -19,6 +23,8 @@ export type Profile = {
   email: string | null;
   full_name: string | null;
   role: CrmRole;
+  /** Defaults to closer for legacy rows; use with `role` for VA features. */
+  role_type?: ProfileRoleType | null;
   team_lead_id: string | null;
   avatar_url: string | null;
   status: ProfileStatus | string;

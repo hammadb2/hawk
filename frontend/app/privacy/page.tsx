@@ -11,8 +11,8 @@ export default function PrivacyPage() {
         <p className="mt-6 text-text-secondary leading-relaxed">
           HAWK Security (AKB Studios) processes business contact information and domain scan data to deliver security assessments
           and services you request. For questions:{" "}
-          <a href="mailto:hello@akbstudios.com" className="text-[#00C48C] hover:underline">
-            hello@akbstudios.com
+          <a href="mailto:hello@securedbyhawk.com" className="text-[#00C48C] hover:underline">
+            hello@securedbyhawk.com
           </a>
           .
         </p>

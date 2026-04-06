@@ -11,6 +11,7 @@ import httpx
 
 from config import CRM_CEO_PHONE_E164, CRM_PUBLIC_BASE_URL
 from services.crm_openphone import send_sms
+from services.crm_portal_email import shield_guarantee_at_risk_email
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,46 @@ def _headers() -> dict[str, str]:
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
+
+
+def _portal_email_and_first_name(client_id: str, prospect_id: str | None) -> tuple[str | None, str]:
+    """Client portal login email + first name for transactional email."""
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/client_portal_profiles",
+        headers=_headers(),
+        params={"client_id": f"eq.{client_id}", "select": "email", "limit": "1"},
+        timeout=20.0,
+    )
+    email = None
+    if r.status_code == 200 and r.json():
+        email = (r.json()[0].get("email") or "").strip() or None
+    first = "there"
+    if prospect_id:
+        pr = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_headers(),
+            params={"id": f"eq.{prospect_id}", "select": "contact_name", "limit": "1"},
+            timeout=20.0,
+        )
+        if pr.status_code == 200 and pr.json():
+            raw = (pr.json()[0].get("contact_name") or "").strip()
+            if raw:
+                first = raw.split()[0]
+    return email, first
+
+
+def _critical_finding_plain(row: dict[str, Any], findings: list[dict[str, Any]]) -> str:
+    fk = str(row.get("finding_key") or "")
+    for f in findings:
+        if _finding_key(f) == fk:
+            t = str(f.get("title") or "").strip()
+            if t:
+                return t[:500]
+            for k in ("interpretation", "plain_english", "description"):
+                v = f.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()[:500]
+    return fk.replace("|", " · ")[:500] if fk else "Critical finding — see portal for details."
 
 
 def _finding_key(f: dict[str, Any]) -> str:
@@ -369,6 +410,19 @@ def process_shield_client_post_scan(
         rid = str(row["id"])
 
         if age >= timedelta(hours=20) and age < timedelta(hours=24) and not row.get("alert_20h_sent_at"):
+            crit_text = _critical_finding_plain(row, findings)
+            portal_email, fn = _portal_email_and_first_name(client_id, prospect_id)
+            if portal_email:
+                try:
+                    shield_guarantee_at_risk_email(
+                        to_email=portal_email,
+                        first_name=fn,
+                        domain=domain,
+                        critical_finding=crit_text,
+                        portal_url=portal,
+                    )
+                except Exception:
+                    logger.exception("20h guarantee-at-risk email failed client=%s", client_id)
             if phone:
                 try:
                     send_sms(

@@ -1634,6 +1634,26 @@ create index if not exists idx_guarantee_ver_email_created
 
 alter table public.guarantee_verification_codes enable row level security;
 
+-- >>> migrations/20260424000001_portal_guarantee_acceptance.sql <<<
+
+alter table public.client_portal_profiles
+  add column if not exists guarantee_terms_accepted_at timestamptz;
+
+comment on column public.client_portal_profiles.guarantee_terms_accepted_at is
+  'When the portal user acknowledged the guarantee summary; required before main portal UI.';
+
+drop policy if exists "client_portal_profiles_update_own_acceptance" on public.client_portal_profiles;
+create policy "client_portal_profiles_update_own_acceptance"
+  on public.client_portal_profiles for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- >>> migrations/20260425000001_profiles_role_type_va_rls.sql (see file for full SQL) <<<
+
+-- Applied via supabase/migrations/20260425000001_profiles_role_type_va_rls.sql — run that file or `supabase db push`.
+-- Adds profiles.role_type, crm_can_access_prospect(), RLS for VA / VA manager, and crm_handle_new_user role_type.
+
 -- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<
 
 select tablename, policyname, cmd, qual, with_check

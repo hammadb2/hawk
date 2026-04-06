@@ -10,7 +10,11 @@ from typing import Any
 import httpx
 
 from config import CAL_COM_BOOKING_URL, CRM_PUBLIC_BASE_URL
-from services.crm_portal_email import shield_day1_findings_email, shield_day7_week_summary_email
+from services.crm_portal_email import (
+    shield_day1_findings_email,
+    shield_day3_update_email,
+    shield_day7_week_summary_email,
+)
 from services.crm_openphone import send_sms
 
 logger = logging.getLogger(__name__)
@@ -264,6 +268,7 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
         email, prospect, phone = _portal_and_prospect(cid, prospect_id_s)
         first = _first_name(prospect)
         company = (c.get("company_name") or c.get("domain") or "Your business")[:200]
+        domain_s = ((c.get("domain") or (prospect or {}).get("domain") or "") or "").strip()
 
         findings, scan_score = _latest_prospect_scan(prospect_id_s)
         cert_end = _parse_ts(c.get("certification_eligible_at"))
@@ -283,9 +288,9 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                     tops = _top_findings_plain(findings, 3)
                     shield_day1_findings_email(
                         to_email=email,
-                        company_name=str(company),
-                        portal_url=portal_login,
-                        booking_url=CAL_COM_BOOKING_URL,
+                        first_name=first,
+                        domain=domain_s or "your domain",
+                        cal_url=CAL_COM_BOOKING_URL,
                         top_findings=tops,
                     )
                     if not c.get("onboarding_call_booked_at") and phone:
@@ -346,6 +351,21 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
 
                 if phone:
                     send_sms(phone, body)
+                if email:
+                    try:
+                        shield_day3_update_email(
+                            to_email=email,
+                            first_name=first,
+                            company_name=str(company),
+                            findings_resolved=improved,
+                            findings_fixed=resolved_n,
+                            score_start=int(score_was) if score_was is not None else 0,
+                            score_current=int(score_now) if score_now is not None else 0,
+                            days_until_certified=days_left,
+                            portal_url=portal_url,
+                        )
+                    except Exception:
+                        logger.exception("day3 email failed client=%s", cid)
                 httpx.patch(
                     f"{SUPABASE_URL}/rest/v1/clients",
                     headers=_headers(),
@@ -387,11 +407,10 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                     shield_day7_week_summary_email(
                         to_email=email,
                         company_name=str(company),
-                        portal_url=portal_login,
+                        domain=domain_s or str(c.get("domain") or company),
+                        portal_url=portal_url,
                         score_now=score_now_i,
-                        score_was=score_was_i,
                         findings_fixed=fixed,
-                        findings_remaining=remaining,
                         days_until_certified=days_left,
                         progress_pct=progress_pct,
                     )

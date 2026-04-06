@@ -24,10 +24,10 @@ def send_email(to: str, subject: str, body: str) -> bool:
 
 def welcome_email(to: str, first_name: str | None = None) -> bool:
     name = (first_name or "there").strip() or "there"
-    subject = "Welcome to HAWK — Your 7-day trial has started"
+    subject = "Welcome to HAWK"
     body = f"""Hi {name},
 
-Welcome to HAWK. Your 7-day free trial is active.
+Welcome to HAWK.
 
 Next steps:
 • Add your domain in the dashboard
@@ -112,15 +112,6 @@ Dashboard: {BASE_URL}/dashboard/reports
     return send_email(to, subject, body)
 
 
-def trial_expiry_tomorrow_email(to: str, first_name: str | None = None) -> bool:
-    name = (first_name or "there").strip() or "there"
-    subject = "HAWK: Your trial ends tomorrow"
-    body = f"""Hi {name},
-
-Your HAWK 7-day trial ends tomorrow. Upgrade to keep your scan history, unlimited Ask HAWK, and compliance reports.
-
-Manage billing: {BASE_URL}/dashboard/settings
-
-— The HAWK team
-"""
-    return send_email(to, subject, body)
+def trial_expiry_tomorrow_email(_to: str, _first_name: str | None = None) -> bool:
+    """Product trials are not offered; cron endpoint is a no-op."""
+    return False

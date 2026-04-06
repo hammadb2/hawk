@@ -201,8 +201,8 @@ export function GuaranteeTermsClient() {
 
         <p className="mt-10 text-sm text-text-dim">
           Questions:{" "}
-          <a href="mailto:hello@akbstudios.com" className="hover:underline" style={{ color: HAWK }}>
-            hello@akbstudios.com
+          <a href="mailto:hello@securedbyhawk.com" className="hover:underline" style={{ color: HAWK }}>
+            hello@securedbyhawk.com
           </a>
         </p>
       </div>

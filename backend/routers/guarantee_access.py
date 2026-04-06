@@ -55,7 +55,7 @@ def _generate_code() -> str:
 def _load_markdown() -> str:
     if not DOC_PATH.is_file():
         logger.error("guarantee document missing: %s", DOC_PATH)
-        return "# Document unavailable\n\nPlease contact hello@akbstudios.com."
+        return "# Document unavailable\n\nPlease contact hello@securedbyhawk.com."
     return DOC_PATH.read_text(encoding="utf-8")
 
 
