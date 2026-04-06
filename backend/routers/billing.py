@@ -109,8 +109,9 @@ def _checkout_public_session_url(
             "success_url": success_url,
             "cancel_url": cancel_url,
             "metadata": meta,
-            # 0 overrides any trial configured on the Stripe Price (no free period at checkout).
-            "subscription_data": {"metadata": sub_meta, "trial_period_days": 0},
+            # Omit trial_period_days — Stripe rejects 0 ("minimum is 1"). No key = use Price as configured
+            # (set Shield/Starter prices to 0-day trial in Dashboard if you need no trial).
+            "subscription_data": {"metadata": sub_meta},
             "allow_promotion_codes": False,
         }
     )
@@ -210,10 +211,7 @@ def checkout(
         success_url=f"{BASE_URL}/dashboard/settings?billing=success",
         cancel_url=f"{BASE_URL}/dashboard/settings?billing=cancel",
         metadata={"user_id": str(user.id), "plan": req.plan},
-        subscription_data={
-            "metadata": {"user_id": str(user.id), "plan": req.plan},
-            "trial_period_days": 0,
-        },
+        subscription_data={"metadata": {"user_id": str(user.id), "plan": req.plan}},
         allow_promotion_codes=False,
     )
     return {"url": session.url}
