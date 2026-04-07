@@ -54,28 +54,44 @@ def ensure_client_profile(uid: str, email: str, company: str) -> None:
     )
     r.raise_for_status()
     rows = r.json()
-    body: dict[str, Any] = {
+    base: dict[str, Any] = {
         "role": "client",
-        "role_type": "client",
         "status": "active",
         "email": email,
         "full_name": company[:120],
     }
+    with_rt: dict[str, Any] = {**base, "role_type": "client"}
+
     if not rows:
         ins = httpx.post(
             f"{SUPABASE_URL}/rest/v1/profiles",
             headers=_headers(),
-            json={"id": uid, **body},
+            json={"id": uid, **with_rt},
             timeout=20.0,
         )
         if ins.status_code >= 400:
-            logger.error("profiles insert failed: %s", ins.text[:400])
-            ins.raise_for_status()
+            ins2 = httpx.post(
+                f"{SUPABASE_URL}/rest/v1/profiles",
+                headers=_headers(),
+                json={"id": uid, **base},
+                timeout=20.0,
+            )
+            if ins2.status_code >= 400:
+                logger.error("profiles insert failed: %s", ins2.text[:400])
+                ins2.raise_for_status()
     else:
-        httpx.patch(
+        pr = httpx.patch(
             f"{SUPABASE_URL}/rest/v1/profiles",
             headers=_headers(),
             params={"id": f"eq.{uid}"},
-            json=body,
+            json=with_rt,
             timeout=20.0,
-        ).raise_for_status()
+        )
+        if pr.status_code >= 400:
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/profiles",
+                headers=_headers(),
+                params={"id": f"eq.{uid}"},
+                json=base,
+                timeout=20.0,
+            ).raise_for_status()

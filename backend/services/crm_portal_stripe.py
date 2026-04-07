@@ -448,23 +448,46 @@ def _seed_onboarding_sequence(headers: dict[str, str], client_id: str, now: date
             logger.warning("sequence seed step %s failed: %s", step, r.text[:200])
 
 
-def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
+def _patch_clients_row(headers: dict[str, str], cid: str, patch: dict[str, Any]) -> None:
+    """PATCH clients; retry without billing_status if column missing on older DBs."""
+    r = httpx.patch(
+        f"{SUPABASE_URL}/rest/v1/clients",
+        headers=headers,
+        params={"id": f"eq.{cid}"},
+        json=patch,
+        timeout=20.0,
+    )
+    if r.status_code >= 400 and "billing_status" in patch:
+        p2 = {k: v for k, v in patch.items() if k != "billing_status"}
+        r2 = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/clients",
+            headers=headers,
+            params={"id": f"eq.{cid}"},
+            json=p2,
+            timeout=20.0,
+        )
+        r2.raise_for_status()
+        return
+    r.raise_for_status()
+
+
+def provision_portal_from_checkout(event: dict[str, Any]) -> tuple[bool, str]:
     """
     On checkout.session.completed, link Stripe payment to a CRM client and invite portal user.
     Shield clients: Day 0 deep scan, WhatsApp (client + CEO), Resend welcome, onboarded_at + certification_eligible_at.
-    Returns True if provisioning ran (even if partially skipped).
+    Returns (True, "") on success, (False, reason) on failure (reason is safe to show in API detail).
     """
     if event.get("type") != "checkout.session.completed":
         logger.warning("portal provision: wrong event type %s", event.get("type"))
-        return False
+        return False, "wrong event type"
     if not SUPABASE_URL or not SERVICE_KEY:
         logger.error("portal provision: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
-        return False
+        return False, "server missing Supabase configuration"
 
     session_obj = (event.get("data") or {}).get("object") or {}
     if not isinstance(session_obj, dict):
         logger.warning("portal provision: session object missing or not a dict")
-        return False
+        return False, "invalid session payload"
 
     headers = _sb_headers()
     client_row = _find_client_row(headers, session_obj)
@@ -472,7 +495,7 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
         client_row = _create_client_from_public_checkout(headers, session_obj)
     if not client_row:
         logger.error("portal provision: no CRM client row and create_client_from_public_checkout failed")
-        return False
+        return False, "no CRM client for this checkout — run portal bootstrap or check Stripe metadata crm_client_id"
 
     meta = session_obj.get("metadata") or {}
     hp = str(meta.get("hawk_product", "")).lower()
@@ -485,19 +508,23 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
 
     if client_row.get("onboarded_at"):
         logger.info("portal provision: client %s already onboarded — idempotent skip", client_row.get("id"))
-        return True
+        return True, ""
 
-    # Non-Shield: duplicate checkout webhooks skip after first successful portal link
-    if client_row.get("portal_user_id") and not shield:
-        logger.info("portal provision: client %s already has portal (non-Shield) — skip", client_row.get("id"))
-        return True
+    # Starter: do not skip just because portal_user_id exists (account-first bootstrap sets it before payment).
+    # Only skip duplicate webhooks once billing is already active.
+    if not shield:
+        mrr = int(client_row.get("mrr_cents") or 0)
+        bs = (client_row.get("billing_status") or "").lower()
+        if mrr >= 19900 and bs == "active":
+            logger.info("portal provision: client %s Starter already active — skip", client_row.get("id"))
+            return True, ""
 
     email = (session_obj.get("customer_email") or "").strip().lower()
     if not email and session_obj.get("customer_details"):
         email = (session_obj["customer_details"].get("email") or "").strip().lower()
     if not email:
         logger.warning("portal provision: no customer email on session")
-        return False
+        return False, "no customer email on checkout"
 
     cid = str(client_row["id"])
     prospect_id = client_row.get("prospect_id")
@@ -547,7 +574,7 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
             "portal provision: could not create or resolve auth user for %s (invite + admin create + lookup)",
             email,
         )
-        return False
+        return False, f"could not resolve Supabase auth user for {email}"
 
     # Account-first: clients.portal_user_id was set at bootstrap — same person paying; do not treat as CRM staff collision.
     prelinked = str(client_row.get("portal_user_id") or "").strip() == str(uid).strip()
@@ -563,13 +590,13 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
                 "portal provision: email %s maps to CRM staff profile — refusing client portal role",
                 email,
             )
-            return False
+            return False, "this email is linked to a CRM staff profile; use a different account for the client portal"
 
     try:
         ensure_client_profile(uid, email, str(company))
-    except Exception:
+    except Exception as e:
         logger.exception("portal provision: ensure_client_profile failed for %s", email)
-        return False
+        return False, f"profiles update failed: {e!s}"[:300]
 
     now = datetime.now(timezone.utc)
     cert_at = now + timedelta(days=90)
@@ -592,14 +619,11 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
         if isinstance(hs0, int) and hs0 >= 0:
             patch["week_one_score_start"] = hs0
 
-    patch_req = httpx.patch(
-        f"{SUPABASE_URL}/rest/v1/clients",
-        headers=headers,
-        params={"id": f"eq.{cid}"},
-        json=patch,
-        timeout=20.0,
-    )
-    patch_req.raise_for_status()
+    try:
+        _patch_clients_row(headers, cid, patch)
+    except Exception as e:
+        logger.exception("portal provision: clients patch failed client_id=%s", cid)
+        return False, f"clients update failed: {e!s}"[:300]
 
     cpp_chk = httpx.get(
         f"{SUPABASE_URL}/rest/v1/client_portal_profiles",
@@ -685,4 +709,4 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
         timeout=20.0,
     )
 
-    return True
+    return True, ""

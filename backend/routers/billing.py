@@ -495,16 +495,17 @@ def _run_provision_and_magic_link(session_obj: dict, email: str, log_label: str)
     try:
         from services.crm_portal_stripe import provision_portal_from_checkout
 
-        ok = provision_portal_from_checkout(ev)
+        ok, prov_reason = provision_portal_from_checkout(ev)
     except Exception:
         logger.exception("checkout-complete provision failed (%s)", log_label)
         raise HTTPException(status_code=502, detail="Could not finish account setup") from None
 
     if not ok:
-        logger.error("checkout-complete: provision returned false (%s)", log_label)
+        logger.error("checkout-complete: provision failed (%s): %s", log_label, prov_reason)
         raise HTTPException(
             status_code=502,
-            detail="Could not finish account setup. Try again shortly or contact hello@securedbyhawk.com.",
+            detail=prov_reason
+            or "Could not finish account setup. Try again shortly or contact hello@securedbyhawk.com.",
         )
 
     next_path = _portal_next_path_from_session(session_obj)
@@ -813,7 +814,9 @@ async def webhook(
         try:
             from services.crm_portal_stripe import provision_portal_from_checkout
 
-            provision_portal_from_checkout(evd)
+            _ok, prov_err = provision_portal_from_checkout(evd)
+            if not _ok:
+                logger.warning("checkout.session.completed CRM provision incomplete: %s", prov_err)
         except Exception:
             logger.exception("checkout.session.completed CRM provision failed")
         try:
