@@ -54,7 +54,13 @@ def ensure_client_profile(uid: str, email: str, company: str) -> None:
     )
     r.raise_for_status()
     rows = r.json()
-    body: dict[str, Any] = {"role": "client", "status": "active", "email": email, "full_name": company[:120]}
+    body: dict[str, Any] = {
+        "role": "client",
+        "role_type": "client",
+        "status": "active",
+        "email": email,
+        "full_name": company[:120],
+    }
     if not rows:
         ins = httpx.post(
             f"{SUPABASE_URL}/rest/v1/profiles",
