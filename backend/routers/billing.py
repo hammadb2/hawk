@@ -450,13 +450,27 @@ def _retrieve_subscription_dict(subscription_id: str) -> dict:
 def _session_like_from_subscription(sub: dict, cust: dict, email: str, name: str, price_id: str) -> dict:
     """Minimal checkout Session-shaped dict for provision_portal_from_checkout (embedded Elements)."""
     meta = dict(sub.get("metadata") or {})
+    for k, v in list(meta.items()):
+        if v is not None and not isinstance(v, str):
+            meta[k] = str(v)
+
+    hp = str(meta.get("hawk_product", "")).lower()
+    if hp not in ("starter", "shield"):
+        if price_id and (price_id == STRIPE_PRICE_SHIELD or (STRIPE_PRICE_SHIELD_TEST and price_id == STRIPE_PRICE_SHIELD_TEST)):
+            meta["hawk_product"] = "shield"
+        elif price_id and (price_id == STRIPE_PRICE_STARTER or (STRIPE_PRICE_STARTER_TEST and price_id == STRIPE_PRICE_STARTER_TEST)):
+            meta["hawk_product"] = "starter"
+
+    hp2 = str(meta.get("hawk_product", "")).lower()
     inv = sub.get("latest_invoice")
     amt = 0
     if isinstance(inv, dict):
-        amt = int(inv.get("amount_paid") or inv.get("amount_due") or 0)
+        try:
+            amt = int(inv.get("amount_paid") or inv.get("amount_due") or 0)
+        except (TypeError, ValueError):
+            amt = 0
     if not amt:
-        hp = str(meta.get("hawk_product", "")).lower()
-        amt = 99700 if hp == "shield" else 19900
+        amt = 99700 if hp2 == "shield" else 19900
 
     return {
         "id": f"cs_embedded_{sub.get('id', 'unknown')}",

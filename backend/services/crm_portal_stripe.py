@@ -30,6 +30,8 @@ from config import (
     CRM_PUBLIC_BASE_URL,
     STRIPE_PRICE_SHIELD,
     STRIPE_PRICE_SHIELD_TEST,
+    STRIPE_PRICE_STARTER,
+    STRIPE_PRICE_STARTER_TEST,
     SUPABASE_URL,
 )
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
@@ -208,10 +210,38 @@ def _find_client_row(headers: dict[str, str], session_obj: dict[str, Any]) -> di
 
 def _create_client_from_public_checkout(headers: dict[str, str], session_obj: dict[str, Any]) -> dict[str, Any] | None:
     """Marketing site paid before sales created a CRM client — insert minimal clients row."""
-    meta = session_obj.get("metadata") or {}
+    meta = dict(session_obj.get("metadata") or {})
     hp = str(meta.get("hawk_product", "")).lower()
     if hp not in ("starter", "shield"):
+        lis = session_obj.get("line_items")
+        if isinstance(lis, dict):
+            for li in lis.get("data") or []:
+                if not isinstance(li, dict):
+                    continue
+                price = li.get("price") or {}
+                pid = price.get("id") if isinstance(price, dict) else None
+                if pid and (pid == STRIPE_PRICE_SHIELD or (STRIPE_PRICE_SHIELD_TEST and pid == STRIPE_PRICE_SHIELD_TEST)):
+                    hp = "shield"
+                    meta["hawk_product"] = "shield"
+                    break
+                if pid and (pid == STRIPE_PRICE_STARTER or (STRIPE_PRICE_STARTER_TEST and pid == STRIPE_PRICE_STARTER_TEST)):
+                    hp = "starter"
+                    meta["hawk_product"] = "starter"
+                    break
+    if hp not in ("starter", "shield"):
+        try:
+            amt = int(session_obj.get("amount_total") or 0)
+            if amt >= 99700:
+                hp = "shield"
+                meta["hawk_product"] = "shield"
+            elif amt >= 19900:
+                hp = "starter"
+                meta["hawk_product"] = "starter"
+        except (TypeError, ValueError):
+            pass
+    if hp not in ("starter", "shield"):
         return None
+    session_obj["metadata"] = meta
     email = (session_obj.get("customer_email") or "").strip().lower()
     if not email and session_obj.get("customer_details"):
         cd0 = session_obj.get("customer_details") or {}
