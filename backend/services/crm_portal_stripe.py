@@ -273,7 +273,7 @@ def _create_client_from_public_checkout(headers: dict[str, str], session_obj: di
     name = (cd.get("name") or "").strip() if isinstance(cd, dict) else ""
     company = (name or domain.split(".")[0].replace("-", " ").title())[:200]
     mrr = 19900 if hp == "starter" else 99700
-    plan = "hawk_starter" if hp == "starter" else "hawk_shield"
+    plan = "starter" if hp == "starter" else "shield"
     row = {
         "company_name": company,
         "domain": domain,

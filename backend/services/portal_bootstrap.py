@@ -108,7 +108,7 @@ def _bootstrap_insert_clients_row(uid: str, company: str, domain: str) -> tuple[
     base: dict[str, Any] = {
         "company_name": company,
         "domain": domain,
-        "plan": "hawk_shield",
+        "plan": "shield",
         "mrr_cents": 0,
         "status": "active",
         "portal_user_id": uid,

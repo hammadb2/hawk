@@ -1971,6 +1971,11 @@ set billing_status = 'active'
 where coalesce(mrr_cents, 0) > 0
   and billing_status = 'pending_payment';
 
+-- >>> migrations/20260406130000_clients_plan_check.sql >>>
+
+-- Portal / checkout use plan = shield | starter (and legacy hawk_* in some rows). Drop strict check if present.
+alter table public.clients drop constraint if exists clients_plan_check;
+
 -- >>> OPTIONAL: verify RLS policies (read-only) — from tests/crm_phase1_rls.sql <<<
 
 select tablename, policyname, cmd, qual, with_check
