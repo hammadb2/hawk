@@ -74,6 +74,8 @@ SMARTLEAD_API_KEY = os.environ.get("SMARTLEAD_API_KEY", "")
 # CRM (Supabase Auth JWT for FastAPI — same as Dashboard > Settings > API > JWT Secret)
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+# Server-side REST (portal bootstrap, JWT fallback via /auth/v1/user)
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 # CRM public URL for WhatsApp deep links (no trailing slash)
 CRM_PUBLIC_BASE_URL = (
