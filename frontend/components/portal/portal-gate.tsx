@@ -5,13 +5,18 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { portalApi } from "@/lib/api";
 
-function isPortalPublicPath(pathname: string | null): boolean {
+/** Login + OAuth callback only — no session/bootstrap logic here. */
+function isPortalAuthPublicPath(pathname: string | null): boolean {
   if (!pathname?.startsWith("/portal")) return false;
   if (pathname === "/portal/login") return true;
-  if (pathname.startsWith("/portal/auth/callback")) return true;
-  if (pathname.startsWith("/portal/return")) return true;
-  if (pathname.startsWith("/portal/billing")) return true;
+  if (pathname.startsWith("/portal/auth")) return true;
   return false;
+}
+
+/** Billing / Stripe return: run bootstrap when signed in, but do not enforce paid access here. */
+function isPortalBillingPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.startsWith("/portal/billing") || pathname.startsWith("/portal/return");
 }
 
 function buildNextForLogin(pathname: string, searchParams: URLSearchParams): string {
@@ -32,10 +37,10 @@ export function PortalGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [ready, setReady] = useState(() => isPortalPublicPath(pathname));
+  const [ready, setReady] = useState(() => isPortalAuthPublicPath(pathname));
 
   useEffect(() => {
-    if (isPortalPublicPath(pathname)) {
+    if (isPortalAuthPublicPath(pathname)) {
       setReady(true);
       return;
     }
@@ -57,6 +62,13 @@ export function PortalGate({ children }: { children: React.ReactNode }) {
         await portalApi.bootstrap(session.access_token);
       } catch (e) {
         console.error("portal bootstrap:", e);
+      }
+
+      if (cancelled) return;
+
+      if (isPortalBillingPath(pathname)) {
+        setReady(true);
+        return;
       }
 
       const { data: cpp } = await supabase

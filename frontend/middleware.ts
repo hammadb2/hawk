@@ -56,18 +56,17 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (user && pathname.startsWith("/portal/login")) {
-      // If this auth user has no portal profile, keep them on login (e.g. ?error=not_linked).
-      // Otherwise: /portal → login → /portal → login … (ERR_TOO_MANY_REDIRECTS).
+      // Account-first: rows are created by PortalGate + /api/portal/bootstrap — never block on client_portal_profiles in middleware.
       const { data: cppAtLogin } = await supabase
         .from("client_portal_profiles")
         .select("id")
         .eq("user_id", user.id)
         .maybeSingle();
-      if (!cppAtLogin) {
-        return supabaseResponse;
-      }
-      const next = request.nextUrl.searchParams.get("next") || "/portal";
-      const safe = next.startsWith("/") && !next.startsWith("//") && !next.includes("://") ? next : "/portal";
+      const nextParam = request.nextUrl.searchParams.get("next");
+      const fallback = cppAtLogin ? "/portal" : "/portal/billing";
+      const raw = nextParam || fallback;
+      const safe =
+        raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("://") ? raw : fallback;
       return NextResponse.redirect(new URL(safe, request.url));
     }
 
@@ -77,12 +76,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(login);
     }
 
-    if (!isPublic && user) {
-      const { data: cpp } = await supabase.from("client_portal_profiles").select("id").eq("user_id", user.id).maybeSingle();
-      if (!cpp) {
-        return NextResponse.redirect(new URL("/portal/login?error=not_linked", request.url));
-      }
-    }
+    // Authenticated portal routes: do not enforce client_portal_profiles in middleware (bootstrap runs in PortalGate).
 
     return supabaseResponse;
   }
