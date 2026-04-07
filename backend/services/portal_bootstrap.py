@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 import httpx
@@ -15,6 +16,48 @@ from services.crm_profile_sync import ensure_client_profile
 logger = logging.getLogger(__name__)
 
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+
+# Shared public mail hosts: many users map to the same apex (e.g. gmail.com). Use localpart.host
+# as clients.domain so each mailbox gets its own CRM row (unique key) and we never steal another user's client.
+_PUBLIC_MAIL_DOMAINS = frozenset(
+    {
+        "gmail.com",
+        "googlemail.com",
+        "yahoo.com",
+        "yahoo.co.uk",
+        "hotmail.com",
+        "outlook.com",
+        "live.com",
+        "msn.com",
+        "icloud.com",
+        "me.com",
+        "aol.com",
+        "protonmail.com",
+        "proton.me",
+        "gmx.com",
+        "zoho.com",
+        "yandex.com",
+        "fastmail.com",
+        "mail.com",
+    }
+)
+
+
+def _local_part_for_client_domain(local: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", local.strip().lower()).strip("-")
+    return (s[:80] if s else "user") or "user"
+
+
+def portal_clients_domain_for_email(email: str) -> str:
+    """Stable unique clients.domain for portal bootstrap (apex for corporate; local.host for public mail)."""
+    em = email.strip().lower()
+    local, _, host = em.partition("@")
+    host = host.strip().lower()
+    if not host:
+        return "invalid.local"
+    if host in _PUBLIC_MAIL_DOMAINS:
+        return f"{_local_part_for_client_domain(local)}.{host}"
+    return host
 
 
 def _headers() -> dict[str, str]:
@@ -56,7 +99,7 @@ def bootstrap_portal_account(uid: str, email: str) -> dict[str, Any]:
     if "@" not in em:
         raise HTTPException(status_code=400, detail="Invalid email")
 
-    domain = em.split("@", 1)[1].strip().lower()
+    domain = portal_clients_domain_for_email(em)
     company = em.split("@", 1)[0].replace(".", " ").replace("_", " ").title()[:200]
 
     # Already linked?
@@ -81,21 +124,33 @@ def bootstrap_portal_account(uid: str, email: str) -> dict[str, Any]:
     cl_rows = r_cl.json()
 
     if not cl_rows:
+        base_payload: dict[str, Any] = {
+            "company_name": company,
+            "domain": domain,
+            "plan": "hawk_shield",
+            "mrr_cents": 0,
+            "status": "active",
+            "portal_user_id": uid,
+            "billing_status": "pending_payment",
+        }
         ins = httpx.post(
             f"{SUPABASE_URL}/rest/v1/clients",
             headers=_headers(),
             params={"select": "*"},
-            json={
-                "company_name": company,
-                "domain": domain,
-                "plan": "hawk_shield",
-                "mrr_cents": 0,
-                "status": "active",
-                "portal_user_id": uid,
-                "billing_status": "pending_payment",
-            },
+            json=base_payload,
             timeout=20.0,
         )
+        if ins.status_code >= 400:
+            err_txt = (ins.text or "").lower()
+            if "billing_status" in err_txt or "does not exist" in err_txt or "schema cache" in err_txt:
+                p2 = {k: v for k, v in base_payload.items() if k != "billing_status"}
+                ins = httpx.post(
+                    f"{SUPABASE_URL}/rest/v1/clients",
+                    headers=_headers(),
+                    params={"select": "*"},
+                    json=p2,
+                    timeout=20.0,
+                )
         if ins.status_code >= 400:
             logger.error("bootstrap clients insert: %s %s", ins.status_code, ins.text[:500])
             raise HTTPException(status_code=502, detail="Could not create client record") from None

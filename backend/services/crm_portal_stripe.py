@@ -37,6 +37,7 @@ from config import (
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
 from services.crm_openphone import send_sms
 from services.crm_profile_sync import ensure_client_profile, profile_role, staff_roles
+from services.portal_bootstrap import portal_clients_domain_for_email
 from services.scanner import enqueue_async_scan
 
 logger = logging.getLogger(__name__)
@@ -542,7 +543,13 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> tuple[bool, str]:
     cust = str(cust).strip() if cust else None
 
     # First scan (async): Shield = full depth; Starter = fast queue
-    if domain:
+    # Skip when clients.domain is the synthetic public-mail key (localpart.gmail.com) from portal bootstrap.
+    _skip_scan = bool(
+        email
+        and domain
+        and domain.strip().lower() == portal_clients_domain_for_email(email).strip().lower()
+    )
+    if domain and not _skip_scan:
         try:
             if shield:
                 enqueue_async_scan(
