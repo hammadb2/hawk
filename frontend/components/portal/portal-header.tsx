@@ -90,6 +90,9 @@ export function PortalHeader() {
           <Link href="/portal/compliance" className="hover:text-[#00C48C]">
             C-27 primer
           </Link>
+          <Link href="/portal/settings" className="hover:text-[#00C48C]">
+            Settings
+          </Link>
           <PortalSignOut />
         </nav>
       </div>

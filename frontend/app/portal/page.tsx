@@ -495,6 +495,11 @@ function PortalHomeContent() {
               You signed up with a generic email provider, so we don&apos;t know which website to monitor yet. Enter the
               main domain you want HAWK to protect (your public site or app), without <code className="text-zinc-300">https://</code>{" "}
               or <code className="text-zinc-300">www</code> — for example <span className="text-zinc-200">acme.com</span>.
+              You can change this later in{" "}
+              <Link href="/portal/settings" className="font-medium text-[#00C48C] hover:underline">
+                Settings
+              </Link>
+              .
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
