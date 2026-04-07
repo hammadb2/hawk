@@ -1,7 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+function PortalSignOut() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function handleSignOut() {
+    setBusy(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut({ scope: "local" });
+      router.push("/portal/login");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleSignOut()}
+      disabled={busy}
+      className="text-zinc-400 hover:text-[#00C48C] disabled:opacity-50"
+    >
+      {busy ? "Signing out…" : "Sign out"}
+    </button>
+  );
+}
 
 /** Full app nav only when authenticated area; login stays minimal (no feature links). */
 export function PortalHeader() {
@@ -60,9 +90,7 @@ export function PortalHeader() {
           <Link href="/portal/compliance" className="hover:text-[#00C48C]">
             C-27 primer
           </Link>
-          <Link href="/portal/login" className="text-zinc-500 hover:text-[#00C48C]">
-            Sign out / login
-          </Link>
+          <PortalSignOut />
         </nav>
       </div>
     </header>
