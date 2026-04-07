@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -69,6 +70,140 @@ def _headers() -> dict[str, str]:
     }
 
 
+def _extract_supabase_error_detail(response: httpx.Response) -> str | None:
+    """Short safe message from PostgREST / Postgres JSON error for support debugging."""
+    try:
+        j = response.json()
+        if isinstance(j, dict):
+            m = j.get("message") or j.get("hint") or j.get("details")
+            if isinstance(m, str) and m.strip():
+                s = m.strip()
+                if len(s) > 220:
+                    s = s[:217] + "..."
+                return s
+    except Exception:
+        pass
+    t = (response.text or "").strip()
+    if t and len(t) < 280:
+        return t[:260]
+    return None
+
+
+def _dedupe_payload_variants(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for p in payloads:
+        key = json.dumps(p, sort_keys=True, default=str)
+        if key not in seen:
+            seen.add(key)
+            out.append(p)
+    return out
+
+
+def _bootstrap_insert_clients_row(uid: str, company: str, domain: str) -> tuple[dict[str, Any], str]:
+    """
+    Insert a new clients row with fallbacks for older schemas and duplicate domain.
+    Returns (row dict, effective domain string for client_portal_profiles.domain).
+    """
+    base: dict[str, Any] = {
+        "company_name": company,
+        "domain": domain,
+        "plan": "hawk_shield",
+        "mrr_cents": 0,
+        "status": "active",
+        "portal_user_id": uid,
+        "billing_status": "pending_payment",
+    }
+    variants = _dedupe_payload_variants(
+        [
+            base,
+            {k: v for k, v in base.items() if k != "billing_status"},
+            {k: v for k, v in base.items() if k not in ("billing_status", "portal_user_id")},
+        ]
+    )
+
+    def _post(payload: dict[str, Any]) -> httpx.Response:
+        return httpx.post(
+            f"{SUPABASE_URL}/rest/v1/clients",
+            headers=_headers(),
+            params={"select": "*"},
+            json=payload,
+            timeout=20.0,
+        )
+
+    def _try_variants(payloads: list[dict[str, Any]]) -> tuple[httpx.Response | None, dict[str, Any] | None]:
+        last: httpx.Response | None = None
+        for payload in payloads:
+            ins = _post(payload)
+            last = ins
+            if ins.status_code < 400:
+                return ins, payload
+            if ins.status_code in (401, 403):
+                logger.error("bootstrap clients insert forbidden: %s %s", ins.status_code, ins.text[:500])
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Supabase rejected the client insert (permission denied). "
+                        "Set SUPABASE_SERVICE_ROLE_KEY to the service_role secret from "
+                        "Supabase → Project Settings → API (not the anon key)."
+                    ),
+                ) from None
+        return last, None
+
+    ins, winning = _try_variants(variants)
+    assert ins is not None
+
+    if ins.status_code >= 400:
+        err_low = (ins.text or "").lower()
+        if "23505" in err_low or "duplicate" in err_low or "unique" in err_low:
+            alt_domain = f"{domain}-{uid[:8]}"
+            base2 = dict(base)
+            base2["domain"] = alt_domain
+            variants2 = _dedupe_payload_variants(
+                [
+                    base2,
+                    {k: v for k, v in base2.items() if k != "billing_status"},
+                    {k: v for k, v in base2.items() if k not in ("billing_status", "portal_user_id")},
+                ]
+            )
+            ins2, win2 = _try_variants(variants2)
+            if ins2 is not None:
+                ins = ins2
+            if ins2 is not None and ins2.status_code < 400 and win2 is not None:
+                winning = win2
+                domain = alt_domain
+
+    if ins.status_code >= 400 or winning is None:
+        hint = _extract_supabase_error_detail(ins)
+        logger.error("bootstrap clients insert: %s %s", ins.status_code, ins.text[:800])
+        msg = "Could not create client record"
+        if hint:
+            msg = f"{msg}: {hint}"
+        raise HTTPException(status_code=502, detail=msg) from None
+
+    out = ins.json()
+    row = out[0] if isinstance(out, list) and out else out
+    if not isinstance(row, dict) or not row.get("id"):
+        raise HTTPException(status_code=502, detail="Unexpected clients insert response")
+
+    if "portal_user_id" not in winning:
+        patch = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/clients",
+            headers=_headers(),
+            params={"id": f"eq.{row['id']}"},
+            json={"portal_user_id": uid},
+            timeout=20.0,
+        )
+        if patch.status_code >= 400:
+            logger.error("bootstrap portal_user_id patch after insert: %s %s", patch.status_code, patch.text[:500])
+            raise HTTPException(
+                status_code=502,
+                detail="Could not link portal user to new client — check portal_user_id FK to auth.users.",
+            ) from None
+
+    return row, domain
+
+
 def get_client_id_for_portal_user(uid: str) -> str | None:
     """client_portal_profiles.client_id for this auth user — used to tag Stripe subscription metadata."""
     if not SUPABASE_URL or not SERVICE_KEY:
@@ -124,40 +259,7 @@ def bootstrap_portal_account(uid: str, email: str) -> dict[str, Any]:
     cl_rows = r_cl.json()
 
     if not cl_rows:
-        base_payload: dict[str, Any] = {
-            "company_name": company,
-            "domain": domain,
-            "plan": "hawk_shield",
-            "mrr_cents": 0,
-            "status": "active",
-            "portal_user_id": uid,
-            "billing_status": "pending_payment",
-        }
-        ins = httpx.post(
-            f"{SUPABASE_URL}/rest/v1/clients",
-            headers=_headers(),
-            params={"select": "*"},
-            json=base_payload,
-            timeout=20.0,
-        )
-        if ins.status_code >= 400:
-            err_txt = (ins.text or "").lower()
-            if "billing_status" in err_txt or "does not exist" in err_txt or "schema cache" in err_txt:
-                p2 = {k: v for k, v in base_payload.items() if k != "billing_status"}
-                ins = httpx.post(
-                    f"{SUPABASE_URL}/rest/v1/clients",
-                    headers=_headers(),
-                    params={"select": "*"},
-                    json=p2,
-                    timeout=20.0,
-                )
-        if ins.status_code >= 400:
-            logger.error("bootstrap clients insert: %s %s", ins.status_code, ins.text[:500])
-            raise HTTPException(status_code=502, detail="Could not create client record") from None
-        out = ins.json()
-        row = out[0] if isinstance(out, list) and out else out
-        if not isinstance(row, dict) or not row.get("id"):
-            raise HTTPException(status_code=502, detail="Unexpected clients insert response")
+        row, domain = _bootstrap_insert_clients_row(uid, company, domain)
         cid = str(row["id"])
         cpp = httpx.post(
             f"{SUPABASE_URL}/rest/v1/client_portal_profiles",
