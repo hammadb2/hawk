@@ -347,8 +347,27 @@ def _invite_portal_user(*, email: str, company_name: str, client_id: str) -> str
 
 
 def _lookup_user_id_by_email(email: str) -> str | None:
-    """Find auth user id by email via GoTrue admin list (paginated scan)."""
+    """Find auth user id by email via GoTrue admin API (email filter if supported, else paginated scan)."""
     want = email.lower().strip()
+    if not SUPABASE_URL or not SERVICE_KEY:
+        return None
+
+    r0 = httpx.get(
+        f"{SUPABASE_URL}/auth/v1/admin/users",
+        headers=_sb_headers(),
+        params={"email": want, "per_page": "1"},
+        timeout=30.0,
+    )
+    if r0.status_code == 200:
+        data = r0.json()
+        users = data.get("users") if isinstance(data, dict) else []
+        for u in users or []:
+            if (u.get("email") or "").lower() == want:
+                uid = u.get("id")
+                return str(uid) if uid else None
+    elif r0.status_code >= 400:
+        logger.warning("admin users email filter failed %s: %s", r0.status_code, r0.text[:300])
+
     page = 1
     for _ in range(20):
         r = httpx.get(
@@ -358,6 +377,7 @@ def _lookup_user_id_by_email(email: str) -> str | None:
             timeout=30.0,
         )
         if r.status_code >= 400:
+            logger.error("admin users list failed %s: %s", r.status_code, r.text[:300])
             return None
         data = r.json()
         users = data.get("users") if isinstance(data, dict) else []
@@ -368,6 +388,39 @@ def _lookup_user_id_by_email(email: str) -> str | None:
         if not users or len(users) < 100:
             break
         page += 1
+    return None
+
+
+def _create_auth_user_admin(email: str) -> str | None:
+    """
+    Create a confirmed Auth user without sending the Supabase invite email.
+    Checkout-complete sends the magic link separately; invite() is often blocked or misconfigured.
+    """
+    if not SUPABASE_URL or not SERVICE_KEY:
+        return None
+    em = email.lower().strip()
+    r = httpx.post(
+        f"{SUPABASE_URL}/auth/v1/admin/users",
+        headers=_sb_headers(),
+        json={"email": em, "email_confirm": True},
+        timeout=30.0,
+    )
+    if r.status_code == 200:
+        out = r.json()
+        if isinstance(out, dict):
+            uid = out.get("id")
+            if uid:
+                return str(uid)
+            user = out.get("user")
+            if isinstance(user, dict) and user.get("id"):
+                return str(user["id"])
+        return None
+
+    if r.status_code in (400, 409, 422):
+        logger.warning("admin create user %s: %s — user may already exist", r.status_code, r.text[:400])
+        return _lookup_user_id_by_email(em)
+
+    logger.error("admin create user unexpected %s: %s", r.status_code, r.text[:400])
     return None
 
 
@@ -402,12 +455,15 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     Returns True if provisioning ran (even if partially skipped).
     """
     if event.get("type") != "checkout.session.completed":
+        logger.warning("portal provision: wrong event type %s", event.get("type"))
         return False
     if not SUPABASE_URL or not SERVICE_KEY:
+        logger.error("portal provision: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
         return False
 
     session_obj = (event.get("data") or {}).get("object") or {}
     if not isinstance(session_obj, dict):
+        logger.warning("portal provision: session object missing or not a dict")
         return False
 
     headers = _sb_headers()
@@ -415,7 +471,7 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     if not client_row:
         client_row = _create_client_from_public_checkout(headers, session_obj)
     if not client_row:
-        logger.info("portal provision: no matching CRM client for checkout session")
+        logger.error("portal provision: no CRM client row and create_client_from_public_checkout failed")
         return False
 
     meta = session_obj.get("metadata") or {}
@@ -483,12 +539,21 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     if not uid:
         uid = _invite_portal_user(email=email, company_name=str(company), client_id=cid)
     if not uid:
+        uid = _create_auth_user_admin(email)
+    if not uid:
         uid = _lookup_user_id_by_email(email)
     if not uid:
-        logger.error("portal provision: could not create or resolve auth user for %s", email)
+        logger.error(
+            "portal provision: could not create or resolve auth user for %s (invite + admin create + lookup)",
+            email,
+        )
         return False
 
-    role = profile_role(uid)
+    role = None
+    try:
+        role = profile_role(uid)
+    except Exception:
+        logger.exception("portal provision: profile_role lookup failed uid=%s", uid)
     if role and role in staff_roles():
         logger.error(
             "portal provision: email %s maps to CRM staff profile — refusing client portal role",
