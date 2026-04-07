@@ -8,7 +8,7 @@ import { isStripeCheckoutTestMode } from "@/lib/stripe-checkout-mode";
 /** Backend API (Railway, etc.) — not the same as NEXT_PUBLIC_SITE_URL unless you proxy /api. */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/** Test mode (NEXT_PUBLIC_TEST_MODE): only Shield uses /checkout-public-test; Starter stays on live checkout-public. */
+/** Legacy hosted Stripe Checkout paths (optional). Marketing Get Started uses /checkout instead. */
 function publicCheckoutPath(product: "starter" | "shield"): string {
   if (isStripeCheckoutTestMode() && product === "shield") {
     return "/api/billing/checkout-public-test";
@@ -125,21 +125,39 @@ export const reportsApi = {
 // Billing
 export const billingApi = {
   /**
-   * Public marketing checkout — no auth. Calls FastAPI directly (same as /api/scan/public).
-   * When NEXT_PUBLIC_TEST_MODE=true, Shield uses /api/billing/checkout-public-test (Shield-only, test keys + price).
-   * Starter always uses /api/billing/checkout-public (live Stripe).
+   * Hosted Stripe Checkout (optional). Marketing uses embedded /checkout + create-payment-intent instead.
    */
   checkoutPublic: (body: { hawk_product: "starter" | "shield" }) => {
     const path = publicCheckoutPath(body.hawk_product);
     const payload = path === "/api/billing/checkout-public-test" ? "{}" : JSON.stringify(body);
     return request<{ url: string; mode?: string; product?: string }>(path, { method: "POST", body: payload });
   },
-  /** After Stripe success_url → /portal/return?session_id=… — server verifies session, provisions CRM, returns Supabase magic link. */
-  completeCheckoutSession: (sessionId: string) =>
-    request<{ redirect_url: string }>("/api/billing/checkout-complete", {
+  /**
+   * Hosted: pass session id string. Embedded: pass { subscription_id, email, name } after card confirmation.
+   */
+  completeCheckoutSession: (
+    bodyOrSessionId:
+      | string
+      | { session_id?: string; subscription_id?: string; email?: string; name?: string },
+  ) => {
+    const body =
+      typeof bodyOrSessionId === "string" ? { session_id: bodyOrSessionId } : bodyOrSessionId;
+    return request<{ redirect_url: string }>("/api/billing/checkout-complete", {
       method: "POST",
-      body: JSON.stringify({ session_id: sessionId }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
+  /** Embedded Elements — incomplete subscription + client_secret for confirmCardPayment. */
+  createPaymentIntent: (body: {
+    email: string;
+    name: string;
+    hawk_product: "starter" | "shield";
+    test_mode: boolean;
+  }) =>
+    request<{ client_secret: string; subscription_id: string; customer_id: string }>(
+      "/api/billing/create-payment-intent",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   checkout: (body: { plan: string }, token: string) =>
     request<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify(body), token }),
   portal: (token: string) =>

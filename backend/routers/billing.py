@@ -11,7 +11,12 @@ from sqlalchemy.orm import Session
 from auth import get_current_user
 from database import get_db
 from models import User
-from schemas import CheckoutRequest, CheckoutCompleteRequest, PublicCheckoutRequest
+from schemas import (
+    CheckoutRequest,
+    CheckoutCompleteRequest,
+    CreatePaymentIntentRequest,
+    PublicCheckoutRequest,
+)
 
 from config import (
     STRIPE_SECRET_KEY,
@@ -261,13 +266,93 @@ def _magic_link_redirect_url(email: str, next_path: str) -> str:
     return str(link)
 
 
-@router.post("/checkout-complete")
-def checkout_complete(body: CheckoutCompleteRequest):
-    """
-    After Stripe redirects to /portal/return?session_id=… — verify the session, run the same CRM provision
-    as the webhook, then return a Supabase magic link so the browser can establish a session (PKCE callback).
-    """
-    sid = body.session_id.strip()
+def _client_secret_from_subscription_dict(sub: dict) -> str | None:
+    inv = sub.get("latest_invoice")
+    if not isinstance(inv, dict):
+        return None
+    pi = inv.get("payment_intent")
+    if isinstance(pi, dict):
+        return pi.get("client_secret")
+    return None
+
+
+def _retrieve_subscription_dict(subscription_id: str) -> dict:
+    import stripe as stripe_mod
+
+    last_err: Exception | None = None
+    for api_key in (STRIPE_SECRET_KEY, STRIPE_SECRET_KEY_TEST):
+        if not (api_key or "").strip():
+            continue
+        try:
+            stripe_mod.api_key = api_key
+            sub = stripe_mod.Subscription.retrieve(
+                subscription_id,
+                expand=["latest_invoice.payment_intent", "items.data.price", "customer"],
+            )
+            return _stripe_obj_to_dict(sub)
+        except Exception as e:
+            last_err = e
+    logger.warning("Stripe retrieve subscription failed: %s", last_err)
+    raise HTTPException(status_code=404, detail="Subscription not found") from last_err
+
+
+def _session_like_from_subscription(sub: dict, cust: dict, email: str, name: str, price_id: str) -> dict:
+    """Minimal checkout Session-shaped dict for provision_portal_from_checkout (embedded Elements)."""
+    meta = dict(sub.get("metadata") or {})
+    inv = sub.get("latest_invoice")
+    amt = 0
+    if isinstance(inv, dict):
+        amt = int(inv.get("amount_paid") or inv.get("amount_due") or 0)
+    if not amt:
+        hp = str(meta.get("hawk_product", "")).lower()
+        amt = 99700 if hp == "shield" else 19900
+
+    return {
+        "id": f"cs_embedded_{sub.get('id', 'unknown')}",
+        "object": "checkout.session",
+        "mode": "subscription",
+        "status": "complete",
+        "payment_status": "paid",
+        "customer": cust.get("id"),
+        "customer_email": email,
+        "customer_details": {"email": email, "name": name},
+        "metadata": meta,
+        "amount_total": amt,
+        "line_items": {"data": [{"price": {"id": price_id}}]},
+    }
+
+
+def _run_provision_and_magic_link(session_obj: dict, email: str, log_label: str) -> dict:
+    ev = {"type": "checkout.session.completed", "data": {"object": session_obj}}
+    try:
+        from services.crm_portal_stripe import provision_portal_from_checkout
+
+        ok = provision_portal_from_checkout(ev)
+    except Exception:
+        logger.exception("checkout-complete provision failed (%s)", log_label)
+        raise HTTPException(status_code=502, detail="Could not finish account setup") from None
+
+    if not ok:
+        logger.error("checkout-complete: provision returned false (%s)", log_label)
+        raise HTTPException(
+            status_code=502,
+            detail="Could not finish account setup. Try again shortly or contact hello@securedbyhawk.com.",
+        )
+
+    next_path = _portal_next_path_from_session(session_obj)
+    try:
+        redirect_url = _magic_link_redirect_url(email, next_path)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("checkout-complete magic link failed (%s)", log_label)
+        raise HTTPException(status_code=502, detail="Could not create sign-in link") from None
+
+    return {"redirect_url": redirect_url}
+
+
+def _checkout_complete_session(session_id: str) -> dict:
+    sid = session_id.strip()
     if not sid.startswith("cs_"):
         raise HTTPException(status_code=400, detail="Invalid session id")
 
@@ -288,32 +373,150 @@ def checkout_complete(body: CheckoutCompleteRequest):
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="No customer email on checkout session")
 
-    ev = {"type": "checkout.session.completed", "data": {"object": session_obj}}
-    try:
-        from services.crm_portal_stripe import provision_portal_from_checkout
+    return _run_provision_and_magic_link(session_obj, email, sid)
 
-        ok = provision_portal_from_checkout(ev)
-    except Exception:
-        logger.exception("checkout-complete provision failed")
-        raise HTTPException(status_code=502, detail="Could not finish account setup") from None
 
-    if not ok:
-        logger.error("checkout-complete: provision returned false for session %s", sid)
-        raise HTTPException(
-            status_code=502,
-            detail="Could not finish account setup. Try again shortly or contact hello@securedbyhawk.com.",
+def _checkout_complete_subscription(body: CheckoutCompleteRequest) -> dict:
+    import time
+
+    sub_id = (body.subscription_id or "").strip()
+    if not sub_id.startswith("sub_"):
+        raise HTTPException(status_code=400, detail="Invalid subscription id")
+
+    sub = None
+    for _ in range(12):
+        sub = _retrieve_subscription_dict(sub_id)
+        status = (sub.get("status") or "").lower()
+        if status in ("active", "trialing"):
+            break
+        if status not in ("incomplete", "incomplete_expired", "past_due"):
+            break
+        time.sleep(0.5)
+
+    if sub is None:
+        raise HTTPException(status_code=502, detail="Could not load subscription")
+
+    status = (sub.get("status") or "").lower()
+    if status not in ("active", "trialing"):
+        raise HTTPException(status_code=400, detail="Subscription is not active yet — complete payment first")
+
+    cust = sub.get("customer")
+    if isinstance(cust, str):
+        raise HTTPException(status_code=502, detail="Expand customer on subscription retrieve failed")
+    if not isinstance(cust, dict):
+        raise HTTPException(status_code=502, detail="No customer on subscription")
+
+    email = (cust.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="No email on Stripe customer")
+
+    if body.email and body.email.strip().lower() != email:
+        raise HTTPException(status_code=400, detail="Email does not match this subscription")
+
+    name = (cust.get("name") or body.name or "").strip() or email.split("@", 1)[0]
+
+    items = sub.get("items") or {}
+    rows = items.get("data") or []
+    price_id = ""
+    if rows and isinstance(rows[0], dict):
+        pr = rows[0].get("price") or {}
+        if isinstance(pr, dict):
+            price_id = str(pr.get("id") or "")
+
+    if not price_id:
+        raise HTTPException(status_code=502, detail="Could not read subscription price")
+
+    session_like = _session_like_from_subscription(sub, cust, email, name, price_id)
+    return _run_provision_and_magic_link(session_like, email, sub_id)
+
+
+@router.post("/create-payment-intent")
+def create_payment_intent(req: CreatePaymentIntentRequest):
+    """
+    Embedded checkout: create Customer + incomplete Subscription; return PaymentIntent client_secret.
+    Client confirms card with Stripe.js — no hosted Checkout page.
+    """
+    import stripe as stripe_mod
+
+    test = bool(req.test_mode)
+    api_key = STRIPE_SECRET_KEY_TEST if test else STRIPE_SECRET_KEY
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Stripe not configured")
+
+    if req.hawk_product == "starter":
+        price_id = STRIPE_PRICE_STARTER_TEST if test else STRIPE_PRICE_STARTER
+    else:
+        price_id = STRIPE_PRICE_SHIELD_TEST if test else STRIPE_PRICE_SHIELD
+    if not price_id:
+        raise HTTPException(status_code=503, detail="Stripe price not configured for this product")
+
+    stripe_mod.api_key = api_key
+    email = req.email.strip().lower()
+    name = req.name.strip()
+
+    existing = stripe_mod.Customer.list(email=email, limit=1)
+    ex_data = getattr(existing, "data", None) or []
+    if ex_data:
+        customer_id = ex_data[0].id
+        stripe_mod.Customer.modify(customer_id, metadata={"hawk_product": req.hawk_product})
+    else:
+        cust = stripe_mod.Customer.create(
+            email=email,
+            name=name,
+            metadata={"hawk_product": req.hawk_product},
         )
+        customer_id = cust.id
 
-    next_path = _portal_next_path_from_session(session_obj)
+    meta: dict[str, str] = {"hawk_product": req.hawk_product}
+    if test:
+        meta["hawk_checkout_mode"] = "test"
+
     try:
-        redirect_url = _magic_link_redirect_url(email, next_path)
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("checkout-complete magic link failed")
-        raise HTTPException(status_code=502, detail="Could not create sign-in link") from None
+        subscription = stripe_mod.Subscription.create(
+            customer=customer_id,
+            items=[{"price": price_id}],
+            payment_behavior="default_incomplete",
+            payment_settings={"save_default_payment_method": "on_subscription"},
+            metadata=meta,
+            expand=["latest_invoice.payment_intent"],
+        )
+    except Exception as e:
+        logger.exception("create subscription for embedded checkout")
+        raise HTTPException(status_code=502, detail=str(e)[:200]) from e
 
-    return {"redirect_url": redirect_url}
+    sub_d = _stripe_obj_to_dict(subscription)
+    secret = _client_secret_from_subscription_dict(sub_d)
+    if not secret:
+        inv_ref = sub_d.get("latest_invoice")
+        if isinstance(inv_ref, str):
+            try:
+                inv = stripe_mod.Invoice.retrieve(inv_ref, expand=["payment_intent"])
+                inv_d = _stripe_obj_to_dict(inv)
+                pi = inv_d.get("payment_intent")
+                if isinstance(pi, dict):
+                    secret = pi.get("client_secret")
+            except Exception:
+                logger.exception("fallback invoice retrieve for client_secret")
+
+    if not secret:
+        raise HTTPException(status_code=502, detail="Could not get payment client secret for subscription")
+
+    return {
+        "subscription_id": sub_d.get("id"),
+        "client_secret": secret,
+        "customer_id": customer_id,
+    }
+
+
+@router.post("/checkout-complete")
+def checkout_complete(body: CheckoutCompleteRequest):
+    """
+    Hosted: session_id from /portal/return. Embedded: subscription_id after confirmCardPayment succeeds.
+    Provisions CRM + returns Supabase magic link for PKCE session.
+    """
+    if body.subscription_id:
+        return _checkout_complete_subscription(body)
+    return _checkout_complete_session(body.session_id or "")
 
 
 @router.post("/checkout")

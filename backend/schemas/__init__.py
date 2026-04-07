@@ -15,7 +15,13 @@ from schemas.scan import (
 from schemas.finding import FindingSchema, IgnoreFindingRequest
 from schemas.domain import DomainCreate, DomainUpdate, DomainResponse
 from schemas.report import ReportGenerateRequest, ReportResponse, ReportListItem
-from schemas.billing import CheckoutRequest, CheckoutCompleteRequest, PublicCheckoutRequest, InvoiceItem
+from schemas.billing import (
+    CheckoutRequest,
+    CheckoutCompleteRequest,
+    CreatePaymentIntentRequest,
+    PublicCheckoutRequest,
+    InvoiceItem,
+)
 from schemas.hawk import HawkChatRequest, HawkChatResponse
 from schemas.agency import AgencyClientCreate, AgencyClientResponse
 from schemas.notification import NotificationResponse
