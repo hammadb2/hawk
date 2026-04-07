@@ -19,7 +19,11 @@ from schemas import (
     PublicCheckoutRequest,
 )
 from routers.crm_auth import require_supabase_uid_and_email
-from services.portal_bootstrap import get_client_id_for_portal_user
+from services.portal_bootstrap import (
+    bootstrap_portal_account,
+    ensure_portal_crm_client_id_for_email,
+    get_client_id_for_portal_user,
+)
 
 from config import (
     STRIPE_SECRET_KEY,
@@ -596,6 +600,15 @@ def _checkout_complete_subscription(body: CheckoutCompleteRequest) -> dict:
         raise HTTPException(status_code=502, detail="Could not read subscription price")
 
     session_like = _session_like_from_subscription(sub, cust, email, name, price_id)
+    meta = dict(session_like.get("metadata") or {})
+    if not meta.get("crm_client_id"):
+        try:
+            cid = ensure_portal_crm_client_id_for_email(email)
+        except HTTPException:
+            raise
+        if cid:
+            meta["crm_client_id"] = cid
+            session_like["metadata"] = meta
     return _run_provision_and_magic_link(session_like, email, sub_id)
 
 
@@ -680,10 +693,29 @@ def create_payment_intent_portal(
     Same as create-payment-intent, but email is taken from the Supabase access token (signed-in portal user).
     Tags Stripe subscription with crm_client_id so checkout-complete provisions the bootstrapped client
     (domain-only lookup fails for shared hosts like gmail.com).
+
+    If the browser never finished client-side bootstrap, run bootstrap here so crm_client_id is always set.
     """
     uid, jwt_email = auth
     name = (req.name or "").strip() or jwt_email.split("@", 1)[0]
     crm_client_id = get_client_id_for_portal_user(uid)
+    if not crm_client_id:
+        try:
+            bootstrap_portal_account(uid, jwt_email)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("bootstrap before payment intent failed uid=%s", uid)
+            raise HTTPException(
+                status_code=502,
+                detail="Could not prepare your account for billing. Try again or contact support.",
+            ) from e
+        crm_client_id = get_client_id_for_portal_user(uid)
+    if not crm_client_id:
+        raise HTTPException(
+            status_code=503,
+            detail="CRM link missing after bootstrap — verify SUPABASE_SERVICE_ROLE_KEY and clients/client_portal_profiles tables.",
+        )
     inner = CreatePaymentIntentRequest(
         email=jwt_email,
         name=name,

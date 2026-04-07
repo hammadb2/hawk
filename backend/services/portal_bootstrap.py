@@ -187,3 +187,27 @@ def bootstrap_portal_account(uid: str, email: str) -> dict[str, Any]:
         logger.exception("bootstrap ensure_client_profile (existing client)")
         raise HTTPException(status_code=502, detail="Could not ensure user profile") from None
     return {"ok": True, "client_id": cid, "created": True}
+
+
+def ensure_portal_crm_client_id_for_email(email: str) -> str | None:
+    """
+    Resolve clients.id for embedded subscription checkout-complete when Stripe subscription metadata
+    is missing crm_client_id (e.g. subscription created before API tagged metadata). Uses auth user
+    email → portal profile / bootstrap; does not rely on clients.domain = email host (gmail.com).
+    """
+    em = email.strip().lower()
+    if "@" not in em:
+        return None
+    from services.crm_portal_stripe import _lookup_user_id_by_email  # noqa: PLC0415
+
+    uid = _lookup_user_id_by_email(em)
+    if not uid:
+        return None
+    cid = get_client_id_for_portal_user(uid)
+    if cid:
+        return cid
+    try:
+        bootstrap_portal_account(uid, em)
+    except HTTPException:
+        raise
+    return get_client_id_for_portal_user(uid)
