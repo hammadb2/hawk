@@ -266,14 +266,84 @@ def _magic_link_redirect_url(email: str, next_path: str) -> str:
     return str(link)
 
 
-def _client_secret_from_subscription_dict(sub: dict) -> str | None:
-    inv = sub.get("latest_invoice")
-    if not isinstance(inv, dict):
-        return None
-    pi = inv.get("payment_intent")
+def _payment_intent_client_secret(stripe_mod, pi) -> str | None:
+    """payment_intent on an Invoice may be a dict, a string id, or (rarely) missing until invoice is finalized."""
     if isinstance(pi, dict):
         return pi.get("client_secret")
+    if isinstance(pi, str) and pi.startswith("pi_"):
+        try:
+            got = _stripe_obj_to_dict(stripe_mod.PaymentIntent.retrieve(pi))
+            return got.get("client_secret")
+        except Exception:
+            logger.exception("retrieve PaymentIntent for client_secret")
+            return None
     return None
+
+
+def _embedded_checkout_client_secret(stripe_mod, subscription) -> str:
+    """
+    Resolve PaymentIntent client_secret for Subscription.create(payment_behavior=default_incomplete).
+    Re-fetches with expand (create() response sometimes omits nested expansions), finalizes draft
+    invoices when needed, and resolves string PaymentIntent ids.
+    """
+    sub_id = subscription.get("id") if isinstance(subscription, dict) else getattr(subscription, "id", None)
+    if not sub_id:
+        raise HTTPException(status_code=502, detail="Could not read subscription id")
+
+    sub = stripe_mod.Subscription.retrieve(
+        str(sub_id),
+        expand=["latest_invoice.payment_intent"],
+    )
+    sub_d = _stripe_obj_to_dict(sub)
+    inv = sub_d.get("latest_invoice")
+
+    if isinstance(inv, str):
+        inv = _stripe_obj_to_dict(stripe_mod.Invoice.retrieve(inv, expand=["payment_intent"]))
+    elif isinstance(inv, dict):
+        pass
+    else:
+        raise HTTPException(status_code=502, detail="No invoice on subscription")
+
+    inv_id = inv.get("id")
+    st = (inv.get("status") or "").lower()
+
+    def _from_inv(inv_dict: dict) -> str | None:
+        return _payment_intent_client_secret(stripe_mod, inv_dict.get("payment_intent"))
+
+    secret = _from_inv(inv)
+    if secret:
+        return secret
+
+    # Draft first invoice: PI may not exist until finalized
+    if inv_id and st == "draft":
+        try:
+            finalized = stripe_mod.Invoice.finalize_invoice(inv_id, expand=["payment_intent"])
+            inv = _stripe_obj_to_dict(finalized)
+            secret = _from_inv(inv)
+        except Exception:
+            logger.exception("finalize_invoice for embedded checkout")
+
+    if secret:
+        return secret
+
+    # Retry full invoice fetch (some API versions return PI only after a second read)
+    if inv_id:
+        try:
+            inv2 = _stripe_obj_to_dict(stripe_mod.Invoice.retrieve(inv_id, expand=["payment_intent"]))
+            secret = _from_inv(inv2)
+        except Exception:
+            logger.exception("invoice retrieve retry for client_secret")
+
+    if secret:
+        return secret
+
+    logger.warning(
+        "embedded checkout: still no client_secret sub=%s inv=%s status=%s",
+        sub_id,
+        inv_id,
+        st,
+    )
+    raise HTTPException(status_code=502, detail="Could not get payment client secret for subscription")
 
 
 def _retrieve_subscription_dict(subscription_id: str) -> dict:
@@ -485,21 +555,13 @@ def create_payment_intent(req: CreatePaymentIntentRequest):
         raise HTTPException(status_code=502, detail=str(e)[:200]) from e
 
     sub_d = _stripe_obj_to_dict(subscription)
-    secret = _client_secret_from_subscription_dict(sub_d)
-    if not secret:
-        inv_ref = sub_d.get("latest_invoice")
-        if isinstance(inv_ref, str):
-            try:
-                inv = stripe_mod.Invoice.retrieve(inv_ref, expand=["payment_intent"])
-                inv_d = _stripe_obj_to_dict(inv)
-                pi = inv_d.get("payment_intent")
-                if isinstance(pi, dict):
-                    secret = pi.get("client_secret")
-            except Exception:
-                logger.exception("fallback invoice retrieve for client_secret")
-
-    if not secret:
-        raise HTTPException(status_code=502, detail="Could not get payment client secret for subscription")
+    try:
+        secret = _embedded_checkout_client_secret(stripe_mod, subscription)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("embedded client secret resolution")
+        raise HTTPException(status_code=502, detail=str(e)[:200]) from e
 
     return {
         "subscription_id": sub_d.get("id"),
