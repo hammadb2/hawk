@@ -19,6 +19,7 @@ from schemas import (
     PublicCheckoutRequest,
 )
 from routers.crm_auth import require_supabase_uid_and_email
+from services.portal_bootstrap import get_client_id_for_portal_user
 
 from config import (
     STRIPE_SECRET_KEY,
@@ -637,6 +638,8 @@ def create_payment_intent(req: CreatePaymentIntentRequest):
     meta: dict[str, str] = {"hawk_product": req.hawk_product}
     if test:
         meta["hawk_checkout_mode"] = "test"
+    if req.crm_client_id:
+        meta["crm_client_id"] = str(req.crm_client_id).strip()
 
     try:
         subscription = stripe_mod.Subscription.create(
@@ -674,14 +677,18 @@ def create_payment_intent_portal(
 ):
     """
     Same as create-payment-intent, but email is taken from the Supabase access token (signed-in portal user).
+    Tags Stripe subscription with crm_client_id so checkout-complete provisions the bootstrapped client
+    (domain-only lookup fails for shared hosts like gmail.com).
     """
-    _uid, jwt_email = auth
+    uid, jwt_email = auth
     name = (req.name or "").strip() or jwt_email.split("@", 1)[0]
+    crm_client_id = get_client_id_for_portal_user(uid)
     inner = CreatePaymentIntentRequest(
         email=jwt_email,
         name=name,
         hawk_product=req.hawk_product,
         test_mode=req.test_mode,
+        crm_client_id=crm_client_id,
     )
     return create_payment_intent(inner)
 

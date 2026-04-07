@@ -40,6 +40,8 @@ class CreatePaymentIntentRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     hawk_product: Literal["starter", "shield"] = "shield"
     test_mode: bool = False
+    # Set by portal route so checkout-complete finds the right CRM row (domain is not unique for gmail.com, etc.)
+    crm_client_id: str | None = Field(None, description="public.clients id from bootstrap")
 
 
 class CreatePaymentIntentPortalRequest(BaseModel):

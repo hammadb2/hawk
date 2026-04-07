@@ -26,6 +26,24 @@ def _headers() -> dict[str, str]:
     }
 
 
+def get_client_id_for_portal_user(uid: str) -> str | None:
+    """client_portal_profiles.client_id for this auth user — used to tag Stripe subscription metadata."""
+    if not SUPABASE_URL or not SERVICE_KEY:
+        return None
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/client_portal_profiles",
+        headers=_headers(),
+        params={"user_id": f"eq.{uid}", "select": "client_id", "limit": "1"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    if not rows:
+        return None
+    cid = rows[0].get("client_id")
+    return str(cid) if cid else None
+
+
 def bootstrap_portal_account(uid: str, email: str) -> dict[str, Any]:
     """
     Idempotent: create or link clients + client_portal_profiles for magic-link users.
