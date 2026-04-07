@@ -47,3 +47,20 @@ export function getPortalMagicLinkCallbackUrl(nextPath = "/portal"): string {
   u.searchParams.set("next", path);
   return u.toString();
 }
+
+/**
+ * After Supabase magic link, `next` must stay under /portal. Treat `/` and bare marketing paths as /portal
+ * so misconfigured Site URL or empty next does not send users to the marketing home page.
+ */
+export function safePortalNextPath(raw: string | null, fallback = "/portal"): string {
+  if (!raw) return fallback;
+  try {
+    const p = decodeURIComponent(raw).trim();
+    if (!p.startsWith("/") || p.startsWith("//") || p.includes("://")) return fallback;
+    if (p === "/" || p === "/index" || p === "/home") return fallback;
+    if (!p.startsWith("/portal")) return fallback;
+    return p;
+  } catch {
+    return fallback;
+  }
+}

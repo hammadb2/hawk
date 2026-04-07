@@ -182,6 +182,12 @@ export const portalApi = {
       method: "POST",
       token,
     }),
+  setPrimaryDomain: (body: { domain: string }, token: string) =>
+    request<{ ok: string; domain: string }>("/api/portal/primary-domain", {
+      method: "POST",
+      body: JSON.stringify(body),
+      token,
+    }),
 };
 
 // Ask HAWK

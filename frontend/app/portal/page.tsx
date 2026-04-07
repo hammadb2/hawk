@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
+import { portalApi } from "@/lib/api";
+import { needsCompanyDomainForMonitoring } from "@/lib/portal-domain";
 import {
   findingsListFromScanPayload,
   summarizeSeverity,
@@ -12,6 +14,7 @@ import {
 } from "@/lib/portal/findings-parse";
 import { ReadinessSparkline } from "@/components/portal/readiness-sparkline";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +76,9 @@ function PortalWelcomeToast() {
           ? "Test checkout complete — Stripe test mode. No real charge. Webhook should have fired; check CRM and email."
           : "Welcome to HAWK — your subscription is active. Check your email for onboarding.",
       );
-      router.replace("/portal", { scroll: false });
+      const clean = new URLSearchParams();
+      if (test) clean.set("test_checkout", "1");
+      router.replace(`/portal${clean.toString() ? `?${clean}` : ""}`, { scroll: false });
     })();
   }, [searchParams, router, supabase]);
   return null;
@@ -95,6 +100,10 @@ function PortalHomeContent() {
   } | null>(null);
   const [readinessHistory, setReadinessHistory] = useState<{ score: number; at: string }[]>([]);
   const [acceptBusy, setAcceptBusy] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [domainInput, setDomainInput] = useState("");
+  const [domainBusy, setDomainBusy] = useState(false);
+  const [domainError, setDomainError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,6 +119,8 @@ function PortalHomeContent() {
       setLoading(false);
       return;
     }
+
+    setUserEmail((user.email || "").trim().toLowerCase());
 
     const { data: cpp, error: e1 } = await supabase
       .from("client_portal_profiles")
@@ -223,6 +234,28 @@ function PortalHomeContent() {
     }
   }
 
+  async function submitPrimaryDomain() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      toast.error("Sign in again to continue.");
+      return;
+    }
+    setDomainBusy(true);
+    setDomainError("");
+    try {
+      await portalApi.setPrimaryDomain({ domain: domainInput.trim() }, session.access_token);
+      toast.success("Domain saved — we’ll use it for monitoring and security scans.");
+      setDomainInput("");
+      await load();
+    } catch (e) {
+      setDomainError(e instanceof Error ? e.message : "Could not save domain.");
+    } finally {
+      setDomainBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
@@ -290,6 +323,9 @@ function PortalHomeContent() {
         : null;
 
   const showGuaranteeGate = !portal.guarantee_terms_accepted_at;
+  const showDomainGate =
+    Boolean(portal.guarantee_terms_accepted_at) &&
+    needsCompanyDomainForMonitoring(userEmail, portal.domain);
 
   async function downloadPipedaPdf() {
     setPipedaBusy(true);
@@ -446,6 +482,40 @@ function PortalHomeContent() {
               onClick={() => void acceptGuaranteeSummary()}
             >
               {acceptBusy ? "Saving…" : "I understand and accept"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDomainGate}>
+        <DialogContent hideClose className="max-w-lg border-[#00C48C]/25 bg-[#0a0910] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-zinc-50">Add your company domain</DialogTitle>
+            <DialogDescription className="text-left text-sm leading-relaxed text-zinc-400">
+              You signed up with a generic email provider, so we don&apos;t know which website to monitor yet. Enter the
+              main domain you want HAWK to protect (your public site or app), without <code className="text-zinc-300">https://</code>{" "}
+              or <code className="text-zinc-300">www</code> — for example <span className="text-zinc-200">acme.com</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              type="text"
+              autoComplete="off"
+              placeholder="company.com"
+              value={domainInput}
+              onChange={(e) => setDomainInput(e.target.value)}
+              className="border-zinc-700 bg-[#0F0E17] text-zinc-100 placeholder:text-zinc-600"
+            />
+            {domainError ? <p className="text-sm text-red-400">{domainError}</p> : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              className="w-full bg-[#00C48C] text-[#07060C] hover:bg-[#00e6a8] sm:w-auto"
+              disabled={domainBusy || !domainInput.trim()}
+              onClick={() => void submitPrimaryDomain()}
+            >
+              {domainBusy ? "Saving…" : "Save and continue"}
             </Button>
           </DialogFooter>
         </DialogContent>

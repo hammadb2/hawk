@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { getPublicSiteUrlFromRequest } from "@/lib/site-url";
+import { getPublicSiteUrlFromRequest, safePortalNextPath } from "@/lib/site-url";
 import { getHawkCrmSupabaseAuthStorageKey } from "@/lib/supabase/auth-storage";
-
-function safePortalNextPath(raw: string | null, fallback = "/portal"): string {
-  if (!raw) return fallback;
-  try {
-    const p = decodeURIComponent(raw);
-    if (!p.startsWith("/") || p.startsWith("//") || p.includes("://")) return fallback;
-    return p;
-  } catch {
-    return fallback;
-  }
-}
 
 export async function GET(request: Request) {
   const reqUrl = new URL(request.url);

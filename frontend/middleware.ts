@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getHawkCrmSupabaseAuthStorageKey } from "@/lib/supabase/auth-storage";
+import { safePortalNextPath } from "@/lib/site-url";
 
 const AUTH_COOKIE = "hawk_auth";
 
@@ -64,9 +65,7 @@ export async function middleware(request: NextRequest) {
         .maybeSingle();
       const nextParam = request.nextUrl.searchParams.get("next");
       const fallback = cppAtLogin ? "/portal" : "/portal/billing";
-      const raw = nextParam || fallback;
-      const safe =
-        raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("://") ? raw : fallback;
+      const safe = safePortalNextPath(nextParam, fallback);
       return NextResponse.redirect(new URL(safe, request.url));
     }
 
