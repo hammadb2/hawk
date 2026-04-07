@@ -19,6 +19,7 @@ from schemas.billing import (
     CheckoutRequest,
     CheckoutCompleteRequest,
     CreatePaymentIntentRequest,
+    CreatePaymentIntentPortalRequest,
     PublicCheckoutRequest,
     InvoiceItem,
 )

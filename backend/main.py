@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications, breach_check, marketing, guarantee_access
-from routers import crm_client_portal, crm_cron, crm_enterprise, crm_portal_api, crm_scale, crm_webhooks, monitor, portal_phase2
+from routers import crm_client_portal, crm_cron, crm_enterprise, crm_portal_api, crm_scale, crm_webhooks, monitor, portal_phase2, portal_self_serve
 
 if os.environ.get("SENTRY_DSN"):
     try:
@@ -54,6 +54,7 @@ app.include_router(crm_portal_api.router)
 app.include_router(crm_client_portal.router)
 app.include_router(crm_enterprise.router)
 app.include_router(portal_phase2.router)
+app.include_router(portal_self_serve.router)
 app.include_router(crm_scale.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(monitor.router)

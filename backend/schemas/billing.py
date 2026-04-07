@@ -42,6 +42,14 @@ class CreatePaymentIntentRequest(BaseModel):
     test_mode: bool = False
 
 
+class CreatePaymentIntentPortalRequest(BaseModel):
+    """Same as embedded checkout but email comes from Supabase JWT (signed-in portal user)."""
+
+    name: str | None = Field(None, max_length=200)
+    hawk_product: Literal["starter", "shield"] = "shield"
+    test_mode: bool = False
+
+
 class InvoiceItem(BaseModel):
     id: str
     amount_due: int

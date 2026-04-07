@@ -36,8 +36,14 @@ export function getCrmMagicLinkCallbackUrl(nextPath: string): string {
   return u.toString();
 }
 
-/** Portal magic link — absolute URL for emailRedirectTo. */
-export function getPortalMagicLinkCallbackUrl(): string {
+/**
+ * Portal magic link — absolute URL for emailRedirectTo.
+ * @param nextPath path after callback (e.g. /portal/billing?plan=shield), default /portal
+ */
+export function getPortalMagicLinkCallbackUrl(nextPath = "/portal"): string {
   const origin = getPublicSiteOrigin();
-  return `${origin}/portal/auth/callback`;
+  const path = nextPath.startsWith("/") ? nextPath : `/${nextPath}`;
+  const u = new URL(`${origin}/portal/auth/callback`);
+  u.searchParams.set("next", path);
+  return u.toString();
 }

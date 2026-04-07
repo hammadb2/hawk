@@ -15,8 +15,10 @@ from schemas import (
     CheckoutRequest,
     CheckoutCompleteRequest,
     CreatePaymentIntentRequest,
+    CreatePaymentIntentPortalRequest,
     PublicCheckoutRequest,
 )
+from routers.crm_auth import require_supabase_uid_and_email
 
 from config import (
     STRIPE_SECRET_KEY,
@@ -663,6 +665,25 @@ def create_payment_intent(req: CreatePaymentIntentRequest):
         "client_secret": secret,
         "customer_id": customer_id,
     }
+
+
+@router.post("/create-payment-intent-portal")
+def create_payment_intent_portal(
+    req: CreatePaymentIntentPortalRequest,
+    auth: tuple[str, str] = Depends(require_supabase_uid_and_email),
+):
+    """
+    Same as create-payment-intent, but email is taken from the Supabase access token (signed-in portal user).
+    """
+    _uid, jwt_email = auth
+    name = (req.name or "").strip() or jwt_email.split("@", 1)[0]
+    inner = CreatePaymentIntentRequest(
+        email=jwt_email,
+        name=name,
+        hawk_product=req.hawk_product,
+        test_mode=req.test_mode,
+    )
+    return create_payment_intent(inner)
 
 
 @router.post("/checkout-complete")

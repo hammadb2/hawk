@@ -573,7 +573,12 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> bool:
     patch: dict[str, Any] = {
         "portal_user_id": uid,
         "onboarding_sequence_status": "in_progress",
+        "billing_status": "active",
     }
+    if hp == "starter":
+        patch["mrr_cents"] = 19900
+    else:
+        patch["mrr_cents"] = 99700
     if cust:
         patch["stripe_customer_id"] = cust
     if shield:

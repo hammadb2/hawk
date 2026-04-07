@@ -24,10 +24,11 @@ function PortalLoginForm() {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
+    const nextPath = searchParams.get("next") || "/portal/billing";
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
-        emailRedirectTo: getPortalMagicLinkCallbackUrl(),
+        emailRedirectTo: getPortalMagicLinkCallbackUrl(nextPath),
       },
     });
     setLoading(false);

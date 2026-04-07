@@ -33,6 +33,7 @@ type ClientRow = {
   id: string;
   prospect_id: string | null;
   mrr_cents: number;
+  billing_status: string | null;
   onboarding_sequence_status: string | null;
   hawk_readiness_score: number | null;
   guarantee_status: string | null;
@@ -131,7 +132,7 @@ function PortalHomeContent() {
     const { data: cl, error: e2 } = await supabase
       .from("clients")
       .select(
-        "id,prospect_id,mrr_cents,onboarding_sequence_status,hawk_readiness_score,guarantee_status,certification_eligible_at,certified_at,guarantee_checklist_critical_ok,guarantee_checklist_high_ok,guarantee_checklist_subscription_ok",
+        "id,prospect_id,mrr_cents,billing_status,onboarding_sequence_status,hawk_readiness_score,guarantee_status,certification_eligible_at,certified_at,guarantee_checklist_critical_ok,guarantee_checklist_high_ok,guarantee_checklist_subscription_ok",
       )
       .eq("id", cpp.client_id)
       .single();

@@ -158,12 +158,30 @@ export const billingApi = {
       "/api/billing/create-payment-intent",
       { method: "POST", body: JSON.stringify(body) },
     ),
+  /** Same as createPaymentIntent; email is taken from Supabase JWT (signed-in portal user). */
+  createPaymentIntentPortal: (
+    body: { name?: string; hawk_product: "starter" | "shield"; test_mode: boolean },
+    token: string,
+  ) =>
+    request<{ client_secret: string; subscription_id: string; customer_id: string }>(
+      "/api/billing/create-payment-intent-portal",
+      { method: "POST", body: JSON.stringify(body), token },
+    ),
   checkout: (body: { plan: string }, token: string) =>
     request<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify(body), token }),
   portal: (token: string) =>
     request<{ url: string }>("/api/billing/portal", { method: "POST", token }),
   invoices: (token: string) =>
     request<{ invoices: { id: string; amount_due: number; status: string; pdf_url?: string; created: number }[] }>("/api/billing/invoices", { token }),
+};
+
+/** Account-first portal: bootstrap CRM rows after magic-link sign-in. */
+export const portalApi = {
+  bootstrap: (token: string) =>
+    request<{ ok: boolean; client_id: string; created: boolean }>("/api/portal/bootstrap", {
+      method: "POST",
+      token,
+    }),
 };
 
 // Ask HAWK
