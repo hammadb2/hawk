@@ -16,17 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 class _RateLimiter:
-    """Simple in-memory token-bucket rate limiter keyed by client IP."""
+    """Simple in-memory sliding-window rate limiter keyed by client IP."""
 
     def __init__(self, max_requests: int = 5, window_seconds: int = 60):
         self._max = max_requests
         self._window = window_seconds
         self._hits: dict[str, list[float]] = {}
         self._lock = threading.Lock()
+        self._last_prune: float = 0.0
 
     def check(self, key: str) -> bool:
         now = time.monotonic()
         with self._lock:
+            # Periodically prune stale keys (every 5 minutes)
+            if now - self._last_prune > 300:
+                self._hits = {k: v for k, v in self._hits.items() if v and now - v[-1] < self._window}
+                self._last_prune = now
             hits = self._hits.get(key, [])
             hits = [t for t in hits if now - t < self._window]
             if len(hits) >= self._max:
@@ -146,7 +151,8 @@ def _scan_to_item(scan: Scan) -> dict:
 @router.post("/api/scan/public")
 def start_scan_public(req: ScanStartRequest, request: Request):
     """Run a real scan without auth. Slim JSON by default; set full_result=true for CRM-sized payload."""
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                 or (request.client.host if request.client else "unknown"))
     if not _public_scan_limiter.check(client_ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in a minute.")
     domain_clean = _normalize_domain(req.domain)
@@ -176,7 +182,8 @@ def start_scan_public(req: ScanStartRequest, request: Request):
 @router.post("/api/scan/enqueue")
 def scan_enqueue(req: ScanEnqueueRequest, request: Request):
     """Queue async scan on hawk-scanner-v2 (Redis/arq). Returns job_id for polling."""
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                 or (request.client.host if request.client else "unknown"))
     if not _public_scan_limiter.check(client_ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in a minute.")
     domain_clean = _normalize_domain(req.domain)
