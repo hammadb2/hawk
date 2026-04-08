@@ -13,6 +13,16 @@ from schemas import FindingSchema, IgnoreFindingRequest
 router = APIRouter(tags=["findings"])
 
 
+def _parse_findings(raw_json: str | None) -> list:
+    """Normalise findings_json which may be a list or a dict wrapper."""
+    raw = json.loads(raw_json or "[]")
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        return raw.get("findings", [])
+    return []
+
+
 @router.get("/api/findings/{scan_id}")
 def get_findings(
     scan_id: str,
@@ -23,8 +33,7 @@ def get_findings(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     ignored = {r.finding_id: r for r in db.query(IgnoredFinding).filter(IgnoredFinding.user_id == user.id, IgnoredFinding.scan_id == scan_id).all()}
-    raw = json.loads(scan.findings_json or "[]")
-    findings = raw if isinstance(raw, list) else raw.get("findings", []) if isinstance(raw, dict) else []
+    findings = _parse_findings(scan.findings_json)
     out = []
     for f in findings:
         fid = f.get("id")
@@ -54,7 +63,7 @@ def ignore_finding(
         for s in scans:
             if not s.findings_json:
                 continue
-            for f in json.loads(s.findings_json):
+            for f in _parse_findings(s.findings_json):
                 if f.get("id") == finding_id:
                     scan_id = s.id
                     break
@@ -96,7 +105,7 @@ def fix_finding(
     for s in scans:
         if not s.findings_json:
             continue
-        for f in json.loads(s.findings_json):
+        for f in _parse_findings(s.findings_json):
             if f.get("id") == finding_id:
                 domain_str = s.scanned_domain or (s.domain.domain if s.domain else None)
                 source_domain_id = s.domain_id
