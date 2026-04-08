@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from database import Base
 
@@ -13,4 +13,4 @@ class IgnoredFinding(Base):
     finding_id = Column(String(36), nullable=False, index=True)  # UUID from scanner
     scan_id = Column(String(36), ForeignKey("scans.id"), nullable=False)
     reason = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

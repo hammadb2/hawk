@@ -23,7 +23,8 @@ def get_findings(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     ignored = {r.finding_id: r for r in db.query(IgnoredFinding).filter(IgnoredFinding.user_id == user.id, IgnoredFinding.scan_id == scan_id).all()}
-    findings = json.loads(scan.findings_json or "[]")
+    raw = json.loads(scan.findings_json or "[]")
+    findings = raw if isinstance(raw, list) else raw.get("findings", []) if isinstance(raw, dict) else []
     out = []
     for f in findings:
         fid = f.get("id")
@@ -47,8 +48,9 @@ def ignore_finding(
     # So we need scan_id in body for context
     scan_id = req.scan_id
     if not scan_id:
-        # Check if finding exists in any of user's scans
-        scans = db.query(Scan).filter(Scan.user_id == user.id).all()
+        # Check if finding exists in recent user scans (limit to 50 most recent)
+        from sqlalchemy import desc
+        scans = db.query(Scan).filter(Scan.user_id == user.id).order_by(desc(Scan.started_at)).limit(50).all()
         for s in scans:
             if not s.findings_json:
                 continue
@@ -90,12 +92,14 @@ def fix_finding(
     from sqlalchemy import desc
     scans = db.query(Scan).filter(Scan.user_id == user.id).order_by(desc(Scan.started_at)).limit(50).all()
     domain_str = None
+    source_domain_id = None
     for s in scans:
         if not s.findings_json:
             continue
         for f in json.loads(s.findings_json):
             if f.get("id") == finding_id:
                 domain_str = s.scanned_domain or (s.domain.domain if s.domain else None)
+                source_domain_id = s.domain_id
                 break
         if domain_str:
             break
@@ -108,6 +112,7 @@ def fix_finding(
     new_scan = Scan(
         id=new_id,
         user_id=user.id,
+        domain_id=source_domain_id,
         scanned_domain=domain_str,
         triggered_by="user",
         status=result.get("status", "completed"),

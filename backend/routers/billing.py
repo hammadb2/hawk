@@ -217,10 +217,10 @@ def _retrieve_checkout_session_dict(session_id: str) -> dict:
         if not (api_key or "").strip():
             continue
         try:
-            stripe_mod.api_key = api_key
             sess = stripe_mod.checkout.Session.retrieve(
                 session_id,
                 expand=["line_items.data.price", "customer"],
+                api_key=api_key,
             )
             return _stripe_obj_to_dict(sess)
         except Exception as e:
@@ -442,10 +442,10 @@ def _retrieve_subscription_dict(subscription_id: str) -> dict:
         if not (api_key or "").strip():
             continue
         try:
-            stripe_mod.api_key = api_key
             sub = stripe_mod.Subscription.retrieve(
                 subscription_id,
                 expand=["latest_invoice.payment_intent", "items.data.price", "customer"],
+                api_key=api_key,
             )
             return _stripe_obj_to_dict(sub)
         except Exception as e:
@@ -632,20 +632,20 @@ def create_payment_intent(req: CreatePaymentIntentRequest):
     if not price_id:
         raise HTTPException(status_code=503, detail="Stripe price not configured for this product")
 
-    stripe_mod.api_key = api_key
     email = req.email.strip().lower()
     name = req.name.strip()
 
-    existing = stripe_mod.Customer.list(email=email, limit=1)
+    existing = stripe_mod.Customer.list(email=email, limit=1, api_key=api_key)
     ex_data = getattr(existing, "data", None) or []
     if ex_data:
         customer_id = ex_data[0].id
-        stripe_mod.Customer.modify(customer_id, metadata={"hawk_product": req.hawk_product})
+        stripe_mod.Customer.modify(customer_id, metadata={"hawk_product": req.hawk_product}, api_key=api_key)
     else:
         cust = stripe_mod.Customer.create(
             email=email,
             name=name,
             metadata={"hawk_product": req.hawk_product},
+            api_key=api_key,
         )
         customer_id = cust.id
 
@@ -663,6 +663,7 @@ def create_payment_intent(req: CreatePaymentIntentRequest):
             payment_settings={"save_default_payment_method": "on_subscription"},
             metadata=meta,
             expand=["latest_invoice.payment_intent"],
+            api_key=api_key,
         )
     except Exception as e:
         logger.exception("create subscription for embedded checkout")
@@ -825,19 +826,19 @@ async def webhook(
     if event["type"] == "customer.subscription.updated":
         sub = event["data"]["object"]
         cust_id = sub.get("customer")
-        user = db.query(User).filter(User.stripe_customer_id == cust_id).first()
-        if user:
-            user.stripe_subscription_id = sub.get("id")
+        sub_user = db.query(User).filter(User.stripe_customer_id == cust_id).first()
+        if sub_user:
+            sub_user.stripe_subscription_id = sub.get("id")
             plan = _plan_from_subscription(sub)
             if plan:
-                user.plan = plan
+                sub_user.plan = plan
             db.commit()
     elif event["type"] == "customer.subscription.deleted":
         sub = event["data"]["object"]
-        user = db.query(User).filter(User.stripe_customer_id == sub.get("customer")).first()
-        if user:
-            user.stripe_subscription_id = None
-            user.plan = "starter"
+        del_user = db.query(User).filter(User.stripe_customer_id == sub.get("customer")).first()
+        if del_user:
+            del_user.stripe_subscription_id = None
+            del_user.plan = "starter"
             db.commit()
     elif event["type"] == "checkout.session.completed":
         evd = _stripe_event_to_dict(event)

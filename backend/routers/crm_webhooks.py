@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import secrets
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -27,8 +28,8 @@ WEBHOOK_SECRET = os.environ.get("CRM_EMAIL_WEBHOOK_SECRET", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
-# Charlotte / CEO alert — defaults to spec number if env unset
-CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip() or "+18259458282"
+# Charlotte / CEO alert — must be set via CRM_CEO_PHONE_E164 env var
+CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip()
 VA_PHONE_NUMBER = os.environ.get("VA_PHONE_NUMBER", "").strip()
 
 
@@ -101,12 +102,18 @@ def _require_webhook_secret(x_secret: str | None) -> None:
     if not WEBHOOK_SECRET:
         logger.warning("CRM_EMAIL_WEBHOOK_SECRET not set — rejecting webhook")
         raise HTTPException(status_code=503, detail="Webhook not configured")
-    if x_secret != WEBHOOK_SECRET:
+    if not x_secret or not secrets.compare_digest(x_secret, WEBHOOK_SECRET):
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
 
 def _round_robin_closer_rep_id() -> tuple[str | None, str | None, str | None]:
-    """Next active closer (preferred) or sales_rep. Returns (rep_id, full_name, whatsapp_e164)."""
+    """Next active closer (preferred) or sales_rep. Returns (rep_id, full_name, whatsapp_e164).
+
+    Uses optimistic locking via last_assigned_at to reduce race conditions:
+    we PATCH only the row whose last_assigned_at still matches what we read.
+    If another request grabbed the same rep first, the PATCH returns 0 rows
+    and we retry with the next candidate.
+    """
     headers = _sb_headers()
     for role in ("closer", "sales_rep"):
         r = httpx.get(
@@ -117,7 +124,7 @@ def _round_robin_closer_rep_id() -> tuple[str | None, str | None, str | None]:
                 "status": "eq.active",
                 "select": "id,full_name,whatsapp_number,last_assigned_at",
                 "order": "last_assigned_at.asc.nullsfirst",
-                "limit": "1",
+                "limit": "5",
             },
             timeout=20.0,
         )
@@ -125,18 +132,30 @@ def _round_robin_closer_rep_id() -> tuple[str | None, str | None, str | None]:
         rows = r.json()
         if not rows:
             continue
-        rid = str(rows[0]["id"])
-        name = str(rows[0].get("full_name") or rows[0].get("email") or "Rep")
-        wa = rows[0].get("whatsapp_number")
-        patch = httpx.patch(
-            f"{SUPABASE_URL}/rest/v1/profiles",
-            headers=headers,
-            params={"id": f"eq.{rid}"},
-            json={"last_assigned_at": datetime.now(timezone.utc).isoformat()},
-            timeout=20.0,
-        )
-        patch.raise_for_status()
-        return rid, name, (str(wa).strip() if wa else None)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for candidate in rows:
+            rid = str(candidate["id"])
+            name = str(candidate.get("full_name") or candidate.get("email") or "Rep")
+            wa = candidate.get("whatsapp_number")
+            old_ts = candidate.get("last_assigned_at")
+            # Optimistic lock: only update if last_assigned_at hasn't changed
+            match_params: dict[str, str] = {"id": f"eq.{rid}"}
+            if old_ts:
+                match_params["last_assigned_at"] = f"eq.{old_ts}"
+            else:
+                match_params["last_assigned_at"] = "is.null"
+            patch = httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/profiles",
+                headers={**headers, "Prefer": "return=representation"},
+                params=match_params,
+                json={"last_assigned_at": now_iso},
+                timeout=20.0,
+            )
+            patch.raise_for_status()
+            patched = patch.json()
+            if patched:
+                return rid, name, (str(wa).strip() if wa else None)
+            # Another request grabbed this rep — try next candidate
     return None, None, None
 
 

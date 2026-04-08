@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, String, Text
 from sqlalchemy.orm import relationship
 
@@ -22,8 +22,8 @@ class User(Base):
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     stripe_customer_id = Column(String(255), nullable=True, index=True)
     stripe_subscription_id = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     domains = relationship("Domain", back_populates="user")
     scans = relationship("Scan", back_populates="user")

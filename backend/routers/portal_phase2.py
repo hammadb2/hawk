@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_mod
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -418,8 +419,8 @@ def run_weekly_threat_briefings_for_all_clients() -> dict[str, Any]:
                     subject=f"HAWK Weekly Threat Briefing — {title[:80]}",
                     html=(
                         f"<p>Your weekly sector briefing is ready.</p>"
-                        f"<pre style='white-space:pre-wrap;font-family:system-ui,sans-serif'>{body_md}</pre>"
-                        f"<p><a href='{portal_url}'>Open portal</a></p>"
+                        f"<pre style='white-space:pre-wrap;font-family:system-ui,sans-serif'>{html_mod.escape(body_md)}</pre>"
+                        f"<p><a href='{html_mod.escape(portal_url)}'>Open portal</a></p>"
                     ),
                     tags=[{"name": "category", "value": "threat_briefing"}],
                 )

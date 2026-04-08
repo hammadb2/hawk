@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 
 from fastapi import APIRouter, Header, HTTPException
 
@@ -25,7 +26,7 @@ def _require_secret(x_cron_secret: str | None) -> None:
     if not CRON_SECRET:
         logger.warning("Monitor: cron secret not configured — rejecting")
         raise HTTPException(status_code=503, detail="Monitor not configured")
-    if x_cron_secret != CRON_SECRET:
+    if not x_cron_secret or not secrets.compare_digest(x_cron_secret, CRON_SECRET):
         raise HTTPException(status_code=401, detail="Invalid cron secret")
 
 

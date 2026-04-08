@@ -4,7 +4,16 @@ from __future__ import annotations
 import os
 
 # App
-SECRET_KEY = os.environ.get("HAWK_SECRET_KEY", "change-me-in-production")
+SECRET_KEY = os.environ.get("HAWK_SECRET_KEY", "")
+if not SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "HAWK_SECRET_KEY is not set — using an insecure random key. "
+        "Set HAWK_SECRET_KEY in your environment for production.",
+        stacklevel=1,
+    )
+    import secrets as _secrets
+    SECRET_KEY = _secrets.token_urlsafe(64)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
@@ -25,7 +34,7 @@ else:
     CONNECT_ARGS = {"check_same_thread": False}
 
 # Scanner relay (Ghost)
-SCANNER_RELAY_URL = os.environ.get("HAWK_SCANNER_RELAY_URL", "http://178.104.27.211:8002")
+SCANNER_RELAY_URL = os.environ.get("HAWK_SCANNER_RELAY_URL", "")
 # Must be >= longest expected hawk-scanner-v2 sync run (Vercel CRM calls wait up to ~295s)
 SCANNER_TIMEOUT = float(os.environ.get("HAWK_SCANNER_TIMEOUT", "300"))
 
@@ -58,7 +67,7 @@ DEEPSEEK_REASONER_MODEL = "deepseek-reasoner"
 
 # Charlotte (Revenue-Ops) for emails
 CHARLOTTE_URL = os.environ.get("CHARLOTTE_URL", "http://46.225.168.75:8001/agent/charlotte")
-CHARLOTTE_API_KEY = os.environ.get("CHARLOTTE_API_KEY", "akb-revenue-ops-2026")
+CHARLOTTE_API_KEY = os.environ.get("CHARLOTTE_API_KEY", "")
 
 # Frontend / marketing site (Stripe redirects, email links — same host as Next.js when unified)
 DEFAULT_PUBLIC_SITE_URL = "https://securedbyhawk.com"

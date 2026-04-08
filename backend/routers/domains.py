@@ -43,7 +43,7 @@ def create_domain(
     user: User = Depends(get_current_user),
 ):
     plan = user.plan
-    limit = PLAN_DOMAINS.get(plan, 0)
+    limit = PLAN_DOMAINS.get(plan, 1)  # default to 1 for unknown plans
     if limit >= 0:
         count = db.query(Domain).filter(Domain.user_id == user.id).count()
         if count >= limit:

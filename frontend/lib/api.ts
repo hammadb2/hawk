@@ -129,7 +129,7 @@ export const billingApi = {
    */
   checkoutPublic: (body: { hawk_product: "starter" | "shield" }) => {
     const path = publicCheckoutPath(body.hawk_product);
-    const payload = path === "/api/billing/checkout-public-test" ? "{}" : JSON.stringify(body);
+    const payload = JSON.stringify(body);
     return request<{ url: string; mode?: string; product?: string }>(path, { method: "POST", body: payload });
   },
   /**

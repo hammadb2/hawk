@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets as secrets_mod
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -146,7 +148,7 @@ def va_action(body: VaActionBody, uid: str = Depends(require_supabase_uid)):
     book_url = CAL_COM_BOOKING_URL
     if body.action == "book_call":
         # Pre-filled Cal.com query params (best-effort)
-        q = f"?name={p.get('contact_name') or ''}&email={p.get('contact_email') or ''}"
+        q = "?" + urlencode({"name": p.get("contact_name") or "", "email": p.get("contact_email") or ""})
         return {"ok": True, "cal_url": f"{book_url}{q}", "crm_url": f"{base}/crm/prospects/{body.prospect_id}"}
 
     return {"ok": True, "crm_url": f"{base}/crm/prospects/{body.prospect_id}"}
@@ -209,7 +211,7 @@ def _require_cron_secret(x_cron_secret: str | None) -> None:
     if not CRON_SECRET:
         logger.warning("Cron secret not set (HAWK_CRM_CRON_SECRET / HAWK_CRON_SECRET / CRON_SECRET) — rejecting")
         raise HTTPException(status_code=503, detail="Cron not configured")
-    if x_cron_secret != CRON_SECRET:
+    if not x_cron_secret or not secrets_mod.compare_digest(x_cron_secret, CRON_SECRET):
         raise HTTPException(status_code=401, detail="Invalid cron secret")
 
 

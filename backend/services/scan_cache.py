@@ -107,18 +107,11 @@ def set_cached_scan(domain: str, depth: str, result: dict[str, Any]) -> None:
             "result": result,
             "expires_at": exp,
         }
-        try:
-            httpx.delete(
-                f"{SUPABASE_URL}/rest/v1/scanner_cache",
-                headers=_sb_headers(),
-                params={"domain": f"eq.{row['domain']}", "scan_depth": f"eq.{depth}"},
-                timeout=12.0,
-            )
-        except Exception:
-            pass
+        # Atomic upsert: on conflict (domain, scan_depth) merge into existing row
+        upsert_headers = {**_sb_headers(), "Prefer": "resolution=merge-duplicates,return=representation"}
         httpx.post(
             f"{SUPABASE_URL}/rest/v1/scanner_cache",
-            headers=_sb_headers(),
+            headers=upsert_headers,
             json=row,
             timeout=12.0,
         ).raise_for_status()

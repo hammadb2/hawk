@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
@@ -16,6 +16,6 @@ class Notification(Base):
     title = Column(String(255), nullable=False)
     body = Column(Text, nullable=True)
     read = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="notifications")

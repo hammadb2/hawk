@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from database import Base
 
@@ -13,4 +13,4 @@ class AgencyClient(Base):
     name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
     company = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

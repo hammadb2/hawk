@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -111,14 +114,15 @@ def create_client_report(
         scan = db.query(Scan).filter(Scan.user_id == user.id).order_by(desc(Scan.completed_at)).first()
         if not scan:
             raise HTTPException(status_code=400, detail="No scans yet. Run a scan first.")
-    domain_str = scan.scanned_domain or (scan.domain.domain if getattr(scan, "domain", None) and scan.domain else "unknown")
+    domain_str = scan.scanned_domain or (scan.domain.domain if scan.domain else "unknown")
     reports_dir = Path(os.environ.get("HAWK_REPORTS_DIR", "./reports"))
     reports_dir.mkdir(parents=True, exist_ok=True)
     report_id = str(uuid4())
     pdf_path = reports_dir / f"{report_id}.pdf"
     sections = ["executive", "findings", "compliance"]
     if not render_report_pdf(scan, sections, pdf_path, client_name=c.name, client_company=c.company or None):
-        pdf_path.write_bytes(b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n")
+        logger.warning("PDF rendering failed for agency client %s scan %s", client_id, scan.id)
+        raise HTTPException(status_code=502, detail="PDF generation failed. Please try again later.")
     r = Report(id=report_id, user_id=user.id, scan_id=scan.id, domain=domain_str, pdf_path=str(pdf_path))
     db.add(r)
     db.commit()

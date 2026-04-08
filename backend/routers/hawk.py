@@ -21,7 +21,7 @@ def hawk_chat(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    limit = PLAN_ASK_HAWK_LIMIT.get(user.plan, 0)
+    limit = PLAN_ASK_HAWK_LIMIT.get(user.plan, 5)  # default to 5 for unknown plans
     if limit >= 0:
         row = db.query(HawkMessage).filter(HawkMessage.user_id == user.id).first()
         if not row:
@@ -29,13 +29,26 @@ def hawk_chat(
             db.add(row)
             db.commit()
             db.refresh(row)
+        # Reset counter if period_start is from a previous month
+        now = datetime.now(timezone.utc)
+        if row.period_start:
+            period = row.period_start if row.period_start.tzinfo else row.period_start.replace(tzinfo=timezone.utc)
+            current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if period < current_month_start:
+                row.message_count = 0
+                row.period_start = now
+                db.commit()
+        elif row.message_count > 0:
+            # No period_start recorded yet — set it now
+            row.period_start = now
+            db.commit()
         if row.message_count >= limit:
             raise HTTPException(
                 status_code=403,
                 detail="Ask HAWK message limit reached for your plan. Upgrade for unlimited messages.",
             )
         row.message_count += 1
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = now
         db.commit()
 
     findings_json = None

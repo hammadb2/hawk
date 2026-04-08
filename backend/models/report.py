@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
@@ -15,6 +15,6 @@ class Report(Base):
     scan_id = Column(String(36), ForeignKey("scans.id"), nullable=False)
     domain = Column(String(255), nullable=False)
     pdf_path = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="reports")

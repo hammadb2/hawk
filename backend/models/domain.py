@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
@@ -17,7 +17,7 @@ class Domain(Base):
     scan_frequency = Column(String(50), nullable=True)  # on_demand, weekly, daily
     notify_email = Column(String(255), nullable=True)
     notify_slack = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="domains")
     scans = relationship("Scan", back_populates="domain")

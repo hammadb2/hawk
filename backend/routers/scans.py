@@ -1,13 +1,43 @@
 from __future__ import annotations
 
 import json
+import logging
+import threading
+import time
 from uuid import uuid4
-from datetime import datetime, timezone
-
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+import secrets
+import re
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
+
+logger = logging.getLogger(__name__)
+
+
+class _RateLimiter:
+    """Simple in-memory token-bucket rate limiter keyed by client IP."""
+
+    def __init__(self, max_requests: int = 5, window_seconds: int = 60):
+        self._max = max_requests
+        self._window = window_seconds
+        self._hits: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def check(self, key: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            hits = self._hits.get(key, [])
+            hits = [t for t in hits if now - t < self._window]
+            if len(hits) >= self._max:
+                self._hits[key] = hits
+                return False
+            hits.append(now)
+            self._hits[key] = hits
+            return True
+
+
+_public_scan_limiter = _RateLimiter(max_requests=5, window_seconds=60)
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -89,8 +119,12 @@ def _public_scan_findings_plain(result: dict) -> tuple[list[str], int]:
 
 def _normalize_domain(domain: str) -> str:
     d = domain.lower().strip()
-    if d.startswith("http"):
-        d = d.split("//")[1].split("/")[0]
+    if re.match(r'^(https?|ftp)://', d):
+        d = d.split("//", 1)[1].split("/")[0]
+    elif d.startswith("//"):
+        d = d[2:].split("/")[0]
+    # Strip port number
+    d = re.sub(r':\d+$', '', d)
     if d.startswith("www."):
         d = d[4:]
     return d
@@ -110,8 +144,11 @@ def _scan_to_item(scan: Scan) -> dict:
 
 
 @router.post("/api/scan/public")
-def start_scan_public(req: ScanStartRequest):
+def start_scan_public(req: ScanStartRequest, request: Request):
     """Run a real scan without auth. Slim JSON by default; set full_result=true for CRM-sized payload."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not _public_scan_limiter.check(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in a minute.")
     domain_clean = _normalize_domain(req.domain)
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
@@ -137,8 +174,11 @@ def start_scan_public(req: ScanStartRequest):
 
 
 @router.post("/api/scan/enqueue")
-def scan_enqueue(req: ScanEnqueueRequest):
+def scan_enqueue(req: ScanEnqueueRequest, request: Request):
     """Queue async scan on hawk-scanner-v2 (Redis/arq). Returns job_id for polling."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not _public_scan_limiter.check(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again in a minute.")
     domain_clean = _normalize_domain(req.domain)
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
@@ -286,7 +326,7 @@ def rescan(
 
 
 def _cron_verified(x_cron_secret: str | None = Header(None)):
-    if not CRON_SECRET or x_cron_secret != CRON_SECRET:
+    if not CRON_SECRET or not x_cron_secret or not secrets.compare_digest(x_cron_secret, CRON_SECRET):
         raise HTTPException(status_code=403, detail="Invalid or missing cron secret")
     return True
 
@@ -367,7 +407,6 @@ def run_weekly_digest(
     _: bool = Depends(_cron_verified),
 ):
     """Call weekly from cron. Sends digest to users who had scans in the last 7 days."""
-    from datetime import timedelta
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=7)
     # Get users who have scans in the last 7 days
@@ -404,7 +443,6 @@ def run_monthly_report_emails(
     _: bool = Depends(_cron_verified),
 ):
     """Call monthly from cron. Sends 'report ready' email to users who have at least one report in the past 30 days."""
-    from datetime import timedelta
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=30)
     user_ids = db.query(Report.user_id).filter(Report.created_at >= since).distinct().all()
