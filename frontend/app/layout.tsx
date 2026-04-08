@@ -15,9 +15,22 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HAWK Security — See what attackers see | Canadian SMBs",
+  metadataBase: new URL("https://hawk.akbstudios.com"),
+  title: {
+    default: "HAWK — Cybersecurity for Canadian Small Business",
+    template: "%s | HAWK",
+  },
   description:
-    "Scan your domain in seconds. Plain-English security findings, monitoring, and a financially backed guarantee for Canadian small businesses.",
+    "HAWK scans your business for exposed attack surfaces, breached credentials, and lookalike domains. Built for Canadian SMBs. Start free.",
+  keywords: [
+    "cybersecurity canada",
+    "attack surface management",
+    "small business security",
+    "domain monitoring canada",
+    "breach detection",
+  ],
+  authors: [{ name: "AKB Studios" }],
+  creator: "AKB Studios",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },
@@ -26,6 +39,29 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  openGraph: {
+    type: 'website',
+    locale: 'en_CA',
+    url: 'https://hawk.akbstudios.com',
+    siteName: 'HAWK',
+    title: 'HAWK — Cybersecurity for Canadian Small Business',
+    description: 'HAWK scans your business for exposed attack surfaces, breached credentials, and lookalike domains. Built for Canadian SMBs.',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'HAWK Cybersecurity' }]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'HAWK — Cybersecurity for Canadian Small Business',
+    description: 'Attack surface monitoring built for Canadian SMBs.',
+    images: ['/og-image.png']
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true }
+  },
+  alternates: {
+    canonical: 'https://hawk.akbstudios.com'
+  }
 };
 
 export default function RootLayout({

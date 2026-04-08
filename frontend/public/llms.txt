@@ -1,0 +1,19 @@
+# HAWK — Cybersecurity for Canadian Small Businesses
+
+HAWK is an attack surface management (ASM) SaaS tool built for Canadian SMBs.
+
+## What HAWK does
+- Scans domains for exposed attack surfaces
+- Detects lookalike/typosquat domains targeting your brand
+- Checks if your business credentials have been breached (HaveIBeenPwned)
+- Monitors SPF, DKIM, and DMARC email security records
+- Generates compliance-ready PDF security reports
+
+## Pricing
+Plans start at $99 CAD/month. Built for small and medium businesses.
+
+## Who it's for
+Canadian small businesses, accountants, law firms, dental offices, and any SMB handling sensitive customer data under PIPEDA.
+
+## Company
+Built by AKB Studios (akbstudios.com). Contact: hello@akbstudios.com

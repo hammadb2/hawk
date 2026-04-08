@@ -13,7 +13,8 @@ redis>=5.0.0
 anthropic>=0.40.0
 stripe>=8.0.0
 python-multipart>=0.0.6
-# PDF (PIPEDA portal, monthly reports). Needs cairo/pango on the host — see backend/Dockerfile for Railway.
+# PDF — user scan reports (ReportLab); PIPEDA / CRM monthly still use WeasyPrint — see backend/Dockerfile for Railway.
+reportlab>=4.0
 weasyprint>=61.0
 supabase>=2.7.0
 python-dotenv>=1.0.0
