@@ -273,13 +273,13 @@ def _magic_link_redirect_url(email: str, next_path: str) -> str:
     return str(link)
 
 
-def _payment_intent_client_secret(stripe_mod, pi) -> str | None:
+def _payment_intent_client_secret(stripe_mod, pi, *, api_key: str | None = None) -> str | None:
     """payment_intent on an Invoice may be a dict, a string id, or (rarely) missing until invoice is finalized."""
     if isinstance(pi, dict):
         return pi.get("client_secret")
     if isinstance(pi, str) and pi.startswith("pi_"):
         try:
-            got = _stripe_obj_to_dict(stripe_mod.PaymentIntent.retrieve(pi))
+            got = _stripe_obj_to_dict(stripe_mod.PaymentIntent.retrieve(pi, api_key=api_key))
             return got.get("client_secret")
         except Exception:
             logger.exception("retrieve PaymentIntent for client_secret")
@@ -293,7 +293,7 @@ def _invoice_expand_params() -> list[str]:
     return ["confirmation_secret", "payment_intent", "payments"]
 
 
-def _invoice_retrieve_embedded(stripe_mod, inv_id: str) -> dict:
+def _invoice_retrieve_embedded(stripe_mod, inv_id: str, *, api_key: str | None = None) -> dict:
     """Retrieve invoice; retry with simpler expand if Stripe rejects nested expand params."""
     expansions = (
         _invoice_expand_params(),
@@ -304,7 +304,7 @@ def _invoice_retrieve_embedded(stripe_mod, inv_id: str) -> dict:
     last_err: Exception | None = None
     for exp in expansions:
         try:
-            return _stripe_obj_to_dict(stripe_mod.Invoice.retrieve(inv_id, expand=exp))
+            return _stripe_obj_to_dict(stripe_mod.Invoice.retrieve(inv_id, expand=exp, api_key=api_key))
         except Exception as e:
             last_err = e
             logger.warning("Invoice.retrieve %s expand=%s: %s", inv_id, exp, e)
@@ -320,7 +320,7 @@ def _subscription_latest_invoice_expand() -> list[str]:
     ]
 
 
-def _client_secret_from_invoice_dict(stripe_mod, inv: dict) -> str | None:
+def _client_secret_from_invoice_dict(stripe_mod, inv: dict, *, api_key: str | None = None) -> str | None:
     """
     Stripe API: newer invoices expose confirmation_secret.client_secret; legacy uses payment_intent;
     some accounts populate invoice payments (payments.data[].payment.payment_intent) instead of top-level PI.
@@ -331,7 +331,7 @@ def _client_secret_from_invoice_dict(stripe_mod, inv: dict) -> str | None:
         if isinstance(sec, str) and sec.strip():
             return sec.strip()
 
-    sec = _payment_intent_client_secret(stripe_mod, inv.get("payment_intent"))
+    sec = _payment_intent_client_secret(stripe_mod, inv.get("payment_intent"), api_key=api_key)
     if sec:
         return sec
 
@@ -342,13 +342,13 @@ def _client_secret_from_invoice_dict(stripe_mod, inv: dict) -> str | None:
                 continue
             pay = row.get("payment") or {}
             if pay.get("type") == "payment_intent":
-                sec = _payment_intent_client_secret(stripe_mod, pay.get("payment_intent"))
+                sec = _payment_intent_client_secret(stripe_mod, pay.get("payment_intent"), api_key=api_key)
                 if sec:
                     return sec
     return None
 
 
-def _embedded_checkout_client_secret(stripe_mod, subscription) -> str:
+def _embedded_checkout_client_secret(stripe_mod, subscription, *, api_key: str | None = None) -> str:
     """
     Resolve PaymentIntent client_secret for Subscription.create(payment_behavior=default_incomplete).
     Re-fetches with expand (create() response sometimes omits nested expansions), finalizes draft
@@ -361,12 +361,13 @@ def _embedded_checkout_client_secret(stripe_mod, subscription) -> str:
     sub = stripe_mod.Subscription.retrieve(
         str(sub_id),
         expand=_subscription_latest_invoice_expand(),
+        api_key=api_key,
     )
     sub_d = _stripe_obj_to_dict(sub)
     inv = sub_d.get("latest_invoice")
 
     if isinstance(inv, str):
-        inv = _invoice_retrieve_embedded(stripe_mod, inv)
+        inv = _invoice_retrieve_embedded(stripe_mod, inv, api_key=api_key)
     elif isinstance(inv, dict):
         pass
     else:
@@ -375,15 +376,15 @@ def _embedded_checkout_client_secret(stripe_mod, subscription) -> str:
     inv_id = inv.get("id")
     st = (inv.get("status") or "").lower()
 
-    secret = _client_secret_from_invoice_dict(stripe_mod, inv)
+    secret = _client_secret_from_invoice_dict(stripe_mod, inv, api_key=api_key)
     if secret:
         return secret
 
     # Full invoice read (confirmation_secret + payments; avoids relying on Subscription nested object)
     if inv_id:
         try:
-            inv_full = _invoice_retrieve_embedded(stripe_mod, inv_id)
-            secret = _client_secret_from_invoice_dict(stripe_mod, inv_full)
+            inv_full = _invoice_retrieve_embedded(stripe_mod, inv_id, api_key=api_key)
+            secret = _client_secret_from_invoice_dict(stripe_mod, inv_full, api_key=api_key)
             if secret:
                 return secret
             inv = inv_full
@@ -398,15 +399,15 @@ def _embedded_checkout_client_secret(stripe_mod, subscription) -> str:
             for exp in (_invoice_expand_params(), ["confirmation_secret", "payment_intent"], ["payment_intent"], None):
                 try:
                     if exp is None:
-                        finalized = stripe_mod.Invoice.finalize_invoice(inv_id)
+                        finalized = stripe_mod.Invoice.finalize_invoice(inv_id, api_key=api_key)
                     else:
-                        finalized = stripe_mod.Invoice.finalize_invoice(inv_id, expand=exp)
+                        finalized = stripe_mod.Invoice.finalize_invoice(inv_id, expand=exp, api_key=api_key)
                     break
                 except Exception as e:
                     logger.warning("finalize_invoice expand=%s: %s", exp, e)
             if finalized is not None:
                 inv = _stripe_obj_to_dict(finalized)
-                secret = _client_secret_from_invoice_dict(stripe_mod, inv)
+                secret = _client_secret_from_invoice_dict(stripe_mod, inv, api_key=api_key)
         except Exception:
             logger.exception("finalize_invoice for embedded checkout")
 
@@ -416,8 +417,8 @@ def _embedded_checkout_client_secret(stripe_mod, subscription) -> str:
     # Retry full invoice fetch (payments / confirmation_secret sometimes only after finalize + second read)
     if inv_id:
         try:
-            inv2 = _invoice_retrieve_embedded(stripe_mod, inv_id)
-            secret = _client_secret_from_invoice_dict(stripe_mod, inv2)
+            inv2 = _invoice_retrieve_embedded(stripe_mod, inv_id, api_key=api_key)
+            secret = _client_secret_from_invoice_dict(stripe_mod, inv2, api_key=api_key)
         except Exception:
             logger.exception("invoice retrieve retry for client_secret")
 
@@ -671,7 +672,7 @@ def create_payment_intent(req: CreatePaymentIntentRequest):
 
     sub_d = _stripe_obj_to_dict(subscription)
     try:
-        secret = _embedded_checkout_client_secret(stripe_mod, subscription)
+        secret = _embedded_checkout_client_secret(stripe_mod, subscription, api_key=api_key)
     except HTTPException:
         raise
     except Exception as e:
