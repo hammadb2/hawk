@@ -38,7 +38,7 @@ export function CrmSidebar() {
       )}
     >
       <div className="flex h-14 items-center border-b border-zinc-800 px-3 xl:px-4">
-        <span className="font-semibold tracking-tight text-emerald-400 xl:text-lg">HAWK</span>
+        <img src="/hawk-logo.png" alt="HAWK" className="h-8 w-auto xl:h-10" />
         <span className="ml-1 hidden text-sm text-zinc-500 xl:inline">CRM</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">

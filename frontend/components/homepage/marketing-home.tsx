@@ -33,7 +33,7 @@ export function MarketingHome() {
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="flex shrink-0 items-center gap-2">
-              <img src="/hawk-logo.png" alt="HAWK Security" className="h-9 w-auto sm:h-10" width={120} height={40} />
+              <img src="/hawk-logo.png" alt="HAWK Security" className="h-12 w-auto sm:h-14" width={168} height={56} />
             </Link>
             <div className="flex items-center gap-2 sm:gap-3">
               <NavScanButton className="rounded-lg px-3 py-2 text-xs font-semibold sm:px-4 sm:text-sm" />

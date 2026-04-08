@@ -46,7 +46,7 @@ export function PortalHeader() {
       <header className="border-b border-zinc-800/80 bg-[#07060C]/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <Link href="https://securedbyhawk.com" className="flex items-center gap-2">
-            <span className="text-lg font-bold tracking-tight text-zinc-50">HAWK</span>
+            <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
             <span className="rounded-md bg-[#00C48C]/15 px-2 py-0.5 text-xs font-medium text-[#00C48C]">Client</span>
           </Link>
           <p className="text-sm text-zinc-500">Portal sign in</p>
@@ -59,7 +59,7 @@ export function PortalHeader() {
     <header className="border-b border-zinc-800/80 bg-[#07060C]/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
         <Link href="/portal" className="flex items-center gap-2">
-          <span className="text-lg font-bold tracking-tight text-zinc-50">HAWK</span>
+          <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
           <span className="rounded-md bg-[#00C48C]/15 px-2 py-0.5 text-xs font-medium text-[#00C48C]">Client</span>
         </Link>
         <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-400">
