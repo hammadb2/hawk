@@ -44,8 +44,8 @@ export default function AuditLogPage() {
       const activities = (data ?? []) as CrmActivityRow[];
 
       // Enrich with prospect and author names
-      const prospectIds = [...new Set(activities.map((a) => a.prospect_id).filter(Boolean))] as string[];
-      const authorIds = [...new Set(activities.map((a) => a.created_by).filter(Boolean))] as string[];
+      const prospectIds = Array.from(new Set(activities.map((a) => a.prospect_id).filter(Boolean))) as string[];
+      const authorIds = Array.from(new Set(activities.map((a) => a.created_by).filter(Boolean))) as string[];
 
       const [prospectRes, authorRes] = await Promise.all([
         prospectIds.length > 0
@@ -77,7 +77,7 @@ export default function AuditLogPage() {
 
       // Load unique activity types for filter
       if (activityTypes.length === 0) {
-        const types = [...new Set(activities.map((a) => a.type))].sort();
+        const types = Array.from(new Set(activities.map((a) => a.type))).sort();
         if (types.length > 0) setActivityTypes(types);
       }
     } catch (e) {
