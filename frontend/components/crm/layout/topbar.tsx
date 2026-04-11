@@ -18,7 +18,9 @@ import type { CrmNotificationRow, Prospect } from "@/lib/crm/types";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 
-export function CrmTopbar() {
+type TopbarProps = { theme?: "dark" | "light"; toggleTheme?: () => void };
+
+export function CrmTopbar({ theme, toggleTheme }: TopbarProps = {}) {
   const router = useRouter();
   const { profile, session, signOut } = useCrmAuth();
   const supabase = useMemo(() => createClient(), []);
@@ -162,6 +164,18 @@ export function CrmTopbar() {
         </Button>
 
         <div className="flex items-center gap-2">
+          {toggleTheme && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-zinc-300"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === "light" ? "🌙" : "☀️"}
+            </Button>
+          )}
+
           <div className="relative">
             <Button
               variant="ghost"
