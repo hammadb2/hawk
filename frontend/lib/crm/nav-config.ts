@@ -15,6 +15,7 @@ export const CRM_NAV: NavItem[] = [
   { href: "/crm/scoreboard", label: "Scoreboard", roles: ["ceo", "hos", "team_lead", "sales_rep"] },
   { href: "/crm/charlotte", label: "Charlotte", roles: ["ceo", "hos"] },
   { href: "/crm/charlotte/replies", label: "Replies", roles: ["ceo", "hos", "team_lead"] },
+  { href: "/crm/guarantees", label: "Guarantees", roles: ["ceo", "hos"] },
   { href: "/crm/health", label: "Health", roles: ["ceo", "hos"] },
   { href: "/crm/team", label: "Team", badgeKey: "team_flagged", roles: ["ceo", "hos"] },
   { href: "/crm/reports", label: "Reports", roles: ["ceo", "hos", "team_lead"] },

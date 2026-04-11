@@ -10,19 +10,51 @@ import { STAGE_META, STAGE_ORDER } from "@/lib/crm/types";
 
 const CLOSED = new Set(["lost", "closed_won"]);
 
-function monthStartIso(): string {
+type DateRange = "mtd" | "last30" | "last90" | "ytd" | "all";
+
+const DATE_RANGE_LABELS: Record<DateRange, string> = {
+  mtd: "Month to date",
+  last30: "Last 30 days",
+  last90: "Last 90 days",
+  ytd: "Year to date",
+  all: "All time",
+};
+
+function rangeStartIso(range: DateRange): string | null {
   const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  switch (range) {
+    case "mtd":
+      d.setDate(1);
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    case "last30":
+      d.setDate(d.getDate() - 30);
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    case "last90":
+      d.setDate(d.getDate() - 90);
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    case "ytd":
+      d.setMonth(0, 1);
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    case "all":
+      return null;
+  }
+}
+
+function toCsvRow(cells: string[]): string {
+  return cells.map((c) => `"${c.replace(/"/g, '""')}"`).join(",");
 }
 
 export function ReportsHub() {
   const supabase = useMemo(() => createClient(), []);
   const { authReady, session, profile } = useCrmAuth();
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<DateRange>("mtd");
   const [openPipeline, setOpenPipeline] = useState(0);
-  const [clientsMtd, setClientsMtd] = useState(0);
+  const [clientsInRange, setClientsInRange] = useState(0);
   const [bookedMrrCents, setBookedMrrCents] = useState(0);
   const [pendingCommCents, setPendingCommCents] = useState(0);
   const [funnel, setFunnel] = useState<Record<string, number>>({});
@@ -31,11 +63,11 @@ export function ReportsHub() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const start = monthStartIso();
+      const start = rangeStartIso(range);
       const [{ data: prospects, error: e1 }, { data: clients, error: e2 }, commRes] = await Promise.all([
-        supabase.from("prospects").select("stage"),
+        supabase.from("prospects").select("stage, created_at"),
         supabase.from("clients").select("mrr_cents, status, close_date"),
-        supabase.from("crm_commissions").select("amount_cents, status"),
+        supabase.from("crm_commissions").select("amount_cents, status, created_at"),
       ]);
 
       if (e1) throw e1;
@@ -56,6 +88,7 @@ export function ReportsHub() {
       let won = 0;
       let lost = 0;
       for (const p of plist) {
+        if (start && (p.created_at as string) < start) continue;
         const st = p.stage as string;
         byStage[st] = (byStage[st] ?? 0) + 1;
         if (!CLOSED.has(st)) open += 1;
@@ -63,20 +96,21 @@ export function ReportsHub() {
         if (st === "lost") lost += 1;
       }
 
-      let mtd = 0;
+      let inRange = 0;
       let mrr = 0;
       for (const c of clients ?? []) {
-        if ((c.close_date as string) >= start) mtd += 1;
+        if (!start || (c.close_date as string) >= start) inRange += 1;
         if (c.status === "active") mrr += (c.mrr_cents as number) ?? 0;
       }
 
       let pend = 0;
       for (const x of commissions) {
+        if (start && (x.created_at as string) < start) continue;
         if (x.status === "pending") pend += (x.amount_cents as number) ?? 0;
       }
 
       setOpenPipeline(open);
-      setClientsMtd(mtd);
+      setClientsInRange(inRange);
       setBookedMrrCents(mrr);
       setPendingCommCents(pend);
       setFunnel(byStage);
@@ -86,11 +120,34 @@ export function ReportsHub() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, range]);
 
   useEffect(() => {
     if (authReady && session && profile) void load();
   }, [authReady, session, profile, load]);
+
+  function exportCsv() {
+    const rows = [
+      toCsvRow(["Metric", "Value"]),
+      toCsvRow(["Date range", DATE_RANGE_LABELS[range]]),
+      toCsvRow(["Open pipeline", String(openPipeline)]),
+      toCsvRow(["New clients", String(clientsInRange)]),
+      toCsvRow(["Booked MRR (active)", formatUsd(bookedMrrCents)]),
+      toCsvRow(["Pending commission", formatUsd(pendingCommCents)]),
+      toCsvRow(["Won", String(wonLost.won)]),
+      toCsvRow(["Lost", String(wonLost.lost)]),
+      "",
+      toCsvRow(["Stage", "Count"]),
+      ...STAGE_ORDER.map((st) => toCsvRow([STAGE_META[st as ProspectStage].label, String(funnel[st] ?? 0)])),
+    ];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hawk-crm-report-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   if (!authReady || !session || !profile) {
     return (
@@ -106,16 +163,36 @@ export function ReportsHub() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-zinc-500">
-          Numbers respect your role: team leads see their pod; executives see the full org.
-        </p>
-        <button
-          type="button"
-          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900"
-          onClick={() => void load()}
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value as DateRange)}
+            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-300 focus:border-emerald-600 focus:outline-none"
+          >
+            {(Object.keys(DATE_RANGE_LABELS) as DateRange[]).map((k) => (
+              <option key={k} value={k}>{DATE_RANGE_LABELS[k]}</option>
+            ))}
+          </select>
+          <p className="text-sm text-zinc-500">
+            Numbers respect your role: team leads see their pod; executives see the full org.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900"
+            onClick={exportCsv}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900"
+            onClick={() => void load()}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -129,9 +206,9 @@ export function ReportsHub() {
               <p className="mt-1 text-xs text-zinc-600">Prospects not lost / won</p>
             </div>
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">New clients (MTD)</div>
-              <div className="mt-1 text-2xl font-semibold text-sky-400">{clientsMtd}</div>
-              <p className="mt-1 text-xs text-zinc-600">Client records created this month</p>
+              <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">New clients</div>
+              <div className="mt-1 text-2xl font-semibold text-sky-400">{clientsInRange}</div>
+              <p className="mt-1 text-xs text-zinc-600">In selected date range</p>
             </div>
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-4">
               <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Booked MRR (active)</div>
@@ -148,7 +225,7 @@ export function ReportsHub() {
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
               <h2 className="text-sm font-semibold text-zinc-200">Pipeline funnel</h2>
-              <p className="mt-0.5 text-xs text-zinc-500">Prospect count by stage (visible scope)</p>
+              <p className="mt-0.5 text-xs text-zinc-500">Prospect count by stage ({DATE_RANGE_LABELS[range].toLowerCase()})</p>
               <ul className="mt-4 space-y-2">
                 {STAGE_ORDER.map((st) => {
                   const n = funnel[st] ?? 0;
@@ -172,8 +249,8 @@ export function ReportsHub() {
             </div>
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-              <h2 className="text-sm font-semibold text-zinc-200">Outcomes (prospects)</h2>
-              <p className="mt-0.5 text-xs text-zinc-500">Won vs lost cards still in pipeline data</p>
+              <h2 className="text-sm font-semibold text-zinc-200">Outcomes</h2>
+              <p className="mt-0.5 text-xs text-zinc-500">Won vs lost in {DATE_RANGE_LABELS[range].toLowerCase()}</p>
               <dl className="mt-4 space-y-3 text-sm">
                 <div className="flex justify-between border-b border-zinc-800/80 pb-2">
                   <dt className="text-zinc-500">Marked closed won</dt>

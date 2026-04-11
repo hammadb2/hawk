@@ -27,9 +27,43 @@ const OBJECTIONS: Record<string, { q: string; a: string }[]> = {
   default: [
     { q: "We already have IT.", a: "This scan is external, like an attacker. It often finds gaps internal tools miss." },
     { q: "Send info by email.", a: "Happy to. The report is ready; I can send it right after this call." },
+    { q: "We're too small to be targeted.", a: "Actually, 43% of cyberattacks target small businesses. Hackers use automated tools that scan every domain regardless of size." },
+    { q: "How much does it cost?", a: "We have plans starting at $97/month. But first, let me show you what's exposed — the scan is free." },
   ],
   dental: [
     { q: "We use a managed IT vendor.", a: "Great. This shows what shows up from the outside on your domain, vendor aside." },
+    { q: "We're PHIPA compliant already.", a: "PHIPA covers internal processes, but external attack surface is different. This scan checks what a hacker sees from outside." },
+    { q: "Our patient data is in the cloud.", a: "Cloud apps still connect through your domain. If your email or DNS is compromised, patient data is at risk regardless of where it's stored." },
+  ],
+  law: [
+    { q: "We have solicitor-client privilege concerns.", a: "Exactly why this matters — a breach of privileged communications is a regulatory nightmare. This scan shows external exposure, no data access needed." },
+    { q: "Our IT firm handles security.", a: "They handle internal. This scan shows what's visible externally — things your IT firm may not monitor from outside the firewall." },
+    { q: "We're a small firm, not a target.", a: "Law firms hold high-value data — client financials, case strategies. Attackers know this. 25% of law firms report being breached." },
+  ],
+  accounting: [
+    { q: "We use QuickBooks Online, it's secure.", a: "QuickBooks itself may be, but your domain, email, and login portals are separate attack surfaces. That's what we scan." },
+    { q: "CRA already audits us.", a: "CRA audits your books, not your cybersecurity. If client SINs or financial data leak, that's a privacy breach — different liability entirely." },
+    { q: "Tax season is too busy for this.", a: "That's actually when you're most vulnerable — staff are rushing, phishing emails spike. A quick scan now prevents a crisis during crunch time." },
+  ],
+  financial: [
+    { q: "We're regulated by IIROC/MFDA.", a: "Regulation requires you to protect client data, but doesn't tell you what's exposed externally. This scan fills that gap." },
+    { q: "Our compliance team handles this.", a: "Compliance ensures policy — this scan shows technical reality. We often find gaps between what policy says and what's actually exposed." },
+    { q: "Our clients trust us already.", a: "Trust is built on protection. If a breach hits the news, clients leave. This scan helps you verify the trust is warranted." },
+  ],
+  medical: [
+    { q: "We're PHIPA/PIPEDA compliant.", a: "Compliance is about process. This scan shows technical exposure — open ports, vulnerable services, leaked credentials. Compliance doesn't catch those." },
+    { q: "Our EMR vendor handles security.", a: "They secure their platform, but your clinic's domain, email, and network are your responsibility. That's what we check." },
+    { q: "We don't store data on our servers.", a: "Your email, patient portal login, and DNS records are still on your domain. If those are compromised, attackers can intercept or redirect patient data." },
+  ],
+  optometry: [
+    { q: "We're a small clinic.", a: "Small clinics are prime targets — less security budget, same valuable patient data. Automated attacks don't discriminate by size." },
+    { q: "Our PMS vendor handles everything.", a: "Your practice management system is one piece. Your domain, email, and any connected devices are separate attack surfaces we scan." },
+    { q: "Insurance covers us for breaches.", a: "Insurance covers costs after a breach, but not reputation damage or patient trust. Prevention is cheaper than a claim — and some policies require proof of security measures." },
+  ],
+  physiotherapy: [
+    { q: "We mostly use paper records.", a: "If you have email, a website, or any online booking, you have an attack surface. We scan what's visible from the outside." },
+    { q: "Our patients wouldn't care about a breach.", a: "Patient health records are worth 10x more than credit cards on the dark web. PHIPA requires you to protect them regardless." },
+    { q: "We can't afford cybersecurity.", a: "The average breach costs a small health practice $150K+. Our plans start at $97/month — that's insurance for your digital front door." },
   ],
 };
 
@@ -128,7 +162,15 @@ export default function CallModePage() {
       : Array.isArray(rawFindings)
         ? rawFindings.slice(0, 3)
         : [];
-  const ind = p?.industry?.toLowerCase().includes("dental") ? "dental" : "default";
+  const industryLower = (p?.industry ?? "").toLowerCase();
+  const ind = industryLower.includes("dental") ? "dental"
+    : industryLower.includes("law") || industryLower.includes("legal") ? "law"
+    : industryLower.includes("accounting") || industryLower.includes("cpa") || industryLower.includes("bookkeep") ? "accounting"
+    : industryLower.includes("financial") || industryLower.includes("advisor") || industryLower.includes("wealth") || industryLower.includes("insurance") ? "financial"
+    : industryLower.includes("medical") || industryLower.includes("clinic") || industryLower.includes("doctor") || industryLower.includes("physician") ? "medical"
+    : industryLower.includes("optom") || industryLower.includes("eye") || industryLower.includes("vision") ? "optometry"
+    : industryLower.includes("physio") || industryLower.includes("chiro") || industryLower.includes("rehab") ? "physiotherapy"
+    : "default";
   const pool = OBJECTIONS[ind] ?? OBJECTIONS.default;
 
   if (!id) return <p className="p-6 text-zinc-500">Invalid</p>;
