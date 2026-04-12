@@ -68,6 +68,38 @@ def verify_payment(body: VerifyPaymentBody, uid: str = Depends(require_supabase_
     return {"verified": ok}
 
 
+@router.patch("/commissions/bulk-update")
+def bulk_update_commission_status(
+    body: UpdateCommissionBody,
+    uid: str = Depends(require_supabase_uid),
+):
+    """CEO/HoS bulk-updates all pending commissions to approved, or all approved to paid."""
+    _require_exec_role(uid)
+    if not SUPABASE_URL:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    # Determine which commissions to update based on target status
+    if body.status == "approved":
+        source_status = "pending"
+    elif body.status == "paid":
+        source_status = "approved"
+    else:
+        raise HTTPException(status_code=400, detail="Bulk update only supports pending→approved or approved→paid")
+
+    r = httpx.patch(
+        f"{SUPABASE_URL}/rest/v1/crm_commissions",
+        headers=_sb_headers(),
+        params={"status": f"eq.{source_status}"},
+        json={"status": body.status},
+        timeout=30.0,
+    )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text[:400])
+
+    updated = r.json() if r.text.strip() else []
+    return {"ok": True, "updated_count": len(updated) if isinstance(updated, list) else 0}
+
+
 @router.patch("/commissions/{commission_id}")
 def update_commission_status(
     commission_id: str,
@@ -103,35 +135,3 @@ def update_commission_status(
 
     updated = r.json()
     return {"ok": True, "commission": updated[0] if updated else None}
-
-
-@router.patch("/commissions/bulk-update")
-def bulk_update_commission_status(
-    body: UpdateCommissionBody,
-    uid: str = Depends(require_supabase_uid),
-):
-    """CEO/HoS bulk-updates all pending commissions to approved, or all approved to paid."""
-    _require_exec_role(uid)
-    if not SUPABASE_URL:
-        raise HTTPException(status_code=503, detail="Supabase not configured")
-
-    # Determine which commissions to update based on target status
-    if body.status == "approved":
-        source_status = "pending"
-    elif body.status == "paid":
-        source_status = "approved"
-    else:
-        raise HTTPException(status_code=400, detail="Bulk update only supports pending→approved or approved→paid")
-
-    r = httpx.patch(
-        f"{SUPABASE_URL}/rest/v1/crm_commissions",
-        headers=_sb_headers(),
-        params={"status": f"eq.{source_status}"},
-        json={"status": body.status},
-        timeout=30.0,
-    )
-    if r.status_code >= 400:
-        raise HTTPException(status_code=r.status_code, detail=r.text[:400])
-
-    updated = r.json() if r.text.strip() else []
-    return {"ok": True, "updated_count": len(updated) if isinstance(updated, list) else 0}
