@@ -217,7 +217,7 @@ export default function PortalFindingsPage() {
                       >
                         {STATUSES.map((s) => (
                           <option key={s} value={s}>
-                            {s.replace("_", " ")}
+                            {s.replaceAll("_", " ")}
                           </option>
                         ))}
                       </select>

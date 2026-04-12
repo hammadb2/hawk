@@ -261,43 +261,43 @@ function PortalBillingContent() {
       </div>
 
       <p className="mb-6 text-center text-sm text-zinc-400">
-          Activate your subscription to open the full HAWK client portal.
+        Activate your subscription to open the full HAWK client portal.
+      </p>
+
+      {!stripePromise ? (
+        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
+          Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
         </p>
-
-        {!stripePromise ? (
-          <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
-            Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
-          </p>
-        ) : (
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-            <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
-              <h1 className="text-2xl font-bold text-zinc-50">{title}</h1>
-              <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
-                {price}
-              </p>
-              <ul className="mt-6 space-y-2 text-sm text-zinc-300">
-                {features.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span style={{ color: ACCENT }}>✓</span>
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-8 text-sm leading-relaxed text-zinc-500">
-                Backed by our breach response guarantee.
-                <br />
-                Cancel anytime.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
-              <h2 className="mb-6 text-lg font-semibold text-zinc-100">Payment</h2>
-              <Elements stripe={stripePromise}>
-                <PortalBillingFormInner plan={plan} />
-              </Elements>
-            </div>
+      ) : (
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
+            <h2 className="text-2xl font-bold text-zinc-50">{title}</h2>
+            <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
+              {price}
+            </p>
+            <ul className="mt-6 space-y-2 text-sm text-zinc-300">
+              {features.map((f) => (
+                <li key={f} className="flex gap-2">
+                  <span style={{ color: ACCENT }}>✓</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-8 text-sm leading-relaxed text-zinc-500">
+              Backed by our breach response guarantee.
+              <br />
+              Cancel anytime.
+            </p>
           </div>
-        )}
+
+          <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
+            <h2 className="mb-6 text-lg font-semibold text-zinc-100">Payment</h2>
+            <Elements stripe={stripePromise}>
+              <PortalBillingFormInner plan={plan} />
+            </Elements>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

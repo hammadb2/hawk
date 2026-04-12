@@ -23,7 +23,7 @@ function PortalLoginForm() {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
-    const nextPath = searchParams.get("next") || "/portal/billing";
+    const nextPath = searchParams.get("next") || "/portal";
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {

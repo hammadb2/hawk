@@ -50,7 +50,7 @@ export default function PortalAskPage() {
       <div>
         <h1 className="text-2xl font-semibold text-zinc-50">Ask HAWK AI Advisor</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Answers use your latest scan, industry, and Canadian privacy context (PIPEDA / C-26). Not legal advice.
+          Answers use your latest scan, industry, and Canadian privacy context (PIPEDA / C-27). Not legal advice.
         </p>
         <Link href="/portal" className="mt-2 inline-block text-sm text-[#00C48C] hover:underline">
           ← Back to overview
