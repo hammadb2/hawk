@@ -7,7 +7,6 @@ import { loadStripe } from "@stripe/stripe-js";
 import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { billingApi } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
-import { isStripeCheckoutTestMode } from "@/lib/stripe-checkout-mode";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,6 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const testMode = isStripeCheckoutTestMode();
   const priceLabel = plan === "shield" ? "CA$997/month" : "CA$199/month";
   const buttonLabel = `Pay ${priceLabel}`;
 
@@ -90,7 +88,7 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
         {
           name: name.trim() || name,
           hawk_product: plan,
-          test_mode: testMode,
+          test_mode: false,
         },
         session.access_token,
       );
@@ -200,8 +198,7 @@ function PortalBillingContent() {
   const plan: "shield" | "starter" = planParam === "starter" ? "starter" : "shield";
 
   const stripePromise = useMemo(() => {
-    const test = isStripeCheckoutTestMode();
-    const pk = test ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     if (!pk) return null;
     return loadStripe(pk);
   }, []);
@@ -264,49 +261,43 @@ function PortalBillingContent() {
       </div>
 
       <p className="mb-6 text-center text-sm text-zinc-400">
-          Activate your subscription to open the full HAWK client portal.
+        Activate your subscription to open the full HAWK client portal.
+      </p>
+
+      {!stripePromise ? (
+        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
+          Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
         </p>
-
-        {isStripeCheckoutTestMode() && (
-          <p className="mb-8 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
-            <strong className="text-amber-50">Test mode</strong> — use card 4242 4242 4242 4242. No real charge.
-          </p>
-        )}
-
-        {!stripePromise ? (
-          <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
-            Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
-          </p>
-        ) : (
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-            <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
-              <h1 className="text-2xl font-bold text-zinc-50">{title}</h1>
-              <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
-                {price}
-              </p>
-              <ul className="mt-6 space-y-2 text-sm text-zinc-300">
-                {features.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span style={{ color: ACCENT }}>✓</span>
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-8 text-sm leading-relaxed text-zinc-500">
-                Backed by our breach response guarantee.
-                <br />
-                Cancel anytime.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
-              <h2 className="mb-6 text-lg font-semibold text-zinc-100">Payment</h2>
-              <Elements stripe={stripePromise}>
-                <PortalBillingFormInner plan={plan} />
-              </Elements>
-            </div>
+      ) : (
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
+            <h2 className="text-2xl font-bold text-zinc-50">{title}</h2>
+            <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
+              {price}
+            </p>
+            <ul className="mt-6 space-y-2 text-sm text-zinc-300">
+              {features.map((f) => (
+                <li key={f} className="flex gap-2">
+                  <span style={{ color: ACCENT }}>✓</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-8 text-sm leading-relaxed text-zinc-500">
+              Backed by our breach response guarantee.
+              <br />
+              Cancel anytime.
+            </p>
           </div>
-        )}
+
+          <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
+            <h2 className="mb-6 text-lg font-semibold text-zinc-100">Payment</h2>
+            <Elements stripe={stripePromise}>
+              <PortalBillingFormInner plan={plan} />
+            </Elements>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

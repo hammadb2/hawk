@@ -6,7 +6,6 @@ import {
   EnterpriseBookingLink,
   ShieldCheckoutButton,
   StarterCheckoutButton,
-  StripeTestModeBanner,
 } from "./pricing-checkout-buttons";
 
 function NavScanButton({ className }: { className?: string }) {
@@ -214,7 +213,6 @@ export function MarketingHome() {
             <h2 className="text-3xl font-extrabold text-text-primary sm:text-4xl">Pricing</h2>
             <p className="mt-4 text-lg text-text-secondary">Enterprise-grade security, priced for small businesses.</p>
           </div>
-          <StripeTestModeBanner />
           <div className="mx-auto mt-16 grid max-w-6xl gap-8 lg:grid-cols-3 items-center">
             <div className="rounded-2xl border border-surface-3 bg-white p-8 shadow-sm">
               <h3 className="text-xl font-bold text-text-primary">HAWK Starter</h3>

@@ -154,6 +154,26 @@ def va_action(body: VaActionBody, uid: str = Depends(require_supabase_uid)):
     return {"ok": True, "crm_url": f"{base}/crm/prospects/{body.prospect_id}"}
 
 
+@router.get("/charlotte-runs")
+def list_charlotte_runs(uid: str = Depends(require_supabase_uid)):
+    """Recent Charlotte automation runs with stats."""
+    _require_va_dashboard(uid)
+    if not SUPABASE_URL:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/charlotte_runs",
+        headers=_sb_headers(),
+        params={
+            "select": "*",
+            "order": "created_at.desc",
+            "limit": "25",
+        },
+        timeout=30.0,
+    )
+    r.raise_for_status()
+    return {"ok": True, "runs": r.json() or []}
+
+
 @router.get("/health-dashboard")
 def health_dashboard(uid: str = Depends(require_supabase_uid)):
     _require_va_dashboard(uid)

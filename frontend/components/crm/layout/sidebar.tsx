@@ -21,6 +21,7 @@ const icons: Record<string, string> = {
   Settings: "⚙",
   "Support Tickets": "🎫",
   Replies: "↩",
+  Guarantees: "🛡",
   Health: "◆",
 };
 

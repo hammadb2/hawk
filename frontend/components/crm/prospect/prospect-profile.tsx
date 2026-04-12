@@ -73,6 +73,9 @@ export function ProspectProfile({
   const [newNote, setNewNote] = useState("");
   const [fileTitle, setFileTitle] = useState("");
   const [fileUrl, setFileUrl] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const canReassign = profile?.role === "ceo" || profile?.role === "hos";
   const privileged = profile?.role === "ceo" || profile?.role === "hos";
@@ -370,6 +373,31 @@ export function ProspectProfile({
     await load();
   }
 
+  async function sendEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!emailSubject.trim() || !emailBody.trim() || !p?.contact_email) return;
+    setSendingEmail(true);
+    try {
+      await supabase.from("prospect_email_events").insert({
+        prospect_id: prospectId,
+        subject: emailSubject.trim(),
+        sent_at: new Date().toISOString(),
+        sequence_step: null,
+        source: "manual",
+        metadata: { body: emailBody.trim(), sent_by: session?.user?.id },
+      });
+      await logActivity("email_sent", { subject: emailSubject.trim() });
+      toast.success("Email logged");
+      setEmailSubject("");
+      setEmailBody("");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to log email");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
   if (loading || !p) {
     return (
       <div className="flex min-h-[200px] items-center justify-center text-zinc-500">
@@ -653,7 +681,38 @@ export function ProspectProfile({
           ))}
         </TabsContent>
 
-        <TabsContent value="emails" className="min-h-[120px] space-y-2 text-sm">
+        <TabsContent value="emails" className="min-h-[120px] space-y-4 text-sm">
+          {p.contact_email && (
+            <form onSubmit={sendEmail} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-zinc-500">
+                <span>To:</span>
+                <span className="text-zinc-300">{p.contact_email}</span>
+              </div>
+              <Input
+                placeholder="Subject"
+                className="border-zinc-700 bg-zinc-900 text-sm"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+              <textarea
+                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                rows={4}
+                placeholder="Compose your email…"
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+              />
+              <div className="flex justify-end">
+                <Button type="submit" size="sm" className="bg-emerald-600" disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}>
+                  {sendingEmail ? "Sending…" : "Log & send"}
+                </Button>
+              </div>
+            </form>
+          )}
+          {!p.contact_email && (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              Add a contact email to this prospect to enable inline email composition.
+            </p>
+          )}
           {emailEvents.length === 0 && (
             <p className="text-zinc-500">
               No email events yet. POST to the API webhook (see{" "}

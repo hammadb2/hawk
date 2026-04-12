@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { billingApi } from "@/lib/api";
-import { isStripeCheckoutTestMode } from "@/lib/stripe-checkout-mode";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,9 +40,8 @@ function CheckoutFormInner({ plan }: { plan: "shield" | "starter" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const testMode = isStripeCheckoutTestMode();
   const priceLabel = plan === "shield" ? "CA$997/month" : "CA$199/month";
-  const buttonLabel = plan === "shield" ? `Pay ${priceLabel}` : `Pay ${priceLabel}`;
+  const buttonLabel = `Pay ${priceLabel}`;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,7 +59,7 @@ function CheckoutFormInner({ plan }: { plan: "shield" | "starter" }) {
         email: email.trim(),
         name: name.trim(),
         hawk_product: plan,
-        test_mode: testMode,
+        test_mode: false,
       });
 
       const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(client_secret, {
@@ -165,8 +163,7 @@ function CheckoutPageContent() {
   const plan: "shield" | "starter" = planParam === "starter" ? "starter" : "shield";
 
   const stripePromise = useMemo(() => {
-    const test = isStripeCheckoutTestMode();
-    const pk = test ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     if (!pk) return null;
     return loadStripe(pk);
   }, []);
@@ -187,16 +184,9 @@ function CheckoutPageContent() {
           </Link>
         </div>
 
-        {isStripeCheckoutTestMode() && (
-          <p className="mb-8 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
-            <strong className="text-amber-50">Test mode</strong> — use card 4242 4242 4242 4242. No real charge.
-          </p>
-        )}
-
         {!stripePromise ? (
           <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
-            Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-            {isStripeCheckoutTestMode() ? " or NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST" : ""} on Vercel.
+            Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
           </p>
         ) : (
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">

@@ -14,7 +14,6 @@ function PortalLoginForm() {
   const searchParams = useSearchParams();
   const err = searchParams.get("error");
   const postCheckout = searchParams.get("welcome") === "1";
-  const testCheckout = searchParams.get("test_checkout") === "1";
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,7 +23,7 @@ function PortalLoginForm() {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
-    const nextPath = searchParams.get("next") || "/portal/billing";
+    const nextPath = searchParams.get("next") || "/portal";
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
@@ -52,9 +51,6 @@ function PortalLoginForm() {
               <strong className="text-[#00C48C]">Payment confirmed.</strong> You aren&apos;t signed in yet — that&apos;s
               normal. Use the <strong>same email you entered in Stripe</strong>. Check your inbox for the HAWK portal invite
               (magic link), or enter that email below and we&apos;ll send a new link.
-              {testCheckout && (
-                <span className="mt-2 block text-zinc-400">Stripe test mode: no real charge.</span>
-              )}
             </p>
           )}
           {err === "not_linked" && (

@@ -70,15 +70,8 @@ function PortalWelcomeToast() {
       if (!user) return;
       if (welcomeToast.current) return;
       welcomeToast.current = true;
-      const test = searchParams.get("test_checkout") === "1";
-      toast.success(
-        test
-          ? "Test checkout complete — Stripe test mode. No real charge. Webhook should have fired; check CRM and email."
-          : "Welcome to HAWK — your subscription is active. Check your email for onboarding.",
-      );
-      const clean = new URLSearchParams();
-      if (test) clean.set("test_checkout", "1");
-      router.replace(`/portal${clean.toString() ? `?${clean}` : ""}`, { scroll: false });
+      toast.success("Welcome to HAWK — your subscription is active. Check your email for onboarding.");
+      router.replace("/portal", { scroll: false });
     })();
   }, [searchParams, router, supabase]);
   return null;
@@ -114,7 +107,6 @@ function PortalHomeContent() {
       const q = new URLSearchParams();
       q.set("next", "/portal");
       if (searchParams.get("welcome") === "1") q.set("welcome", "1");
-      if (searchParams.get("test_checkout") === "1") q.set("test_checkout", "1");
       router.replace(`/portal/login?${q.toString()}`);
       setLoading(false);
       return;
@@ -333,7 +325,7 @@ function PortalHomeContent() {
       const res = await fetch("/api/portal/pipeda-report");
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
-        window.alert(j.error || "Could not generate the report. Try again later.");
+        toast.error(j.error || "Could not generate the report. Try again later.");
         return;
       }
       const blob = await res.blob();
@@ -344,7 +336,7 @@ function PortalHomeContent() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      window.alert("Download failed. Check your connection and try again.");
+      toast.error("Download failed. Check your connection and try again.");
     } finally {
       setPipedaBusy(false);
     }
@@ -535,7 +527,7 @@ function PortalHomeContent() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {[
-          { href: "/portal/ask", label: "Ask HAWK AI", sub: "Claude + your scan context" },
+          { href: "/portal/ask", label: "Ask HAWK AI", sub: "AI advisor + your scan context" },
           { href: "/portal/briefing", label: "Weekly briefing", sub: "Sector threat digest" },
           { href: "/portal/findings", label: "Findings", sub: "Status & verify fixes" },
           { href: "/portal/journey", label: "Journey", sub: "Scores & badges" },
@@ -544,6 +536,8 @@ function PortalHomeContent() {
           { href: "/portal/enterprise", label: "Enterprise", sub: "Multi-domain rollup" },
           { href: "/portal/attacker-simulation", label: "Attacker sim", sub: "Weekly narrative" },
           { href: "/portal/compliance", label: "C-27 primer", sub: "Canada privacy reform" },
+          { href: "/portal/billing", label: "Billing", sub: "Subscription & invoices" },
+          { href: "/portal/settings", label: "Settings", sub: "Account & domain" },
         ].map((x) => (
           <Link
             key={x.href}
@@ -618,16 +612,6 @@ function PortalHomeContent() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-6">
-        <h2 className="text-lg font-semibold text-zinc-100">Ask HAWK</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          Get personalised security Q&amp;A grounded in your latest scan context — open the full chat with streaming
-          answers.
-        </p>
-        <Button asChild className="mt-4 bg-zinc-100 text-zinc-900 hover:bg-white">
-          <Link href="/portal/ask">Open Ask HAWK</Link>
-        </Button>
-      </section>
     </div>
   );
 }
