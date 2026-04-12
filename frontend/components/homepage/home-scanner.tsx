@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const HAWK = "#00C48C";
+const BRAND = "#0052CC";
 
 function normalizeDomain(raw: string): string {
   let d = raw.trim().toLowerCase();
@@ -17,7 +17,7 @@ function normalizeDomain(raw: string): string {
 
 function gradeStroke(grade: string | undefined): string {
   const g = (grade || "F").toUpperCase()[0];
-  if (g === "A" || g === "B") return HAWK;
+  if (g === "A" || g === "B") return BRAND;
   if (g === "C") return "#FBBF24";
   return "#F87171";
 }
@@ -31,7 +31,7 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
   return (
     <div className="relative mx-auto h-[140px] w-[140px] shrink-0">
       <svg width="140" height="140" viewBox="0 0 120 120" className="block" aria-hidden>
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#1A1727" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#E2E8F0" strokeWidth="10" />
         <circle
           cx="60"
           cy="60"
@@ -174,8 +174,7 @@ export function HomeScanner() {
           type="button"
           onClick={onScan}
           disabled={phase === "scanning" || !normalizeDomain(domain).includes(".")}
-          className="h-12 shrink-0 px-6 font-semibold text-[#07060C] sm:min-w-[200px]"
-          style={{ backgroundColor: HAWK }}
+          className="h-12 shrink-0 px-6 font-semibold text-white bg-accent hover:bg-accent/90 sm:min-w-[200px]"
         >
           {phase === "scanning" ? "Scanning…" : "Scan My Domain Free"}
         </Button>
@@ -193,7 +192,7 @@ export function HomeScanner() {
             return (
               <div
                 key={line}
-                className={cn("flex gap-2 py-1.5 text-text-secondary", (done || spinning) && "text-[#00C48C]")}
+                className={cn("flex gap-2 py-1.5 text-text-secondary", (done || spinning) && "text-accent")}
               >
                 <span className="w-5 shrink-0 font-mono text-xs" aria-hidden>
                   {done ? "✓" : spinning ? "⟳" : "·"}
@@ -223,7 +222,7 @@ export function HomeScanner() {
             </p>
           )}
           {emailSentSlow ? (
-            <p className="text-sm text-[#00C48C]">
+            <p className="text-sm text-accent font-medium">
               Check your inbox in 5 minutes. We are running your full security analysis now.
             </p>
           ) : (
@@ -236,7 +235,7 @@ export function HomeScanner() {
                 onChange={(e) => setEmailSlow(e.target.value)}
                 className="h-12 border-surface-3 bg-background"
               />
-              <Button type="submit" className="h-12 font-semibold text-[#07060C] sm:shrink-0" style={{ backgroundColor: HAWK }}>
+              <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
                 Send Me The Results
               </Button>
             </form>
@@ -263,8 +262,8 @@ export function HomeScanner() {
             </h3>
             <ul className="space-y-3 text-text-secondary">
               {plain.slice(0, 3).map((line, i) => (
-                <li key={i} className="flex gap-2 border-l-2 border-[#00C48C]/40 pl-4 leading-relaxed">
-                  <span className="text-[#00C48C]" aria-hidden>
+                <li key={i} className="flex gap-2 border-l-2 border-accent/40 pl-4 leading-relaxed">
+                  <span className="text-accent" aria-hidden>
                     •
                   </span>
                   <span>{line}</span>
@@ -284,7 +283,7 @@ export function HomeScanner() {
               Enter your email and we will send you the full report within 5 minutes — free.
             </p>
             {emailSent ? (
-              <p className="mt-4 text-sm text-[#00C48C]">
+              <p className="mt-4 text-sm text-accent font-medium">
                 Check your inbox in 5 minutes. We are running your full security analysis now.
               </p>
             ) : (
@@ -297,7 +296,7 @@ export function HomeScanner() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="h-12 border-surface-3 bg-background"
                 />
-                <Button type="submit" className="h-12 font-semibold text-[#07060C] sm:shrink-0" style={{ backgroundColor: HAWK }}>
+                <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
                   Send Me The Full Report
                 </Button>
               </form>
