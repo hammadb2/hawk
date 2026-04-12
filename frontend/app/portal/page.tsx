@@ -70,15 +70,8 @@ function PortalWelcomeToast() {
       if (!user) return;
       if (welcomeToast.current) return;
       welcomeToast.current = true;
-      const test = searchParams.get("test_checkout") === "1";
-      toast.success(
-        test
-          ? "Test checkout complete — Stripe test mode. No real charge. Webhook should have fired; check CRM and email."
-          : "Welcome to HAWK — your subscription is active. Check your email for onboarding.",
-      );
-      const clean = new URLSearchParams();
-      if (test) clean.set("test_checkout", "1");
-      router.replace(`/portal${clean.toString() ? `?${clean}` : ""}`, { scroll: false });
+      toast.success("Welcome to HAWK — your subscription is active. Check your email for onboarding.");
+      router.replace("/portal", { scroll: false });
     })();
   }, [searchParams, router, supabase]);
   return null;
@@ -114,7 +107,6 @@ function PortalHomeContent() {
       const q = new URLSearchParams();
       q.set("next", "/portal");
       if (searchParams.get("welcome") === "1") q.set("welcome", "1");
-      if (searchParams.get("test_checkout") === "1") q.set("test_checkout", "1");
       router.replace(`/portal/login?${q.toString()}`);
       setLoading(false);
       return;

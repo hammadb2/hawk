@@ -7,7 +7,6 @@ import { loadStripe } from "@stripe/stripe-js";
 import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { billingApi } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
-import { isStripeCheckoutTestMode } from "@/lib/stripe-checkout-mode";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,6 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const testMode = isStripeCheckoutTestMode();
   const priceLabel = plan === "shield" ? "CA$997/month" : "CA$199/month";
   const buttonLabel = `Pay ${priceLabel}`;
 
@@ -90,7 +88,7 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
         {
           name: name.trim() || name,
           hawk_product: plan,
-          test_mode: testMode,
+          test_mode: false,
         },
         session.access_token,
       );
@@ -200,8 +198,7 @@ function PortalBillingContent() {
   const plan: "shield" | "starter" = planParam === "starter" ? "starter" : "shield";
 
   const stripePromise = useMemo(() => {
-    const test = isStripeCheckoutTestMode();
-    const pk = test ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     if (!pk) return null;
     return loadStripe(pk);
   }, []);
@@ -266,12 +263,6 @@ function PortalBillingContent() {
       <p className="mb-6 text-center text-sm text-zinc-400">
           Activate your subscription to open the full HAWK client portal.
         </p>
-
-        {isStripeCheckoutTestMode() && (
-          <p className="mb-8 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
-            <strong className="text-amber-50">Test mode</strong> — use card 4242 4242 4242 4242. No real charge.
-          </p>
-        )}
 
         {!stripePromise ? (
           <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
