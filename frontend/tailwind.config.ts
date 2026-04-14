@@ -10,11 +10,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#07060C",
+        /** Page canvas (light app shell) */
+        background: "#f8fafc",
         surface: {
-          1: "#0D0B14",
-          2: "#13111E",
-          3: "#1A1727",
+          1: "#ffffff",
+          2: "#f1f5f9",
+          3: "#e2e8f0",
         },
         accent: {
           DEFAULT: "#22C55E",
@@ -25,9 +26,9 @@ const config: Config = {
         green: "#34D399",
         blue: "#60A5FA",
         yellow: "#FBBF24",
-        "text-primary": "#F2F0FA",
-        "text-secondary": "#9B98B4",
-        "text-dim": "#5C5876",
+        "text-primary": "#0f172a",
+        "text-secondary": "#475569",
+        "text-dim": "#64748b",
       },
       fontFamily: {
         sans: ["var(--font-cabinet)", "system-ui", "sans-serif"],

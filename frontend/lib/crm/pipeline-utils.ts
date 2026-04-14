@@ -5,7 +5,7 @@ export function agingBorderClass(lastActivityAt: string, now: number = Date.now(
   const days = (now - new Date(lastActivityAt).getTime()) / (1000 * 60 * 60 * 24);
   if (days >= 14) return "border-2 border-red-500 shadow-[0_0_0_1px_rgba(239,68,68,0.35)]";
   if (days >= 7) return "border-2 border-amber-400 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]";
-  return "border border-zinc-800";
+  return "border border-slate-200";
 }
 
 export function bottleneckStage(counts: Record<ProspectStage, number>): ProspectStage | null {

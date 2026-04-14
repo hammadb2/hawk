@@ -47,13 +47,13 @@ function Bubble({ msg, index }: { msg: Message; index: number }) {
           "max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
           isUser
             ? "bg-accent text-white rounded-br-sm"
-            : "bg-surface-2 text-text-primary border border-surface-3 rounded-bl-sm"
+            : "rounded-bl-sm border border-surface-3 bg-surface-2 text-text-primary shadow-sm"
         )}
       >
         {isUser ? (
           <span>{msg.content}</span>
         ) : (
-          <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:text-text-primary prose-headings:font-semibold prose-headings:text-sm prose-code:text-accent-light">
+          <div className="prose prose-slate prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:font-semibold prose-headings:text-sm prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-code:text-emerald-700">
             <ReactMarkdown>{msg.content}</ReactMarkdown>
           </div>
         )}
@@ -227,8 +227,8 @@ export default function AskHawkPage() {
             className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0",
               message.trim() && !loading
-                ? "bg-accent text-white hover:bg-accent-light"
-                : "bg-surface-3 text-text-dim cursor-not-allowed"
+                ? "bg-accent text-white hover:bg-accent/90"
+                : "cursor-not-allowed bg-slate-200 text-slate-500"
             )}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
