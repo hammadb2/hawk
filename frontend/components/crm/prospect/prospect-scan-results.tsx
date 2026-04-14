@@ -273,15 +273,15 @@ export function ProspectScanResultsPanel({
 
       {attackPaths.length > 0 && (
         <section>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-violet-400/90">Attack paths</h3>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-400/90">Attack paths</h3>
           <div className="space-y-5">
             {attackPaths.map((p, pi) => (
               <div
                 key={pi}
-                className="rounded-lg border border-violet-900/40 bg-violet-950/20 px-3 py-3"
+                className="rounded-lg border border-emerald-900/40 bg-emerald-950/20 px-3 py-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-violet-100">{p.name || `Path ${pi + 1}`}</span>
+                  <span className="font-medium text-emerald-100">{p.name || `Path ${pi + 1}`}</span>
                   {p.likelihood && (
                     <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] uppercase text-zinc-300">
                       {p.likelihood} likelihood
@@ -294,7 +294,7 @@ export function ProspectScanResultsPanel({
                     {p.steps.map((step, si) => (
                       <div key={si} className="flex items-center gap-1">
                         {si > 0 && (
-                          <span className="px-1 text-violet-500" aria-hidden>
+                          <span className="px-1 text-emerald-500" aria-hidden>
                             →
                           </span>
                         )}

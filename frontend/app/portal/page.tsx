@@ -600,7 +600,7 @@ function PortalHomeContent() {
           </p>
           <Button
             type="button"
-            className="mt-3 bg-zinc-100 text-zinc-900 hover:bg-white"
+            className="mt-3 bg-surface-2 text-text-primary hover:bg-surface-3 border border-surface-3"
             disabled={pipedaBusy || !scan}
             onClick={() => void downloadPipedaPdf()}
           >

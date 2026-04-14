@@ -32,7 +32,7 @@ export function activityLabel(type: string): string {
 
 export function activityColor(type: string): string {
   if (type.includes("call")) return "text-sky-400";
-  if (type.includes("email")) return "text-violet-400";
+  if (type.includes("email")) return "text-emerald-400";
   if (type.includes("stage")) return "text-amber-400";
   if (type.includes("scan")) return "text-emerald-400";
   if (type.includes("note")) return "text-zinc-300";

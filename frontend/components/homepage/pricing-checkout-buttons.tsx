@@ -33,7 +33,7 @@ export function EnterpriseBookingLink({ href }: { href: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-6 block w-full rounded-lg border border-surface-3 bg-white py-3 text-center text-sm font-semibold text-text-primary hover:bg-surface-2"
+      className="mt-6 block w-full rounded-lg border border-surface-3 bg-surface-1 py-3 text-center text-sm font-semibold text-text-primary hover:bg-surface-2"
     >
       Book a call — Enterprise
     </a>

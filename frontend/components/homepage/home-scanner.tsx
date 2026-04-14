@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#0052CC";
+const BRAND = "#22C55E";
 
 function normalizeDomain(raw: string): string {
   let d = raw.trim().toLowerCase();
@@ -31,7 +31,7 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
   return (
     <div className="relative mx-auto h-[140px] w-[140px] shrink-0">
       <svg width="140" height="140" viewBox="0 0 120 120" className="block" aria-hidden>
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#E2E8F0" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#1A1727" strokeWidth="10" />
         <circle
           cx="60"
           cy="60"

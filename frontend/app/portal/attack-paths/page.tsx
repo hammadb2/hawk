@@ -81,10 +81,10 @@ export default function PortalAttackPathsPage() {
           {paths.map((p, pi) => (
             <section
               key={pi}
-              className="rounded-2xl border border-violet-900/35 bg-gradient-to-b from-violet-950/30 to-zinc-950/40 p-6"
+              className="rounded-2xl border border-emerald-900/35 bg-gradient-to-b from-emerald-950/30 to-zinc-950/40 p-6"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-lg font-semibold text-violet-100">{p.name || `Scenario ${pi + 1}`}</span>
+                <span className="text-lg font-semibold text-emerald-100">{p.name || `Scenario ${pi + 1}`}</span>
                 {p.likelihood && (
                   <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-medium uppercase text-zinc-300">
                     {p.likelihood} likelihood
@@ -94,12 +94,12 @@ export default function PortalAttackPathsPage() {
               {p.impact && <p className="mt-3 text-sm leading-relaxed text-zinc-300">{p.impact}</p>}
               {p.steps && p.steps.length > 0 && (
                 <div className="mt-6">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-400/90">Chain</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400/90">Chain</p>
                   <div className="mt-3 flex flex-wrap items-start gap-1">
                     {p.steps.map((step, si) => (
                       <div key={si} className="flex items-center gap-1">
                         {si > 0 && (
-                          <span className="px-1 text-violet-500" aria-hidden>
+                          <span className="px-1 text-emerald-500" aria-hidden>
                             →
                           </span>
                         )}

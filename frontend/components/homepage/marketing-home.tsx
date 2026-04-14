@@ -25,11 +25,11 @@ const ENTERPRISE_BOOKING =
 export function MarketingHome() {
   return (
     <div className="min-h-screen bg-background text-text-primary selection:bg-accent/20">
-      <header className="sticky top-0 z-40 border-b border-surface-3 bg-white/80 backdrop-blur-md shadow-sm">
+      <header className="sticky top-0 z-40 border-b border-surface-3 bg-surface-1/80 backdrop-blur-md shadow-sm">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="flex shrink-0 items-center gap-2">
-              <img src="/hawk-logo.png" alt="HAWK Security" className="h-10 w-auto sm:h-12 filter brightness-0 opacity-80" width={168} height={56} />
+              <img src="/hawk-logo.png" alt="HAWK Security" className="h-10 w-auto sm:h-12 opacity-95" width={168} height={56} />
             </Link>
             <div className="flex items-center gap-2 sm:gap-4 md:hidden">
               <NavScanButton className="rounded-md px-4 py-2 text-sm font-medium" />
@@ -60,7 +60,7 @@ export function MarketingHome() {
 
       <main>
         {/* Hero */}
-        <section id="scan" className="scroll-mt-28 bg-white border-b border-surface-3 px-4 py-20 sm:px-6 sm:py-32">
+        <section id="scan" className="scroll-mt-28 bg-surface-1 border-b border-surface-3 px-4 py-20 sm:px-6 sm:py-32">
           <div className="mx-auto max-w-4xl text-center">
             <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight text-text-primary sm:text-5xl md:text-6xl">
               Your business has security vulnerabilities right now. Here is what attackers can see.
@@ -68,7 +68,7 @@ export function MarketingHome() {
             <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-text-secondary sm:text-xl">
               HAWK monitors and tests Canadian small businesses daily. Follow our recommendations and if you still get breached — we cover the response costs. In writing. No other company will say that.
             </p>
-            <div className="mx-auto mt-12 max-w-2xl shadow-xl rounded-xl bg-white border border-surface-3 overflow-hidden">
+            <div className="mx-auto mt-12 max-w-2xl shadow-xl rounded-xl bg-surface-1 border border-surface-3 overflow-hidden">
               <HomeScanner />
             </div>
             <p className="mx-auto mt-8 max-w-lg text-sm leading-relaxed text-text-dim">
@@ -98,7 +98,7 @@ export function MarketingHome() {
         </section>
 
         {/* How it works */}
-        <section id="how-it-works" className="scroll-mt-24 border-y border-surface-3 bg-white px-4 py-20 sm:px-6 sm:py-24">
+        <section id="how-it-works" className="scroll-mt-24 border-y border-surface-3 bg-surface-1 px-4 py-20 sm:px-6 sm:py-24">
           <h2 className="text-center text-3xl font-extrabold text-text-primary sm:text-4xl">How It Works</h2>
           <div className="mx-auto mt-16 grid max-w-6xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -156,14 +156,14 @@ export function MarketingHome() {
               </div>
             </div>
             <div className="flex justify-center lg:justify-end">
-              <div className="w-full max-w-md rounded-2xl border border-surface-3 bg-white p-10 shadow-xl relative overflow-hidden">
+              <div className="w-full max-w-md rounded-2xl border border-surface-3 bg-surface-1 p-10 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-accent" />
                 <div className="flex items-start gap-5">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-green-100 text-2xl text-green-700">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-2xl text-emerald-400">
                     ✓
                   </div>
                   <div>
-                    <img src="/hawk-logo.png" alt="" className="h-7 w-auto filter brightness-0" />
+                    <img src="/hawk-logo.png" alt="" className="h-7 w-auto opacity-95" />
                     <p className="mt-4 text-2xl font-bold text-text-primary">HAWK Certified</p>
                     <p className="text-base text-text-secondary mt-1">Verified Security Posture</p>
                   </div>
@@ -177,7 +177,7 @@ export function MarketingHome() {
         </section>
 
         {/* Who */}
-        <section className="bg-white px-4 py-20 sm:px-6 sm:py-24 border-b border-surface-3">
+        <section className="bg-surface-1 px-4 py-20 sm:px-6 sm:py-24 border-b border-surface-3">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-extrabold text-text-primary sm:text-4xl">Who It Is For</h2>
             <p className="mt-4 text-lg text-text-secondary">Designed specifically for regulated Canadian practices.</p>
@@ -214,7 +214,7 @@ export function MarketingHome() {
             <p className="mt-4 text-lg text-text-secondary">Enterprise-grade security, priced for small businesses.</p>
           </div>
           <div className="mx-auto mt-16 grid max-w-6xl gap-8 lg:grid-cols-3 items-center">
-            <div className="rounded-2xl border border-surface-3 bg-white p-8 shadow-sm">
+            <div className="rounded-2xl border border-surface-3 bg-surface-1 p-8 shadow-sm">
               <h3 className="text-xl font-bold text-text-primary">HAWK Starter</h3>
               <p className="mt-4 text-4xl font-extrabold text-text-primary">
                 $199<span className="text-lg font-normal text-text-secondary">/mo</span>
@@ -228,7 +228,7 @@ export function MarketingHome() {
               </div>
             </div>
             
-            <div className="relative rounded-2xl border-2 border-accent bg-white p-10 shadow-2xl transform lg:-translate-y-4">
+            <div className="relative rounded-2xl border-2 border-accent bg-surface-1 p-10 shadow-2xl transform lg:-translate-y-4">
               <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1 text-xs font-bold uppercase tracking-wide text-white">
                 Most Popular
               </span>
@@ -245,7 +245,7 @@ export function MarketingHome() {
               </div>
             </div>
             
-            <div className="rounded-2xl border border-surface-3 bg-white p-8 shadow-sm">
+            <div className="rounded-2xl border border-surface-3 bg-surface-1 p-8 shadow-sm">
               <h3 className="text-xl font-bold text-text-primary">HAWK Enterprise</h3>
               <p className="mt-4 text-4xl font-extrabold text-text-primary">
                 $2,500<span className="text-lg font-normal text-text-secondary">/mo</span>
@@ -262,7 +262,7 @@ export function MarketingHome() {
         </section>
 
         {/* Final CTA */}
-        <section className="bg-white border-t border-surface-3 px-4 py-20 sm:px-6 sm:py-32">
+        <section className="bg-surface-1 border-t border-surface-3 px-4 py-20 sm:px-6 sm:py-32">
           <div className="mx-auto max-w-4xl rounded-3xl bg-accent px-6 py-16 text-center sm:px-12 shadow-2xl">
             <h2 className="text-3xl font-bold text-white sm:text-4xl text-balance">
               Find out what attackers can see about your business right now.
@@ -272,7 +272,7 @@ export function MarketingHome() {
             </p>
             <a
               href="#scan"
-              className="mt-10 inline-block rounded-xl bg-white px-10 py-4 text-base font-bold text-accent shadow-md hover:bg-slate-50 transition-colors"
+              className="mt-10 inline-block rounded-xl bg-surface-1 px-10 py-4 text-base font-bold text-accent shadow-md hover:bg-surface-2 transition-colors"
             >
               Scan My Domain Free
             </a>
@@ -283,7 +283,7 @@ export function MarketingHome() {
       <footer className="border-t border-surface-3 bg-background px-4 py-12 sm:px-6">
         <div className="mx-auto max-w-6xl text-center text-sm text-text-secondary">
           <div className="flex justify-center mb-6">
-             <img src="/hawk-logo.png" alt="" className="h-8 w-auto filter brightness-0 opacity-40 hover:opacity-80 transition-opacity" />
+             <img src="/hawk-logo.png" alt="" className="h-8 w-auto opacity-50 hover:opacity-90 transition-opacity" />
           </div>
           <p className="font-medium text-text-dim">HAWK Security &copy; AKB Studios &mdash; Calgary, AB</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 font-medium">
