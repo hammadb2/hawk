@@ -46,13 +46,13 @@ export function CrmLoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-xl">
+    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-xl">
       <h1 className="text-2xl font-semibold tracking-tight">HAWK CRM</h1>
-      <p className="mt-2 text-sm text-zinc-400">Sign in with a magic link (invite required).</p>
-      {err && <p className="mt-4 text-sm text-rose-400">Authentication failed. Try again.</p>}
+      <p className="mt-2 text-sm text-slate-600">Sign in with a magic link (invite required).</p>
+      {err && <p className="mt-4 text-sm text-rose-600">Authentication failed. Try again.</p>}
       <form className="mt-8 space-y-4" onSubmit={sendLink}>
         <div>
-          <Label htmlFor="email" className="text-zinc-300">
+          <Label htmlFor="email" className="text-slate-700">
             Work email
           </Label>
           <Input
@@ -65,7 +65,7 @@ export function CrmLoginForm() {
               setEmail(e.target.value);
               setLinkSent(false);
             }}
-            className="mt-1 border-zinc-700 bg-zinc-950"
+            className="mt-1 border-slate-200 bg-white"
             placeholder="you@company.com"
           />
         </div>
@@ -77,11 +77,11 @@ export function CrmLoginForm() {
           {loading ? "Sending…" : linkSent ? "Sent" : "Send magic link"}
         </Button>
         {linkSent && (
-          <p className="text-center text-sm text-zinc-400">Check your inbox — edit the email above to send again.</p>
+          <p className="text-center text-sm text-slate-600">Check your inbox — edit the email above to send again.</p>
         )}
       </form>
-      <p className="mt-6 text-center text-xs text-zinc-500">
-        <Link href="/" className="underline hover:text-zinc-300">
+      <p className="mt-6 text-center text-xs text-slate-600">
+        <Link href="/" className="underline hover:text-slate-700">
           Back to HAWK product site
         </Link>
       </p>

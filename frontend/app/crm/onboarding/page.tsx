@@ -64,24 +64,24 @@ export default function CrmOnboardingPage() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">First login checklist</h1>
-        <p className="text-sm text-zinc-500">Complete these to unlock the pipeline and get the most from HAWK CRM.</p>
+        <h1 className="text-2xl font-semibold text-slate-900">First login checklist</h1>
+        <p className="text-sm text-slate-600">Complete these to unlock the pipeline and get the most from HAWK CRM.</p>
       </div>
       <ul className="space-y-3">
         {KEYS.map((k) => (
-          <li key={k} className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+          <li key={k} className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-3">
             <input
               type="checkbox"
               className="mt-1 h-4 w-4"
               checked={!!checklist[k]}
               onChange={() => void toggle(k)}
             />
-            <span className="text-sm text-zinc-200">{LABELS[k]}</span>
+            <span className="text-sm text-slate-800">{LABELS[k]}</span>
           </li>
         ))}
       </ul>
       {allDone && (
-        <p className="text-sm text-emerald-400">You&apos;re all set. You can open the pipeline now.</p>
+        <p className="text-sm text-emerald-600">You&apos;re all set. You can open the pipeline now.</p>
       )}
       <Button asChild className="bg-emerald-600" disabled={!allDone}>
         <Link href="/crm/pipeline">Go to pipeline</Link>

@@ -34,13 +34,13 @@ export function CrmSidebar() {
     <aside
       className={cn(
         "fixed inset-y-0 left-0 z-40 hidden md:flex md:flex-col",
-        "border-r border-zinc-800 bg-zinc-950/95 backdrop-blur",
+        "border-r border-slate-200 bg-white/95 backdrop-blur",
         "w-16 xl:w-64 transition-[width] duration-200"
       )}
     >
-      <div className="flex h-14 items-center border-b border-zinc-800 px-3 xl:px-4">
+      <div className="flex h-14 items-center border-b border-slate-200 px-3 xl:px-4">
         <img src="/hawk-logo.png" alt="HAWK" className="h-8 w-auto xl:h-10" />
-        <span className="ml-1 hidden text-sm text-zinc-500 xl:inline">CRM</span>
+        <span className="ml-1 hidden text-sm text-slate-600 xl:inline">CRM</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">
         {items.map((item) => {
@@ -51,11 +51,18 @@ export function CrmSidebar() {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium transition-colors xl:px-3",
-                active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+                active
+                  ? "bg-emerald-50 text-slate-900 ring-1 ring-emerald-200/70"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
               title={item.label}
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-zinc-900 text-xl leading-none">
+              <span
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xl leading-none",
+                  active ? "bg-emerald-100/90 text-emerald-900" : "bg-slate-50 text-slate-700"
+                )}
+              >
                 {icons[item.label] ?? "•"}
               </span>
               <span className="hidden xl:inline">{item.label}</span>
@@ -63,10 +70,10 @@ export function CrmSidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-zinc-800 p-2">
+      <div className="border-t border-slate-200 p-2">
         <Button
           variant="outline"
-          className="w-full justify-center border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 xl:justify-start"
+          className="w-full justify-center border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100 xl:justify-start"
           onClick={() => void signOut()}
         >
           <span className="xl:mr-2">⎋</span>

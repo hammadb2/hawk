@@ -178,8 +178,8 @@ export function LiveScoreboard() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -187,25 +187,25 @@ export function LiveScoreboard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-slate-600">
           Ranked by pending commission, then open pipeline count. Updates live when prospects, clients, or commissions change.
         </p>
-        <div className="flex items-center gap-3 text-xs text-zinc-500">
+        <div className="flex items-center gap-3 text-xs text-slate-600">
           {updatedAt && <span>Updated {updatedAt.toLocaleTimeString()}</span>}
-          <button type="button" className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-900" onClick={() => void load()}>
+          <button type="button" className="rounded border border-slate-200 px-2 py-1 text-slate-700 hover:bg-slate-50" onClick={() => void load()}>
             Refresh
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-zinc-500">Loading…</div>
+        <div className="py-12 text-center text-slate-600">Loading…</div>
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-500">No reps to show.</p>
+        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">No reps to show.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-3 py-2">#</th>
                 <th className="px-3 py-2">Rep</th>
@@ -217,13 +217,13 @@ export function LiveScoreboard() {
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={r.repId} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
-                  <td className="px-3 py-2 font-mono text-zinc-500">{i + 1}</td>
-                  <td className="px-3 py-2 font-medium text-zinc-100">{r.name}</td>
-                  <td className="px-3 py-2 text-zinc-300">{r.pipeline}</td>
+                <tr key={r.repId} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+                  <td className="px-3 py-2 font-mono text-slate-600">{i + 1}</td>
+                  <td className="px-3 py-2 font-medium text-slate-900">{r.name}</td>
+                  <td className="px-3 py-2 text-slate-700">{r.pipeline}</td>
                   <td className="px-3 py-2 text-sky-400">{r.monthlyWins}</td>
-                  <td className="px-3 py-2 text-zinc-300">{r.activeClients}</td>
-                  <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.pendingCents)}</td>
+                  <td className="px-3 py-2 text-slate-700">{r.activeClients}</td>
+                  <td className="px-3 py-2 font-medium text-emerald-600">{formatUsd(r.pendingCents)}</td>
                 </tr>
               ))}
             </tbody>

@@ -139,8 +139,8 @@ export default function EarningsPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -156,30 +156,30 @@ export default function EarningsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Earnings</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-2xl font-semibold text-slate-900">Earnings</h1>
+        <p className="mt-1 text-sm text-slate-600">
           Commissions are created automatically when a deal is marked closed won (30% of first-month MRR).
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Pending</div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Pending</div>
           <div className="mt-1 text-xl font-semibold text-amber-200">{formatUsd(totalPending)}</div>
-          <div className="text-xs text-zinc-600">{pendingCount} record{pendingCount !== 1 ? "s" : ""}</div>
+          <div className="text-xs text-slate-500">{pendingCount} record{pendingCount !== 1 ? "s" : ""}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Approved</div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Approved</div>
           <div className="mt-1 text-xl font-semibold text-sky-300">{formatUsd(totalApproved)}</div>
-          <div className="text-xs text-zinc-600">{approvedCount} record{approvedCount !== 1 ? "s" : ""}</div>
+          <div className="text-xs text-slate-500">{approvedCount} record{approvedCount !== 1 ? "s" : ""}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Paid</div>
-          <div className="mt-1 text-xl font-semibold text-emerald-300">{formatUsd(totalPaid)}</div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Paid</div>
+          <div className="mt-1 text-xl font-semibold text-emerald-700">{formatUsd(totalPaid)}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Records</div>
-          <div className="mt-1 text-xl font-semibold text-zinc-200">{rows.length}</div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Records</div>
+          <div className="mt-1 text-xl font-semibold text-slate-800">{rows.length}</div>
         </div>
       </div>
 
@@ -199,7 +199,7 @@ export default function EarningsPage() {
             <button
               type="button"
               disabled={bulkUpdating}
-              className="rounded-md border border-emerald-700 bg-emerald-900/40 px-4 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-800/60 disabled:opacity-50"
+              className="rounded-md border border-emerald-700 bg-emerald-900/40 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-800/60 disabled:opacity-50"
               onClick={() => void bulkUpdate("paid")}
             >
               {bulkUpdating ? "Updating…" : `Mark all approved as paid (${approvedCount})`}
@@ -209,15 +209,15 @@ export default function EarningsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12 text-zinc-500">Loading…</div>
+        <div className="flex justify-center py-12 text-slate-600">Loading…</div>
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-500">
+        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">
           No commissions yet. Close a deal from the pipeline to create a client and commission row.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-3 py-2">Date</th>
                 <th className="px-3 py-2">Client</th>
@@ -230,22 +230,22 @@ export default function EarningsPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
-                  <td className="px-3 py-2 text-zinc-400">{new Date(r.created_at).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-zinc-100">
+                <tr key={r.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+                  <td className="px-3 py-2 text-slate-600">{new Date(r.created_at).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-slate-900">
                     {r.clients?.company_name ?? r.clients?.domain ?? "—"}
                     {r.clients?.domain && (
-                      <span className="ml-1 text-xs text-zinc-500">({r.clients.domain})</span>
+                      <span className="ml-1 text-xs text-slate-600">({r.clients.domain})</span>
                     )}
                   </td>
-                  {closerCol && <td className="px-3 py-2 text-zinc-300">{repNames[r.rep_id] ?? r.rep_id.slice(0, 8)}</td>}
-                  <td className="px-3 py-2 text-zinc-300">{formatUsd(r.basis_mrr_cents)}</td>
-                  <td className="px-3 py-2 font-medium text-emerald-400/90">{formatUsd(r.amount_cents)}</td>
+                  {closerCol && <td className="px-3 py-2 text-slate-700">{repNames[r.rep_id] ?? r.rep_id.slice(0, 8)}</td>}
+                  <td className="px-3 py-2 text-slate-700">{formatUsd(r.basis_mrr_cents)}</td>
+                  <td className="px-3 py-2 font-medium text-emerald-600/90">{formatUsd(r.amount_cents)}</td>
                   <td className="px-3 py-2">
                     <span
                       className={
                         r.status === "paid"
-                          ? "text-emerald-400"
+                          ? "text-emerald-600"
                           : r.status === "approved"
                             ? "text-sky-400"
                             : "text-amber-400"
@@ -271,7 +271,7 @@ export default function EarningsPage() {
                           <button
                             type="button"
                             disabled={updating === r.id}
-                            className="rounded border border-emerald-700 bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-300 hover:bg-emerald-800/50 disabled:opacity-50"
+                            className="rounded border border-emerald-700 bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-700 hover:bg-emerald-800/50 disabled:opacity-50"
                             onClick={() => void updateCommissionStatus(r.id, "paid")}
                           >
                             {updating === r.id ? "…" : "Mark paid"}

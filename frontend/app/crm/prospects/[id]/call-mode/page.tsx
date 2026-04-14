@@ -173,12 +173,12 @@ export default function CallModePage() {
     : "default";
   const pool = OBJECTIONS[ind] ?? OBJECTIONS.default;
 
-  if (!id) return <p className="p-6 text-zinc-500">Invalid</p>;
+  if (!id) return <p className="p-6 text-slate-600">Invalid</p>;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-white text-slate-900">
       <Dialog open={briefOpen} onOpenChange={setBriefOpen}>
-        <DialogContent className="border-zinc-800 bg-zinc-900 text-zinc-100">
+        <DialogContent className="border-slate-200 bg-slate-50 text-slate-900">
           <DialogHeader>
             <DialogTitle>Pre-call brief</DialogTitle>
           </DialogHeader>
@@ -199,27 +199,27 @@ export default function CallModePage() {
 
       {entered && (
         <div className="flex min-h-screen flex-col">
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 px-6 py-4">
+          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
             <div>
               <p className="text-2xl font-semibold">{p?.company_name || p?.domain}</p>
-              <p className="text-sm text-zinc-400">{p?.domain} · {p?.industry || "—"}</p>
+              <p className="text-sm text-slate-600">{p?.domain} · {p?.industry || "—"}</p>
             </div>
-            <div className="text-right font-mono text-lg text-emerald-400">
+            <div className="text-right font-mono text-lg text-emerald-600">
               {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
             </div>
-            <Button variant="outline" className="border-zinc-700" asChild>
+            <Button variant="outline" className="border-slate-200" asChild>
               <Link href={`/crm/prospects/${id}`}>Exit</Link>
             </Button>
           </header>
 
           <div className="grid flex-1 gap-6 p-6 lg:grid-cols-2">
-            <section className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-              <h2 className="text-lg font-medium text-zinc-200">Loaded scan</h2>
+            <section className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6">
+              <h2 className="text-lg font-medium text-slate-800">Loaded scan</h2>
               <div className="flex flex-col items-center justify-center gap-2 py-4">
                 <HawkScoreRing score={scan?.hawk_score ?? p?.hawk_score ?? 0} size={120} />
-                <span className="text-sm text-zinc-400">Grade {(scan?.grade as string) || "—"}</span>
+                <span className="text-sm text-slate-600">Grade {(scan?.grade as string) || "—"}</span>
               </div>
-              <ul className="space-y-2 text-sm text-zinc-300">
+              <ul className="space-y-2 text-sm text-slate-700">
                 {topFindings.map((f, i) => (
                   <li key={i}>
                     {(f as { title?: string }).title || "Finding"}: {(f as { interpretation?: string }).interpretation || (f as { description?: string }).description || ""}
@@ -228,8 +228,8 @@ export default function CallModePage() {
               </ul>
             </section>
 
-            <section className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-              <h2 className="text-lg font-medium text-zinc-200">Live deep scan</h2>
+            <section className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-6">
+              <h2 className="text-lg font-medium text-slate-800">Live deep scan</h2>
               <Button
                 className="w-full bg-emerald-600 py-6 text-lg"
                 disabled={scanning}
@@ -238,7 +238,7 @@ export default function CallModePage() {
                 {scanning ? PHASES[phaseIdx] : "Run live scan"}
               </Button>
               {scanning && (
-                <div className="h-2 w-full overflow-hidden rounded bg-zinc-800">
+                <div className="h-2 w-full overflow-hidden rounded bg-slate-100">
                   <div
                     className="h-full bg-emerald-500 transition-all duration-1000"
                     style={{ width: `${((phaseIdx + 1) / PHASES.length) * 100}%` }}
@@ -248,14 +248,14 @@ export default function CallModePage() {
             </section>
           </div>
 
-          <footer className="border-t border-zinc-800 px-6 py-4">
-            <p className="text-xs text-zinc-500">Objections (← →). {pool[objIdx]?.q}</p>
-            <p className="text-sm text-zinc-300">{pool[objIdx]?.a}</p>
+          <footer className="border-t border-slate-200 px-6 py-4">
+            <p className="text-xs text-slate-600">Objections (← →). {pool[objIdx]?.q}</p>
+            <p className="text-sm text-slate-700">{pool[objIdx]?.a}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" className="border-zinc-700" size="sm" asChild>
+              <Button variant="outline" className="border-slate-200" size="sm" asChild>
                 <a href={`mailto:${p?.contact_email || ""}?subject=Your HAWK security report`}>Send report (email)</a>
               </Button>
-              <Button variant="outline" className="border-zinc-700" size="sm" asChild>
+              <Button variant="outline" className="border-slate-200" size="sm" asChild>
                 <Link href="/portal">Start subscription (portal)</Link>
               </Button>
             </div>

@@ -187,8 +187,8 @@ export function CeoLiveDashboard({
 
   if (!kpis) {
     return (
-      <div className="flex min-h-[120px] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[120px] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -199,7 +199,7 @@ export function CeoLiveDashboard({
     <div className="space-y-6">
       <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
         <h2 className="text-sm font-semibold text-emerald-200">Live ops ({roleNote})</h2>
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-slate-600">
           KPIs use your browser&apos;s local calendar day. Pipeline $ uses the same hawk-score bands as the Kanban. Activity feed updates in real time.
         </p>
       </div>
@@ -218,17 +218,17 @@ export function CeoLiveDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-          <h3 className="text-sm font-medium text-zinc-200">Rep leaderboard (MTD)</h3>
-          <p className="text-xs text-zinc-500">By revenue closed this month</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-medium text-slate-800">Rep leaderboard (MTD)</h3>
+          <p className="text-xs text-slate-600">By revenue closed this month</p>
           <ul className="mt-3 space-y-2 text-sm">
-            {leaderboard.length === 0 && <li className="text-zinc-500">No closes recorded this month yet.</li>}
+            {leaderboard.length === 0 && <li className="text-slate-600">No closes recorded this month yet.</li>}
             {leaderboard.map((row, i) => (
-              <li key={row.repId} className="flex justify-between gap-2 text-zinc-300">
+              <li key={row.repId} className="flex justify-between gap-2 text-slate-700">
                 <span>
                   {i + 1}. {row.name}
                 </span>
-                <span className="text-zinc-500">
+                <span className="text-slate-600">
                   {row.closes} deal{row.closes === 1 ? "" : "s"} · ${(row.mrrCents / 100).toLocaleString()} MRR
                 </span>
               </li>
@@ -236,19 +236,19 @@ export function CeoLiveDashboard({
           </ul>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-          <h3 className="text-sm font-medium text-zinc-200">Rep health (0–100)</h3>
-          <p className="text-xs text-zinc-500">Daily score from pipeline hygiene; under 50 alerts CEO via WhatsApp when configured.</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-medium text-slate-800">Rep health (0–100)</h3>
+          <p className="text-xs text-slate-600">Daily score from pipeline hygiene; under 50 alerts CEO via WhatsApp when configured.</p>
           <ul className="mt-3 max-h-[220px] space-y-2 overflow-y-auto text-sm">
-            {repHealth.length === 0 && <li className="text-zinc-500">No sales roles loaded.</li>}
+            {repHealth.length === 0 && <li className="text-slate-600">No sales roles loaded.</li>}
             {repHealth.map((row) => (
-              <li key={row.repId} className="flex justify-between gap-2 text-zinc-300">
+              <li key={row.repId} className="flex justify-between gap-2 text-slate-700">
                 <span>{row.name}</span>
                 <span
                   className={
                     row.healthScore !== null && row.healthScore < 50
                       ? "font-medium text-rose-400"
-                      : "text-zinc-500"
+                      : "text-slate-600"
                   }
                 >
                   {row.healthScore ?? "—"}
@@ -258,16 +258,16 @@ export function CeoLiveDashboard({
           </ul>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-          <h3 className="text-sm font-medium text-zinc-200">Quick links</h3>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-medium text-slate-800">Quick links</h3>
           <ul className="mt-3 space-y-2 text-sm">
             <li>
-              <Link href="/crm/pipeline" className="text-emerald-400 hover:underline">
+              <Link href="/crm/pipeline" className="text-emerald-600 hover:underline">
                 Pipeline
               </Link>
             </li>
             <li>
-              <Link href="/crm/settings" className="text-emerald-400 hover:underline">
+              <Link href="/crm/settings" className="text-emerald-600 hover:underline">
                 Settings &amp; monitor history
               </Link>
             </li>
@@ -275,13 +275,13 @@ export function CeoLiveDashboard({
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-zinc-200">Activity feed</h3>
+          <h3 className="text-sm font-medium text-slate-800">Activity feed</h3>
           <select
             value={activityFilter}
             onChange={(e) => setActivityFilter(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-800"
           >
             <option value="all">All types</option>
             <option value="stage_changed">Stage changes</option>
@@ -291,14 +291,14 @@ export function CeoLiveDashboard({
         </div>
         <ul className="mt-3 max-h-[420px] space-y-2 overflow-y-auto text-sm">
           {filteredActivities.map((a) => (
-            <li key={a.id} className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
-              <div className="flex flex-wrap justify-between gap-2 text-zinc-400">
-                <span className="text-emerald-400/90">{a.type}</span>
+            <li key={a.id} className="rounded-lg border border-slate-200/90 bg-white shadow-sm px-3 py-2">
+              <div className="flex flex-wrap justify-between gap-2 text-slate-600">
+                <span className="text-emerald-600/90">{a.type}</span>
                 <span className="text-xs">{new Date(a.created_at).toLocaleString()}</span>
               </div>
-              <div className="mt-1 text-zinc-300">
+              <div className="mt-1 text-slate-700">
                 {a.prospect_id ? (
-                  <Link href={`/crm/prospects/${a.prospect_id}`} className="hover:text-emerald-400 hover:underline">
+                  <Link href={`/crm/prospects/${a.prospect_id}`} className="hover:text-emerald-600 hover:underline">
                     {prospectLabel(a.prospect_id)}
                   </Link>
                 ) : (
@@ -306,11 +306,11 @@ export function CeoLiveDashboard({
                 )}
               </div>
               {a.type === "stage_changed" && a.metadata && (
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-slate-600">
                   {(a.metadata as { from?: string; to?: string }).from} → {(a.metadata as { to?: string }).to}
                 </p>
               )}
-              {a.notes && <p className="mt-1 text-xs text-zinc-400">{a.notes}</p>}
+              {a.notes && <p className="mt-1 text-xs text-slate-600">{a.notes}</p>}
             </li>
           ))}
         </ul>
@@ -321,10 +321,10 @@ export function CeoLiveDashboard({
 
 function KpiCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-zinc-100">{value}</div>
-      {hint && <p className="mt-1 text-xs text-zinc-600">{hint}</p>}
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-slate-600">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }

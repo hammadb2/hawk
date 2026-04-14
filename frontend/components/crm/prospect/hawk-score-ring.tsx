@@ -24,7 +24,7 @@ export function HawkScoreRing({
       title={`HAWK score ${score}/100 — red under 40, amber 40–70, green above 70`}
     >
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-zinc-800" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-slate-800" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -38,7 +38,7 @@ export function HawkScoreRing({
           className="transition-[stroke-dashoffset] duration-500"
         />
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-semibold text-zinc-100">{score}</div>
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-900">{score}</div>
     </div>
   );
 }

@@ -30,10 +30,10 @@ type ClientRow = {
 
 function StatusBadge({ label, variant }: { label: string; variant: "green" | "amber" | "red" | "zinc" }) {
   const colors = {
-    green: "bg-emerald-900/50 text-emerald-400 border-emerald-700",
+    green: "bg-emerald-50 text-emerald-600 border-emerald-700",
     amber: "bg-amber-900/50 text-amber-400 border-amber-700",
     red: "bg-rose-900/50 text-rose-400 border-rose-700",
-    zinc: "bg-zinc-800 text-zinc-400 border-zinc-700",
+    zinc: "bg-slate-100 text-slate-600 border-slate-200",
   };
   return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${colors[variant]}`}>{label}</span>;
 }
@@ -94,26 +94,26 @@ export default function ClientOnboardingChecklistPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="border-zinc-700" asChild>
+        <Button variant="outline" size="sm" className="border-slate-200" asChild>
           <Link href="/crm/clients">← Clients</Link>
         </Button>
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Onboarding</h1>
-        <p className="mt-1 text-sm text-zinc-500">{company} · Shield onboarding</p>
+        <h1 className="text-2xl font-semibold text-slate-900">Onboarding</h1>
+        <p className="mt-1 text-sm text-slate-600">{company} · Shield onboarding</p>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
         </div>
       ) : (
         <>
           {/* Client status cards */}
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Account Status</div>
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Account Status</div>
               <div className="mt-1">
                 <StatusBadge
                   label={client?.status || "unknown"}
@@ -121,12 +121,12 @@ export default function ClientOnboardingChecklistPage() {
                 />
               </div>
             </div>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Guarantee</div>
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Guarantee</div>
               <div className="mt-1">{guaranteeBadge(client?.guarantee_status)}</div>
             </div>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Portal</div>
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Portal</div>
               <div className="mt-1">
                 <StatusBadge
                   label={client?.portal_user_id ? "Portal linked" : "No portal account"}
@@ -137,27 +137,27 @@ export default function ClientOnboardingChecklistPage() {
           </div>
 
           {/* Onboarding milestones */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-5">
-            <h2 className="text-sm font-semibold text-zinc-200">Onboarding Milestones</h2>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-5">
+            <h2 className="text-sm font-semibold text-slate-800">Onboarding Milestones</h2>
             <div className="mt-4 space-y-3">
               {milestones.map((m, i) => (
                 <div key={i} className="flex items-center gap-3 text-sm">
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${m.done ? "border-emerald-600 bg-emerald-900/50 text-emerald-400" : "border-zinc-700 bg-zinc-800 text-zinc-500"}`}>
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${m.done ? "border-emerald-500 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-slate-100 text-slate-600"}`}>
                     {m.done ? "\u2713" : i + 1}
                   </div>
-                  <span className={m.done ? "text-zinc-300" : "text-zinc-500"}>{m.label}</span>
+                  <span className={m.done ? "text-slate-700" : "text-slate-600"}>{m.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Onboarding call checklist */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-200">Onboarding Call Checklist</h2>
-              <span className="text-xs text-zinc-500">{completedCount}/{CHECKLIST.length}</span>
+              <h2 className="text-sm font-semibold text-slate-800">Onboarding Call Checklist</h2>
+              <span className="text-xs text-slate-600">{completedCount}/{CHECKLIST.length}</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800">
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full bg-emerald-500 transition-all"
                 style={{ width: `${progress}%` }}
@@ -165,7 +165,7 @@ export default function ClientOnboardingChecklistPage() {
             </div>
             <ul className="mt-4 space-y-2">
               {CHECKLIST.map((line, i) => (
-                <li key={i} className="flex items-start gap-3 rounded-lg border border-zinc-800/60 bg-zinc-900/30 p-3">
+                <li key={i} className="flex items-start gap-3 rounded-lg border border-slate-200/80 bg-slate-50/80 p-3">
                   <input
                     type="checkbox"
                     className="mt-0.5 accent-emerald-500"
@@ -178,13 +178,13 @@ export default function ClientOnboardingChecklistPage() {
                       })
                     }
                   />
-                  <span className={`text-sm ${done[i] ? "text-zinc-500 line-through" : "text-zinc-200"}`}>{line}</span>
+                  <span className={`text-sm ${done[i] ? "text-slate-600 line-through" : "text-slate-800"}`}>{line}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <p className="text-xs text-zinc-600">
+          <p className="text-xs text-slate-500">
             After the call — mark onboarding complete and update client status in CRM.
           </p>
         </>

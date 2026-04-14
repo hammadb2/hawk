@@ -172,8 +172,8 @@ export function TeamDirectory() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -199,7 +199,7 @@ export function TeamDirectory() {
         )}
         <button
           type="button"
-          className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900"
+          className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
           onClick={() => void load()}
         >
           Refresh
@@ -207,32 +207,32 @@ export function TeamDirectory() {
       </div>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="border-zinc-800 bg-zinc-950">
+        <DialogContent className="border-slate-200 bg-white">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100">Invite rep</DialogTitle>
+            <DialogTitle className="text-slate-900">Invite rep</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-zinc-400">Email</Label>
+              <Label className="text-slate-600">Email</Label>
               <Input
-                className="mt-1 border-zinc-700 bg-zinc-900"
+                className="mt-1 border-slate-200 bg-slate-50"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="rep@company.com"
               />
             </div>
             <div>
-              <Label className="text-zinc-400">Name</Label>
+              <Label className="text-slate-600">Name</Label>
               <Input
-                className="mt-1 border-zinc-700 bg-zinc-900"
+                className="mt-1 border-slate-200 bg-slate-50"
                 value={form.full_name}
                 onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-zinc-400">Role</Label>
+              <Label className="text-slate-600">Role</Label>
               <select
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as "sales_rep" | "team_lead" }))}
               >
@@ -241,17 +241,17 @@ export function TeamDirectory() {
               </select>
             </div>
             <div>
-              <Label className="text-zinc-400">WhatsApp (E.164, e.g. +15551234567)</Label>
+              <Label className="text-slate-600">WhatsApp (E.164, e.g. +15551234567)</Label>
               <Input
-                className="mt-1 border-zinc-700 bg-zinc-900"
+                className="mt-1 border-slate-200 bg-slate-50"
                 value={form.whatsapp_number}
                 onChange={(e) => setForm((f) => ({ ...f, whatsapp_number: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-zinc-400">Team lead (optional)</Label>
+              <Label className="text-slate-600">Team lead (optional)</Label>
               <select
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
                 value={form.team_lead_id}
                 onChange={(e) => setForm((f) => ({ ...f, team_lead_id: e.target.value }))}
               >
@@ -265,7 +265,7 @@ export function TeamDirectory() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-zinc-700" onClick={() => setInviteOpen(false)}>
+            <Button variant="outline" className="border-slate-200" onClick={() => setInviteOpen(false)}>
               Cancel
             </Button>
             <Button className="bg-emerald-600" disabled={inviting} onClick={() => void submitInvite()}>
@@ -276,15 +276,15 @@ export function TeamDirectory() {
       </Dialog>
 
       <Dialog open={!!reassignFrom} onOpenChange={(o) => !o && setReassignFrom(null)}>
-        <DialogContent className="border-zinc-800 bg-zinc-950">
+        <DialogContent className="border-slate-200 bg-white">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100">Reassign prospects</DialogTitle>
+            <DialogTitle className="text-slate-900">Reassign prospects</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-zinc-400">Move all prospects from this rep to another active rep.</p>
+          <p className="text-sm text-slate-600">Move all prospects from this rep to another active rep.</p>
           <div>
-            <Label className="text-zinc-400">Assign to</Label>
+            <Label className="text-slate-600">Assign to</Label>
             <select
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
               value={reassignTo}
               onChange={(e) => setReassignTo(e.target.value)}
             >
@@ -299,7 +299,7 @@ export function TeamDirectory() {
             </select>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-zinc-700" onClick={() => setReassignFrom(null)}>
+            <Button variant="outline" className="border-slate-200" onClick={() => setReassignFrom(null)}>
               Cancel
             </Button>
             <Button className="bg-emerald-600" disabled={!reassignTo} onClick={() => void submitReassign()}>
@@ -310,15 +310,15 @@ export function TeamDirectory() {
       </Dialog>
 
       {loading ? (
-        <div className="py-16 text-center text-zinc-500">Loading…</div>
+        <div className="py-16 text-center text-slate-600">Loading…</div>
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-10 text-center text-sm text-zinc-500">
+        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-10 text-center text-sm text-slate-600">
           No sales reps or team leads found.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Email</th>
@@ -333,26 +333,26 @@ export function TeamDirectory() {
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
-                  <td className="px-3 py-2 font-medium text-zinc-100">{p.full_name ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-400">{p.email ?? "—"}</td>
-                  <td className="px-3 py-2 capitalize text-zinc-300">{roleLabel(p.role)}</td>
-                  <td className="px-3 py-2 text-zinc-400">
+                <tr key={p.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+                  <td className="px-3 py-2 font-medium text-slate-900">{p.full_name ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.email ?? "—"}</td>
+                  <td className="px-3 py-2 capitalize text-slate-700">{roleLabel(p.role)}</td>
+                  <td className="px-3 py-2 text-slate-600">
                     {p.team_lead_id ? (tlNames[p.team_lead_id] ?? p.team_lead_id.slice(0, 8)) : "—"}
                   </td>
-                  <td className={cn("px-3 py-2 font-medium capitalize", p.status === "active" ? "text-emerald-400" : "text-amber-400")}>
+                  <td className={cn("px-3 py-2 font-medium capitalize", p.status === "active" ? "text-emerald-600" : "text-amber-400")}>
                     {p.status}
                   </td>
-                  <td className="px-3 py-2 text-zinc-500">{p.whatsapp_number ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-400">{p.monthly_close_target ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-500">
+                  <td className="px-3 py-2 text-slate-600">{p.whatsapp_number ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.monthly_close_target ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">
                     {p.last_close_at ? new Date(p.last_close_at).toLocaleDateString() : "—"}
                   </td>
                   <td className="space-x-2 px-3 py-2">
                     {isCeo && p.email && ["invited", "onboarding"].includes(String(p.status)) && (
                       <button
                         type="button"
-                        className="text-xs text-emerald-400 underline"
+                        className="text-xs text-emerald-600 underline"
                         onClick={() => void resendInvite(p.email)}
                       >
                         Resend
@@ -362,7 +362,7 @@ export function TeamDirectory() {
                       <>
                         <button
                           type="button"
-                          className="text-xs text-zinc-400 underline"
+                          className="text-xs text-slate-600 underline"
                           onClick={() => setReassignFrom(p.id)}
                         >
                           Reassign

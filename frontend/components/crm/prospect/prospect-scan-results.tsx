@@ -55,9 +55,9 @@ function severityBadgeClass(s: string): string {
   if (x === "critical") return "bg-red-600/90 text-white";
   if (x === "high") return "bg-orange-600/90 text-white";
   if (x === "medium" || x === "warning") return "bg-amber-600/90 text-white";
-  if (x === "low" || x === "info") return "bg-zinc-600 text-zinc-100";
+  if (x === "low" || x === "info") return "bg-slate-200 text-slate-800";
   if (x === "ok") return "bg-emerald-700/90 text-white";
-  return "bg-zinc-700 text-zinc-200";
+  return "bg-slate-300 text-slate-900";
 }
 
 function formatMoneyUsd(n: number): string {
@@ -254,26 +254,26 @@ export function ProspectScanResultsPanel({
         <div className="flex flex-col items-center gap-1">
           <HawkScoreRing score={score} size={120} />
           <div className="text-center">
-            <div className="text-2xl font-bold text-zinc-100">{scan.grade ?? "—"}</div>
-            <div className="text-xs text-zinc-500">{new Date(scan.created_at).toLocaleString()}</div>
+            <div className="text-2xl font-bold text-slate-900">{scan.grade ?? "—"}</div>
+            <div className="text-xs text-slate-600">{new Date(scan.created_at).toLocaleString()}</div>
             {scan.scan_version && (
-              <div className="text-[10px] text-zinc-600">Scanner v{scan.scan_version}</div>
+              <div className="text-[10px] text-slate-500">Scanner v{scan.scan_version}</div>
             )}
           </div>
         </div>
-        <div className="min-w-0 flex-1 space-y-1 text-sm text-zinc-400">
+        <div className="min-w-0 flex-1 space-y-1 text-sm text-slate-600">
           <p>
-            <span className="text-zinc-500">Industry:</span> {industry || "—"}
+            <span className="text-slate-600">Industry:</span> {industry || "—"}
           </p>
           {breach?.summary != null && typeof breach.summary === "string" && (
-            <p className="text-zinc-300">{breach.summary}</p>
+            <p className="text-slate-700">{breach.summary}</p>
           )}
         </div>
       </div>
 
       {attackPaths.length > 0 && (
         <section>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-400/90">Attack paths</h3>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-600/90">Attack paths</h3>
           <div className="space-y-5">
             {attackPaths.map((p, pi) => (
               <div
@@ -283,14 +283,14 @@ export function ProspectScanResultsPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-emerald-100">{p.name || `Path ${pi + 1}`}</span>
                   {p.likelihood && (
-                    <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] uppercase text-zinc-300">
+                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] uppercase text-slate-700">
                       {p.likelihood} likelihood
                     </span>
                   )}
                 </div>
-                {p.impact && <p className="mt-2 text-sm text-zinc-400">{p.impact}</p>}
+                {p.impact && <p className="mt-2 text-sm text-slate-600">{p.impact}</p>}
                 {p.steps && p.steps.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-start gap-1 text-xs text-zinc-300">
+                  <div className="mt-3 flex flex-wrap items-start gap-1 text-xs text-slate-700">
                     {p.steps.map((step, si) => (
                       <div key={si} className="flex items-center gap-1">
                         {si > 0 && (
@@ -298,7 +298,7 @@ export function ProspectScanResultsPanel({
                             →
                           </span>
                         )}
-                        <span className="rounded-md border border-zinc-700 bg-zinc-900/80 px-2 py-1">{step}</span>
+                        <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1">{step}</span>
                       </div>
                     ))}
                   </div>
@@ -322,12 +322,12 @@ export function ProspectScanResultsPanel({
                   <span className={cn("rounded px-2 py-0.5 text-[10px] font-semibold uppercase", severityBadgeClass(String(f.severity)))}>
                     {f.severity || "unknown"}
                   </span>
-                  <span className="font-medium text-zinc-100">{f.title || "Finding"}</span>
+                  <span className="font-medium text-slate-900">{f.title || "Finding"}</span>
                   {f.verified_at && (
-                    <span className="rounded bg-emerald-900/50 px-2 py-0.5 text-[10px] text-emerald-300">Verified</span>
+                    <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700">Verified</span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-zinc-300">
+                <p className="mt-1 text-sm text-slate-700">
                   {f.interpretation || f.description || "—"}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -335,7 +335,7 @@ export function ProspectScanResultsPanel({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="border-zinc-600 text-zinc-200"
+                    className="border-slate-300 text-slate-800"
                     disabled={!f.fix_guide && !f.remediation}
                     onClick={() => {
                       const text = (f.fix_guide || f.remediation || "").trim();
@@ -353,7 +353,7 @@ export function ProspectScanResultsPanel({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    className="bg-zinc-800 text-zinc-200"
+                    className="bg-slate-100 text-slate-800"
                     disabled={!f.id || !!f.verified_at || verifyingId === f.id}
                     title="Re-scans the domain; marks verified if this exposure no longer appears at the same severity."
                     onClick={() => void verifyFinding(f)}
@@ -374,22 +374,22 @@ export function ProspectScanResultsPanel({
             {medLow.map((f, i) => (
               <li
                 key={f.id || `ml-${i}`}
-                className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={cn("rounded px-2 py-0.5 text-[10px] font-semibold uppercase", severityBadgeClass(String(f.severity)))}>
                     {f.severity || "unknown"}
                   </span>
-                  <span className="text-sm font-medium text-zinc-200">{f.title || "Finding"}</span>
+                  <span className="text-sm font-medium text-slate-800">{f.title || "Finding"}</span>
                 </div>
-                <p className="mt-1 text-xs text-zinc-400">{f.interpretation || f.description || "—"}</p>
+                <p className="mt-1 text-xs text-slate-600">{f.interpretation || f.description || "—"}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(f.fix_guide || f.remediation) && (
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-xs text-emerald-400"
+                      className="h-7 px-2 text-xs text-emerald-600"
                       onClick={() => {
                         setGuideText(String(f.fix_guide || f.remediation));
                         setGuideOpen(true);
@@ -402,7 +402,7 @@ export function ProspectScanResultsPanel({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-7 px-2 text-xs text-zinc-400"
+                    className="h-7 px-2 text-xs text-slate-600"
                     disabled={!f.id || !!f.verified_at || verifyingId === f.id}
                     onClick={() => void verifyFinding(f)}
                   >
@@ -418,7 +418,7 @@ export function ProspectScanResultsPanel({
       {(okFindings.length > 0 || sorted.length > 0) && (
         <section>
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-500/90">What&apos;s passing</h3>
-          <ul className="space-y-1 text-sm text-zinc-300">
+          <ul className="space-y-1 text-sm text-slate-700">
             {okFindings.map((f, i) => (
               <li key={f.id || `ok-${i}`} className="flex gap-2">
                 <span className="text-emerald-500">✓</span>
@@ -435,19 +435,19 @@ export function ProspectScanResultsPanel({
         </section>
       )}
 
-      <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 shadow-inner shadow-black/40 ring-1 ring-zinc-900/80">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-teal-400/90">Closer prep</h3>
-        <div className="space-y-4 text-sm text-zinc-300">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm ring-1 ring-slate-200/80">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-700">Closer prep</h3>
+        <div className="space-y-4 text-sm text-slate-700">
           <div>
-            <div className="text-xs font-medium text-zinc-500">Opening line</div>
-            <p className="mt-1 text-zinc-100">&quot;{openingLine}&quot;</p>
+            <div className="text-xs font-medium text-slate-600">Opening line</div>
+            <p className="mt-1 text-slate-900">&quot;{openingLine}&quot;</p>
           </div>
           {baselineUsd != null && !Number.isNaN(baselineUsd) && (
-            <div className="rounded-lg border border-amber-900/40 bg-amber-950/25 px-3 py-2">
-              <p className="text-sm font-medium text-amber-100/95">
+            <div className="rounded-lg border border-amber-200/90 bg-amber-50 px-3 py-2">
+              <p className="text-sm font-medium text-amber-950">
                 Estimated breach cost for a business like yours:{" "}
-                <span className="text-amber-200">{formatMoneyUsd(baselineUsd)}</span>
-                <span className="font-normal text-zinc-400">
+                <span className="text-amber-800">{formatMoneyUsd(baselineUsd)}</span>
+                <span className="font-normal text-slate-600">
                   {" "}
                   — source: IBM 2025 Cost of Data Breach Report
                 </span>
@@ -455,22 +455,22 @@ export function ProspectScanResultsPanel({
             </div>
           )}
           <div>
-            <div className="text-xs font-medium text-zinc-500">
+            <div className="text-xs font-medium text-slate-600">
               Top objection ({industry || "general SMB"})
             </div>
-            <p className="mt-2 text-zinc-200">
-              <span className="font-medium text-zinc-100">{topObjection.objection}</span>
+            <p className="mt-2 text-slate-800">
+              <span className="font-medium text-slate-900">{topObjection.objection}</span>
             </p>
-            <p className="mt-1 text-zinc-400">{topObjection.response}</p>
+            <p className="mt-1 text-slate-600">{topObjection.response}</p>
           </div>
           {objections.length > 1 && (
             <div>
-              <div className="text-xs font-medium text-zinc-500">More objections</div>
-              <ol className="mt-2 list-decimal space-y-2 pl-4 text-zinc-400">
+              <div className="text-xs font-medium text-slate-600">More objections</div>
+              <ol className="mt-2 list-decimal space-y-2 pl-4 text-slate-600">
                 {objections.slice(1).map((o, i) => (
                   <li key={i}>
-                    <span className="font-medium text-zinc-300">{o.objection}</span>
-                    <span className="text-zinc-600"> — </span>
+                    <span className="font-medium text-slate-700">{o.objection}</span>
+                    <span className="text-slate-500"> — </span>
                     {o.response}
                   </li>
                 ))}
@@ -481,11 +481,11 @@ export function ProspectScanResultsPanel({
       </section>
 
       <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto border-zinc-800 bg-zinc-950 text-zinc-100">
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-slate-200 bg-white text-slate-900">
           <DialogHeader>
             <DialogTitle>Fix guide</DialogTitle>
           </DialogHeader>
-          <pre className="whitespace-pre-wrap font-sans text-sm text-zinc-300">{guideText}</pre>
+          <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">{guideText}</pre>
         </DialogContent>
       </Dialog>
     </div>

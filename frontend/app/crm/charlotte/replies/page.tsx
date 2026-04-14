@@ -26,10 +26,10 @@ function minutesSince(iso: string | null): number | null {
 }
 
 function slaClass(mins: number | null) {
-  if (mins === null) return "border-zinc-700";
+  if (mins === null) return "border-slate-200";
   if (mins > 30) return "border-rose-600 bg-rose-950/40";
   if (mins >= 10) return "border-amber-500 bg-amber-950/30";
-  return "border-emerald-600 bg-emerald-950/20";
+  return "border-emerald-500 bg-emerald-950/20";
 }
 
 export default function CharlotteRepliesPage() {
@@ -102,14 +102,14 @@ export default function CharlotteRepliesPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4">
       <div>
-        <h1 className="text-xl font-semibold text-zinc-100">Charlotte replies</h1>
-        <p className="text-sm text-zinc-500">Unhandled Smartlead replies, oldest first. Target: act within 30 minutes.</p>
+        <h1 className="text-xl font-semibold text-slate-900">Charlotte replies</h1>
+        <p className="text-sm text-slate-600">Unhandled Smartlead replies, oldest first. Target: act within 30 minutes.</p>
       </div>
       {err && <p className="text-sm text-rose-400">{err}</p>}
       {loading ? (
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-slate-600">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-zinc-500">No pending replies.</p>
+        <p className="text-slate-600">No pending replies.</p>
       ) : (
         <ul className="space-y-3">
           {rows.map((p) => {
@@ -121,13 +121,13 @@ export default function CharlotteRepliesPage() {
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="font-medium text-zinc-100">
+                    <p className="font-medium text-slate-900">
                       {p.company_name || p.domain || "Prospect"}
                     </p>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-slate-600">
                       {p.contact_name || "—"} · {p.contact_email || "—"}
                     </p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-slate-600">
                       Score {p.hawk_score ?? "—"} · {p.industry || "—"} · waiting {mins ?? "—"} min
                     </p>
                   </div>
@@ -143,7 +143,7 @@ export default function CharlotteRepliesPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-zinc-600"
+                      className="border-slate-300"
                       disabled={busy === p.id}
                       onClick={() => void runAction(p.id, "follow_up")}
                     >

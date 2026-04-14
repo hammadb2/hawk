@@ -84,8 +84,8 @@ export default function ScoreboardPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Scoreboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">Live team rankings and historical performance.</p>
+        <h1 className="text-2xl font-semibold text-slate-900">Scoreboard</h1>
+        <p className="mt-1 text-sm text-slate-600">Live team rankings and historical performance.</p>
       </div>
 
       <Tabs defaultValue="live">
@@ -106,8 +106,8 @@ export default function ScoreboardPage() {
                 type="button"
                 className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                   selectedMonth === i
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                    : "border-zinc-700 text-zinc-400 hover:bg-zinc-900"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
                 onClick={() => setSelectedMonth(i)}
               >
@@ -117,15 +117,15 @@ export default function ScoreboardPage() {
           </div>
 
           {histLoading ? (
-            <div className="py-12 text-center text-zinc-500">Loading…</div>
+            <div className="py-12 text-center text-slate-600">Loading…</div>
           ) : histRows.length === 0 ? (
-            <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-500">
+            <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">
               No closed deals for {months[selectedMonth].label}.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[500px] text-left text-sm">
-                <thead className="border-b border-zinc-800 bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                   <tr>
                     <th className="px-3 py-2">#</th>
                     <th className="px-3 py-2">Rep</th>
@@ -135,13 +135,13 @@ export default function ScoreboardPage() {
                 </thead>
                 <tbody>
                   {histRows.map((r, i) => (
-                    <tr key={r.name} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
-                      <td className="px-3 py-2 font-mono text-zinc-500">
+                    <tr key={r.name} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+                      <td className="px-3 py-2 font-mono text-slate-600">
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
                       </td>
-                      <td className="px-3 py-2 font-medium text-zinc-100">{r.name}</td>
+                      <td className="px-3 py-2 font-medium text-slate-900">{r.name}</td>
                       <td className="px-3 py-2 text-sky-400">{r.wins}</td>
-                      <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.commission)}</td>
+                      <td className="px-3 py-2 font-medium text-emerald-600">{formatUsd(r.commission)}</td>
                     </tr>
                   ))}
                 </tbody>

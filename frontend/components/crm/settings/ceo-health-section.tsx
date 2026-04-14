@@ -29,19 +29,19 @@ export function CeoHealthSection() {
   if (profile?.role !== "ceo") return null;
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-5">
-      <h2 className="text-sm font-semibold text-zinc-200">Integration monitor</h2>
-      <p className="mt-1 text-xs text-zinc-500">
-        Latest checks from <code className="text-zinc-600">POST /api/monitor/health-check</code> (Railway cron +{" "}
-        <code className="text-zinc-600">X-Cron-Secret</code>). CEO-only.
+    <section className="rounded-xl border border-slate-200 bg-slate-50/90 p-5">
+      <h2 className="text-sm font-semibold text-slate-800">Integration monitor</h2>
+      <p className="mt-1 text-xs text-slate-600">
+        Latest checks from <code className="text-slate-500">POST /api/monitor/health-check</code> (Railway cron +{" "}
+        <code className="text-slate-500">X-Cron-Secret</code>). CEO-only.
       </p>
       {err && <p className="mt-2 text-sm text-rose-400">{err}</p>}
-      {!err && rows.length === 0 && <p className="mt-3 text-sm text-zinc-500">No rows yet — run the monitor cron.</p>}
+      {!err && rows.length === 0 && <p className="mt-3 text-sm text-slate-600">No rows yet — run the monitor cron.</p>}
       {rows.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs text-zinc-400">
+          <table className="w-full text-left text-xs text-slate-600">
             <thead>
-              <tr className="border-b border-zinc-800 text-zinc-500">
+              <tr className="border-b border-slate-200 text-slate-600">
                 <th className="py-2 pr-2">Time</th>
                 <th className="py-2 pr-2">Service</th>
                 <th className="py-2 pr-2">Status</th>
@@ -51,14 +51,14 @@ export function CeoHealthSection() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-zinc-800/80">
-                  <td className="py-2 pr-2 whitespace-nowrap text-zinc-300">{new Date(r.checked_at).toLocaleString()}</td>
-                  <td className="py-2 pr-2 font-mono text-zinc-300">{r.service}</td>
+                <tr key={r.id} className="border-b border-slate-200/90">
+                  <td className="py-2 pr-2 whitespace-nowrap text-slate-700">{new Date(r.checked_at).toLocaleString()}</td>
+                  <td className="py-2 pr-2 font-mono text-slate-700">{r.service}</td>
                   <td className="py-2 pr-2">
                     <span
                       className={
                         r.status === "ok"
-                          ? "text-emerald-400"
+                          ? "text-emerald-600"
                           : r.status === "degraded"
                             ? "text-amber-400"
                             : "text-rose-400"

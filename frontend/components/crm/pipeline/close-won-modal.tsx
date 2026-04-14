@@ -117,19 +117,19 @@ export function CloseWonModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="border-zinc-800 bg-zinc-950">
+        <DialogContent className="border-slate-200 bg-white">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100">Close won</DialogTitle>
-            <DialogDescription className="text-zinc-400">
+            <DialogTitle className="text-slate-900">Close won</DialogTitle>
+            <DialogDescription className="text-slate-600">
               We verify Stripe for a successful payment in the last 24 hours before creating commission. You can still
               close the deal and defer commission until payment clears.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-zinc-300">Plan</Label>
+              <Label className="text-slate-700">Plan</Label>
               <select
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
                 value={planId}
                 onChange={(e) => setPlanId(e.target.value)}
               >
@@ -142,26 +142,26 @@ export function CloseWonModal({
             </div>
             {planId === "custom" && (
               <div>
-                <Label className="text-zinc-300">Monthly value (USD)</Label>
+                <Label className="text-slate-700">Monthly value (USD)</Label>
                 <Input
                   type="number"
-                  className="mt-1 border-zinc-700 bg-zinc-900"
+                  className="mt-1 border-slate-200 bg-slate-50"
                   value={customMrr}
                   onChange={(e) => setCustomMrr(e.target.value)}
                   placeholder="2500"
                 />
               </div>
             )}
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-300">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
               <div>Monthly value: {formatUsd(mrrCents)}</div>
-              <div className="mt-1 text-emerald-400">
+              <div className="mt-1 text-emerald-600">
                 Closing commission preview (30%): {formatUsd(closingCommission)}
               </div>
             </div>
             <div>
-              <Label className="text-zinc-300">Stripe customer ID (helps verification)</Label>
+              <Label className="text-slate-700">Stripe customer ID (helps verification)</Label>
               <Input
-                className="mt-1 border-zinc-700 bg-zinc-900"
+                className="mt-1 border-slate-200 bg-slate-50"
                 value={stripeId}
                 onChange={(e) => setStripeId(e.target.value)}
                 placeholder="cus_..."
@@ -170,7 +170,7 @@ export function CloseWonModal({
             {verifyError && <p className="text-xs text-rose-400">{verifyError}</p>}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" className="border-zinc-700" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" className="border-slate-200" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
@@ -185,16 +185,16 @@ export function CloseWonModal({
       </Dialog>
 
       <Dialog open={deferPrompt} onOpenChange={setDeferPrompt}>
-        <DialogContent className="border-zinc-800 bg-zinc-950">
+        <DialogContent className="border-slate-200 bg-white">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100">Payment not verified in Stripe</DialogTitle>
-            <DialogDescription className="text-zinc-400">
+            <DialogTitle className="text-slate-900">Payment not verified in Stripe</DialogTitle>
+            <DialogDescription className="text-slate-600">
               Payment not yet confirmed in Stripe. Commission will be created automatically when payment clears (via Stripe
               webhook).
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" className="border-zinc-700" onClick={() => setDeferPrompt(false)}>
+            <Button variant="outline" className="border-slate-200" onClick={() => setDeferPrompt(false)}>
               Back
             </Button>
             <Button

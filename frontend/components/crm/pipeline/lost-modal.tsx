@@ -49,18 +49,18 @@ export function LostReasonModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-zinc-800 bg-zinc-950">
+      <DialogContent className="border-slate-200 bg-white">
         <DialogHeader>
-          <DialogTitle className="text-zinc-100">Mark as lost</DialogTitle>
-          <DialogDescription className="text-zinc-400">
+          <DialogTitle className="text-slate-900">Mark as lost</DialogTitle>
+          <DialogDescription className="text-slate-600">
             A reason is required. This update is logged on the prospect timeline.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-zinc-300">Reason</Label>
+            <Label className="text-slate-700">Reason</Label>
             <select
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             >
@@ -72,27 +72,27 @@ export function LostReasonModal({
             </select>
           </div>
           <div>
-            <Label className="text-zinc-300">Notes {needsNotes ? "(required)" : "(optional)"}</Label>
+            <Label className="text-slate-700">Notes {needsNotes ? "(required)" : "(optional)"}</Label>
             <textarea
               maxLength={500}
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
           <div>
-            <Label className="text-zinc-300">Reactivate on (optional)</Label>
+            <Label className="text-slate-700">Reactivate on (optional)</Label>
             <Input
               type="date"
-              className="mt-1 border-zinc-700 bg-zinc-900"
+              className="mt-1 border-slate-200 bg-slate-50"
               value={reactivate}
               onChange={(e) => setReactivate(e.target.value)}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="border-zinc-700" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="border-slate-200" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button

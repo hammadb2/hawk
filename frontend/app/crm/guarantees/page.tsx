@@ -83,8 +83,8 @@ export default function GuaranteesPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -92,8 +92,8 @@ export default function GuaranteesPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Readiness Guarantees</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-2xl font-semibold text-slate-900">Readiness Guarantees</h1>
+        <p className="mt-1 text-sm text-slate-600">
           Track guarantee status across all clients. At-risk clients need attention before SLA breach.
         </p>
       </div>
@@ -102,11 +102,11 @@ export default function GuaranteesPage() {
       <div className="grid gap-3 sm:grid-cols-5">
         {(["all", "active", "at_risk", "breached", "pending"] as const).map((key) => {
           const colors = {
-            all: "text-zinc-200",
-            active: "text-emerald-400",
+            all: "text-slate-800",
+            active: "text-emerald-600",
             at_risk: "text-amber-400",
             breached: "text-rose-400",
-            pending: "text-zinc-400",
+            pending: "text-slate-600",
           };
           const labels = { all: "Total", active: "Active", at_risk: "At Risk", breached: "Breached", pending: "Pending" };
           return (
@@ -114,9 +114,9 @@ export default function GuaranteesPage() {
               key={key}
               type="button"
               onClick={() => setFilter(key)}
-              className={`rounded-lg border px-4 py-3 text-left transition ${filter === key ? "border-emerald-700 bg-emerald-900/20" : "border-zinc-800 bg-zinc-950/80 hover:border-zinc-700"}`}
+              className={`rounded-lg border px-4 py-3 text-left transition ${filter === key ? "border-emerald-700 bg-emerald-900/20" : "border-slate-200 bg-white hover:border-slate-200"}`}
             >
-              <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">{labels[key]}</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">{labels[key]}</div>
               <div className={`mt-1 text-xl font-semibold ${colors[key]}`}>{counts[key]}</div>
             </button>
           );
@@ -124,17 +124,17 @@ export default function GuaranteesPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12 text-zinc-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+        <div className="flex justify-center py-12 text-slate-600">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
         </div>
       ) : filtered.length === 0 ? (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-500">
+        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">
           No clients match this filter.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
@@ -149,33 +149,33 @@ export default function GuaranteesPage() {
               {filtered.map((c) => {
                 const v = guaranteeVariant(c.guarantee_status);
                 const badgeColors = {
-                  green: "bg-emerald-900/50 text-emerald-400 border-emerald-700",
+                  green: "bg-emerald-50 text-emerald-600 border-emerald-700",
                   amber: "bg-amber-900/50 text-amber-400 border-amber-700",
                   red: "bg-rose-900/50 text-rose-400 border-rose-700",
-                  zinc: "bg-zinc-800 text-zinc-400 border-zinc-700",
+                  zinc: "bg-slate-100 text-slate-600 border-slate-200",
                 };
                 const days = daysSince(c.close_date);
-                const daysColor = days > 90 ? "text-rose-400" : days > 60 ? "text-amber-400" : "text-zinc-300";
+                const daysColor = days > 90 ? "text-rose-400" : days > 60 ? "text-amber-400" : "text-slate-700";
                 return (
-                  <tr key={c.id} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
+                  <tr key={c.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
                     <td className="px-3 py-2">
-                      <Link href={`/crm/clients/${c.id}/onboarding`} className="font-medium text-emerald-400 hover:underline">
+                      <Link href={`/crm/clients/${c.id}/onboarding`} className="font-medium text-emerald-600 hover:underline">
                         {c.company_name ?? "—"}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-zinc-400">{c.domain ?? "—"}</td>
-                    <td className="px-3 py-2 text-zinc-200">{formatUsd(c.mrr_cents)}</td>
+                    <td className="px-3 py-2 text-slate-600">{c.domain ?? "—"}</td>
+                    <td className="px-3 py-2 text-slate-800">{formatUsd(c.mrr_cents)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${badgeColors[v]}`}>
                         {guaranteeLabel(c.guarantee_status)}
                       </span>
                     </td>
                     <td className={`px-3 py-2 font-mono ${daysColor}`}>{days}d</td>
-                    <td className="px-3 py-2 text-zinc-400">
+                    <td className="px-3 py-2 text-slate-600">
                       {c.onboarded_at ? new Date(c.onboarded_at).toLocaleDateString() : "Not yet"}
                     </td>
                     <td className="px-3 py-2">
-                      <span className={c.status === "active" ? "text-emerald-400" : c.status === "churned" ? "text-rose-400" : "text-zinc-400"}>
+                      <span className={c.status === "active" ? "text-emerald-600" : c.status === "churned" ? "text-rose-400" : "text-slate-600"}>
                         {c.status}
                       </span>
                     </td>

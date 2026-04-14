@@ -36,7 +36,7 @@ export function ProspectCard({
 
   if (bulkMode) {
     return (
-      <div className={cn("rounded-lg bg-zinc-900/90 p-3 shadow-sm", border, selected && "ring-2 ring-emerald-500/80")}>
+      <div className={cn("rounded-lg bg-slate-100 p-3 shadow-sm", border, selected && "ring-2 ring-emerald-500/80")}>
         <div className="flex items-start gap-2">
           <input
             type="checkbox"
@@ -45,8 +45,8 @@ export function ProspectCard({
             onChange={onToggleSelect}
           />
           <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen(prospect)}>
-            <div className="truncate font-medium text-zinc-100">{prospect.company_name ?? prospect.domain}</div>
-            <div className="truncate text-xs text-zinc-500">{prospect.domain}</div>
+            <div className="truncate font-medium text-slate-900">{prospect.company_name ?? prospect.domain}</div>
+            <div className="truncate text-xs text-slate-600">{prospect.domain}</div>
           </button>
         </div>
       </div>
@@ -54,20 +54,20 @@ export function ProspectCard({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className={cn("flex gap-1 rounded-lg bg-zinc-900/90 p-2 shadow-sm", border)}>
+    <div ref={setNodeRef} style={style} className={cn("flex gap-1 rounded-lg bg-slate-100 p-2 shadow-sm", border)}>
       <button
         type="button"
         {...listeners}
         {...attributes}
-        className="mt-1 flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 active:cursor-grabbing"
+        className="mt-1 flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-slate-600 hover:bg-slate-100 hover:text-slate-700 active:cursor-grabbing"
         aria-label="Drag to move stage"
       >
         ⋮⋮
       </button>
       <button type="button" className="min-w-0 flex-1 rounded-md px-1 py-1 text-left" onClick={() => onOpen(prospect)}>
-        <div className="truncate font-medium text-zinc-100">{prospect.company_name ?? prospect.domain}</div>
-        <div className="truncate text-xs text-zinc-500">{prospect.domain}</div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+        <div className="truncate font-medium text-slate-900">{prospect.company_name ?? prospect.domain}</div>
+        <div className="truncate text-xs text-slate-600">{prospect.domain}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
           <span
             className="rounded-full px-2 py-0.5 font-medium"
             style={{
@@ -80,10 +80,10 @@ export function ProspectCard({
           <span>Score {prospect.hawk_score}</span>
           <span>{new Date(prospect.last_activity_at).toLocaleDateString()}</span>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-zinc-500">
-          <span className="rounded border border-zinc-800 px-1.5 py-0.5">Log call</span>
-          <span className="rounded border border-zinc-800 px-1.5 py-0.5">Note</span>
-          <span className="rounded border border-zinc-800 px-1.5 py-0.5">Scan</span>
+        <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-600">
+          <span className="rounded border border-slate-200 px-1.5 py-0.5">Log call</span>
+          <span className="rounded border border-slate-200 px-1.5 py-0.5">Note</span>
+          <span className="rounded border border-slate-200 px-1.5 py-0.5">Scan</span>
         </div>
       </button>
     </div>

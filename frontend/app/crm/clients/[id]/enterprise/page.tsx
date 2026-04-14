@@ -80,16 +80,16 @@ export default function ClientEnterpriseDomainsPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center text-zinc-500">
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="mx-auto max-w-lg py-16 text-center text-slate-600">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -100,19 +100,19 @@ export default function ClientEnterpriseDomainsPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-sm text-zinc-500 hover:text-emerald-400"
+          className="text-sm text-slate-600 hover:text-emerald-600"
         >
           ← Back
         </button>
-        <h1 className="mt-2 text-2xl font-semibold text-zinc-50">Enterprise domains</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Primary domain stays <span className="text-zinc-300">{primary || "—"}</span>. Add up to four extra apex
+        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Enterprise domains</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Primary domain stays <span className="text-slate-700">{primary || "—"}</span>. Add up to four extra apex
           domains for monitoring and portal rollup.
         </p>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Additional apex domains</p>
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Additional apex domains</p>
         {lines.map((v, i) => (
           <input
             key={i}
@@ -124,7 +124,7 @@ export default function ClientEnterpriseDomainsPage() {
               setLines(next);
             }}
             placeholder={`example${i + 1}.com`}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-500"
           />
         ))}
       </div>
@@ -138,7 +138,7 @@ export default function ClientEnterpriseDomainsPage() {
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        <Link href="/crm/clients" className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900">
+        <Link href="/crm/clients" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
           All clients
         </Link>
       </div>

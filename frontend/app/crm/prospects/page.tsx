@@ -27,15 +27,15 @@ export default function ProspectsListPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Prospects</h1>
-        <p className="text-sm text-zinc-500">All prospects you can access (RLS). Open a row for the full profile.</p>
+        <h1 className="text-2xl font-semibold text-slate-900">Prospects</h1>
+        <p className="text-sm text-slate-600">All prospects you can access (RLS). Open a row for the full profile.</p>
       </div>
       {loading ? (
-        <div className="flex justify-center py-12 text-zinc-500">Loading…</div>
+        <div className="flex justify-center py-12 text-slate-600">Loading…</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/80 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-600">
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
@@ -45,13 +45,13 @@ export default function ProspectsListPage() {
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id} className="border-b border-zinc-800/80 hover:bg-zinc-900/40">
+                <tr key={p.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
                   <td className="px-3 py-2">
-                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
+                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-600 hover:underline">
                       {p.company_name ?? p.domain}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-zinc-400">{p.domain}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.domain}</td>
                   <td className="px-3 py-2">{STAGE_META[p.stage].label}</td>
                   <td className="px-3 py-2">{p.hawk_score}</td>
                 </tr>

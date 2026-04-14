@@ -101,34 +101,34 @@ export function SupportTicketsConsole() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-        <h2 className="text-sm font-semibold text-zinc-200">New ticket</h2>
-        <p className="mt-1 text-xs text-zinc-500">Describe the issue. CEO and HoS get an in-app notification.</p>
+      <section className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
+        <h2 className="text-sm font-semibold text-slate-800">New ticket</h2>
+        <p className="mt-1 text-xs text-slate-600">Describe the issue. CEO and HoS get an in-app notification.</p>
         <form className="mt-4 space-y-3" onSubmit={(e) => void createTicket(e)}>
           <div>
-            <Label className="text-zinc-400">Subject</Label>
-            <Input className="mt-1 border-zinc-700 bg-zinc-900" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+            <Label className="text-slate-600">Subject</Label>
+            <Input className="mt-1 border-slate-200 bg-slate-50" value={subject} onChange={(e) => setSubject(e.target.value)} required />
           </div>
           <div>
-            <Label className="text-zinc-400">Details</Label>
+            <Label className="text-slate-600">Details</Label>
             <textarea
-              className="mt-1 min-h-[100px] w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 min-h-[100px] w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
           </div>
           <div>
-            <Label className="text-zinc-400">Priority</Label>
+            <Label className="text-slate-600">Priority</Label>
             <select
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
               value={priority}
               onChange={(e) => setPriority(e.target.value as CrmSupportTicketRow["priority"])}
             >
@@ -147,24 +147,24 @@ export function SupportTicketsConsole() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-200">{isExec ? "All tickets" : "Your tickets"}</h2>
-          <Button type="button" variant="outline" size="sm" className="border-zinc-700" onClick={() => void load()}>
+          <h2 className="text-sm font-semibold text-slate-800">{isExec ? "All tickets" : "Your tickets"}</h2>
+          <Button type="button" variant="outline" size="sm" className="border-slate-200" onClick={() => void load()}>
             Refresh
           </Button>
         </div>
         {loading ? (
-          <p className="py-8 text-center text-zinc-500">Loading…</p>
+          <p className="py-8 text-center text-slate-600">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-500">No tickets yet.</p>
+          <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">No tickets yet.</p>
         ) : (
           <div className="space-y-3">
             {rows.map((t) => (
-              <div key={t.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm">
+              <div key={t.id} className="rounded-lg border border-slate-200 bg-white shadow-sm p-4 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <div className="font-medium text-zinc-100">{t.subject}</div>
+                    <div className="font-medium text-slate-900">{t.subject}</div>
                     {isExec && (
-                      <div className="mt-1 text-xs text-zinc-500">
+                      <div className="mt-1 text-xs text-slate-600">
                         From: {names[t.requester_id] ?? t.requester_id.slice(0, 8)}
                       </div>
                     )}
@@ -173,7 +173,7 @@ export function SupportTicketsConsole() {
                     {isExec ? (
                       <>
                         <select
-                          className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200"
+                          className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800"
                           value={t.status}
                           onChange={(e) => void patchTicket(t.id, { status: e.target.value as CrmSupportTicketRow["status"] })}
                         >
@@ -184,7 +184,7 @@ export function SupportTicketsConsole() {
                           ))}
                         </select>
                         <select
-                          className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200"
+                          className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800"
                           value={t.priority}
                           onChange={(e) => void patchTicket(t.id, { priority: e.target.value as CrmSupportTicketRow["priority"] })}
                         >
@@ -196,14 +196,14 @@ export function SupportTicketsConsole() {
                         </select>
                       </>
                     ) : (
-                      <span className={cn("rounded px-2 py-1 text-xs", t.status === "open" ? "bg-amber-500/20 text-amber-200" : "bg-zinc-800 text-zinc-400")}>
+                      <span className={cn("rounded px-2 py-1 text-xs", t.status === "open" ? "bg-amber-500/20 text-amber-200" : "bg-slate-100 text-slate-600")}>
                         {t.status} · {t.priority}
                       </span>
                     )}
                   </div>
                 </div>
-                {t.body ? <p className="mt-2 whitespace-pre-wrap text-zinc-400">{t.body}</p> : null}
-                <div className="mt-2 text-[11px] text-zinc-600">
+                {t.body ? <p className="mt-2 whitespace-pre-wrap text-slate-600">{t.body}</p> : null}
+                <div className="mt-2 text-[11px] text-slate-500">
                   {new Date(t.created_at).toLocaleString()}
                   {t.updated_at !== t.created_at && <span> · updated {new Date(t.updated_at).toLocaleString()}</span>}
                 </div>
@@ -213,9 +213,9 @@ export function SupportTicketsConsole() {
         )}
       </section>
 
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-slate-500">
         For product issues with the HAWK security app your clients use, track internal coordination here.{" "}
-        <Link href="/crm/pipeline" className="text-emerald-400 hover:underline">
+        <Link href="/crm/pipeline" className="text-emerald-600 hover:underline">
           Pipeline
         </Link>
       </p>

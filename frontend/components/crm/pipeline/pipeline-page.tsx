@@ -44,10 +44,10 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: `stage-${stage}` });
   const meta = STAGE_META[stage];
   return (
-    <div className="flex w-[280px] shrink-0 flex-col rounded-xl border border-zinc-800/80" style={{ backgroundColor: meta.columnBg }}>
-      <div className="flex items-center justify-between border-b border-zinc-800/60 px-3 py-2">
-        <div className="text-sm font-semibold text-zinc-100">{meta.label}</div>
-        <div className="text-xs text-zinc-500">
+    <div className="flex w-[280px] shrink-0 flex-col rounded-xl border border-slate-200/90" style={{ backgroundColor: meta.columnBg }}>
+      <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-2">
+        <div className="text-sm font-semibold text-slate-900">{meta.label}</div>
+        <div className="text-xs text-slate-600">
           {count} · ${value.toLocaleString()}
         </div>
       </div>
@@ -91,20 +91,20 @@ function StageList({
     <div className="space-y-4">
       {STAGE_ORDER.map((stage) => (
         <div key={stage}>
-          <div className="mb-2 text-sm font-medium text-zinc-300">{STAGE_META[stage].label}</div>
+          <div className="mb-2 text-sm font-medium text-slate-700">{STAGE_META[stage].label}</div>
           <div className="space-y-2">
             {byStage[stage].map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => onOpenProspect(p)}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-left text-sm transition-colors hover:border-zinc-600"
+                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-left text-sm transition-colors hover:border-slate-300"
               >
-                <div className="font-medium text-zinc-100">{p.company_name ?? p.domain}</div>
-                <div className="text-xs text-zinc-500">{p.domain}</div>
+                <div className="font-medium text-slate-900">{p.company_name ?? p.domain}</div>
+                <div className="text-xs text-slate-600">{p.domain}</div>
               </button>
             ))}
-            {!byStage[stage].length && <div className="text-xs text-zinc-600">Empty</div>}
+            {!byStage[stage].length && <div className="text-xs text-slate-500">Empty</div>}
           </div>
         </div>
       ))}
@@ -322,9 +322,9 @@ export function PipelinePage() {
 
   if (loading && !prospects.length) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
         <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
           Loading pipeline…
         </div>
       </div>
@@ -335,11 +335,11 @@ export function PipelinePage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-50">Pipeline</h1>
-          <p className="text-sm text-zinc-500">Drag cards between stages. Lost and Closed Won require confirmation.</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Pipeline</h1>
+          <p className="text-sm text-slate-600">Drag cards between stages. Lost and Closed Won require confirmation.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             {(["kanban", "list", "table"] as const).map((v) => (
               <button
                 key={v}
@@ -347,22 +347,22 @@ export function PipelinePage() {
                 onClick={() => setPipelineView(v)}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-medium capitalize",
-                  pipelineView === v ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-200"
+                  pipelineView === v ? "bg-slate-100 text-white" : "text-slate-600 hover:text-slate-800"
                 )}
               >
                 {v}
               </button>
             ))}
           </div>
-          <Button variant="outline" className="border-zinc-700" onClick={() => setAddOpen(true)}>
+          <Button variant="outline" className="border-slate-200" onClick={() => setAddOpen(true)}>
             Add prospect
           </Button>
-          <Button variant="outline" className="border-zinc-700" onClick={() => setFilterOpen(true)}>
+          <Button variant="outline" className="border-slate-200" onClick={() => setFilterOpen(true)}>
             Filters{filterCount ? ` (${filterCount})` : ""}
           </Button>
           <Button
             variant={bulkMode ? "default" : "outline"}
-            className={cn(bulkMode ? "bg-emerald-600" : "border-zinc-700")}
+            className={cn(bulkMode ? "bg-emerald-600" : "border-slate-200")}
             onClick={() => setBulkMode(!bulkMode)}
           >
             Bulk
@@ -375,7 +375,7 @@ export function PipelinePage() {
           placeholder="Search company or domain…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md border-zinc-700 bg-zinc-900"
+          className="max-w-md border-slate-200 bg-slate-50"
         />
       </div>
 
@@ -418,9 +418,9 @@ export function PipelinePage() {
               </div>
               <DragOverlay>
                 {activeDrag ? (
-                  <div className="w-[260px] rounded-lg border border-emerald-500/50 bg-zinc-900 p-3 shadow-xl">
-                    <div className="font-medium text-zinc-100">{activeDrag.company_name ?? activeDrag.domain}</div>
-                    <div className="text-xs text-zinc-500">{activeDrag.domain}</div>
+                  <div className="w-[260px] rounded-lg border border-emerald-500/50 bg-slate-50 p-3 shadow-xl">
+                    <div className="font-medium text-slate-900">{activeDrag.company_name ?? activeDrag.domain}</div>
+                    <div className="text-xs text-slate-600">{activeDrag.domain}</div>
                   </div>
                 ) : null}
               </DragOverlay>
@@ -435,9 +435,9 @@ export function PipelinePage() {
       {pipelineView === "list" && <StageList byStage={byStage} onOpenProspect={(row) => setDrawerId(row.id)} />}
 
       {pipelineView === "table" && (
-        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full min-w-[800px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/80 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-600">
               <tr>
                 {(
                   [
@@ -450,7 +450,7 @@ export function PipelinePage() {
                   ] as const
                 ).map(([key, label]) => (
                   <th key={key} className="px-3 py-2">
-                    <button type="button" className="font-semibold hover:text-zinc-300" onClick={() => toggleSort(key)}>
+                    <button type="button" className="font-semibold hover:text-slate-700" onClick={() => toggleSort(key)}>
                       {label}
                       {sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                     </button>
@@ -462,15 +462,15 @@ export function PipelinePage() {
               {sortedTable.map((p) => (
                 <tr
                   key={p.id}
-                  className="cursor-pointer border-b border-zinc-800/80 hover:bg-zinc-900/50"
+                  className="cursor-pointer border-b border-slate-200/90 hover:bg-slate-50"
                   onClick={() => setDrawerId(p.id)}
                 >
-                  <td className="px-3 py-2 text-zinc-100">{p.company_name ?? "—"}</td>
-                  <td className="px-3 py-2 text-zinc-400">{p.domain}</td>
+                  <td className="px-3 py-2 text-slate-900">{p.company_name ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.domain}</td>
                   <td className="px-3 py-2">{STAGE_META[p.stage].label}</td>
                   <td className="px-3 py-2">{p.hawk_score}</td>
                   <td className="px-3 py-2 capitalize">{p.source}</td>
-                  <td className="px-3 py-2 text-zinc-500">{new Date(p.last_activity_at).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-slate-600">{new Date(p.last_activity_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
