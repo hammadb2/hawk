@@ -45,7 +45,7 @@ def _spf_strength(spf: str) -> tuple[str, str]:
     if "-all" in spf:
         return "ok", "SPF uses strict fail (-all) — good."
     if "~all" in spf:
-        return "ok", "SPF uses softfail (~all) — acceptable; consider -all when every sender is known."
+        return "low", "SPF uses softfail (~all) — acceptable; consider -all when every sender is known."
     return "low", "SPF present; confirm includes cover all senders."
 
 
@@ -63,7 +63,7 @@ def _dmarc_strength(records: list[str]) -> tuple[str, str, str]:
     if pol == "reject":
         return "ok", raw, "DMARC policy is reject — strong."
     if pol == "quarantine":
-        return "ok", raw, "DMARC policy is quarantine — good; consider reject when stable."
+        return "low", raw, "DMARC policy is quarantine — good; consider reject when stable."
     if pol == "none":
         return "medium", raw, "DMARC p=none — monitoring only; increase to quarantine/reject."
     return "low", raw, "DMARC present; verify alignment and reporting."
