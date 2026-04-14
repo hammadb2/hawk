@@ -27,7 +27,23 @@ function isExecRole(role: CrmRole | undefined): boolean {
   return role === "ceo" || role === "hos";
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+
+async function readApiError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const j = JSON.parse(text) as { detail?: string | { msg?: string }[] };
+    if (typeof j.detail === "string") return j.detail;
+    if (Array.isArray(j.detail)) {
+      const parts = j.detail.map((x) => (typeof x === "object" && x && "msg" in x ? String((x as { msg?: string }).msg) : ""));
+      const joined = parts.filter(Boolean).join("; ");
+      if (joined) return joined;
+    }
+  } catch {
+    /* not JSON */
+  }
+  return text.trim().slice(0, 240) || `Request failed (${res.status})`;
+}
 
 export default function EarningsPage() {
   const supabase = createClient();
@@ -81,7 +97,7 @@ export default function EarningsPage() {
   }, [authReady, session, load]);
 
   async function updateCommissionStatus(commissionId: string, newStatus: "pending" | "approved" | "paid") {
-    if (!session?.access_token || !API_URL) return;
+    if (!session?.access_token) return;
     setUpdating(commissionId);
     try {
       const res = await fetch(`${API_URL}/api/crm/commissions/${commissionId}`, {
@@ -93,8 +109,7 @@ export default function EarningsPage() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) {
-        const txt = await res.text();
-        toast.error(txt || "Failed to update");
+        toast.error(await readApiError(res));
         return;
       }
       toast.success(`Commission marked as ${newStatus}`);
@@ -107,7 +122,7 @@ export default function EarningsPage() {
   }
 
   async function bulkUpdate(targetStatus: "approved" | "paid") {
-    if (!session?.access_token || !API_URL) return;
+    if (!session?.access_token) return;
     const sourceLabel = targetStatus === "approved" ? "pending" : "approved";
     const count = rows.filter((r) => r.status === sourceLabel).length;
     if (count === 0) {
@@ -125,8 +140,7 @@ export default function EarningsPage() {
         body: JSON.stringify({ status: targetStatus }),
       });
       if (!res.ok) {
-        const txt = await res.text();
-        toast.error(txt || "Bulk update failed");
+        toast.error(await readApiError(res));
         return;
       }
       const j = await res.json();

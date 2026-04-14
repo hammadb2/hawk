@@ -19,7 +19,19 @@ _CORS_ORIGINS_RAW = os.environ.get("HAWK_CORS_ORIGINS", "").strip()
 _CORS_ORIGINS = [o.strip() for o in _CORS_ORIGINS_RAW.split(",") if o.strip()] if _CORS_ORIGINS_RAW else ["*"]
 
 from routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications, breach_check, marketing, guarantee_access
-from routers import crm_client_portal, crm_cron, crm_enterprise, crm_portal_api, crm_scale, crm_webhooks, monitor, portal_phase2, portal_self_serve
+from routers import (
+    crm_client_portal,
+    crm_cron,
+    crm_enterprise,
+    crm_invite,
+    crm_payment,
+    crm_portal_api,
+    crm_scale,
+    crm_webhooks,
+    monitor,
+    portal_phase2,
+    portal_self_serve,
+)
 
 if os.environ.get("SENTRY_DSN"):
     try:
@@ -65,6 +77,8 @@ app.include_router(portal_phase2.router)
 app.include_router(portal_self_serve.router)
 app.include_router(crm_scale.router)
 app.include_router(crm_scale.cron_routes)
+app.include_router(crm_invite.router)
+app.include_router(crm_payment.router)
 app.include_router(monitor.router)
 
 

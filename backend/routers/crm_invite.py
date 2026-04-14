@@ -42,12 +42,6 @@ def _profile(uid: str) -> dict | None:
     return rows[0] if rows else None
 
 
-def _require_ceo(uid: str) -> None:
-    p = _profile(uid)
-    if not p or p.get("role") != "ceo":
-        raise HTTPException(status_code=403, detail="CEO only")
-
-
 def _require_privileged(uid: str) -> None:
     p = _profile(uid)
     if not p or p.get("role") not in ("ceo", "hos"):
@@ -64,7 +58,7 @@ class InviteBody(BaseModel):
 
 @router.post("/invite")
 def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
-    _require_ceo(uid)
+    _require_privileged(uid)
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
@@ -100,7 +94,7 @@ class ResendBody(BaseModel):
 
 @router.post("/invite/resend")
 def resend_invite(body: ResendBody, uid: str = Depends(require_supabase_uid)):
-    _require_ceo(uid)
+    _require_privileged(uid)
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
