@@ -94,7 +94,7 @@ async def analyze(domain: str) -> list[dict[str, Any]]:
     )
 
     # DKIM: common selectors (limited pass)
-    selectors = ["default", "google", "selector1", "selector2", "k1", "s1"]
+    selectors = ["default", "resend", "google", "selector1", "selector2", "k1", "s1"]
     dkim_found = False
     for sel in selectors:
         name = f"{sel}._domainkey.{base}"

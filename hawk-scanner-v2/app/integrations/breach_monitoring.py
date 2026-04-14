@@ -73,40 +73,68 @@ def _bfinding(
 
 
 def _hudson_stealer_count(data: Any) -> int:
-    """Best-effort count of stealer-related rows from Hudson Rock JSON."""
+    """Best-effort count of stealer-related rows tied to the *queried domain*.
+
+    Hudson Rock's ``search-by-domain`` response includes a root-level ``totalStealers`` that is a
+    **global platform statistic**, present on every response. Using it produced false critical findings
+    (e.g. tens of millions of "records") even when ``total`` is 0 and URL buckets are empty.
+    """
     if not isinstance(data, dict):
         return 0
     if data.get("error"):
         return 0
 
-    for key in ("stealers", "stealerLogs", "stealer_logs", "stealerData", "results", "records", "data"):
+    total = int(data["total"]) if isinstance(data.get("total"), int) else 0
+    if total > 0:
+        return total
+
+    people = 0
+    for k in ("employees", "users", "third_parties"):
+        v = data.get(k)
+        if isinstance(v, int) and v > 0:
+            people += v
+
+    url_n = 0
+    inner = data.get("data")
+    if isinstance(inner, dict):
+        for k in ("all_urls", "employees_urls", "clients_urls", "third_party_urls"):
+            u = inner.get(k)
+            if isinstance(u, list):
+                url_n += len(u)
+        for k in ("stealers", "stealerLogs", "stealer_logs"):
+            chunk = inner.get(k)
+            if isinstance(chunk, list) and chunk:
+                return len(chunk)
+            if isinstance(chunk, dict):
+                sub = chunk.get("stealers") or chunk.get("logs") or chunk.get("items")
+                if isinstance(sub, list) and sub:
+                    return len(sub)
+
+    if people > 0 or url_n > 0:
+        return max(people, url_n)
+
+    # Legacy top-level list shapes
+    for key in ("stealers", "stealerLogs", "stealer_logs", "stealerData", "results", "records"):
         chunk = data.get(key)
         if isinstance(chunk, list) and chunk:
             return len(chunk)
         if isinstance(chunk, dict):
-            inner = chunk.get("stealers") or chunk.get("logs") or chunk.get("items")
-            if isinstance(inner, list) and inner:
-                return len(inner)
+            inner2 = chunk.get("stealers") or chunk.get("logs") or chunk.get("items")
+            if isinstance(inner2, list) and inner2:
+                return len(inner2)
 
-    for path in (
-        ("statistics", "totalStealers"),
-        ("statistics", "stealersCount"),
-        ("overview", "compromisedEmployees"),
-        ("totalStealers",),
-        ("stealerCount",),
-        ("compromisedCount",),
-    ):
-        cur: Any = data
-        ok = True
-        for p in path:
-            if not isinstance(cur, dict):
-                ok = False
-                break
-            cur = cur.get(p)
-        if ok and isinstance(cur, int) and cur > 0:
-            return cur
+    stats = data.get("statistics")
+    if isinstance(stats, dict):
+        for subk in ("totalStealers", "stealersCount"):
+            v = stats.get(subk)
+            if isinstance(v, int) and v > 0:
+                return v
+        overview = stats.get("overview")
+        if isinstance(overview, dict):
+            ce = overview.get("compromisedEmployees")
+            if isinstance(ce, int) and ce > 0:
+                return ce
 
-    # Deep scan: any list whose key mentions stealer
     for k, v in data.items():
         if isinstance(v, list) and v and "stealer" in str(k).lower():
             return len(v)
