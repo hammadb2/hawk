@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { portal } from "@/lib/portal-ui";
 
 const NAV_LINKS = [
   { href: "/portal/ask", label: "Ask HAWK" },
@@ -40,7 +41,7 @@ function PortalSignOut() {
       type="button"
       onClick={() => void handleSignOut()}
       disabled={busy}
-      className="text-zinc-400 hover:text-[#00C48C] disabled:opacity-50"
+      className="rounded-full px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
     >
       {busy ? "Signing out…" : "Sign out"}
     </button>
@@ -58,33 +59,39 @@ export function PortalHeader() {
 
   if (isLoginOrPublic) {
     return (
-      <header className="border-b border-zinc-800/80 bg-[#07060C]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-          <Link href="https://securedbyhawk.com" className="flex items-center gap-2">
-            <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
-            <span className="rounded-md bg-[#00C48C]/15 px-2 py-0.5 text-xs font-medium text-[#00C48C]">Client</span>
+      <header className={portal.header}>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <Link href="https://securedbyhawk.com" className="flex items-center gap-2.5" title="HAWK">
+            <span className="inline-flex items-center rounded-lg bg-slate-900 px-2 py-1.5 ring-1 ring-slate-800/80">
+              <img src="/hawk-logo.png" alt="HAWK" className="h-7 w-auto" />
+            </span>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+              Client
+            </span>
           </Link>
-          <p className="text-sm text-zinc-500">Portal sign in</p>
+          <p className="text-sm text-slate-500">Portal sign in</p>
         </div>
       </header>
     );
   }
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <header className="border-b border-zinc-800/80 bg-[#07060C]/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-        <Link href="/portal" className="flex items-center gap-2">
-          <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
-          <span className="rounded-md bg-[#00C48C]/15 px-2 py-0.5 text-xs font-medium text-[#00C48C]">Client</span>
+    <header className={portal.header}>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
+        <Link href="/portal" className="flex shrink-0 items-center gap-2.5" title="HAWK Client">
+          <span className="inline-flex items-center rounded-lg bg-slate-900 px-2 py-1.5 ring-1 ring-slate-800/80">
+            <img src="/hawk-logo.png" alt="HAWK" className="h-7 w-auto" />
+          </span>
+          <span className="hidden rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 sm:inline">
+            Client
+          </span>
         </Link>
 
-        {/* Mobile menu toggle */}
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 lg:hidden"
           onClick={() => setMenuOpen((o) => !o)}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
@@ -102,13 +109,16 @@ export function PortalHeader() {
           )}
         </button>
 
-        {/* Desktop nav */}
-        <nav className="hidden flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-400 lg:flex">
+        <nav className="hidden max-w-[calc(100%-11rem)] flex-1 flex-wrap items-center justify-end gap-1 lg:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={isActive(link.href) ? "font-medium text-[#00C48C]" : "hover:text-[#00C48C]"}
+              className={
+                isActive(link.href)
+                  ? "rounded-full bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm"
+                  : "rounded-full px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              }
             >
               {link.label}
             </Link>
@@ -117,26 +127,25 @@ export function PortalHeader() {
         </nav>
       </div>
 
-      {/* Mobile nav */}
       {menuOpen && (
-        <nav className="border-t border-zinc-800/60 px-4 pb-4 pt-3 lg:hidden">
+        <nav className="border-t border-slate-200/80 px-4 pb-4 pt-3 lg:hidden">
           <div className="grid grid-cols-2 gap-2 text-sm">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className={`rounded-lg px-3 py-2 ${
+                className={
                   isActive(link.href)
-                    ? "bg-[#00C48C]/10 font-medium text-[#00C48C]"
-                    : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
-                }`}
+                    ? "rounded-xl bg-slate-900 px-3 py-2.5 font-medium text-white shadow-sm"
+                    : "rounded-xl px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }
               >
                 {link.label}
               </Link>
             ))}
           </div>
-          <div className="mt-3 border-t border-zinc-800/60 pt-3">
+          <div className="mt-3 border-t border-slate-200/80 pt-3">
             <PortalSignOut />
           </div>
         </nav>

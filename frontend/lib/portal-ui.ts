@@ -1,21 +1,5 @@
 /**
- * Shared Tailwind fragments for light “AI product” shell (portal + CRM).
- * Keep `frontend/tailwind.config.ts` `content` including `./lib/**` so these utilities are generated.
+ * Re-export shell tokens from `components/portal/portal-tokens.ts` so Tailwind
+ * always scans class strings via the `components/**` content glob.
  */
-export const portal = {
-  pageBg: "min-h-dvh w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
-  header:
-    "border-b border-slate-200/80 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70 shadow-[0_1px_0_rgba(15,23,42,0.04)]",
-  card: "rounded-2xl border border-slate-200/90 bg-white shadow-sm",
-  cardMuted: "rounded-2xl border border-slate-200/80 bg-slate-50/80 shadow-sm",
-  link: "font-medium text-emerald-600 hover:text-emerald-700",
-  linkSubtle: "text-slate-500 hover:text-emerald-600",
-  spinner: "h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500",
-  spinnerSm: "h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500",
-  input:
-    "border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-400",
-  btnPrimary: "bg-emerald-500 font-semibold text-white shadow-sm hover:bg-emerald-600",
-} as const;
-
-/** Alias for CRM and other apps using the same light shell. */
-export const lightShell = portal;
+export { portal, lightShell } from "@/components/portal/portal-tokens";
