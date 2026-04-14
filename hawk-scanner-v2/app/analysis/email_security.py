@@ -9,16 +9,30 @@ import dns.asyncresolver
 import dns.exception
 
 
+def _txt_rdata_to_str(rdata: Any) -> str:
+    """One TXT RDATA as a single string (multi-chunk TXT must be concatenated per RFC 1035)."""
+    if hasattr(rdata, "strings") and rdata.strings:
+        return b"".join(rdata.strings).decode("utf-8", errors="replace")
+    return rdata.to_text().strip().strip('"')
+
+
 async def _txt_records(name: str) -> list[str]:
-    try:
-        answers = await dns.asyncresolver.resolve(name, "TXT", lifetime=10)
-    except (dns.exception.DNSException, OSError):
-        return []
+    """Resolve TXT; UDP first, then TCP once on failure (truncation / flaky resolvers)."""
     out: list[str] = []
-    for rdata in answers:
-        txt = rdata.to_text().strip('"')
-        out.append(txt)
-    return out
+    for tcp in (False, True):
+        try:
+            answers = await dns.asyncresolver.resolve(name, "TXT", lifetime=12, tcp=tcp)
+        except (dns.exception.DNSException, OSError):
+            if tcp:
+                return out
+            continue
+        out = []
+        for rdata in answers:
+            txt = _txt_rdata_to_str(rdata)
+            if txt:
+                out.append(txt)
+        return out
+    return []
 
 
 def _spf_strength(spf: str) -> tuple[str, str]:
@@ -29,16 +43,17 @@ def _spf_strength(spf: str) -> tuple[str, str]:
     if "all" not in spf:
         return "medium", "SPF has no explicit all mechanism; review."
     if "-all" in spf:
-        return "low", "SPF uses strict fail (-all) — good."
+        return "ok", "SPF uses strict fail (-all) — good."
     if "~all" in spf:
-        return "low", "SPF uses softfail (~all) — acceptable; consider -all."
+        return "ok", "SPF uses softfail (~all) — acceptable; consider -all when every sender is known."
     return "low", "SPF present; confirm includes cover all senders."
 
 
 def _dmarc_strength(records: list[str]) -> tuple[str, str, str]:
     raw = ""
     for txt in records:
-        if "v=DMARC1" in txt.upper() or "v=dmarc1" in txt:
+        # Must compare case-insensitively; ``txt.upper()`` contains ``V=DMARC1`` not ``v=DMARC1``.
+        if "v=dmarc1" in txt.lower():
             raw = txt
             break
     if not raw:
@@ -46,9 +61,9 @@ def _dmarc_strength(records: list[str]) -> tuple[str, str, str]:
     m = re.search(r"p=(\w+)", raw, re.I)
     pol = (m.group(1) if m else "none").lower()
     if pol == "reject":
-        return "low", raw, "DMARC policy is reject — strong."
+        return "ok", raw, "DMARC policy is reject — strong."
     if pol == "quarantine":
-        return "low", raw, "DMARC policy is quarantine — good; consider reject."
+        return "ok", raw, "DMARC policy is quarantine — good; consider reject when stable."
     if pol == "none":
         return "medium", raw, "DMARC p=none — monitoring only; increase to quarantine/reject."
     return "low", raw, "DMARC present; verify alignment and reporting."
@@ -105,7 +120,7 @@ async def analyze(domain: str) -> list[dict[str, Any]]:
     findings.append(
         {
             "id": str(uuid.uuid4()),
-            "severity": "low" if dkim_found else "medium",
+            "severity": "ok" if dkim_found else "medium",
             "category": "Email Security",
             "title": "DKIM selectors",
             "description": "DKIM key found for a common selector."
