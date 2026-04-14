@@ -5,7 +5,7 @@
 export const portal = {
   pageBg: "min-h-dvh w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
   header:
-    "border-b border-slate-200/80 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70 shadow-[0_1px_0_rgba(15,23,42,0.04)]",
+    "border-b border-slate-200/90 bg-white shadow-[0_1px_0_rgba(15,23,42,0.06)] backdrop-blur-sm",
   card: "rounded-2xl border border-slate-200/90 bg-white shadow-sm",
   cardMuted: "rounded-2xl border border-slate-200/80 bg-slate-50/80 shadow-sm",
   link: "font-medium text-emerald-600 hover:text-emerald-700",

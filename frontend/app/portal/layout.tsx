@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PortalHeader } from "@/components/portal/portal-header";
 import { PortalGate } from "@/components/portal/portal-gate";
+import { portal } from "@/lib/portal-ui";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "HAWK Client Portal",
@@ -10,17 +12,23 @@ export const metadata: Metadata = {
 
 function PortalGateFallback() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center text-zinc-500">
-      <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+    <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+      <div className={portal.spinner} />
     </div>
   );
 }
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#07060C] text-zinc-100">
+    <div
+      className={cn(
+        portal.pageBg,
+        // Duplicated here so Tailwind always emits these utilities from `app/` (belt + suspenders).
+        "min-h-dvh w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
+      )}
+    >
       <PortalHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <Suspense fallback={<PortalGateFallback />}>
           <PortalGate>{children}</PortalGate>
         </Suspense>

@@ -19,6 +19,11 @@
   --yellow: #fbbf24;
 }
 
+html {
+  background-color: var(--background);
+  color-scheme: light;
+}
+
 body {
   background: var(--background);
   color: var(--text-primary);
