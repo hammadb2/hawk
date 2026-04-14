@@ -1,6 +1,9 @@
-/** Shared Tailwind fragments for light “AI product” shell (portal + CRM). */
+/**
+ * Shared Tailwind fragments for light “AI product” shell (portal + CRM).
+ * Keep `frontend/tailwind.config.ts` `content` including `./lib/**` so these utilities are generated.
+ */
 export const portal = {
-  pageBg: "min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
+  pageBg: "min-h-dvh w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
   header:
     "border-b border-slate-200/80 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70 shadow-[0_1px_0_rgba(15,23,42,0.04)]",
   card: "rounded-2xl border border-slate-200/90 bg-white shadow-sm",

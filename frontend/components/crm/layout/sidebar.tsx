@@ -38,9 +38,14 @@ export function CrmSidebar() {
         "w-16 xl:w-64 transition-[width] duration-200"
       )}
     >
-      <div className="flex h-14 items-center border-b border-slate-200 px-3 xl:px-4">
-        <img src="/hawk-logo.png" alt="HAWK" className="h-8 w-auto xl:h-10" />
-        <span className="ml-1 hidden text-sm text-slate-600 xl:inline">CRM</span>
+      <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-3 xl:px-4">
+        <div
+          className="flex shrink-0 items-center rounded-lg bg-slate-900 px-2 py-1 shadow-sm ring-1 ring-slate-800/80"
+          title="HAWK"
+        >
+          <img src="/hawk-logo.png" alt="HAWK" className="h-7 w-auto xl:h-8" />
+        </div>
+        <span className="hidden text-sm font-semibold tracking-tight text-slate-800 xl:inline">CRM</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">
         {items.map((item) => {

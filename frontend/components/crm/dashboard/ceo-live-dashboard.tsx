@@ -197,8 +197,8 @@ export function CeoLiveDashboard({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
-        <h2 className="text-sm font-semibold text-emerald-200">Live ops ({roleNote})</h2>
+      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4">
+        <h2 className="text-sm font-semibold text-emerald-900">Live ops ({roleNote})</h2>
         <p className="mt-1 text-xs text-slate-600">
           KPIs use your browser&apos;s local calendar day. Pipeline $ uses the same hawk-score bands as the Kanban. Activity feed updates in real time.
         </p>
@@ -247,7 +247,7 @@ export function CeoLiveDashboard({
                 <span
                   className={
                     row.healthScore !== null && row.healthScore < 50
-                      ? "font-medium text-rose-400"
+                      ? "font-medium text-rose-600"
                       : "text-slate-600"
                   }
                 >

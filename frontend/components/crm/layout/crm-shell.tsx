@@ -13,7 +13,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
 
   if (!authReady) {
     return (
-      <div className={`flex min-h-screen items-center justify-center ${lightShell.pageBg}`}>
+      <div className={`flex min-h-dvh items-center justify-center ${lightShell.pageBg}`}>
         <div className="flex flex-col items-center gap-3">
           <div className={lightShell.spinnerSm} />
           <p className="text-sm text-slate-600">Loading session…</p>
@@ -23,7 +23,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) {
-    return <>{children}</>;
+    return <div className={lightShell.pageBg}>{children}</div>;
   }
 
   return (

@@ -143,7 +143,7 @@ export function CrmTopbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-slate-200 bg-white/90 px-3 backdrop-blur md:px-4">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm md:px-4">
         <Button
           variant="outline"
           size="sm"

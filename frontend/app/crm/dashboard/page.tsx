@@ -50,8 +50,8 @@ export default function CrmDashboardPage() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-6 text-sm text-amber-100">
-        <p className="font-medium text-amber-50">CRM profile not found</p>
+      <div className="space-y-4 rounded-xl border border-amber-200/90 bg-amber-50 p-6 text-sm text-amber-950">
+        <p className="font-medium text-amber-900">CRM profile not found</p>
         <p className="text-slate-600">
           There is no row in <code className="text-slate-700">public.profiles</code> for your signed-in user, or Supabase
           blocked the read (RLS). Check the browser console for <code className="text-slate-700">[CRM auth]</code> logs.
@@ -81,7 +81,7 @@ export default function CrmDashboardPage() {
       </div>
 
       {!onboardingDone && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-100">
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 p-4 text-sm text-amber-950">
           Complete your first-login checklist.{" "}
           <Link href="/crm/onboarding" className="font-medium underline">
             Continue onboarding
@@ -94,8 +94,8 @@ export default function CrmDashboardPage() {
       )}
 
       {["ceo", "hos"].includes(profile.role) && hotLeads.length > 0 && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4">
-          <h2 className="text-sm font-semibold text-rose-200">Hot leads</h2>
+        <div className="rounded-xl border border-rose-200/80 bg-rose-50/90 p-4">
+          <h2 className="text-sm font-semibold text-rose-800">Hot leads</h2>
           <ul className="mt-2 space-y-2">
             {hotLeads.map((p) => (
               <li key={p.id}>
