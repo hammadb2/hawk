@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { WebhookInstructions } from "@/components/crm/charlotte/webhook-instructions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 
 type CharlotteRunRow = {
   id: string;
@@ -31,7 +30,6 @@ function StatusDot({ status }: { status: string | undefined }) {
 }
 
 export default function CharlottePage() {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
   const supabase = useMemo(() => createClient(), []);
   const { authReady, session, profile } = useCrmAuth();
   const [runs, setRuns] = useState<CharlotteRunRow[]>([]);
@@ -39,13 +37,13 @@ export default function CharlottePage() {
   const [tab, setTab] = useState<"runs" | "webhook">("runs");
 
   const loadRuns = useCallback(async () => {
-    if (!session?.access_token || !API_URL) {
+    if (!session?.access_token) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/crm/charlotte-runs`, {
+      const res = await fetch(`${CRM_API_BASE_URL}/api/crm/charlotte-runs`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (res.ok) {
@@ -168,7 +166,7 @@ export default function CharlottePage() {
           </div>
         )
       ) : (
-        <WebhookInstructions apiBase={apiBase} />
+        <WebhookInstructions apiBase={CRM_API_BASE_URL} />
       )}
     </div>
   );

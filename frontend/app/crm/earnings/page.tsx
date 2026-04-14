@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { readApiErrorResponse } from "@/lib/crm/api-error";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { formatUsd } from "@/lib/crm/format";
 import type { CrmCommissionRow, CrmRole } from "@/lib/crm/types";
 
@@ -25,24 +27,6 @@ function showCloserColumn(role: CrmRole | undefined): boolean {
 
 function isExecRole(role: CrmRole | undefined): boolean {
   return role === "ceo" || role === "hos";
-}
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
-
-async function readApiError(res: Response): Promise<string> {
-  const text = await res.text();
-  try {
-    const j = JSON.parse(text) as { detail?: string | { msg?: string }[] };
-    if (typeof j.detail === "string") return j.detail;
-    if (Array.isArray(j.detail)) {
-      const parts = j.detail.map((x) => (typeof x === "object" && x && "msg" in x ? String((x as { msg?: string }).msg) : ""));
-      const joined = parts.filter(Boolean).join("; ");
-      if (joined) return joined;
-    }
-  } catch {
-    /* not JSON */
-  }
-  return text.trim().slice(0, 240) || `Request failed (${res.status})`;
 }
 
 export default function EarningsPage() {
@@ -100,7 +84,7 @@ export default function EarningsPage() {
     if (!session?.access_token) return;
     setUpdating(commissionId);
     try {
-      const res = await fetch(`${API_URL}/api/crm/commissions/${commissionId}`, {
+      const res = await fetch(`${CRM_API_BASE_URL}/api/crm/commissions/${commissionId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -109,7 +93,7 @@ export default function EarningsPage() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) {
-        toast.error(await readApiError(res));
+        toast.error(await readApiErrorResponse(res));
         return;
       }
       toast.success(`Commission marked as ${newStatus}`);
@@ -131,7 +115,7 @@ export default function EarningsPage() {
     }
     setBulkUpdating(true);
     try {
-      const res = await fetch(`${API_URL}/api/crm/commissions/bulk-update`, {
+      const res = await fetch(`${CRM_API_BASE_URL}/api/crm/commissions/bulk-update`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -140,7 +124,7 @@ export default function EarningsPage() {
         body: JSON.stringify({ status: targetStatus }),
       });
       if (!res.ok) {
-        toast.error(await readApiError(res));
+        toast.error(await readApiErrorResponse(res));
         return;
       }
       const j = await res.json();

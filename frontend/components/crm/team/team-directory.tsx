@@ -15,9 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { cn } from "@/lib/utils";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 function roleLabel(r: string): string {
   return r.replace("_", " ");
@@ -89,7 +88,7 @@ export function TeamDirectory() {
       };
       if (form.team_lead_id) body.team_lead_id = form.team_lead_id;
 
-      const r = await fetch(`${API_URL}/api/crm/invite`, {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/invite`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,11 +97,18 @@ export function TeamDirectory() {
         body: JSON.stringify(body),
       });
       if (!r.ok) {
-        const t = await r.text();
-        toast.error(t.slice(0, 200));
+        let msg = (await r.text()).slice(0, 240);
+        try {
+          const j = JSON.parse(msg) as { detail?: string };
+          if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* plain text */
+        }
+        toast.error(msg);
         return;
       }
-      toast.success("Invite sent");
+      const j = (await r.json()) as { message?: string; existing_user?: boolean };
+      toast.success(j.message || (j.existing_user ? "Rep linked — check email for magic link." : "Invite sent"));
       setInviteOpen(false);
       setForm({ email: "", full_name: "", role: "sales_rep", whatsapp_number: "", team_lead_id: "" });
       await load();
@@ -113,7 +119,7 @@ export function TeamDirectory() {
 
   async function resendInvite(email: string | null) {
     if (!email || !session?.access_token) return;
-    const r = await fetch(`${API_URL}/api/crm/invite/resend`, {
+    const r = await fetch(`${CRM_API_BASE_URL}/api/crm/invite/resend`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -127,7 +133,7 @@ export function TeamDirectory() {
 
   async function deactivateRep(id: string) {
     if (!session?.access_token || !confirm("Deactivate this rep?")) return;
-    const r = await fetch(`${API_URL}/api/crm/rep/deactivate`, {
+    const r = await fetch(`${CRM_API_BASE_URL}/api/crm/rep/deactivate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -147,7 +153,7 @@ export function TeamDirectory() {
 
   async function submitReassign() {
     if (!reassignFrom || !reassignTo || !session?.access_token) return;
-    const r = await fetch(`${API_URL}/api/crm/rep/reassign-prospects`, {
+    const r = await fetch(`${CRM_API_BASE_URL}/api/crm/rep/reassign-prospects`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

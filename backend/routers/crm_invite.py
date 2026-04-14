@@ -1,10 +1,11 @@
-"""CRM — invite reps (CEO), resend, deactivate, reassign prospects."""
+"""CRM — invite reps (CEO / HoS), resend, deactivate, reassign prospects."""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from config import CRM_PUBLIC_BASE_URL, SUPABASE_URL
 from routers.crm_auth import require_supabase_uid
+from services.crm_portal_stripe import _lookup_user_id_by_email
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,113 @@ def _require_privileged(uid: str) -> None:
     p = _profile(uid)
     if not p or p.get("role") not in ("ceo", "hos"):
         raise HTTPException(status_code=403, detail="CEO or HoS only")
+
+
+def _is_invite_duplicate_email(resp: httpx.Response) -> bool:
+    """Supabase GoTrue rejects invite when auth.users already has this email (portal, tests, etc.)."""
+    if resp.status_code not in (400, 409, 422):
+        return False
+    raw = (resp.text or "").lower()
+    try:
+        j = resp.json()
+    except (json.JSONDecodeError, ValueError):
+        return "already" in raw and ("registered" in raw or "exists" in raw)
+    if not isinstance(j, dict):
+        return False
+    code = str(j.get("error_code") or j.get("code") or "").lower()
+    msg = str(j.get("msg") or j.get("message") or j.get("error_description") or "").lower()
+    if code in ("email_exists", "user_already_exists") or "email_exists" in code or "user_already" in code:
+        return True
+    if "already" in msg and ("registered" in msg or "exists" in msg or "signed up" in msg):
+        return True
+    return False
+
+
+def _get_profile_row(uid: str) -> dict[str, Any] | None:
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/profiles",
+        headers=_sb_headers(),
+        params={"id": f"eq.{uid}", "select": "id,email,role,status", "limit": "1"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    return rows[0] if rows else None
+
+
+def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
+    """
+    Email already exists in Supabase Auth — link/update CRM profile and send a magic link so they can sign in.
+    """
+    email = body.email.lower().strip()
+    uid = _lookup_user_id_by_email(email)
+    if not uid:
+        raise HTTPException(
+            status_code=400,
+            detail="Invite was rejected for this email, but no existing auth user could be resolved. "
+            "Check Supabase Auth users or try a different address.",
+        )
+
+    existing = _get_profile_row(uid)
+    if existing:
+        role = str(existing.get("role") or "").lower()
+        if role == "ceo":
+            raise HTTPException(status_code=400, detail="This email is already the CEO account.")
+        if role == "client":
+            raise HTTPException(
+                status_code=400,
+                detail="This email already has a client portal login. Use a different email for CRM reps.",
+            )
+
+    patch: dict[str, Any] = {
+        "full_name": body.full_name.strip(),
+        "role": body.role,
+        "whatsapp_number": body.whatsapp_number.strip(),
+        "status": "invited",
+        "email": email,
+    }
+    if body.team_lead_id:
+        patch["team_lead_id"] = body.team_lead_id
+
+    if existing:
+        pr = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=_sb_headers(),
+            params={"id": f"eq.{uid}"},
+            json=patch,
+            timeout=20.0,
+        )
+        if pr.status_code >= 400:
+            raise HTTPException(status_code=400, detail=pr.text[:500])
+    else:
+        row = {"id": uid, **patch}
+        pr = httpx.post(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=_sb_headers(),
+            json=row,
+            timeout=20.0,
+        )
+        if pr.status_code >= 400:
+            raise HTTPException(status_code=400, detail=pr.text[:500])
+
+    redir = f"{CRM_PUBLIC_BASE_URL}/crm/onboarding" if CRM_PUBLIC_BASE_URL else None
+    recover_json: dict[str, Any] = {"email": email}
+    if redir:
+        recover_json["options"] = {"email_redirect_to": redir}
+    rr = httpx.post(
+        f"{SUPABASE_URL}/auth/v1/recover",
+        headers=_sb_headers(),
+        json=recover_json,
+        timeout=30.0,
+    )
+    if rr.status_code >= 400:
+        logger.warning("recover after rep upsert failed: %s %s", rr.status_code, rr.text[:300])
+
+    return {
+        "ok": True,
+        "existing_user": True,
+        "message": "That email already had a login. We set the CRM rep profile and sent a magic link to finish onboarding.",
+    }
 
 
 class InviteBody(BaseModel):
@@ -83,6 +192,9 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
         timeout=30.0,
     )
     if r.status_code >= 400:
+        if _is_invite_duplicate_email(r):
+            logger.info("invite: email already in Auth, upserting rep profile for %s", body.email)
+            return _provision_existing_auth_user_as_rep(body)
         logger.warning("invite failed: %s %s", r.status_code, r.text)
         raise HTTPException(status_code=400, detail=r.text[:500])
     return {"ok": True, "message": "Invite sent"}

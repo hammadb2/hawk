@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readApiErrorResponse } from "@/lib/crm/api-error";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { createClient } from "@/lib/supabase/client";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 type CharlotteRun = {
   id?: string;
@@ -69,11 +69,6 @@ export default function CrmHealthPage() {
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!API_URL) {
-        setErr("Set NEXT_PUBLIC_API_URL");
-        setLoading(false);
-        return;
-      }
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -82,11 +77,11 @@ export default function CrmHealthPage() {
         setLoading(false);
         return;
       }
-      const res = await fetch(`${API_URL}/api/crm/health-dashboard`, {
+      const res = await fetch(`${CRM_API_BASE_URL}/api/crm/health-dashboard`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!res.ok) {
-        setErr(await res.text());
+        setErr(await readApiErrorResponse(res));
         setLoading(false);
         return;
       }

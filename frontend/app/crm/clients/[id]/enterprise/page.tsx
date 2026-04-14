@@ -7,7 +7,8 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+import { readApiErrorResponse } from "@/lib/crm/api-error";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 
 export default function ClientEnterpriseDomainsPage() {
   const params = useParams();
@@ -53,14 +54,10 @@ export default function ClientEnterpriseDomainsPage() {
       toast.error("Not signed in");
       return;
     }
-    if (!API_URL) {
-      toast.error("Set NEXT_PUBLIC_API_URL");
-      return;
-    }
     const domains = lines.map((s) => s.trim()).filter(Boolean);
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/api/crm/clients/${clientId}/monitored-domains`, {
+      const res = await fetch(`${CRM_API_BASE_URL}/api/crm/clients/${clientId}/monitored-domains`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -68,9 +65,8 @@ export default function ClientEnterpriseDomainsPage() {
         },
         body: JSON.stringify({ domains }),
       });
-      const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(typeof j.detail === "string" ? j.detail : "Save failed");
+        toast.error(await readApiErrorResponse(res));
         setSaving(false);
         return;
       }

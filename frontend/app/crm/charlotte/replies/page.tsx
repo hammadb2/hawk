@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { readApiErrorResponse } from "@/lib/crm/api-error";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { cn } from "@/lib/utils";
 
 type ProspectRow = {
@@ -15,8 +17,6 @@ type ProspectRow = {
   hawk_score: number | null;
   reply_received_at: string | null;
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 function minutesSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -71,10 +71,6 @@ export default function CharlotteRepliesPage() {
   }, [load, supabase]);
 
   async function runAction(pid: string, action: "book_call" | "not_interested" | "follow_up") {
-    if (!API_URL) {
-      setErr("Set NEXT_PUBLIC_API_URL to call VA actions.");
-      return;
-    }
     setBusy(pid);
     setErr(null);
     const {
@@ -85,7 +81,7 @@ export default function CharlotteRepliesPage() {
       setBusy(null);
       return;
     }
-    const res = await fetch(`${API_URL}/api/crm/va/action`, {
+    const res = await fetch(`${CRM_API_BASE_URL}/api/crm/va/action`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -95,8 +91,7 @@ export default function CharlotteRepliesPage() {
     });
     setBusy(null);
     if (!res.ok) {
-      const t = await res.text();
-      setErr(t.slice(0, 400));
+      setErr(await readApiErrorResponse(res));
       return;
     }
     const j = (await res.json()) as { cal_url?: string };

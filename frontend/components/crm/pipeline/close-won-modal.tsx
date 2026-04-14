@@ -12,10 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { readApiErrorResponse } from "@/lib/crm/api-error";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { formatUsd } from "@/lib/crm/format";
 import { PLAN_OPTIONS } from "@/lib/crm/types";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export function CloseWonModal({
   open,
@@ -61,7 +61,7 @@ export function CloseWonModal({
       setVerifyError("Not signed in");
       return false;
     }
-    const r = await fetch(`${API_URL}/api/crm/verify-payment`, {
+    const r = await fetch(`${CRM_API_BASE_URL}/api/crm/verify-payment`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,8 +74,7 @@ export function CloseWonModal({
       }),
     });
     if (!r.ok) {
-      const t = await r.text();
-      setVerifyError(t.slice(0, 200));
+      setVerifyError(await readApiErrorResponse(r));
       return false;
     }
     const j = (await r.json()) as { verified?: boolean };
