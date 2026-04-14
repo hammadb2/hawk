@@ -33,7 +33,7 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
   return (
     <div className="relative mx-auto h-[140px] w-[140px] shrink-0">
       <svg width="140" height="140" viewBox="0 0 120 120" className="block" aria-hidden>
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#1A1727" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#e2e8f0" strokeWidth="10" />
         <circle
           cx="60"
           cy="60"
@@ -49,8 +49,8 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-extrabold tracking-tight text-text-primary">{score}</span>
-        <span className="text-xs text-text-secondary">/ 100</span>
+        <span className="text-3xl font-extrabold tracking-tight text-slate-900">{score}</span>
+        <span className="text-xs text-slate-600">/ 100</span>
       </div>
     </div>
   );
@@ -73,8 +73,8 @@ const WAITING_TIPS = [
 function GlobeIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-      <circle cx="12" cy="12" r="10" className="text-text-dim" />
-      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="text-text-dim" />
+      <circle cx="12" cy="12" r="10" className="text-slate-500" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="text-slate-500" />
     </svg>
   );
 }
@@ -209,10 +209,10 @@ export function HomeScanner() {
       {/* Domain input — elevated card, icon, helper */}
       <div
         className={cn(
-          "rounded-2xl border bg-surface-1/90 p-3 sm:p-4 shadow-lg transition-all duration-300",
+          "rounded-2xl border bg-white/95 p-3 sm:p-4 shadow-lg transition-all duration-300",
           phase === "scanning"
             ? "border-accent/40 shadow-accent/5"
-            : "border-surface-3 focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]",
+            : "border-slate-200 focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]",
         )}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-3">
@@ -223,8 +223,8 @@ export function HomeScanner() {
             <div
               className={cn(
                 "flex h-14 items-center gap-3 rounded-xl border px-3 transition-colors sm:h-[3.25rem]",
-                "border-surface-3 bg-surface-2/60",
-                "focus-within:border-accent/55 focus-within:bg-surface-2",
+                "border-slate-200 bg-slate-100/80",
+                "focus-within:border-accent/55 focus-within:bg-slate-100",
               )}
             >
               <GlobeIcon className="h-5 w-5 shrink-0 text-accent/90" />
@@ -235,15 +235,15 @@ export function HomeScanner() {
                 onChange={(e) => onDomainChange(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && phase === "idle" && canSubmit && onScan()}
                 disabled={phase === "scanning"}
-                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-base shadow-none placeholder:text-text-dim focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-base text-slate-900 shadow-none placeholder:text-slate-500 focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
             </div>
-            <p className="mt-2 text-left text-xs leading-snug text-text-dim sm:text-[13px]">
-              Paste a URL or domain — we strip <span className="text-text-secondary">https://</span> and{" "}
-              <span className="text-text-secondary">www.</span> automatically.
+            <p className="mt-2 text-left text-xs leading-snug text-slate-500 sm:text-[13px]">
+              Paste a URL or domain — we strip <span className="text-slate-600">https://</span> and{" "}
+              <span className="text-slate-600">www.</span> automatically.
               {preview.length > 2 && canSubmit && (
                 <span className="mt-1 block font-mono text-[11px] text-accent/90">→ scans as {preview}</span>
               )}
@@ -270,10 +270,10 @@ export function HomeScanner() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
-            className="relative mt-8 overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-b from-surface-1 via-surface-1 to-surface-2/90 px-4 py-6 shadow-xl sm:px-6"
+            className="relative mt-8 overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-b from-white via-slate-50 to-slate-100/95 px-4 py-6 shadow-xl sm:px-6"
           >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,rgba(34,197,94,0.12),transparent_55%)]" />
-            <div className="absolute inset-x-0 top-0 h-1 bg-surface-3">
+            <div className="absolute inset-x-0 top-0 h-1 bg-slate-200">
               <motion.div
                 className="h-full bg-gradient-to-r from-accent via-emerald-300 to-accent"
                 initial={{ width: "0%" }}
@@ -306,10 +306,10 @@ export function HomeScanner() {
                 </div>
               </div>
               <div className="min-w-0 flex-1 text-center sm:text-left">
-                <p className="text-base font-semibold tracking-tight text-text-primary sm:text-lg">
+                <p className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
                   Scanning <span className="text-accent">{preview || "your domain"}</span>
                 </p>
-                <p className="mt-1 text-sm text-text-secondary">Mapping what the internet already knows about you.</p>
+                <p className="mt-1 text-sm text-slate-600">Mapping what the internet already knows about you.</p>
                 <AnimatePresence mode="wait">
                   <motion.p
                     key={tipIndex}
@@ -317,7 +317,7 @@ export function HomeScanner() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.35 }}
-                    className="mt-3 text-xs italic leading-relaxed text-text-dim sm:text-sm"
+                    className="mt-3 text-xs italic leading-relaxed text-slate-500 sm:text-sm"
                   >
                     {WAITING_TIPS[tipIndex]}
                   </motion.p>
@@ -325,7 +325,7 @@ export function HomeScanner() {
               </div>
             </div>
 
-            <ul className="relative mt-6 space-y-2 border-t border-surface-3/80 pt-5">
+            <ul className="relative mt-6 space-y-2 border-t border-slate-200/80 pt-5">
               {PROGRESS_LINES.map((row, i) => {
                 const done = i < 3 && tickSlot > i;
                 const active = (i === 3 && tickSlot >= 3) || (i < 3 && tickSlot === i);
@@ -341,8 +341,8 @@ export function HomeScanner() {
                     className={cn(
                       "flex items-start gap-3 rounded-lg py-2 pl-1 text-sm sm:text-[15px]",
                       done && "text-accent",
-                      active && "bg-accent/5 text-text-primary",
-                      pending && "text-text-dim",
+                      active && "bg-accent/5 text-slate-900",
+                      pending && "text-slate-500",
                     )}
                   >
                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-base" aria-hidden>
@@ -356,7 +356,7 @@ export function HomeScanner() {
                     </span>
                     {active && (
                       <motion.span
-                        className="ml-auto hidden h-2 w-12 overflow-hidden rounded-full bg-surface-3 sm:block"
+                        className="ml-auto hidden h-2 w-12 overflow-hidden rounded-full bg-slate-200 sm:block"
                         aria-hidden
                       >
                         <motion.span
@@ -375,13 +375,13 @@ export function HomeScanner() {
       </AnimatePresence>
 
       {phase === "done" && !result && (showSlowLead || scanFailed) && (
-        <div className="mt-10 space-y-4 rounded-xl border border-surface-3 bg-surface-1 p-6">
+        <div className="mt-10 space-y-4 rounded-xl border border-slate-200 bg-white p-6">
           {scanFailed ? (
-            <p className="text-text-secondary leading-relaxed">
+            <p className="text-slate-600 leading-relaxed">
               We could not finish the instant preview. Enter your email and we will run your scan and send the full report shortly.
             </p>
           ) : (
-            <p className="text-text-primary leading-relaxed">
+            <p className="text-slate-900 leading-relaxed">
               Our scanner is running your full analysis.
               <br />
               <br />
@@ -403,7 +403,7 @@ export function HomeScanner() {
                 placeholder="you@company.com"
                 value={emailSlow}
                 onChange={(e) => setEmailSlow(e.target.value)}
-                className="h-12 border-surface-3 bg-background"
+                className="h-12 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
               <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
                 Send Me The Results
@@ -423,35 +423,35 @@ export function HomeScanner() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
             <ScoreRing score={result.score ?? 0} grade={result.grade || "F"} />
             <div className="text-center sm:text-left">
-              <p className="text-sm uppercase tracking-wider text-text-dim">Grade</p>
+              <p className="text-sm uppercase tracking-wider text-slate-500">Grade</p>
               <p className="text-5xl font-extrabold tabular-nums" style={{ color: gradeStroke(result.grade) }}>
                 {result.grade || "—"}
               </p>
-              <p className="mt-2 text-sm text-text-secondary">
+              <p className="mt-2 text-sm text-slate-600">
                 Free instant scan — HAWK Engine{" "}
                 {result.scan_version === "2.1-fast" ? "2.1 snapshot" : result.scan_version ?? "2.1"}
               </p>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-surface-1 to-surface-2/80 p-5 shadow-lg sm:p-6">
+          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-white to-slate-100/90 p-5 shadow-lg sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-accent">Go deeper — paid HAWK Shield</p>
-                <h3 className="mt-1 text-lg font-bold text-text-primary sm:text-xl">Turn this snapshot into continuous protection</h3>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">
+                <h3 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Turn this snapshot into continuous protection</h3>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
                   Your free scan already runs email, TLS, breach intelligence, subdomain discovery, targeted ports, HTTP probes,
                   and Internet-wide exposure hints. Shield adds{" "}
-                  <strong className="text-text-primary">Nuclei template coverage</strong>,{" "}
-                  <strong className="text-text-primary">lookalike domain monitoring</strong>, scheduled re-scans, and the
+                  <strong className="text-slate-900">Nuclei template coverage</strong>,{" "}
+                  <strong className="text-slate-900">lookalike domain monitoring</strong>, scheduled re-scans, and the
                   breach-response guarantee on this page — the bundle SMBs buy when insurers and clients ask hard questions.
                 </p>
               </div>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-surface-3 bg-background/50 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-text-dim">Free instant scan</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-text-secondary">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Free instant scan</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
                   <li>✓ Email auth & TLS deep check</li>
                   <li>✓ Multi-source breach / stealer signals</li>
                   <li>✓ Subdomains + ports + HTTP surface</li>
@@ -460,7 +460,7 @@ export function HomeScanner() {
               </div>
               <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-accent">HAWK Shield (paid)</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-text-secondary">
+                <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
                   <li>✓ Full Nuclei vulnerability templates</li>
                   <li>✓ dnstwist lookalike monitoring</li>
                   <li>✓ Scheduled scans & history</li>
@@ -475,17 +475,17 @@ export function HomeScanner() {
               >
                 <Link href="/portal/login?next=%2Fportal%2Fbilling%3Fplan%3Dshield">Start Shield — most popular</Link>
               </Button>
-              <Button asChild variant="outline" className="h-12 flex-1 rounded-xl border-surface-3 font-semibold">
+              <Button asChild variant="outline" className="h-12 flex-1 rounded-xl border-slate-200 bg-white font-semibold text-slate-900 hover:bg-slate-50">
                 <Link href="#pricing">Compare all plans</Link>
               </Button>
             </div>
           </div>
 
           <div>
-            <h3 className="mb-4 text-lg font-semibold text-text-primary">
+            <h3 className="mb-4 text-lg font-semibold text-slate-900">
               Top findings found on {result.domain || dnorm}:
             </h3>
-            <ul className="space-y-3 text-text-secondary">
+            <ul className="space-y-3 text-slate-600">
               {plain.slice(0, 3).map((line, i) => (
                 <li key={i} className="flex gap-2 border-l-2 border-accent/40 pl-4 leading-relaxed">
                   <span className="text-accent" aria-hidden>
@@ -497,8 +497,8 @@ export function HomeScanner() {
             </ul>
           </div>
 
-          <div className="rounded-xl border border-surface-3 bg-surface-1 p-6">
-            <p className="text-text-primary leading-relaxed">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <p className="text-slate-900 leading-relaxed">
               We found {issues} security {issues === 1 ? "issue" : "issues"} on {result.domain || dnorm}.
               <br />
               <br />
@@ -519,7 +519,7 @@ export function HomeScanner() {
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 border-surface-3 bg-background"
+                  className="h-12 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
                 />
                 <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
                   Send Me The Full Report

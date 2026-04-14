@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { portal } from "@/lib/portal-ui";
 import { HomeScanner } from "./home-scanner";
 import {
   EnterpriseBookingLink,
@@ -24,21 +25,23 @@ const ENTERPRISE_BOOKING =
 
 export function MarketingHome() {
   return (
-    <div className="min-h-screen bg-background text-text-primary selection:bg-accent/20">
-      <header className="sticky top-0 z-40 border-b border-surface-3 bg-surface-1/80 backdrop-blur-md shadow-sm">
+    <div className={`${portal.pageBg} selection:bg-emerald-500/15`}>
+      <header className="sticky top-0 z-40 border-b border-slate-200/90 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-md supports-[backdrop-filter]:bg-white/85">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="flex shrink-0 items-center gap-2">
-              <img src="/hawk-logo.png" alt="HAWK Security" className="h-10 w-auto sm:h-12 opacity-95" width={168} height={56} />
+            <Link href="/" className="flex shrink-0 items-center gap-2" title="HAWK Security">
+              <span className="flex items-center rounded-lg bg-slate-900 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 sm:px-2.5 sm:py-2">
+                <img src="/hawk-logo.png" alt="HAWK Security" className="h-8 w-auto sm:h-9" width={168} height={56} />
+              </span>
             </Link>
             <div className="flex items-center gap-2 sm:gap-4 md:hidden">
               <NavScanButton className="rounded-md px-4 py-2 text-sm font-medium" />
-              <Link href="/portal/login" className="whitespace-nowrap text-sm font-medium text-text-secondary hover:text-accent">
+              <Link href="/portal/login" className="whitespace-nowrap text-sm font-medium text-slate-600 hover:text-accent">
                 Log In
               </Link>
             </div>
           </div>
-          <nav className="hidden md:flex flex-wrap items-center justify-center gap-x-6 text-sm font-medium text-text-secondary sm:justify-end">
+          <nav className="hidden md:flex flex-wrap items-center justify-center gap-x-6 text-sm font-medium text-slate-600 sm:justify-end">
             <a href="#how-it-works" className="hover:text-accent transition-colors">
               How It Works
             </a>
@@ -50,7 +53,7 @@ export function MarketingHome() {
             </a>
           </nav>
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/portal/login" className="whitespace-nowrap text-sm font-medium text-text-secondary hover:text-accent transition-colors">
+            <Link href="/portal/login" className="whitespace-nowrap text-sm font-medium text-slate-600 hover:text-accent transition-colors">
               Log In
             </Link>
             <NavScanButton className="rounded-md px-5 py-2.5 text-sm font-medium" />
@@ -60,33 +63,33 @@ export function MarketingHome() {
 
       <main>
         {/* Hero */}
-        <section id="scan" className="scroll-mt-28 bg-surface-1 border-b border-surface-3 px-4 py-20 sm:px-6 sm:py-32">
+        <section id="scan" className="scroll-mt-28 bg-white border-b border-slate-200 px-4 py-20 sm:px-6 sm:py-32">
           <div className="mx-auto max-w-4xl text-center">
-            <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight text-text-primary sm:text-5xl md:text-6xl">
+            <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
               Your business has security vulnerabilities right now. Here is what attackers can see.
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-text-secondary sm:text-xl">
+            <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-slate-600 sm:text-xl">
               HAWK monitors and tests Canadian small businesses daily. Follow our recommendations and if you still get breached — we cover the response costs. In writing. No other company will say that.
             </p>
-            <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-surface-3 bg-surface-1/40 p-4 shadow-xl backdrop-blur-sm sm:p-6">
+            <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-xl backdrop-blur-sm sm:p-6">
               <HomeScanner />
             </div>
-            <p className="mx-auto mt-8 max-w-lg text-sm leading-relaxed text-text-dim">
+            <p className="mx-auto mt-8 max-w-lg text-sm leading-relaxed text-slate-500">
               No account required · Results in seconds · Used by dental clinics, law firms & accountants across Canada
             </p>
           </div>
         </section>
 
         {/* Guarantee */}
-        <section className="bg-background px-4 py-20 sm:px-6 sm:py-24">
+        <section className="bg-slate-50 px-4 py-20 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-text-primary sm:text-4xl">
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               We stand behind our work — financially.
             </h2>
-            <div className="mt-8 space-y-4 text-left text-lg leading-relaxed text-text-secondary sm:text-center">
+            <div className="mt-8 space-y-4 text-left text-lg leading-relaxed text-slate-600 sm:text-center">
               <p>Most cybersecurity companies tell you what is wrong and walk away.</p>
               <p>We do not.</p>
-              <p className="font-medium text-text-primary">
+              <p className="font-medium text-slate-900">
                 If you follow our recommendations and something still happens — we cover your incident response costs. In writing. At signup.
               </p>
               <p>No other cybersecurity company serving Canadian small businesses will say that.</p>
@@ -98,8 +101,8 @@ export function MarketingHome() {
         </section>
 
         {/* How it works */}
-        <section id="how-it-works" className="scroll-mt-24 border-y border-surface-3 bg-surface-1 px-4 py-20 sm:px-6 sm:py-24">
-          <h2 className="text-center text-3xl font-extrabold text-text-primary sm:text-4xl">How It Works</h2>
+        <section id="how-it-works" className="scroll-mt-24 border-y border-slate-200 bg-white px-4 py-20 sm:px-6 sm:py-24">
+          <h2 className="text-center text-3xl font-extrabold text-slate-900 sm:text-4xl">How It Works</h2>
           <div className="mx-auto mt-16 grid max-w-6xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
@@ -123,26 +126,26 @@ export function MarketingHome() {
                 body: "After 90 days of verified security you become HAWK Certified — proof your clients can see.",
               },
             ].map((s) => (
-              <div key={s.step} className="rounded-2xl border border-surface-3 bg-background p-8 shadow-sm transition-shadow hover:shadow-md">
+              <div key={s.step} className="rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm transition-shadow hover:shadow-md">
                 <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10 text-lg font-bold text-accent">
                   {s.step}
                 </div>
-                <h3 className="text-xl font-bold text-text-primary">{s.title}</h3>
-                <p className="mt-3 text-base leading-relaxed text-text-secondary">{s.body}</p>
+                <h3 className="text-xl font-bold text-slate-900">{s.title}</h3>
+                <p className="mt-3 text-base leading-relaxed text-slate-600">{s.body}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* HAWK Certified */}
-        <section id="hawk-certified" className="scroll-mt-24 bg-background px-4 py-20 sm:px-6 sm:py-24 border-b border-surface-3">
+        <section id="hawk-certified" className="scroll-mt-24 bg-slate-50 px-4 py-20 sm:px-6 sm:py-24 border-b border-slate-200">
           <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:items-center lg:gap-20">
             <div>
-              <h2 className="text-3xl font-extrabold text-text-primary sm:text-4xl">HAWK Certified</h2>
+              <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">HAWK Certified</h2>
               <p className="mt-4 text-xl font-medium text-accent">
                 Proof you take your clients&apos; data seriously.
               </p>
-              <div className="mt-6 space-y-5 text-base leading-relaxed text-text-secondary">
+              <div className="mt-6 space-y-5 text-base leading-relaxed text-slate-600">
                 <p>
                   After 90 days of active monitoring with all critical issues resolved — your business becomes HAWK Certified.
                 </p>
@@ -152,23 +155,25 @@ export function MarketingHome() {
                 <p>
                   Dental clinics put it in their waiting room. Law firms put it in their client intake forms. Accountants put it in their proposals.
                 </p>
-                <p className="font-medium text-text-primary text-lg">It tells your clients: we checked. We are protected.</p>
+                <p className="font-medium text-slate-900 text-lg">It tells your clients: we checked. We are protected.</p>
               </div>
             </div>
             <div className="flex justify-center lg:justify-end">
-              <div className="w-full max-w-md rounded-2xl border border-surface-3 bg-surface-1 p-10 shadow-xl relative overflow-hidden">
+              <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-10 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-accent" />
                 <div className="flex items-start gap-5">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-2xl text-emerald-400">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-2xl text-emerald-600">
                     ✓
                   </div>
                   <div>
-                    <img src="/hawk-logo.png" alt="" className="h-7 w-auto opacity-95" />
-                    <p className="mt-4 text-2xl font-bold text-text-primary">HAWK Certified</p>
-                    <p className="text-base text-text-secondary mt-1">Verified Security Posture</p>
+                    <span className="inline-flex rounded-md bg-slate-900 px-2 py-1 ring-1 ring-slate-800/60">
+                      <img src="/hawk-logo.png" alt="HAWK" className="h-6 w-auto" />
+                    </span>
+                    <p className="mt-4 text-2xl font-bold text-slate-900">HAWK Certified</p>
+                    <p className="text-base text-slate-600 mt-1">Verified Security Posture</p>
                   </div>
                 </div>
-                <div className="mt-8 rounded-lg border border-surface-3 bg-surface-2 px-4 py-3 font-mono text-sm text-text-dim text-center">
+                <div className="mt-8 rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 font-mono text-sm text-slate-500 text-center">
                   securedbyhawk.com/verify/example-clinic
                 </div>
               </div>
@@ -177,10 +182,10 @@ export function MarketingHome() {
         </section>
 
         {/* Who */}
-        <section className="bg-surface-1 px-4 py-20 sm:px-6 sm:py-24 border-b border-surface-3">
+        <section className="bg-white px-4 py-20 sm:px-6 sm:py-24 border-b border-slate-200">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-extrabold text-text-primary sm:text-4xl">Who It Is For</h2>
-            <p className="mt-4 text-lg text-text-secondary">Designed specifically for regulated Canadian practices.</p>
+            <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Who It Is For</h2>
+            <p className="mt-4 text-lg text-slate-600">Designed specifically for regulated Canadian practices.</p>
           </div>
           <div className="mx-auto mt-16 grid max-w-6xl gap-8 md:grid-cols-3">
             {[
@@ -197,64 +202,64 @@ export function MarketingHome() {
                 body: "Financial data is the most valuable target in any breach. Your clients trust you with their livelihood. We help you keep that trust.",
               },
             ].map((c) => (
-              <div key={c.title} className="rounded-2xl border border-surface-3 bg-background p-8 shadow-sm">
+              <div key={c.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm">
                 <h3 className="text-xl font-bold text-accent">
                   {c.title}
                 </h3>
-                <p className="mt-4 text-base leading-relaxed text-text-secondary">{c.body}</p>
+                <p className="mt-4 text-base leading-relaxed text-slate-600">{c.body}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-24 px-4 py-20 sm:px-6 sm:py-24 bg-background">
+        <section id="pricing" className="scroll-mt-24 px-4 py-20 sm:px-6 sm:py-24 bg-slate-50">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-extrabold text-text-primary sm:text-4xl">Pricing</h2>
-            <p className="mt-4 text-lg text-text-secondary">Enterprise-grade security, priced for small businesses.</p>
+            <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Pricing</h2>
+            <p className="mt-4 text-lg text-slate-600">Enterprise-grade security, priced for small businesses.</p>
           </div>
           <div className="mx-auto mt-16 grid max-w-6xl gap-8 lg:grid-cols-3 items-center">
-            <div className="rounded-2xl border border-surface-3 bg-surface-1 p-8 shadow-sm">
-              <h3 className="text-xl font-bold text-text-primary">HAWK Starter</h3>
-              <p className="mt-4 text-4xl font-extrabold text-text-primary">
-                $199<span className="text-lg font-normal text-text-secondary">/mo</span>
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <h3 className="text-xl font-bold text-slate-900">HAWK Starter</h3>
+              <p className="mt-4 text-4xl font-extrabold text-slate-900">
+                $199<span className="text-lg font-normal text-slate-600">/mo</span>
               </p>
-              <p className="mt-6 text-base leading-relaxed text-text-secondary min-h-[100px]">
+              <p className="mt-6 text-base leading-relaxed text-slate-600 min-h-[100px]">
                 Monthly scan and findings report. Plain English fix guides. Email alerts.
               </p>
-              <div className="mt-4 pt-6 border-t border-surface-3">
-                <p className="text-sm font-medium text-text-primary mb-6">Best for businesses that want to know their risk.</p>
+              <div className="mt-4 pt-6 border-t border-slate-200">
+                <p className="text-sm font-medium text-slate-900 mb-6">Best for businesses that want to know their risk.</p>
                 <StarterCheckoutButton />
               </div>
             </div>
             
-            <div className="relative rounded-2xl border-2 border-accent bg-surface-1 p-10 shadow-2xl transform lg:-translate-y-4">
+            <div className="relative rounded-2xl border-2 border-accent bg-white p-10 shadow-2xl transform lg:-translate-y-4">
               <span className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1 text-xs font-bold uppercase tracking-wide text-white">
                 Most Popular
               </span>
               <h3 className="text-xl font-bold text-accent">HAWK Shield</h3>
-              <p className="mt-4 text-4xl font-extrabold text-text-primary">
-                $997<span className="text-lg font-normal text-text-secondary">/mo</span>
+              <p className="mt-4 text-4xl font-extrabold text-slate-900">
+                $997<span className="text-lg font-normal text-slate-600">/mo</span>
               </p>
-              <p className="mt-6 text-base leading-relaxed text-text-secondary min-h-[100px]">
+              <p className="mt-6 text-base leading-relaxed text-slate-600 min-h-[100px]">
                 Daily monitoring. Weekly attacker simulation. Real-time alerts. HAWK Certified. Financially backed guarantee.
               </p>
-              <div className="mt-4 pt-6 border-t border-surface-3">
-                <p className="text-sm font-medium text-text-primary mb-6">Best for businesses that want to be protected.</p>
+              <div className="mt-4 pt-6 border-t border-slate-200">
+                <p className="text-sm font-medium text-slate-900 mb-6">Best for businesses that want to be protected.</p>
                 <ShieldCheckoutButton />
               </div>
             </div>
             
-            <div className="rounded-2xl border border-surface-3 bg-surface-1 p-8 shadow-sm">
-              <h3 className="text-xl font-bold text-text-primary">HAWK Enterprise</h3>
-              <p className="mt-4 text-4xl font-extrabold text-text-primary">
-                $2,500<span className="text-lg font-normal text-text-secondary">/mo</span>
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <h3 className="text-xl font-bold text-slate-900">HAWK Enterprise</h3>
+              <p className="mt-4 text-4xl font-extrabold text-slate-900">
+                $2,500<span className="text-lg font-normal text-slate-600">/mo</span>
               </p>
-              <p className="mt-6 text-base leading-relaxed text-text-secondary min-h-[100px]">
+              <p className="mt-6 text-base leading-relaxed text-slate-600 min-h-[100px]">
                 Everything in Shield plus dedicated advisor, up to 5 domains, enhanced guarantee coverage, PIPEDA compliance reporting.
               </p>
-              <div className="mt-4 pt-6 border-t border-surface-3">
-                <p className="text-sm font-medium text-text-primary mb-6">Best for multi-location practices.</p>
+              <div className="mt-4 pt-6 border-t border-slate-200">
+                <p className="text-sm font-medium text-slate-900 mb-6">Best for multi-location practices.</p>
                 <EnterpriseBookingLink href={ENTERPRISE_BOOKING} />
               </div>
             </div>
@@ -262,7 +267,7 @@ export function MarketingHome() {
         </section>
 
         {/* Final CTA */}
-        <section className="bg-surface-1 border-t border-surface-3 px-4 py-20 sm:px-6 sm:py-32">
+        <section className="bg-white border-t border-slate-200 px-4 py-20 sm:px-6 sm:py-32">
           <div className="mx-auto max-w-4xl rounded-3xl bg-accent px-6 py-16 text-center sm:px-12 shadow-2xl">
             <h2 className="text-3xl font-bold text-white sm:text-4xl text-balance">
               Find out what attackers can see about your business right now.
@@ -272,7 +277,7 @@ export function MarketingHome() {
             </p>
             <a
               href="#scan"
-              className="mt-10 inline-block rounded-xl bg-surface-1 px-10 py-4 text-base font-bold text-accent shadow-md hover:bg-surface-2 transition-colors"
+              className="mt-10 inline-block rounded-xl bg-white px-10 py-4 text-base font-bold text-accent shadow-md hover:bg-slate-100 transition-colors"
             >
               Scan My Domain Free
             </a>
@@ -280,29 +285,31 @@ export function MarketingHome() {
         </section>
       </main>
 
-      <footer className="border-t border-surface-3 bg-background px-4 py-12 sm:px-6">
-        <div className="mx-auto max-w-6xl text-center text-sm text-text-secondary">
-          <div className="flex justify-center mb-6">
-             <img src="/hawk-logo.png" alt="" className="h-8 w-auto opacity-50 hover:opacity-90 transition-opacity" />
+      <footer className="border-t border-slate-200 bg-slate-50 px-4 py-12 sm:px-6">
+        <div className="mx-auto max-w-6xl text-center text-sm text-slate-600">
+          <div className="mb-6 flex justify-center">
+            <span className="inline-flex rounded-lg bg-slate-900 px-2.5 py-1.5 opacity-90 ring-1 ring-slate-800/70 transition-opacity hover:opacity-100">
+              <img src="/hawk-logo.png" alt="HAWK Security" className="h-7 w-auto" />
+            </span>
           </div>
-          <p className="font-medium text-text-dim">HAWK Security &copy; AKB Studios &mdash; Calgary, AB</p>
+          <p className="font-medium text-slate-500">HAWK Security &copy; AKB Studios &mdash; Calgary, AB</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 font-medium">
             <a href="#how-it-works" className="hover:text-accent transition-colors">
               How It Works
             </a>
-            <span className="text-surface-3" aria-hidden>|</span>
+            <span className="text-slate-300" aria-hidden>|</span>
             <a href="#pricing" className="hover:text-accent transition-colors">
               Pricing
             </a>
-            <span className="text-surface-3" aria-hidden>|</span>
+            <span className="text-slate-300" aria-hidden>|</span>
             <a href="#hawk-certified" className="hover:text-accent transition-colors">
               HAWK Certified
             </a>
-            <span className="text-surface-3" aria-hidden>|</span>
+            <span className="text-slate-300" aria-hidden>|</span>
             <Link href="/guarantee-terms" className="hover:text-accent transition-colors">
               Guarantee Terms
             </Link>
-            <span className="text-surface-3" aria-hidden>|</span>
+            <span className="text-slate-300" aria-hidden>|</span>
             <Link href="/privacy" className="hover:text-accent transition-colors">
               Privacy Policy
             </Link>
