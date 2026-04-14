@@ -42,7 +42,8 @@ class _RateLimiter:
             return True
 
 
-_public_scan_limiter = _RateLimiter(max_requests=5, window_seconds=60)
+# Homepage full scans are heavier; allow a few more attempts per minute per IP.
+_public_scan_limiter = _RateLimiter(max_requests=8, window_seconds=60)
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -78,8 +79,11 @@ def _finding_plain_english(f: dict, interpreted_row: dict | None) -> str:
     return (f.get("title") or "").strip()
 
 
-def _public_scan_findings_plain(result: dict) -> tuple[list[str], int]:
-    """Top 3 plain-English lines + count of non-ok issues (for homepage)."""
+_HOMEPAGE_PREVIEW_MAX = 6
+
+
+def _public_scan_findings_preview(result: dict) -> tuple[list[dict[str, str]], list[str], int]:
+    """Up to 6 plain-English lines with severity + parallel string list (homepage)."""
     findings = result.get("findings") or []
     interpreted = result.get("interpreted_findings") or []
     merged: list[tuple[dict, str]] = []
@@ -94,32 +98,72 @@ def _public_scan_findings_plain(result: dict) -> tuple[list[str], int]:
             merged.append((f, text))
     merged.sort(key=lambda x: _severity_rank(x[0].get("severity")))
     issues = sum(1 for f, _ in merged if (f.get("severity") or "").lower() != "ok")
-    top: list[str] = []
+
+    preview: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def _push(f: dict, text: str, severity: str) -> None:
+        if text in seen:
+            return
+        seen.add(text)
+        preview.append({"text": text, "severity": severity})
+
     for f, text in merged:
         if (f.get("severity") or "").lower() == "ok":
             continue
-        if text not in top:
-            top.append(text)
-        if len(top) >= 3:
+        sev = (f.get("severity") or "medium").lower()
+        if sev not in ("critical", "high", "medium", "warning", "low", "info"):
+            sev = "medium"
+        _push(f, text, sev)
+        if len(preview) >= _HOMEPAGE_PREVIEW_MAX:
             break
-    if len(top) < 3:
+
+    if len(preview) < _HOMEPAGE_PREVIEW_MAX:
         for f, text in merged:
             if (f.get("severity") or "").lower() != "ok":
                 continue
-            if text not in top:
-                top.append(text)
-            if len(top) >= 3:
+            _push(f, text, "ok")
+            if len(preview) >= _HOMEPAGE_PREVIEW_MAX:
                 break
+
     fillers = [
-        "Your full report translates every check into plain English — no raw technical dumps.",
-        "We prioritize what real attackers look for first on domains like yours.",
-        "Enter your email below and we will send the complete analysis shortly.",
+        "Automated criminal tooling probes this exact public surface 24/7 — what you see above is only what answered immediately.",
+        "Ransomware affiliates and cred-stuffing bots start from the same DNS, mail, and TLS signals we just evaluated.",
+        "Insurers and enterprise clients increasingly ask for continuous evidence — not a one-time PDF that was green last quarter.",
+        "Shield runs deeper template coverage, lookalike monitoring, and scheduled re-tests so drift gets caught before an incident.",
+        "Most SMB breaches start from small, internet-visible misconfigurations — prioritized above so you can fix what attackers enumerate first.",
+        "Enter your work email below and we will send the expanded report with remediation steps you can hand to IT or your MSP.",
     ]
     i = 0
-    while len(top) < 3:
-        top.append(fillers[i % len(fillers)])
+    while len(preview) < _HOMEPAGE_PREVIEW_MAX:
+        preview.append({"text": fillers[i % len(fillers)], "severity": "info"})
         i += 1
-    return top[:3], issues
+
+    plain = [p["text"] for p in preview[:_HOMEPAGE_PREVIEW_MAX]]
+    return preview[:_HOMEPAGE_PREVIEW_MAX], plain, issues
+
+
+def _public_risk_extras(result: dict) -> dict:
+    """Small, factual urgency fields for marketing homepage (no fabricated findings)."""
+    out: dict[str, object] = {}
+    ap = result.get("attack_paths") or []
+    if isinstance(ap, list):
+        out["attack_paths_count"] = len(ap)
+        if ap and isinstance(ap[0], dict):
+            name = (ap[0].get("name") or ap[0].get("title") or "").strip()
+            if name:
+                out["top_attack_path"] = name[:200]
+    bce = result.get("breach_cost_estimate") or {}
+    if isinstance(bce, dict):
+        if bce.get("baseline_usd") is not None:
+            try:
+                out["breach_baseline_usd"] = int(bce["baseline_usd"])
+            except (TypeError, ValueError):
+                pass
+        summ = bce.get("summary")
+        if isinstance(summ, str) and summ.strip():
+            out["breach_cost_summary"] = summ.strip()[:500]
+    return out
 
 
 def _normalize_domain(domain: str) -> str:
@@ -158,16 +202,17 @@ def start_scan_public(req: ScanStartRequest, request: Request):
     domain_clean = _normalize_domain(req.domain)
     if not domain_clean:
         raise HTTPException(status_code=400, detail="Invalid domain")
-    depth = (req.scan_depth or "fast").strip().lower()
+    depth = (req.scan_depth or "full").strip().lower()
     if depth not in ("fast", "full"):
-        depth = "fast"
+        depth = "full"
     try:
         result = run_scan(domain_clean, scan_id=None, scan_depth=depth)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Scanner error: {e}") from e
     if req.full_result:
         return result
-    plain, issues_count = _public_scan_findings_plain(result)
+    preview, plain, issues_count = _public_scan_findings_preview(result)
+    risk = _public_risk_extras(result)
     return {
         "domain": result.get("domain", domain_clean),
         "status": result.get("status", "completed"),
@@ -176,7 +221,9 @@ def start_scan_public(req: ScanStartRequest, request: Request):
         "findings_count": len(result.get("findings", [])),
         "issues_count": issues_count,
         "findings_plain": plain,
+        "findings_preview": preview,
         "scan_version": result.get("scan_version"),
+        **risk,
     }
 
 

@@ -10,7 +10,7 @@ class ScanStartRequest(BaseModel):
     full_result: bool = False
     scan_depth: str | None = Field(
         default=None,
-        description="fast (~10–15s) or full. Omitted: /api/scan/public uses fast; /api/scan uses full.",
+        description="fast (Charlotte-tier, quicker) or full (all layers). Omitted on /api/scan/public defaults to full.",
     )
 
 

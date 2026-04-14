@@ -24,6 +24,32 @@ function gradeStroke(grade: string | undefined): string {
   return "#F87171";
 }
 
+function severityRowClass(severity: string | undefined): string {
+  const s = (severity || "medium").toLowerCase();
+  if (s === "critical" || s === "high") {
+    return "border-l-4 border-rose-600 bg-rose-50/90 text-slate-900 shadow-sm";
+  }
+  if (s === "medium" || s === "warning") {
+    return "border-l-4 border-amber-500 bg-amber-50/85 text-slate-900 shadow-sm";
+  }
+  if (s === "low") {
+    return "border-l-4 border-amber-400/90 bg-amber-50/50 text-slate-800";
+  }
+  if (s === "ok") {
+    return "border-l-4 border-emerald-400/80 bg-emerald-50/40 text-slate-800";
+  }
+  if (s === "info") {
+    return "border-l-4 border-slate-300 bg-slate-50/90 text-slate-700";
+  }
+  return "border-l-4 border-slate-200 bg-white text-slate-800";
+}
+
+function formatUsdShort(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}k`;
+  return `$${n}`;
+}
+
 function ScoreRing({ score, grade }: { score: number; grade: string }) {
   const r = 46;
   const c = 2 * Math.PI * r;
@@ -57,17 +83,19 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
 }
 
 const PROGRESS_LINES = [
-  { text: "Checking email security (DMARC / SPF / DKIM)…", emoji: "✉️" },
-  { text: "Checking TLS & certificate on your edge…", emoji: "🔐" },
-  { text: "Mapping subdomains, ports & web exposure…", emoji: "🌐" },
-  { text: "Checking breach intel & correlating your score…", emoji: "⚡" },
+  { text: "Email & identity spoofing surface (DMARC / SPF / DKIM)…", emoji: "✉️" },
+  { text: "TLS, certificate chain, and downgrade paths…", emoji: "🔐" },
+  { text: "Subdomains, high-risk ports, and live HTTP exposure…", emoji: "🌐" },
+  { text: "Breach, stealer, and leaked-credential signals…", emoji: "🧾" },
+  { text: "Template-based vulnerability probes (where enabled)…", emoji: "⚡" },
+  { text: "Scoring how an opportunistic attacker would prioritize you…", emoji: "🎯" },
 ];
 
 const WAITING_TIPS = [
-  "We never store your password — this is an external, read-only snapshot.",
-  "Attackers use the same public data we are looking at right now.",
-  "Canadian privacy laws care about email spoofing — we check that first.",
-  "A slow response usually means we are going deeper, not skipping checks.",
+  "This is the same externally visible data ransomware crews harvest before they send the first phishing wave.",
+  "Most SMB incidents start with a small, public misconfiguration — not a Hollywood zero-day.",
+  "A longer run usually means we are pulling more corroborating sources, not skipping checks.",
+  "If your score looks harsh, that is the point: we would rather you fix it here than in incident response billing.",
 ];
 
 function GlobeIcon({ className }: { className?: string }) {
@@ -144,14 +172,14 @@ export function HomeScanner() {
 
     slowTimerRef.current = setTimeout(() => {
       if (!resultRef.current) setShowSlowLead(true);
-    }, 15000);
+    }, 42000);
 
     const tick = setInterval(() => {
-      setTickSlot((s) => Math.min(s + 1, 3));
-    }, 2200);
+      setTickSlot((s) => Math.min(s + 1, 40));
+    }, 2400);
 
     try {
-      const res = await scansApi.startPublic({ domain: d, scan_depth: "fast" });
+      const res = await scansApi.startPublic({ domain: d, scan_depth: "full" });
       resultRef.current = res;
       setResult(res);
       setShowSlowLead(false);
@@ -173,6 +201,10 @@ export function HomeScanner() {
   }, []);
 
   const plain = result?.findings_plain || [];
+  const previewRows =
+    result?.findings_preview?.length && result.findings_preview.length > 0
+      ? result.findings_preview
+      : plain.map((text) => ({ text, severity: "medium" }));
   const issues = result?.issues_count ?? result?.findings_count ?? 0;
   const dnorm = normalizeDomain(domain);
 
@@ -202,7 +234,8 @@ export function HomeScanner() {
     }
   };
 
-  const progressPct = Math.min(100, 8 + tickSlot * 24 + (phase === "scanning" ? 8 : 0));
+  const progressPct =
+    phase === "scanning" ? Math.min(94, 6 + tickSlot * 2.2 + (tickSlot > 12 ? 8 : 0)) : 100;
 
   return (
     <div className="w-full max-w-xl mx-auto px-1 sm:px-0">
@@ -255,7 +288,7 @@ export function HomeScanner() {
             disabled={phase === "scanning" || !canSubmit}
             className="h-14 shrink-0 rounded-xl px-6 font-semibold text-white shadow-md transition-transform active:scale-[0.98] sm:h-[3.25rem] sm:min-w-[200px] sm:self-end"
           >
-            {phase === "scanning" ? "Scanning…" : "Scan free"}
+            {phase === "scanning" ? "Scanning…" : "Run full exposure scan"}
           </Button>
         </div>
       </div>
@@ -309,7 +342,9 @@ export function HomeScanner() {
                 <p className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
                   Scanning <span className="text-accent">{preview || "your domain"}</span>
                 </p>
-                <p className="mt-1 text-sm text-slate-600">Mapping what the internet already knows about you.</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Full-depth exposure pass (all layers) — usually 45s–3 min. We would rather be thorough than polite.
+                </p>
                 <AnimatePresence mode="wait">
                   <motion.p
                     key={tipIndex}
@@ -327,8 +362,10 @@ export function HomeScanner() {
 
             <ul className="relative mt-6 space-y-2 border-t border-slate-200/80 pt-5">
               {PROGRESS_LINES.map((row, i) => {
-                const done = i < 3 && tickSlot > i;
-                const active = (i === 3 && tickSlot >= 3) || (i < 3 && tickSlot === i);
+                const cap = PROGRESS_LINES.length;
+                const visualTick = Math.min(tickSlot, cap);
+                const done = i < visualTick || tickSlot >= cap;
+                const active = tickSlot < cap && i === visualTick;
                 const pending = !done && !active;
                 return (
                   <motion.li
@@ -420,6 +457,22 @@ export function HomeScanner() {
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           className="mt-10 space-y-8"
         >
+          {(() => {
+            const g = (result.grade || "F").toUpperCase().charAt(0);
+            const sc = result.score ?? 0;
+            const harsh = issues >= 4 || g === "D" || g === "F" || sc < 58;
+            if (!harsh) return null;
+            return (
+              <div className="rounded-xl border border-rose-400/70 bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-950 shadow-sm sm:text-[15px]">
+                <strong className="font-semibold">High-friction snapshot.</strong> We flagged{" "}
+                <strong>{issues}</strong> non-trivial exposure{issues === 1 ? "" : "s"} on the public internet for{" "}
+                <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span>. That is the same
+                surface ransomware affiliates harvest before they ever email you — and insurers ask about after an
+                incident.
+              </div>
+            );
+          })()}
+
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
             <ScoreRing score={result.score ?? 0} grade={result.grade || "F"} />
             <div className="text-center sm:text-left">
@@ -428,23 +481,60 @@ export function HomeScanner() {
                 {result.grade || "—"}
               </p>
               <p className="mt-2 text-sm text-slate-600">
-                Free instant scan — HAWK Engine{" "}
-                {result.scan_version === "2.1-fast" ? "2.1 snapshot" : result.scan_version ?? "2.1"}
+                Full public pass — HAWK Engine {result.scan_version ?? "2.1"} (this run is not a toy DNS ping).
               </p>
             </div>
           </div>
 
+          {(result.breach_baseline_usd != null || result.breach_cost_summary || (result.attack_paths_count ?? 0) > 0) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {result.breach_baseline_usd != null && (
+                <div className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+                  <p className="font-semibold text-amber-900">Breach cost context</p>
+                  <p className="mt-1 leading-relaxed">
+                    Sector-style incident baseline (IBM-style averages):{" "}
+                    <strong>{formatUsdShort(result.breach_baseline_usd)}</strong>. One successful breach usually costs
+                    more than years of prevention.
+                  </p>
+                </div>
+              )}
+              {(result.attack_paths_count ?? 0) > 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm">
+                  <p className="font-semibold text-slate-900">Attack-path narratives</p>
+                  <p className="mt-1 leading-relaxed">
+                    We mapped <strong>{result.attack_paths_count}</strong> plausible path
+                    {result.attack_paths_count === 1 ? "" : "s"} from public signals to impact
+                    {result.top_attack_path ? (
+                      <>
+                        {" "}
+                        — e.g. <span className="italic">&quot;{result.top_attack_path}&quot;</span>
+                      </>
+                    ) : (
+                      "."
+                    )}
+                  </p>
+                </div>
+              )}
+              {result.breach_cost_summary && !result.breach_baseline_usd && (
+                <div className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:col-span-2">
+                  <p className="font-semibold text-amber-900">Risk note</p>
+                  <p className="mt-1 leading-relaxed">{result.breach_cost_summary}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-white to-slate-100/90 p-5 shadow-lg sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-accent">Go deeper — paid HAWK Shield</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent">Stop hoping nothing happens</p>
                 <h3 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Turn this snapshot into continuous protection</h3>
                 <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
-                  Your free scan already runs email, TLS, breach intelligence, subdomain discovery, targeted ports, HTTP probes,
-                  and Internet-wide exposure hints. Shield adds{" "}
-                  <strong className="text-slate-900">Nuclei template coverage</strong>,{" "}
-                  <strong className="text-slate-900">lookalike domain monitoring</strong>, scheduled re-scans, and the
-                  breach-response guarantee on this page — the bundle SMBs buy when insurers and clients ask hard questions.
+                  The scan you just ran is real signal — not a vanity widget. Shield keeps{" "}
+                  <strong className="text-slate-900">Nuclei-grade templates</strong>,{" "}
+                  <strong className="text-slate-900">lookalike domains</strong>, scheduled re-tests, and the breach-response
+                  guarantee in writing so when a regulator or client asks &quot;what do you do after you get hit?&quot; you
+                  have an answer.
                 </p>
               </div>
             </div>
@@ -482,16 +572,18 @@ export function HomeScanner() {
           </div>
 
           <div>
-            <h3 className="mb-4 text-lg font-semibold text-slate-900">
-              Top findings found on {result.domain || dnorm}:
-            </h3>
-            <ul className="space-y-3 text-slate-600">
-              {plain.slice(0, 3).map((line, i) => (
-                <li key={i} className="flex gap-2 border-l-2 border-accent/40 pl-4 leading-relaxed">
-                  <span className="text-accent" aria-hidden>
-                    •
-                  </span>
-                  <span>{line}</span>
+            <h3 className="mb-1 text-lg font-semibold text-slate-900">What we already see on {result.domain || dnorm}</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Six highest-priority signals (worst first). Anything in red or amber should be treated as incident-prevention
+              work, not &quot;nice to have&quot; hygiene.
+            </p>
+            <ul className="space-y-3">
+              {previewRows.slice(0, 6).map((row, i) => (
+                <li
+                  key={i}
+                  className={cn("rounded-r-lg py-3 pl-4 pr-3 text-sm leading-relaxed sm:text-[15px]", severityRowClass(row.severity))}
+                >
+                  <span className="font-medium text-slate-500">{i + 1}.</span> {row.text}
                 </li>
               ))}
             </ul>
@@ -499,13 +591,15 @@ export function HomeScanner() {
 
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <p className="text-slate-900 leading-relaxed">
-              We found {issues} security {issues === 1 ? "issue" : "issues"} on {result.domain || dnorm}.
+              <strong>{issues}</strong> externally visible security issue{issues === 1 ? "" : "s"} on{" "}
+              <span className="font-mono text-sm">{result.domain || dnorm}</span> — before you spend another dollar on ads
+              or headcount, close what strangers can already exploit for free.
               <br />
               <br />
-              We are running a deeper 60-point analysis right now.
+              We are queuing the expanded write-up with remediation you can hand to IT or your MSP.
               <br />
               <br />
-              Enter your email and we will send you the full report within 5 minutes — free.
+              Drop your work email — we will send the full report shortly. No spam. No cold calls unless you ask.
             </p>
             {emailSent ? (
               <p className="mt-4 text-sm text-accent font-medium">

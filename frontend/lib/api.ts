@@ -35,6 +35,34 @@ async function request<T>(
   return data as T;
 }
 
+/** Portal self-serve (`/api/portal/bootstrap`, primary-domain): browser uses same-origin Next proxies; server/SSR uses FastAPI base. */
+async function portalRequest<T>(
+  path: string,
+  options: RequestInit & { token?: string | null } = {},
+): Promise<T> {
+  const { token, ...init } = options;
+  const base = typeof window !== "undefined" ? "" : API_URL;
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${base}${path}`, { ...init, headers });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const detail =
+      typeof data.detail === "string"
+        ? data.detail
+        : Array.isArray(data.detail)
+          ? data.detail.map((x: { msg?: string }) => x?.msg).filter(Boolean).join("; ")
+          : data.detail?.[0]?.msg || data.error || "Request failed";
+    throw new Error(detail);
+  }
+  return data as T;
+}
+
 async function guaranteeRequest<T>(
   path: string,
   options: RequestInit & { token?: string | null } = {},
@@ -72,7 +100,7 @@ export const authApi = {
 export const scansApi = {
   start: (body: { domain: string }, token: string) =>
     request<{ scan_id: string; domain: string; status: string; score?: number; grade?: string }>("/api/scan", { method: "POST", body: JSON.stringify(body), token }),
-  /** Public scan (no auth). Use scan_depth: "fast" on homepage (typically ~20–90s depending on host). */
+  /** Public scan (no auth). Default backend depth is `full`; pass `fast` for a quicker Charlotte-tier pass. */
   startPublic: (body: { domain: string; scan_depth?: "fast" | "full" }) =>
     request<PublicScanResult>("/api/scan/public", { method: "POST", body: JSON.stringify(body) }),
   get: (scanId: string, token: string) =>
@@ -166,12 +194,12 @@ export const billingApi = {
 /** Account-first portal: bootstrap CRM rows after magic-link sign-in. */
 export const portalApi = {
   bootstrap: (token: string) =>
-    request<{ ok: boolean; client_id: string; created: boolean }>("/api/portal/bootstrap", {
+    portalRequest<{ ok: boolean; client_id: string; created: boolean }>("/api/portal/bootstrap", {
       method: "POST",
       token,
     }),
   setPrimaryDomain: (body: { domain: string }, token: string) =>
-    request<{ ok: string; domain: string }>("/api/portal/primary-domain", {
+    portalRequest<{ ok: string; domain: string }>("/api/portal/primary-domain", {
       method: "POST",
       body: JSON.stringify(body),
       token,
@@ -271,6 +299,11 @@ export interface ScanListItem {
   completed_at: string | null;
 }
 
+export interface PublicScanFindingPreview {
+  text: string;
+  severity: string;
+}
+
 export interface PublicScanResult {
   domain: string;
   status: string;
@@ -279,6 +312,12 @@ export interface PublicScanResult {
   findings_count?: number;
   issues_count?: number;
   findings_plain?: string[];
+  /** Severity-coloured lines for homepage (preferred over findings_plain alone). */
+  findings_preview?: PublicScanFindingPreview[];
+  attack_paths_count?: number;
+  top_attack_path?: string;
+  breach_baseline_usd?: number;
+  breach_cost_summary?: string;
   /** Scanner build id e.g. 2.1-fast (from hawk-scanner-v2) */
   scan_version?: string | null;
 }
