@@ -9,7 +9,7 @@ from typing import Any
 
 from app.analysis import email_security, ssl_deep
 from app.breach_cost import build_estimate
-from app.integrations import attack_paths, breach_monitoring, claude_interpret, exposure_screenshot, github_search, internetdb, nvd_cves
+from app.integrations import attack_paths, breach_monitoring, exposure_screenshot, github_search, internetdb, nvd_cves, openai_interpret
 from app.models import Finding, ScanResponse
 from app.pipeline.layers import dnstwist, httpx_whatweb, naabu, nuclei, subfinder
 from app.scoring import compute_score
@@ -112,7 +112,7 @@ def _fast_path_naabu_hosts(hosts: list[str], *, max_hosts: int = _FAST_NAABU_MAX
 
 
 def _fast_naabu_port_findings(results: list[dict], domain: str) -> list[dict[str, Any]]:
-    """Flag non-standard listeners from the fast-path naabu slice (bounded host list)."""
+    """Flag non-standard listeners from naabu results (used by fast and full scans)."""
     extras: list[str] = []
     for row in results or []:
         p = str(row.get("port") or "").strip()
@@ -153,7 +153,7 @@ def _row_status(row: dict[str, Any]) -> int | None:
 
 
 def _fast_httpx_surface_findings(jsonl: list[dict], domain: str) -> list[dict[str, Any]]:
-    """Lightweight signals from httpx JSONL (no nuclei) for the fast tier."""
+    """Lightweight signals from httpx JSONL (no nuclei); used by fast and full scans."""
     findings: list[dict[str, Any]] = []
     login_urls: list[str] = []
     cleartext: list[str] = []
@@ -271,6 +271,27 @@ async def run_scan(
     raw_layers["httpx"] = l3a
     raw_layers["whatweb"] = l3b
 
+    # Align full scan scoring with run_scan_fast: httpx heuristics, naabu extras, subdomain footprint.
+    all_findings.extend(_fast_httpx_surface_findings(l3a.get("jsonl") or [], domain))
+    all_findings.extend(_fast_naabu_port_findings(naabu_results, domain))
+    if len(hosts) > 2:
+        all_findings.append(
+            {
+                "id": str(uuid.uuid4()),
+                "severity": "low",
+                "category": "Attack surface",
+                "title": "Subdomain footprint",
+                "description": (
+                    f"Enumeration found {len(hosts)} hostnames for this domain. "
+                    "A wider footprint usually means more surface area — review anything you do not recognize."
+                ),
+                "technical_detail": str(hosts[:40])[:4000],
+                "affected_asset": domain,
+                "remediation": "Review DNS and retire unused hosts.",
+                "layer": "subfinder",
+            }
+        )
+
     try:
         nvd_fs = await nvd_cves.nvd_findings_from_whatweb(
             l3b.get("lines") or [],
@@ -307,7 +328,7 @@ async def run_scan(
     raw_layers["nuclei"] = l4_meta
     all_findings.extend(nuc_findings)
 
-    interpreted = await claude_interpret.interpret_findings(all_findings, settings)
+    interpreted = await openai_interpret.interpret_findings(all_findings, settings)
     raw_layers["interpreted_count"] = len(interpreted)
     _merge_interpretations(all_findings, interpreted)
 
@@ -357,7 +378,7 @@ async def run_scan_fast(
     """
     Fast tier for homepage / Charlotte: email + TLS + breach + subdomains, plus a **bounded**
     naabu slice, httpx probes on derived URLs, and Shodan InternetDB hints — still **no** nuclei,
-    dnstwist, GitHub, or Claude interpretation (keeps wall clock predictable vs full pipeline).
+    dnstwist, GitHub, or OpenAI interpretation (keeps wall clock predictable vs full pipeline).
     """
     settings = settings or get_settings()
     domain = _normalize_domain(domain)
