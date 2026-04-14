@@ -17,6 +17,7 @@ export function CrmLoginForm() {
   const err = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [linkSent, setLinkSent] = useState(false);
   const { authReady, session } = useCrmAuth();
   const supabase = useMemo(() => createClient(), []);
 
@@ -40,6 +41,7 @@ export function CrmLoginForm() {
       toast.error(error.message);
       return;
     }
+    setLinkSent(true);
     toast.success("Check your email for the magic link.");
   }
 
@@ -59,14 +61,24 @@ export function CrmLoginForm() {
             autoComplete="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setLinkSent(false);
+            }}
             className="mt-1 border-zinc-700 bg-zinc-950"
             placeholder="you@company.com"
           />
         </div>
-        <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500" disabled={loading}>
-          {loading ? "Sending…" : "Send magic link"}
+        <Button
+          type="submit"
+          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-90"
+          disabled={loading || linkSent}
+        >
+          {loading ? "Sending…" : linkSent ? "Sent" : "Send magic link"}
         </Button>
+        {linkSent && (
+          <p className="text-center text-sm text-zinc-400">Check your inbox — edit the email above to send again.</p>
+        )}
       </form>
       <p className="mt-6 text-center text-xs text-zinc-500">
         <Link href="/" className="underline hover:text-zinc-300">

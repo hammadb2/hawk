@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { scansApi, marketingApi, type PublicScanResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,18 +56,35 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
 }
 
 const PROGRESS_LINES = [
-  "Checking email security (DMARC/SPF/DKIM)...",
-  "Checking SSL certificate...",
-  "Checking for data breaches...",
-  "Running vulnerability analysis...",
+  { text: "Checking email security (DMARC / SPF / DKIM)…", emoji: "✉️" },
+  { text: "Checking TLS & certificate on your edge…", emoji: "🔐" },
+  { text: "Checking breach & stealer intelligence…", emoji: "🛡️" },
+  { text: "Correlating signals for your score…", emoji: "⚡" },
 ];
+
+const WAITING_TIPS = [
+  "We never store your password — this is an external, read-only snapshot.",
+  "Attackers use the same public data we are looking at right now.",
+  "Canadian privacy laws care about email spoofing — we check that first.",
+  "A slow response usually means we are going deeper, not skipping checks.",
+];
+
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <circle cx="12" cy="12" r="10" className="text-text-dim" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="text-text-dim" />
+    </svg>
+  );
+}
 
 export function HomeScanner() {
   const [domain, setDomain] = useState("");
   const [phase, setPhase] = useState<"idle" | "scanning" | "done">("idle");
   const [tickSlot, setTickSlot] = useState(0);
+  const [tipIndex, setTipIndex] = useState(0);
   const [result, setResult] = useState<PublicScanResult | null>(null);
-  const [scanFailed, setScanFailed] = useState(false); // API error — still offer email capture only
+  const [scanFailed, setScanFailed] = useState(false);
   const [showSlowLead, setShowSlowLead] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSlow, setEmailSlow] = useState("");
@@ -81,6 +99,9 @@ export function HomeScanner() {
       slowTimerRef.current = null;
     }
   };
+
+  const preview = normalizeDomain(domain);
+  const canSubmit = preview.includes(".");
 
   const submitLead = useCallback(
     async (addr: string, plain: string[], res: PublicScanResult | null) => {
@@ -98,6 +119,14 @@ export function HomeScanner() {
     [domain],
   );
 
+  useEffect(() => {
+    if (phase !== "scanning") return;
+    const id = setInterval(() => {
+      setTipIndex((i) => (i + 1) % WAITING_TIPS.length);
+    }, 3800);
+    return () => clearInterval(id);
+  }, [phase]);
+
   const onScan = async () => {
     const d = normalizeDomain(domain);
     if (!d || !d.includes(".")) return;
@@ -109,6 +138,7 @@ export function HomeScanner() {
     setEmailSentSlow(false);
     resultRef.current = null;
     setTickSlot(0);
+    setTipIndex(0);
     clearSlowTimer();
 
     slowTimerRef.current = setTimeout(() => {
@@ -117,7 +147,7 @@ export function HomeScanner() {
 
     const tick = setInterval(() => {
       setTickSlot((s) => Math.min(s + 1, 3));
-    }, 2600);
+    }, 2200);
 
     try {
       const res = await scansApi.startPublic({ domain: d, scan_depth: "fast" });
@@ -159,50 +189,189 @@ export function HomeScanner() {
     setEmailSentSlow(true);
   };
 
+  const onDomainChange = (v: string) => {
+    setDomain(v);
+    if (phase === "done") {
+      setPhase("idle");
+      setResult(null);
+      setScanFailed(false);
+      setShowSlowLead(false);
+      setEmailSent(false);
+      setEmailSentSlow(false);
+    }
+  };
+
+  const progressPct = Math.min(100, 8 + tickSlot * 24 + (phase === "scanning" ? 8 : 0));
+
   return (
-    <div className="w-full max-w-xl mx-auto">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-        <Input
-          placeholder="yourbusiness.com"
-          value={domain}
-          onChange={(e) => setDomain(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && phase === "idle" && onScan()}
-          disabled={phase === "scanning"}
-          className="h-12 border-surface-3 bg-surface-1 text-base"
-        />
-        <Button
-          type="button"
-          onClick={onScan}
-          disabled={phase === "scanning" || !normalizeDomain(domain).includes(".")}
-          className="h-12 shrink-0 px-6 font-semibold text-white bg-accent hover:bg-accent/90 sm:min-w-[200px]"
-        >
-          {phase === "scanning" ? "Scanning…" : "Scan My Domain Free"}
-        </Button>
+    <div className="w-full max-w-xl mx-auto px-1 sm:px-0">
+      {/* Domain input — elevated card, icon, helper */}
+      <div
+        className={cn(
+          "rounded-2xl border bg-surface-1/90 p-3 sm:p-4 shadow-lg transition-all duration-300",
+          phase === "scanning"
+            ? "border-accent/40 shadow-accent/5"
+            : "border-surface-3 focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]",
+        )}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-3">
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="hawk-domain-scan" className="sr-only">
+              Domain to scan
+            </label>
+            <div
+              className={cn(
+                "flex h-14 items-center gap-3 rounded-xl border px-3 transition-colors sm:h-[3.25rem]",
+                "border-surface-3 bg-surface-2/60",
+                "focus-within:border-accent/55 focus-within:bg-surface-2",
+              )}
+            >
+              <GlobeIcon className="h-5 w-5 shrink-0 text-accent/90" />
+              <Input
+                id="hawk-domain-scan"
+                placeholder="yourbusiness.com"
+                value={domain}
+                onChange={(e) => onDomainChange(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && phase === "idle" && canSubmit && onScan()}
+                disabled={phase === "scanning"}
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-base shadow-none placeholder:text-text-dim focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </div>
+            <p className="mt-2 text-left text-xs leading-snug text-text-dim sm:text-[13px]">
+              Paste a URL or domain — we strip <span className="text-text-secondary">https://</span> and{" "}
+              <span className="text-text-secondary">www.</span> automatically.
+              {preview.length > 2 && canSubmit && (
+                <span className="mt-1 block font-mono text-[11px] text-accent/90">→ scans as {preview}</span>
+              )}
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={onScan}
+            disabled={phase === "scanning" || !canSubmit}
+            className="h-14 shrink-0 rounded-xl px-6 font-semibold text-white shadow-md transition-transform active:scale-[0.98] sm:h-[3.25rem] sm:min-w-[200px] sm:self-end"
+          >
+            {phase === "scanning" ? "Scanning…" : "Scan free"}
+          </Button>
+        </div>
       </div>
 
-      {phase === "scanning" && (
-        <div
-          className="mt-8 rounded-xl border border-surface-3 bg-surface-1 px-4 py-5 text-left text-sm"
-          role="status"
-          aria-live="polite"
-        >
-          {PROGRESS_LINES.map((line, i) => {
-            const done = i < 3 && tickSlot > i;
-            const spinning = i === 3 && tickSlot >= 3;
-            return (
-              <div
-                key={line}
-                className={cn("flex gap-2 py-1.5 text-text-secondary", (done || spinning) && "text-accent")}
-              >
-                <span className="w-5 shrink-0 font-mono text-xs" aria-hidden>
-                  {done ? "✓" : spinning ? "⟳" : "·"}
-                </span>
-                <span>{line}</span>
+      <AnimatePresence mode="wait">
+        {phase === "scanning" && (
+          <motion.div
+            key="scanning"
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            className="relative mt-8 overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-b from-surface-1 via-surface-1 to-surface-2/90 px-4 py-6 shadow-xl sm:px-6"
+          >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,rgba(34,197,94,0.12),transparent_55%)]" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-surface-3">
+              <motion.div
+                className="h-full bg-gradient-to-r from-accent via-emerald-300 to-accent"
+                initial={{ width: "0%" }}
+                animate={{ width: `${progressPct}%` }}
+                transition={{ type: "spring", stiffness: 120, damping: 18 }}
+              />
+            </div>
+
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
+              <div className="flex shrink-0 justify-center sm:justify-start">
+                <div className="relative h-[4.5rem] w-[4.5rem]">
+                  <motion.div
+                    className="absolute inset-0 rounded-full border-2 border-accent/25"
+                    animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0.85, 0.5] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                  <motion.div
+                    className="absolute inset-1 rounded-full border border-accent/40"
+                    style={{ borderTopColor: BRAND, borderRightColor: "transparent" }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+                  />
+                  <motion.div
+                    className="absolute inset-0 flex items-center justify-center text-2xl"
+                    animate={{ scale: [1, 1.12, 1] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    🦅
+                  </motion.div>
+                </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="min-w-0 flex-1 text-center sm:text-left">
+                <p className="text-base font-semibold tracking-tight text-text-primary sm:text-lg">
+                  Scanning <span className="text-accent">{preview || "your domain"}</span>
+                </p>
+                <p className="mt-1 text-sm text-text-secondary">Mapping what the internet already knows about you.</p>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={tipIndex}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.35 }}
+                    className="mt-3 text-xs italic leading-relaxed text-text-dim sm:text-sm"
+                  >
+                    {WAITING_TIPS[tipIndex]}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <ul className="relative mt-6 space-y-2 border-t border-surface-3/80 pt-5">
+              {PROGRESS_LINES.map((row, i) => {
+                const done = i < 3 && tickSlot > i;
+                const active = (i === 3 && tickSlot >= 3) || (i < 3 && tickSlot === i);
+                const pending = !done && !active;
+                return (
+                  <motion.li
+                    key={row.text}
+                    initial={false}
+                    animate={{
+                      opacity: done ? 1 : active ? 1 : 0.45,
+                      x: done ? 0 : active ? 2 : 0,
+                    }}
+                    className={cn(
+                      "flex items-start gap-3 rounded-lg py-2 pl-1 text-sm sm:text-[15px]",
+                      done && "text-accent",
+                      active && "bg-accent/5 text-text-primary",
+                      pending && "text-text-dim",
+                    )}
+                  >
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-base" aria-hidden>
+                      {done ? "✓" : active ? "✨" : "○"}
+                    </span>
+                    <span>
+                      <span className="mr-2 select-none" aria-hidden>
+                        {row.emoji}
+                      </span>
+                      {row.text}
+                    </span>
+                    {active && (
+                      <motion.span
+                        className="ml-auto hidden h-2 w-12 overflow-hidden rounded-full bg-surface-3 sm:block"
+                        aria-hidden
+                      >
+                        <motion.span
+                          className="block h-full w-1/2 rounded-full bg-accent"
+                          animate={{ x: ["-100%", "200%"] }}
+                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                        />
+                      </motion.span>
+                    )}
+                  </motion.li>
+                );
+              })}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {phase === "done" && !result && (showSlowLead || scanFailed) && (
         <div className="mt-10 space-y-4 rounded-xl border border-surface-3 bg-surface-1 p-6">
@@ -244,7 +413,12 @@ export function HomeScanner() {
       )}
 
       {phase === "done" && result && !scanFailed && (
-        <div className="mt-10 space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-10 space-y-8"
+        >
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
             <ScoreRing score={result.score ?? 0} grade={result.grade || "F"} />
             <div className="text-center sm:text-left">
@@ -302,9 +476,8 @@ export function HomeScanner() {
               </form>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
-
     </div>
   );
 }

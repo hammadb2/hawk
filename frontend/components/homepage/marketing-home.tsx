@@ -68,7 +68,7 @@ export function MarketingHome() {
             <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-text-secondary sm:text-xl">
               HAWK monitors and tests Canadian small businesses daily. Follow our recommendations and if you still get breached — we cover the response costs. In writing. No other company will say that.
             </p>
-            <div className="mx-auto mt-12 max-w-2xl shadow-xl rounded-xl bg-surface-1 border border-surface-3 overflow-hidden">
+            <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-surface-3 bg-surface-1/40 p-4 shadow-xl backdrop-blur-sm sm:p-6">
               <HomeScanner />
             </div>
             <p className="mx-auto mt-8 max-w-lg text-sm leading-relaxed text-text-dim">
