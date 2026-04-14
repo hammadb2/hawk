@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Charlotte outbound enrichment: Apollo CSV → HAWK Scanner (sync) → Claude email → Smartlead-ready CSV.
+Charlotte outbound enrichment: Apollo CSV → HAWK Scanner (sync) → OpenAI email → Smartlead-ready CSV.
 
 Usage:
   export SCANNER_URL=https://intelligent-rejoicing-production.up.railway.app
-  export ANTHROPIC_API_KEY=sk-ant-...
+  export OPENAI_API_KEY=sk-...
   export SUPABASE_URL=...
   export SUPABASE_SERVICE_ROLE_KEY=...
 
@@ -57,7 +57,6 @@ FREE_EMAIL_DOMAINS = frozenset(
     }
 )
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
 MAX_TOKENS = 500
 SCAN_TIMEOUT = 90.0
 
@@ -217,7 +216,7 @@ async def _scan_domain(client: Any, scanner_url: str, domain: str, industry: str
 
 
 async def _charlotte_email(
-    ac: Any,
+    oa_client: Any,
     *,
     first_name: str,
     company: str,
@@ -271,15 +270,13 @@ Return ONLY this JSON with no other text:
   "body": "email body here"
 }}
 """
-    msg = await ac.messages.create(
-        model=CLAUDE_MODEL,
+    model = (os.environ.get("CHARLOTTE_OPENAI_MODEL") or os.environ.get("OPENAI_MODEL") or "gpt-4o").strip()
+    completion = await oa_client.chat.completions.create(
+        model=model,
         max_tokens=MAX_TOKENS,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = ""
-    for block in msg.content:
-        if block.type == "text":
-            text += block.text
+    text = (completion.choices[0].message.content or "").strip()
     parsed = _parse_claude_json(text)
     if parsed:
         parsed["subject"] = _sanitize_no_hyphens(parsed["subject"])
@@ -295,7 +292,7 @@ def _sequence_templates(
     industry: str,
     score: int,
 ) -> dict[str, str]:
-    """Smartlead follow-ups (Day 3, 7, 14). Email 1 is the personalised Claude output."""
+    """Smartlead follow-ups (Day 3, 7, 14). Email 1 is the personalised OpenAI output."""
     ind = industry or "your sector"
     return {
         "seq2_subject": _sanitize_no_hyphens(f"re: {domain} security scan"),
@@ -331,7 +328,7 @@ async def _process_row(
     sem: asyncio.Semaphore,
     delay: float,
     httpx_client: Any,
-    anthropic_client: Any,
+    openai_client: Any,
     scanner_url: str,
     supabase_url: str,
     supabase_key: str,
@@ -401,7 +398,7 @@ async def _process_row(
 
         breach_detected, breach_detail = _breach_info(findings)
         if breach_detected and top:
-            # Prefer breach-heavy narrative for Claude
+            # Prefer breach-heavy narrative for the LLM
             for f in top3:
                 layer = str(f.get("layer") or "").lower()
                 if "breach" in layer or "hibp" in layer or "stealer" in layer:
@@ -416,7 +413,7 @@ async def _process_row(
         for attempt in range(2):
             try:
                 ce = await _charlotte_email(
-                    anthropic_client,
+                    openai_client,
                     first_name=first or "there",
                     company=company or domain,
                     industry=industry or "business services",
@@ -432,13 +429,13 @@ async def _process_row(
             except Exception as e:
                 if attempt == 0:
                     continue
-                return None, f"claude_error:{e!s}"
+                return None, f"openai_error:{e!s}"
             if ce:
                 break
             if attempt == 0:
                 continue
         if not ce:
-            return None, "claude_parse"
+            return None, "llm_parse"
 
         seq = _sequence_templates(
             sender_name=sender_name,
@@ -464,17 +461,18 @@ async def _process_row(
 
 
 async def run(args: argparse.Namespace) -> int:
-    import anthropic
+    from openai import AsyncOpenAI
+
     import httpx
 
     scanner_url = os.environ.get("SCANNER_URL", "http://127.0.0.1:8000").strip()
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     supabase_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
     sender_name = os.environ.get("CHARLOTTE_SENDER_NAME", "Charlotte").strip()
 
     if not args.dry_run and not api_key:
-        print("ANTHROPIC_API_KEY is required (or use --dry-run)", file=sys.stderr)
+        print("OPENAI_API_KEY is required (or use --dry-run)", file=sys.stderr)
         return 1
 
     with open(args.input, newline="", encoding="utf-8-sig") as f:
@@ -504,7 +502,7 @@ async def run(args: argparse.Namespace) -> int:
     results: list[tuple[int, dict[str, Any]]] = []
 
     sem = asyncio.Semaphore(max(1, args.batch_size))
-    anthropic_client = None if args.dry_run else anthropic.AsyncAnthropic(api_key=api_key)
+    openai_client = None if args.dry_run else AsyncOpenAI(api_key=api_key)
 
     norm_rows = [{_norm_header(k): v for k, v in row.items()} for row in rows]
 
@@ -515,7 +513,7 @@ async def run(args: argparse.Namespace) -> int:
             sem,
             args.delay,
             hc,
-            anthropic_client,
+            openai_client,
             scanner_url,
             supabase_url,
             supabase_key,
@@ -574,7 +572,7 @@ async def run(args: argparse.Namespace) -> int:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Apollo → HAWK Scanner → Claude → Smartlead CSV")
+    p = argparse.ArgumentParser(description="Apollo → HAWK Scanner → OpenAI → Smartlead CSV")
     p.add_argument("--input", required=True, help="Apollo export CSV")
     p.add_argument("--output", required=True, help="Output CSV path")
     p.add_argument("--batch-size", type=int, default=1, help="Concurrent scans (semaphore)")
@@ -582,7 +580,7 @@ def main() -> None:
     p.add_argument(
         "--dry-run",
         action="store_true",
-        help="Parse rows and write empty email fields (no Scanner/Claude)",
+        help="Parse rows and write empty email fields (no Scanner/OpenAI)",
     )
     args = p.parse_args()
     raise SystemExit(asyncio.run(run(args)))

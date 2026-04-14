@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     # Redis — same broker pattern as BullMQ (Redis); workers use arq (Python)
     redis_url: str = "redis://localhost:6379/0"
 
-    # API keys
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-20250514"
+    # API keys — pipeline LLM (interpretation + attack paths)
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o"
     hibp_api_key: str = ""
     breachsense_api_key: str = ""
     breachsense_base_url: str = ""

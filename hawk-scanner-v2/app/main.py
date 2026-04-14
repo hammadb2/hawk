@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HAWK Scanner 2.0",
-    description="Attack-surface pipeline: subfinder, naabu, httpx, whatweb, NVD supply-chain, nuclei, dnstwist, HIBP, GitHub, Claude.",
+    description="Attack-surface pipeline: subfinder, naabu, httpx, whatweb, NVD supply-chain, nuclei, dnstwist, HIBP, GitHub, OpenAI.",
     version="2.0.0",
     lifespan=lifespan,
 )

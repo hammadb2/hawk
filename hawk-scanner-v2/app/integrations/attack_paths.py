@@ -1,11 +1,11 @@
-"""Claude — top 3 attack paths from findings (2B)."""
+"""OpenAI — top 3 attack paths from findings (2B)."""
 from __future__ import annotations
 
 import json
 import logging
 from typing import Any
 
-import anthropic
+from openai import AsyncOpenAI
 
 from app.settings import Settings, get_settings
 
@@ -21,7 +21,7 @@ async def compute_attack_paths(
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     settings = settings or get_settings()
-    if not settings.anthropic_api_key:
+    if not settings.openai_api_key:
         return []
 
     slim = [
@@ -49,21 +49,18 @@ async def compute_attack_paths(
         'Output ONLY valid JSON: {"paths":[{"name":"...","steps":["1. ...","2. ..."],"likelihood":"High|Medium|Low","impact":"..."}]}'
     )
 
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
     try:
-        msg = await client.messages.create(
-            model=settings.anthropic_model,
+        completion = await client.chat.completions.create(
+            model=settings.openai_model,
             max_tokens=6000,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as e:
-        logger.exception("attack_paths claude failed: %s", e)
+        logger.exception("attack_paths openai failed: %s", e)
         return []
 
-    text = ""
-    for block in msg.content:
-        if block.type == "text":
-            text += block.text
+    text = (completion.choices[0].message.content or "").strip()
     try:
         start = text.index("{")
         end = text.rindex("}") + 1
