@@ -254,12 +254,12 @@ async def run_scan_fast(
         all_findings.append(
             {
                 "id": str(uuid.uuid4()),
-                "severity": "info",
+                "severity": "ok",
                 "category": "Attack surface",
                 "title": "Subdomain footprint",
                 "description": (
                     f"Quick pass found {len(hosts)} hostnames for this domain. "
-                    "A wider footprint usually means more ways in for attackers."
+                    "More hostnames can mean more surface area — review anything you do not recognize."
                 ),
                 "technical_detail": str(hosts[:40])[:4000],
                 "affected_asset": domain,

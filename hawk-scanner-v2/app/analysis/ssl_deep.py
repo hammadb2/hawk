@@ -63,7 +63,8 @@ async def analyze(domain: str) -> list[dict[str, Any]]:
         return findings
 
     ver = (info.get("tls_version") or "").upper()
-    sev = "low"
+    # Modern TLS 1.2+ with sane ciphers is a pass (ok); legacy protocols stay high/critical.
+    sev = "ok"
     desc = f"TLS version: {ver}"
     if "TLSV1" in ver and "1.2" not in ver and "1.3" not in ver:
         sev = "high"
