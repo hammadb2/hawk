@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 redis_pool: ArqRedis | None = None
 
-SCAN_JOB_TIMEOUT_FAST_SEC = 120.0
+SCAN_JOB_TIMEOUT_FAST_SEC = 150.0  # subfinder + naabu/httpx/internetdb fast tier (see pipeline/runner.run_scan_fast)
 SCAN_JOB_TIMEOUT_FULL_SEC = 300.0
 
 

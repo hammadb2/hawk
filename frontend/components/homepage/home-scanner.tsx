@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { scansApi, marketingApi, type PublicScanResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -58,8 +59,8 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
 const PROGRESS_LINES = [
   { text: "Checking email security (DMARC / SPF / DKIM)…", emoji: "✉️" },
   { text: "Checking TLS & certificate on your edge…", emoji: "🔐" },
-  { text: "Checking breach & stealer intelligence…", emoji: "🛡️" },
-  { text: "Correlating signals for your score…", emoji: "⚡" },
+  { text: "Mapping subdomains, ports & web exposure…", emoji: "🌐" },
+  { text: "Checking breach intel & correlating your score…", emoji: "⚡" },
 ];
 
 const WAITING_TIPS = [
@@ -426,7 +427,57 @@ export function HomeScanner() {
               <p className="text-5xl font-extrabold tabular-nums" style={{ color: gradeStroke(result.grade) }}>
                 {result.grade || "—"}
               </p>
-              <p className="mt-2 text-sm text-text-secondary">Fast scan — full report in your inbox</p>
+              <p className="mt-2 text-sm text-text-secondary">
+                Free instant scan — HAWK Engine{" "}
+                {result.scan_version === "2.1-fast" ? "2.1 snapshot" : result.scan_version ?? "2.1"}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-surface-1 to-surface-2/80 p-5 shadow-lg sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent">Go deeper — paid HAWK Shield</p>
+                <h3 className="mt-1 text-lg font-bold text-text-primary sm:text-xl">Turn this snapshot into continuous protection</h3>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">
+                  Your free scan already runs email, TLS, breach intelligence, subdomain discovery, targeted ports, HTTP probes,
+                  and Internet-wide exposure hints. Shield adds{" "}
+                  <strong className="text-text-primary">Nuclei template coverage</strong>,{" "}
+                  <strong className="text-text-primary">lookalike domain monitoring</strong>, scheduled re-scans, and the
+                  breach-response guarantee on this page — the bundle SMBs buy when insurers and clients ask hard questions.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-surface-3 bg-background/50 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-dim">Free instant scan</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-text-secondary">
+                  <li>✓ Email auth & TLS deep check</li>
+                  <li>✓ Multi-source breach / stealer signals</li>
+                  <li>✓ Subdomains + ports + HTTP surface</li>
+                  <li>✓ InternetDB exposure hints</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-accent">HAWK Shield (paid)</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-text-secondary">
+                  <li>✓ Full Nuclei vulnerability templates</li>
+                  <li>✓ dnstwist lookalike monitoring</li>
+                  <li>✓ Scheduled scans & history</li>
+                  <li>✓ Breach response guarantee — in writing</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="h-12 flex-1 rounded-xl font-semibold text-white shadow-md bg-accent hover:bg-accent/90"
+              >
+                <Link href="/portal/login?next=%2Fportal%2Fbilling%3Fplan%3Dshield">Start Shield — most popular</Link>
+              </Button>
+              <Button asChild variant="outline" className="h-12 flex-1 rounded-xl border-surface-3 font-semibold">
+                <Link href="#pricing">Compare all plans</Link>
+              </Button>
             </div>
           </div>
 

@@ -176,6 +176,7 @@ def start_scan_public(req: ScanStartRequest, request: Request):
         "findings_count": len(result.get("findings", [])),
         "issues_count": issues_count,
         "findings_plain": plain,
+        "scan_version": result.get("scan_version"),
     }
 
 

@@ -72,7 +72,7 @@ export const authApi = {
 export const scansApi = {
   start: (body: { domain: string }, token: string) =>
     request<{ scan_id: string; domain: string; status: string; score?: number; grade?: string }>("/api/scan", { method: "POST", body: JSON.stringify(body), token }),
-  /** Public scan (no auth). Use scan_depth: "fast" on homepage (~10–15s). */
+  /** Public scan (no auth). Use scan_depth: "fast" on homepage (typically ~20–90s depending on host). */
   startPublic: (body: { domain: string; scan_depth?: "fast" | "full" }) =>
     request<PublicScanResult>("/api/scan/public", { method: "POST", body: JSON.stringify(body) }),
   get: (scanId: string, token: string) =>
@@ -279,6 +279,8 @@ export interface PublicScanResult {
   findings_count?: number;
   issues_count?: number;
   findings_plain?: string[];
+  /** Scanner build id e.g. 2.1-fast (from hawk-scanner-v2) */
+  scan_version?: string | null;
 }
 
 export interface Finding {
