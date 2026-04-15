@@ -3,7 +3,7 @@ import type { CrmRole } from "@/lib/crm/types";
 export type NavItem = {
   href: string;
   label: string;
-  badgeKey?: "pipeline_overdue" | "prospects_uncontacted" | "clients_churn" | "team_flagged" | "tickets_open";
+  badgeKey?: "pipeline_overdue" | "prospects_uncontacted" | "clients_churn" | "team_flagged" | "tickets_open" | "va_alerts";
   roles: CrmRole[];
 };
 
@@ -21,6 +21,12 @@ export const CRM_NAV: NavItem[] = [
   { href: "/crm/reports", label: "Reports", roles: ["ceo", "hos", "team_lead"] },
   { href: "/crm/earnings", label: "Earnings", roles: ["ceo", "hos", "team_lead", "sales_rep"] },
   { href: "/crm/audit-log", label: "Audit log", roles: ["ceo", "hos"] },
+  { href: "/crm/va/roster", label: "VA Team", badgeKey: "va_alerts", roles: ["ceo", "hos", "team_lead", "va_manager"] },
+  { href: "/crm/va/input", label: "VA Daily Input", roles: ["ceo", "hos", "team_lead", "va_manager", "va"] },
+  { href: "/crm/va/health", label: "Campaign Health", roles: ["ceo", "hos", "team_lead", "va_manager"] },
+  { href: "/crm/va/abtests", label: "A/B Tests", roles: ["ceo", "hos", "team_lead", "va_manager"] },
+  { href: "/crm/va/objections", label: "Objection Bank", roles: ["ceo", "hos", "team_lead", "va_manager"] },
+  { href: "/crm/va/bonus", label: "Bonus Tracker", roles: ["ceo", "hos", "va_manager"] },
   { href: "/crm/settings", label: "Settings", roles: ["ceo"] },
   { href: "/crm/tickets", label: "Support Tickets", badgeKey: "tickets_open", roles: ["ceo", "hos", "team_lead", "sales_rep"] },
 ];

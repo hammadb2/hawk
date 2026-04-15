@@ -36,7 +36,7 @@ def _profile(uid: str) -> dict | None:
     r = httpx.get(
         f"{SUPABASE_URL}/rest/v1/profiles",
         headers=_sb_headers(),
-        params={"id": f"eq.{uid}", "select": "id,role", "limit": "1"},
+        params={"id": f"eq.{uid}", "select": "id,role,role_type", "limit": "1"},
         timeout=20.0,
     )
     r.raise_for_status()
@@ -45,9 +45,17 @@ def _profile(uid: str) -> dict | None:
 
 
 def _require_privileged(uid: str) -> None:
+    """CEO, HoS, or va_manager can invite."""
     p = _profile(uid)
-    if not p or p.get("role") not in ("ceo", "hos"):
-        raise HTTPException(status_code=403, detail="CEO or HoS only")
+    if not p:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    role = p.get("role") or ""
+    if role in ("ceo", "hos"):
+        return
+    # va_manager stored in role_type column (role may still be something else)
+    if p.get("role_type") == "va_manager":
+        return
+    raise HTTPException(status_code=403, detail="CEO, HoS, or VA Manager only")
 
 
 def _is_invite_duplicate_email(resp: httpx.Response) -> bool:
@@ -160,8 +168,8 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
 class InviteBody(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=200)
-    role: Literal["sales_rep", "team_lead"] = "sales_rep"
-    whatsapp_number: str = Field(..., min_length=5, max_length=40)
+    role: Literal["sales_rep", "team_lead", "va_manager", "va"] = "sales_rep"
+    whatsapp_number: str = Field(default="", max_length=40)
     team_lead_id: str | None = None
 
 
@@ -171,16 +179,23 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
-    meta = {
+    meta: dict[str, Any] = {
         "full_name": body.full_name.strip(),
         "crm_role": body.role,
         "crm_initial_status": "invited",
-        "whatsapp_number": body.whatsapp_number.strip(),
     }
+    if body.whatsapp_number:
+        meta["whatsapp_number"] = body.whatsapp_number.strip()
     if body.team_lead_id:
         meta["crm_team_lead_id"] = body.team_lead_id
 
-    redir = f"{CRM_PUBLIC_BASE_URL}/crm/onboarding" if CRM_PUBLIC_BASE_URL else None
+    # VA roles land on different pages
+    if body.role == "va_manager":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/roster" if CRM_PUBLIC_BASE_URL else None
+    elif body.role == "va":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/input" if CRM_PUBLIC_BASE_URL else None
+    else:
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/onboarding" if CRM_PUBLIC_BASE_URL else None
     payload: dict = {"email": body.email.lower().strip(), "data": meta}
     if redir:
         payload["options"] = {"email_redirect_to": redir}

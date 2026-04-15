@@ -14,11 +14,19 @@ type Kpis = {
   pipelineOpenDollars: number;
   stale48h: number;
   activeMrrCents: number;
+  /* VA ops */
+  vaCallsBookedToday: number;
+  vaEmailsSentToday: number;
+  vaReplyRate: number;
+  vaStandings: { green: number; yellow: number; red: number };
+  vaActiveAlerts: number;
 };
 
 type LeaderRow = { repId: string; name: string; closes: number; mrrCents: number };
 
 type RepHealthRow = { repId: string; name: string; healthScore: number | null };
+
+type VaStandingSummary = { green: number; yellow: number; red: number };
 
 function localStartOfDayIso(): string {
   const d = new Date();
@@ -52,7 +60,7 @@ export function CeoLiveDashboard({
     const startMonth = localStartOfMonthIso();
     const staleCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
 
-    const [evRes, actRes, clientsRes, prospectsRes, healthRes] = await Promise.all([
+    const [evRes, actRes, clientsRes, prospectsRes, healthRes, vaReportsRes, vaScoresRes, vaAlertsRes] = await Promise.all([
       supabase.from("prospect_email_events").select("id,sent_at,replied_at,created_at").gte("created_at", startDay).limit(2000),
       supabase
         .from("activities")
@@ -66,6 +74,9 @@ export function CeoLiveDashboard({
         .select("id,full_name,email,health_score,role")
         .in("role", ["sales_rep", "closer", "team_lead"])
         .limit(100),
+      supabase.from("va_daily_reports").select("emails_sent,replies_received,calls_booked").eq("report_date", startDay.slice(0, 10)),
+      supabase.from("va_scores").select("va_id,standing").order("week_start", { ascending: false }).limit(200),
+      supabase.from("va_alerts").select("id").eq("acknowledged", false),
     ]);
 
     const events = evRes.data ?? [];
@@ -91,6 +102,26 @@ export function CeoLiveDashboard({
     }).length;
     const activeMrrCents = clients.reduce((s, c) => s + (c.mrr_cents ?? 0), 0);
 
+    /* VA ops aggregates */
+    const vaReports = vaReportsRes.data ?? [];
+    const vaEmailsSentToday = vaReports.reduce((s: number, r: { emails_sent?: number }) => s + (r.emails_sent ?? 0), 0);
+    const vaRepliesTotal = vaReports.reduce((s: number, r: { replies_received?: number }) => s + (r.replies_received ?? 0), 0);
+    const vaCallsBookedToday = vaReports.reduce((s: number, r: { calls_booked?: number }) => s + (r.calls_booked ?? 0), 0);
+    const vaReplyRate = vaEmailsSentToday > 0 ? (vaRepliesTotal / vaEmailsSentToday) * 100 : 0;
+
+    const vaScoreRows = vaScoresRes.data ?? [];
+    const latestByVa = new Map<string, string>();
+    for (const row of vaScoreRows as { va_id: string; standing: string }[]) {
+      if (!latestByVa.has(row.va_id)) latestByVa.set(row.va_id, row.standing);
+    }
+    const vaStandings: VaStandingSummary = { green: 0, yellow: 0, red: 0 };
+    for (const st of latestByVa.values()) {
+      if (st === "green") vaStandings.green++;
+      else if (st === "yellow") vaStandings.yellow++;
+      else if (st === "red") vaStandings.red++;
+    }
+    const vaActiveAlerts = (vaAlertsRes.data ?? []).length;
+
     setKpis({
       emailsSentToday,
       emailRepliesToday,
@@ -99,6 +130,11 @@ export function CeoLiveDashboard({
       pipelineOpenDollars,
       stale48h,
       activeMrrCents,
+      vaCallsBookedToday,
+      vaEmailsSentToday,
+      vaReplyRate,
+      vaStandings,
+      vaActiveAlerts,
     });
     setActivities(acts);
 
@@ -267,11 +303,56 @@ export function CeoLiveDashboard({
               </Link>
             </li>
             <li>
+              <Link href="/crm/va/roster" className="text-emerald-600 hover:underline">
+                VA Team
+              </Link>
+            </li>
+            <li>
               <Link href="/crm/settings" className="text-emerald-600 hover:underline">
                 Settings &amp; monitor history
               </Link>
             </li>
           </ul>
+        </div>
+      </div>
+
+      {/* VA Operations section */}
+      <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/60 p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-indigo-900">VA Operations</h2>
+          <Link href="/crm/va/roster" className="text-xs text-indigo-600 hover:underline">
+            View VA roster →
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <KpiCard
+            label="Calls booked today"
+            value={`${kpis.vaCallsBookedToday} / 24`}
+            hint={kpis.vaCallsBookedToday < 24 ? "Below target" : "On track"}
+          />
+          <KpiCard
+            label="Emails sent today"
+            value={`${kpis.vaEmailsSentToday.toLocaleString()} / 2,700`}
+            hint={kpis.vaEmailsSentToday < 2700 ? "Below target" : "On track"}
+          />
+          <KpiCard
+            label="Reply rate"
+            value={`${kpis.vaReplyRate.toFixed(1)}%`}
+            hint={`Target: 3.4%${kpis.vaReplyRate < 3.4 ? " — below" : ""}`}
+          />
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-600">VA standings</div>
+            <div className="mt-1 flex gap-3 text-lg font-semibold">
+              <span className="text-emerald-600">{kpis.vaStandings.green}G</span>
+              <span className="text-amber-500">{kpis.vaStandings.yellow}Y</span>
+              <span className="text-rose-600">{kpis.vaStandings.red}R</span>
+            </div>
+          </div>
+          <KpiCard
+            label="Active alerts"
+            value={kpis.vaActiveAlerts}
+            hint={kpis.vaActiveAlerts > 0 ? "Needs attention" : "All clear"}
+          />
         </div>
       </div>
 

@@ -1,8 +1,118 @@
 /** CRM seat / org role (profiles.role). */
-export type CrmRole = "ceo" | "hos" | "team_lead" | "sales_rep" | "closer" | "client";
+export type CrmRole = "ceo" | "hos" | "team_lead" | "sales_rep" | "closer" | "client" | "va_manager" | "va";
 
 /** Functional access bucket — VA system, CSM, etc. (profiles.role_type). */
 export type ProfileRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | "csm" | "client";
+
+/* ---------- VA Management types ---------- */
+
+export type VaRole = "list_qa" | "reply_book";
+export type VaStatus = "active" | "pip" | "inactive";
+export type VaStanding = "green" | "yellow" | "red";
+export type VaCoachingType = "coaching" | "pip" | "commendation";
+export type AbTestVertical = "dental" | "legal" | "accounting";
+export type ObjectionOutcome = "booked" | "warm" | "not_interested";
+export type DomainHealthStatus = "active" | "warming" | "paused" | "flagged";
+export type VaAlertType = "low_calls" | "high_bounce" | "low_reply_rate" | "missed_input" | "red_score";
+
+export type VaProfile = {
+  id: string;
+  user_id: string | null;
+  full_name: string;
+  email: string;
+  role: VaRole;
+  status: VaStatus;
+  start_date: string;
+  created_at: string;
+};
+
+export type VaDailyReport = {
+  id: string;
+  va_id: string;
+  report_date: string;
+  emails_sent: number;
+  replies_received: number;
+  positive_replies: number;
+  calls_booked: number;
+  no_shows: number;
+  domains_scanned: number;
+  blockers: string | null;
+  submitted_at: string;
+};
+
+export type VaScore = {
+  id: string;
+  va_id: string;
+  week_start: string;
+  output_score: number;
+  accuracy_score: number;
+  reply_quality_score: number;
+  booking_score: number;
+  total_score: number;
+  standing: VaStanding;
+  created_at: string;
+};
+
+export type VaCoachingNote = {
+  id: string;
+  va_id: string;
+  manager_id: string;
+  note: string;
+  type: VaCoachingType;
+  created_at: string;
+};
+
+export type AbTest = {
+  id: string;
+  subject_line: string;
+  email_body: string;
+  vertical: AbTestVertical;
+  sends: number;
+  open_rate: number;
+  reply_rate: number;
+  book_rate: number;
+  winner: boolean;
+  created_at: string;
+};
+
+export type Objection = {
+  id: string;
+  objection_text: string;
+  response_used: string;
+  outcome: ObjectionOutcome;
+  vertical: AbTestVertical;
+  logged_by: string | null;
+  created_at: string;
+};
+
+export type DomainHealth = {
+  id: string;
+  domain: string;
+  warmup_day: number;
+  daily_sends: number;
+  bounce_rate: number;
+  status: DomainHealthStatus;
+  updated_at: string;
+};
+
+export type CampaignPreflight = {
+  id: string;
+  check_date: string;
+  checks: Record<string, boolean>;
+  completed_by: string | null;
+  go_status: boolean;
+  created_at: string;
+};
+
+export type VaAlert = {
+  id: string;
+  alert_type: VaAlertType;
+  va_id: string | null;
+  domain: string | null;
+  message: string;
+  acknowledged: boolean;
+  created_at: string;
+};
 
 export type ProspectStage =
   | "new"
