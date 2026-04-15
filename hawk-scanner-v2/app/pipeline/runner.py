@@ -31,7 +31,8 @@ def _normalize_domain(domain: str) -> str:
     return d
 
 
-def _urls_from_naabu(naabu_results: list[dict]) -> list[str]:
+def _urls_from_naabu(naabu_results: list[dict], *, max_urls: int = 80) -> list[str]:
+    cap = max(8, min(120, max_urls))
     urls: list[str] = []
     for row in naabu_results:
         h = (row.get("host") or "").strip()
@@ -46,7 +47,7 @@ def _urls_from_naabu(naabu_results: list[dict]) -> list[str]:
             urls.append(f"https://{h}:{p}")
         else:
             urls.append(f"http://{h}:{p}")
-    return list(dict.fromkeys(urls))[:80]
+    return list(dict.fromkeys(urls))[:cap]
 
 
 def _merge_interpretations(findings: list[dict], interpreted: list[dict]) -> None:
@@ -222,24 +223,25 @@ async def run_scan(
     started = _iso_now()
     raw_layers: dict[str, Any] = {}
 
-    l1 = await subfinder.run(domain, settings)
-    raw_layers["subfinder"] = l1
-    hosts = list(dict.fromkeys([domain] + l1.get("hosts", [])))
-
-    l2_task = naabu.run(hosts, settings)
+    # Subfinder only gates naabu (host list). Everything else is domain-only — run in parallel.
+    l1_task = subfinder.run(domain, settings)
     l5_task = dnstwist.run(domain, settings)
     l7_task = email_security.analyze(domain)
     l8_task = ssl_deep.analyze(domain)
     l6_task = breach_monitoring.run_breach_layers(domain, settings)
     l9_task = github_search.search_domain(domain, settings.github_token)
 
-    l2, l5, l7, l8, breach_summaries, gh_sum = await asyncio.gather(
-        l2_task, l5_task, l7_task, l8_task, l6_task, l9_task
+    l1, l5, l7, l8, breach_summaries, gh_sum = await asyncio.gather(
+        l1_task, l5_task, l7_task, l8_task, l6_task, l9_task
     )
-    raw_layers["naabu"] = l2
+    raw_layers["subfinder"] = l1
     raw_layers["dnstwist"] = l5
     raw_layers["breach_monitoring"] = breach_summaries
     raw_layers["github"] = gh_sum
+
+    hosts = list(dict.fromkeys([domain] + (l1.get("hosts") or [])))
+    l2 = await naabu.run(hosts, settings)
+    raw_layers["naabu"] = l2
 
     all_findings: list[dict[str, Any]] = []
     all_findings.extend(l7)
@@ -253,21 +255,25 @@ async def run_scan(
     all_findings.extend(_dnstwist_findings(domain, l5))
 
     naabu_results = l2.get("results") or []
-    targets = _urls_from_naabu(naabu_results)
+    targets = _urls_from_naabu(
+        naabu_results, max_urls=settings.full_scan_target_url_cap
+    )
     if not targets:
         targets = [f"https://{domain}", f"http://{domain}"]
 
-    try:
-        idb_fs = await internetdb.internetdb_findings(naabu_results, domain)
-        all_findings.extend(idb_fs)
-        raw_layers["internetdb_findings"] = len(idb_fs)
-    except Exception:
-        logger.exception("InternetDB layer failed")
-        raw_layers["internetdb_findings"] = 0
+    async def _internetdb_block() -> list[dict[str, Any]]:
+        try:
+            return await internetdb.internetdb_findings(naabu_results, domain)
+        except Exception:
+            logger.exception("InternetDB layer failed")
+            return []
 
     l3a_task = httpx_whatweb.run_httpx(targets, settings)
     l3b_task = httpx_whatweb.run_whatweb([u for u in targets[:15]], settings)
-    l3a, l3b = await asyncio.gather(l3a_task, l3b_task)
+    idb_fs, l3a, l3b = await asyncio.gather(_internetdb_block(), l3a_task, l3b_task)
+    if idb_fs:
+        all_findings.extend(idb_fs)
+    raw_layers["internetdb_findings"] = len(idb_fs)
     raw_layers["httpx"] = l3a
     raw_layers["whatweb"] = l3b
 
@@ -292,53 +298,63 @@ async def run_scan(
             }
         )
 
-    try:
-        nvd_fs = await nvd_cves.nvd_findings_from_whatweb(
-            l3b.get("lines") or [],
-            domain,
-            settings,
-        )
-        all_findings.extend(nvd_fs)
-        raw_layers["nvd_supply_chain_findings"] = len(nvd_fs)
-    except Exception:
-        logger.exception("NVD supply-chain layer failed")
-        raw_layers["nvd_supply_chain_findings"] = 0
-
-    try:
-        shot_fs = await exposure_screenshot.capture_exposure_screenshots(
-            l3a.get("jsonl") or [],
-            domain,
-        )
-        all_findings.extend(shot_fs)
-        raw_layers["exposure_screenshots"] = len(shot_fs)
-    except Exception:
-        logger.exception("exposure screenshots failed")
-        raw_layers["exposure_screenshots"] = 0
-
     httpx_urls: list[str] = []
     for row in l3a.get("jsonl") or []:
         u = row.get("url") or row.get("final_url")
         if u:
             httpx_urls.append(u)
-    httpx_urls = list(dict.fromkeys(httpx_urls))[:30]
+    nuc_cap = max(5, settings.nuclei_max_target_urls)
+    httpx_urls = list(dict.fromkeys(httpx_urls))[: max(nuc_cap + 6, 18)]
     if not httpx_urls:
         httpx_urls = targets[:10]
 
-    l4_meta, nuc_findings = await nuclei.run(httpx_urls, domain, settings)
+    async def _nvd_block() -> list[dict[str, Any]]:
+        try:
+            return await nvd_cves.nvd_findings_from_whatweb(
+                l3b.get("lines") or [],
+                domain,
+                settings,
+            )
+        except Exception:
+            logger.exception("NVD supply-chain layer failed")
+            return []
+
+    async def _shots_block() -> list[dict[str, Any]]:
+        try:
+            return await exposure_screenshot.capture_exposure_screenshots(
+                l3a.get("jsonl") or [],
+                domain,
+            )
+        except Exception:
+            logger.exception("exposure screenshots failed")
+            return []
+
+    nvd_fs, shot_fs, (l4_meta, nuc_findings) = await asyncio.gather(
+        _nvd_block(),
+        _shots_block(),
+        nuclei.run(httpx_urls, domain, settings),
+    )
+    if nvd_fs:
+        all_findings.extend(nvd_fs)
+    raw_layers["nvd_supply_chain_findings"] = len(nvd_fs)
+    if shot_fs:
+        all_findings.extend(shot_fs)
+    raw_layers["exposure_screenshots"] = len(shot_fs)
     raw_layers["nuclei"] = l4_meta
     all_findings.extend(nuc_findings)
 
-    interpreted = await openai_interpret.interpret_findings(all_findings, settings)
+    interpreted, paths = await asyncio.gather(
+        openai_interpret.interpret_findings(all_findings, settings),
+        attack_paths.compute_attack_paths(
+            domain=domain,
+            industry=industry,
+            company_name=company_name,
+            findings=all_findings,
+            settings=settings,
+        ),
+    )
     raw_layers["interpreted_count"] = len(interpreted)
     _merge_interpretations(all_findings, interpreted)
-
-    paths = await attack_paths.compute_attack_paths(
-        domain=domain,
-        industry=industry,
-        company_name=company_name,
-        findings=all_findings,
-        settings=settings,
-    )
     raw_layers["attack_paths_count"] = len(paths)
 
     score, grade, mult = compute_score(all_findings, industry)
@@ -385,8 +401,15 @@ async def run_scan_fast(
     started = _iso_now()
     raw_layers: dict[str, Any] = {}
 
-    l_sub = await subfinder.run(domain, settings)
+    l_sub_task = subfinder.run(domain, settings)
+    l7_task = email_security.analyze(domain)
+    l8_task = ssl_deep.analyze(domain)
+    l6_task = breach_monitoring.run_breach_layers(domain, settings)
+    l_sub, l7, l8, breach_summaries = await asyncio.gather(
+        l_sub_task, l7_task, l8_task, l6_task
+    )
     raw_layers["subfinder"] = l_sub
+    raw_layers["breach_monitoring"] = breach_summaries
     hosts = list(dict.fromkeys([domain] + (l_sub.get("hosts") or [])))
     naabu_hosts = _fast_path_naabu_hosts(hosts)
 
@@ -400,17 +423,11 @@ async def run_scan_fast(
             logger.warning("fast scan: naabu timed out for %s", domain)
             return {"tool": "naabu", "results": [], "note": "timeout"}
 
-    l7, l8, breach_summaries, l2 = await asyncio.gather(
-        email_security.analyze(domain),
-        ssl_deep.analyze(domain),
-        breach_monitoring.run_breach_layers(domain, settings),
-        _bounded_naabu(),
-    )
-    raw_layers["breach_monitoring"] = breach_summaries
+    l2 = await _bounded_naabu()
     raw_layers["naabu"] = l2
 
     naabu_results = l2.get("results") or []
-    targets = _urls_from_naabu(naabu_results)
+    targets = _urls_from_naabu(naabu_results, max_urls=36)
     if not targets:
         targets = [f"https://{domain}", f"http://{domain}"]
     targets = targets[:18]

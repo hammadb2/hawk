@@ -16,7 +16,8 @@ async def run(hosts: list[str], settings: Settings) -> dict:
     if not hosts:
         return {"tool": "naabu", "results": [], "note": "no hosts"}
     bin_path = tools.which_or_configured("naabu", settings.naabu_bin)
-    sample = hosts[:40]
+    cap = max(5, min(60, settings.naabu_max_hosts))
+    sample = hosts[:cap]
     code, out, err = -1, "", ""
     path = tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt")
     try:

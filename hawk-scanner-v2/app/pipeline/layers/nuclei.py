@@ -37,16 +37,17 @@ async def run(target_urls: list[str], domain: str, settings: Settings) -> tuple[
     if not target_urls:
         return {"tool": "nuclei", "skipped": True}, []
     bin_path = tools.which_or_configured("nuclei", settings.nuclei_bin)
+    nuc_cap = max(5, min(35, settings.nuclei_max_target_urls))
     argv = [
         bin_path,
         "-u",
-        ",".join(target_urls[:30]),
+        ",".join(target_urls[:nuc_cap]),
         "-jsonl",
         "-silent",
         "-timeout",
-        "8",
+        "6",
         "-rate-limit",
-        "50",
+        "80",
     ]
     if settings.nuclei_templates_dir:
         argv.extend(["-templates", settings.nuclei_templates_dir])

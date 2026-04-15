@@ -42,9 +42,14 @@ class Settings(BaseSettings):
     nuclei_bin: str = "nuclei"
     dnstwist_bin: str = "dnstwist"
 
-    # Time budget (seconds) — target total wall clock ~3–5 min
-    layer_timeout_sec: int = 90
+    # Time budget (seconds) — per subprocess layer; lower = fail faster under load
+    layer_timeout_sec: int = 72
     total_budget_sec: int = 300
+
+    # Breadth caps — lower values shorten wall clock (less host/url coverage)
+    naabu_max_hosts: int = 28
+    full_scan_target_url_cap: int = 55
+    nuclei_max_target_urls: int = 22
 
     # Nuclei
     nuclei_templates_dir: str = ""  # empty = default template path in image
