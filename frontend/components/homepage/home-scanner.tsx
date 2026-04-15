@@ -462,24 +462,38 @@ export function HomeScanner() {
           {(() => {
             const g = (result.grade || "F").toUpperCase().charAt(0);
             const sc = result.score ?? 0;
-            const harsh =
-              issues >= 3 || g === "C" || g === "D" || g === "F" || sc < 68;
-            if (harsh) {
+            // Issue count alone is a poor proxy: several low findings can still yield A/B. Tie alarm copy to grade+score.
+            const critical =
+              g === "D" || g === "F" || sc < 56 || (g === "C" && sc < 62);
+            const elevated =
+              !critical &&
+              (g === "C" || sc < 72 || (issues >= 5 && sc < 82 && g !== "A"));
+            if (critical) {
               return (
                 <div className="rounded-xl border border-rose-500/80 bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-950 shadow-sm sm:text-[15px]">
-                  <strong className="font-semibold">This is what risk looks like from the outside.</strong> We counted{" "}
-                  <strong>{issues}</strong> externally visible issue{issues === 1 ? "" : "s"} on{" "}
-                  <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span>. Criminal tooling and
-                  ransomware affiliates harvest exactly this class of signal before anyone sends you a polite email. The
-                  question is whether you fix it here — or under pressure with lawyers and insurers in the room.
+                  <strong className="font-semibold">This is what serious exposure looks like from the outside.</strong> We
+                  counted <strong>{issues}</strong> externally visible issue{issues === 1 ? "" : "s"} on{" "}
+                  <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span> — and your score still
+                  landed in a range where criminals and insurers treat you as an easier target. Fix it here, not under
+                  incident-response pressure.
+                </div>
+              );
+            }
+            if (elevated) {
+              return (
+                <div className="rounded-xl border border-amber-500/80 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 shadow-sm sm:text-[15px]">
+                  <strong className="font-semibold">Real issues — not a crisis letter — yet.</strong> We flagged{" "}
+                  <strong>{issues}</strong> item{issues === 1 ? "" : "s"} worth tightening on{" "}
+                  <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span>. Your grade still has
+                  headroom, which is good; the point is to clear the list before low severity turns into headline severity.
                 </div>
               );
             }
             return (
               <div className="rounded-xl border border-amber-400/80 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 shadow-sm sm:text-[15px]">
-                <strong className="font-semibold">Do not confuse a calmer grade with safety.</strong> This pass did not
-                light up as many urgent items as we often see — but your perimeter is still probed constantly. Signing up
-                means we watch it when you are busy running the business.
+                <strong className="font-semibold">Strong surface score — still not invincible.</strong> Bots do not care
+                about your {g === "A" || g === "B" ? `grade ${g}` : "score"}; they probe everyone. Shield keeps watching when you are busy
+                running the business.
               </div>
             );
           })()}
