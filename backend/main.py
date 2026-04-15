@@ -27,6 +27,7 @@ from routers import (
     crm_payment,
     crm_portal_api,
     crm_scale,
+    crm_team_docs,
     crm_va,
     crm_webhooks,
     monitor,
@@ -81,6 +82,7 @@ app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
 app.include_router(crm_payment.router)
 app.include_router(crm_va.router)
+app.include_router(crm_team_docs.router)
 app.include_router(monitor.router)
 
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { ProfileTabs } from "@/components/crm/profile/profile-tabs";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import type { VaProfile, VaDailyReport, VaScore, VaCoachingNote } from "@/lib/crm/types";
 
@@ -19,6 +20,7 @@ export default function VaProfilePage() {
   const [scores, setScores] = useState<VaScore[]>([]);
   const [notes, setNotes] = useState<VaCoachingNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vaProfileId, setVaProfileId] = useState<string | null>(null);
 
   /* coaching note form */
   const [noteText, setNoteText] = useState("");
@@ -38,10 +40,22 @@ export default function VaProfilePage() {
       supabase.from("va_scores").select("*").eq("va_id", id).order("week_start", { ascending: false }).limit(12),
       supabase.from("va_coaching_notes").select("*").eq("va_id", id).order("created_at", { ascending: false }).limit(50),
     ]);
-    setVa((vpRes.data as VaProfile) ?? null);
+    const vaRow = (vpRes.data as VaProfile) ?? null;
+    setVa(vaRow);
     setReports((drRes.data ?? []) as VaDailyReport[]);
     setScores((scRes.data ?? []) as VaScore[]);
     setNotes((cnRes.data ?? []) as VaCoachingNote[]);
+    /* Resolve the profiles.id from va_profiles.user_id so ProfileTabs can query by profile_id */
+    if (vaRow?.user_id) {
+      const { data: profRow } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", vaRow.user_id)
+        .maybeSingle();
+      setVaProfileId((profRow as { id: string } | null)?.id ?? null);
+    } else {
+      setVaProfileId(null);
+    }
     setLoading(false);
   }, [id, supabase]);
 
@@ -286,6 +300,28 @@ export default function VaProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Profile tabs (Details / Documents / Bank Details) */}
+      {vaProfileId && (() => {
+        const isCeo = myProfile.role === "ceo";
+        const isHos = myProfile.role === "hos";
+        const isVaManager = myProfile.role_type === "va_manager";
+        const isOwn = session?.user?.id === va.user_id;
+        const canEdit = isOwn || isCeo || isHos || isVaManager;
+        const showBankDetails = isOwn || isCeo || isHos || isVaManager;
+        const canDeleteDocs = isCeo;
+        return (
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h2 className="mb-3 text-sm font-semibold text-slate-800">Profile &amp; Documents</h2>
+            <ProfileTabs
+              targetProfileId={vaProfileId}
+              canEdit={canEdit}
+              showBankDetails={showBankDetails}
+              canDeleteDocs={canDeleteDocs}
+            />
+          </div>
+        );
+      })()}
 
       {/* Coaching notes */}
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">

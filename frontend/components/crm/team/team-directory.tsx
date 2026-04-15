@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
@@ -24,7 +25,7 @@ function roleLabel(r: string): string {
 
 export function TeamDirectory() {
   const supabase = useMemo(() => createClient(), []);
-  const { authReady, session, profile } = useCrmAuth();
+  const { authReady, profileFetched, session, profile } = useCrmAuth();
   const [rows, setRows] = useState<Profile[]>([]);
   const [tlNames, setTlNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -188,10 +189,18 @@ export function TeamDirectory() {
     }
   }
 
-  if (!authReady || !session || !profile) {
+  if (!authReady || !profileFetched) {
     return (
       <div className="flex min-h-[200px] items-center justify-center text-slate-600">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  if (!session || !profile) {
+    return (
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-6 text-sm text-amber-700">
+        Please sign in to view the team directory.
       </div>
     );
   }
@@ -377,7 +386,11 @@ export function TeamDirectory() {
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
-                  <td className="px-3 py-2 font-medium text-slate-900">{p.full_name ?? "—"}</td>
+                  <td className="px-3 py-2 font-medium text-slate-900">
+                    <Link href={`/crm/team/${p.id}`} className="text-emerald-600 hover:underline">
+                      {p.full_name ?? "—"}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2 text-slate-600">{p.email ?? "—"}</td>
                   <td className="px-3 py-2 capitalize text-slate-700">{roleLabel(p.role)}</td>
                   <td className="px-3 py-2 text-slate-600">

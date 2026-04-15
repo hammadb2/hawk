@@ -114,6 +114,49 @@ export type VaAlert = {
   created_at: string;
 };
 
+/* ---------- Team document / profile types ---------- */
+
+export type TeamDocumentType = "contract" | "id" | "nda" | "other";
+export type PaymentMethod = "wise" | "paypal" | "bank_transfer" | "gcash" | "other";
+
+export type TeamDocument = {
+  id: string;
+  profile_id: string;
+  document_type: TeamDocumentType;
+  file_name: string;
+  file_url: string;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamBankDetails = {
+  id: string;
+  profile_id: string;
+  full_name: string | null;
+  bank_name: string | null;
+  account_number: string | null;
+  routing_or_swift: string | null;
+  payment_method: PaymentMethod;
+  payment_notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamPersonalDetails = {
+  id: string;
+  profile_id: string;
+  phone_number: string | null;
+  whatsapp_number: string | null;
+  address: string | null;
+  country: string | null;
+  date_of_birth: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProspectStage =
   | "new"
   | "scanned"
