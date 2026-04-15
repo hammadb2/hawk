@@ -83,19 +83,19 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
 }
 
 const PROGRESS_LINES = [
-  { text: "Email & identity spoofing surface (DMARC / SPF / DKIM)…", emoji: "✉️" },
-  { text: "TLS, certificate chain, and downgrade paths…", emoji: "🔐" },
-  { text: "Subdomains, high-risk ports, and live HTTP exposure…", emoji: "🌐" },
-  { text: "Breach, stealer, and leaked-credential signals…", emoji: "🧾" },
-  { text: "Template-based vulnerability probes (where enabled)…", emoji: "⚡" },
-  { text: "Scoring how an opportunistic attacker would prioritize you…", emoji: "🎯" },
+  { text: "How criminals spoof your brand and hijack your inbox (DMARC / SPF / DKIM)…", emoji: "✉️" },
+  { text: "Where TLS breaks — and where attackers downgrade or intercept traffic…", emoji: "🔐" },
+  { text: "Every hostname and risky port the internet can reach without your VPN…", emoji: "🌐" },
+  { text: "Leaked passwords, stealer dumps, and breach history tied to your footprint…", emoji: "🧾" },
+  { text: "Automated exploit templates — the same class of checks attackers run at scale…", emoji: "⚡" },
+  { text: "How an opportunistic attacker would rank you vs the business next door…", emoji: "🎯" },
 ];
 
 const WAITING_TIPS = [
-  "This is the same externally visible data ransomware crews harvest before they send the first phishing wave.",
-  "Most SMB incidents start with a small, public misconfiguration — not a Hollywood zero-day.",
-  "A longer run usually means we are pulling more corroborating sources, not skipping checks.",
-  "If your score looks harsh, that is the point: we would rather you fix it here than in incident response billing.",
+  "Bots and affiliate crews do not sleep. They run this same class of checks against thousands of domains a night.",
+  "Most breaches you read about started with something boring and public: mail, TLS, or a forgotten subdomain.",
+  "If this feels slow, it is because we are stacking evidence — not giving you a green checkmark from a DNS ping.",
+  "Uncomfortable results are a gift. Incident response invoices are worse.",
 ];
 
 function GlobeIcon({ className }: { className?: string }) {
@@ -288,7 +288,7 @@ export function HomeScanner() {
             disabled={phase === "scanning" || !canSubmit}
             className="h-14 shrink-0 rounded-xl px-6 font-semibold text-white shadow-md transition-transform active:scale-[0.98] sm:h-[3.25rem] sm:min-w-[200px] sm:self-end"
           >
-            {phase === "scanning" ? "Scanning…" : "Run full exposure scan"}
+            {phase === "scanning" ? "Scanning…" : "Expose my surface"}
           </Button>
         </div>
       </div>
@@ -343,7 +343,7 @@ export function HomeScanner() {
                   Scanning <span className="text-accent">{preview || "your domain"}</span>
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Full-depth exposure pass (all layers) — usually 45s–3 min. We would rather be thorough than polite.
+                  Full-depth pass — usually 45s–3 min. Attackers are not polite either; we match their visibility.
                 </p>
                 <AnimatePresence mode="wait">
                   <motion.p
@@ -415,17 +415,14 @@ export function HomeScanner() {
         <div className="mt-10 space-y-4 rounded-xl border border-slate-200 bg-white p-6">
           {scanFailed ? (
             <p className="text-slate-600 leading-relaxed">
-              We could not finish the instant preview. Enter your email and we will run your scan and send the full report shortly.
+              We could not finish the live preview. Drop your email — we will run the full pass and send what attackers would see on your perimeter.
             </p>
           ) : (
             <p className="text-slate-900 leading-relaxed">
-              Our scanner is running your full analysis.
+              Your scan is still running — the ugly stuff takes longer than a fake instant score.
               <br />
               <br />
-              This takes a few minutes for a thorough check.
-              <br />
-              <br />
-              Enter your email and we will send you the complete report the moment it is ready.
+              Leave your email and we will send the full breakdown the moment it is ready. No account required to get the bad news.
             </p>
           )}
           {emailSentSlow ? (
@@ -443,7 +440,7 @@ export function HomeScanner() {
                 className="h-12 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
               <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
-                Send Me The Results
+                Email me the damage
               </Button>
             </form>
           )}
@@ -460,15 +457,24 @@ export function HomeScanner() {
           {(() => {
             const g = (result.grade || "F").toUpperCase().charAt(0);
             const sc = result.score ?? 0;
-            const harsh = issues >= 4 || g === "D" || g === "F" || sc < 58;
-            if (!harsh) return null;
+            const harsh =
+              issues >= 3 || g === "C" || g === "D" || g === "F" || sc < 68;
+            if (harsh) {
+              return (
+                <div className="rounded-xl border border-rose-500/80 bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-950 shadow-sm sm:text-[15px]">
+                  <strong className="font-semibold">This is what risk looks like from the outside.</strong> We counted{" "}
+                  <strong>{issues}</strong> externally visible issue{issues === 1 ? "" : "s"} on{" "}
+                  <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span>. Criminal tooling and
+                  ransomware affiliates harvest exactly this class of signal before anyone sends you a polite email. The
+                  question is whether you fix it here — or under pressure with lawyers and insurers in the room.
+                </div>
+              );
+            }
             return (
-              <div className="rounded-xl border border-rose-400/70 bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-950 shadow-sm sm:text-[15px]">
-                <strong className="font-semibold">High-friction snapshot.</strong> We flagged{" "}
-                <strong>{issues}</strong> non-trivial exposure{issues === 1 ? "" : "s"} on the public internet for{" "}
-                <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span>. That is the same
-                surface ransomware affiliates harvest before they ever email you — and insurers ask about after an
-                incident.
+              <div className="rounded-xl border border-amber-400/80 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 shadow-sm sm:text-[15px]">
+                <strong className="font-semibold">Do not confuse a calmer grade with safety.</strong> This pass did not
+                light up as many urgent items as we often see — but your perimeter is still probed constantly. Signing up
+                means we watch it when you are busy running the business.
               </div>
             );
           })()}
@@ -481,7 +487,8 @@ export function HomeScanner() {
                 {result.grade || "—"}
               </p>
               <p className="mt-2 text-sm text-slate-600">
-                Full public pass — HAWK Engine {result.scan_version ?? "2.1"} (this run is not a toy DNS ping).
+                All of this is visible to anyone on the internet — no VPN, no insider access. HAWK Engine{" "}
+                {result.scan_version ?? "2.1"}.
               </p>
             </div>
           </div>
@@ -490,11 +497,11 @@ export function HomeScanner() {
             <div className="grid gap-3 sm:grid-cols-2">
               {result.breach_baseline_usd != null && (
                 <div className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
-                  <p className="font-semibold text-amber-900">Breach cost context</p>
+                  <p className="font-semibold text-amber-900">What one bad day can cost</p>
                   <p className="mt-1 leading-relaxed">
                     Sector-style incident baseline (IBM-style averages):{" "}
-                    <strong>{formatUsdShort(result.breach_baseline_usd)}</strong>. One successful breach usually costs
-                    more than years of prevention.
+                    <strong>{formatUsdShort(result.breach_baseline_usd)}</strong>. One successful hit usually dwarfs
+                    years of prevention — and that is before reputational damage.
                   </p>
                 </div>
               )}
@@ -527,14 +534,16 @@ export function HomeScanner() {
           <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-white to-slate-100/90 p-5 shadow-lg sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-accent">Stop hoping nothing happens</p>
-                <h3 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">Turn this snapshot into continuous protection</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent">They will not wait for you</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
+                  You already saw the cracks — now get Shield before someone else drives a truck through them
+                </h3>
                 <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
-                  The scan you just ran is real signal — not a vanity widget. Shield keeps{" "}
-                  <strong className="text-slate-900">Nuclei-grade templates</strong>,{" "}
-                  <strong className="text-slate-900">lookalike domains</strong>, scheduled re-tests, and the breach-response
-                  guarantee in writing so when a regulator or client asks &quot;what do you do after you get hit?&quot; you
-                  have an answer.
+                  Free scan ends at this screen. Shield runs{" "}
+                  <strong className="text-slate-900">continuous Nuclei-grade checks</strong>,{" "}
+                  <strong className="text-slate-900">lookalike domain monitoring</strong>, scheduled re-tests, and a
+                  breach-response guarantee in writing — so the next time your gut drops reading a headline, you already
+                  have a plan.
                 </p>
               </div>
             </div>
@@ -563,19 +572,19 @@ export function HomeScanner() {
                 asChild
                 className="h-12 flex-1 rounded-xl font-semibold text-white shadow-md bg-accent hover:bg-accent/90"
               >
-                <Link href="/portal/login?next=%2Fportal%2Fbilling%3Fplan%3Dshield">Start Shield — most popular</Link>
+                <Link href="/portal/login?next=%2Fportal%2Fbilling%3Fplan%3Dshield">Get Shield — lock this down</Link>
               </Button>
               <Button asChild variant="outline" className="h-12 flex-1 rounded-xl border-slate-200 bg-white font-semibold text-slate-900 hover:bg-slate-50">
-                <Link href="#pricing">Compare all plans</Link>
+                <Link href="#pricing">See plans & pricing</Link>
               </Button>
             </div>
           </div>
 
           <div>
-            <h3 className="mb-1 text-lg font-semibold text-slate-900">What we already see on {result.domain || dnorm}</h3>
+            <h3 className="mb-1 text-lg font-semibold text-slate-900">What strangers can already use against {result.domain || dnorm}</h3>
             <p className="mb-4 text-sm text-slate-600">
-              Six highest-priority signals (worst first). Anything in red or amber should be treated as incident-prevention
-              work, not &quot;nice to have&quot; hygiene.
+              Worst first. Red and amber rows are not hygiene projects — they are how an attacker shortlists you. Fix
+              them before you are answering uncomfortable questions from a client or regulator.
             </p>
             <ul className="space-y-3">
               {previewRows.slice(0, 6).map((row, i) => (
@@ -592,14 +601,17 @@ export function HomeScanner() {
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <p className="text-slate-900 leading-relaxed">
               <strong>{issues}</strong> externally visible security issue{issues === 1 ? "" : "s"} on{" "}
-              <span className="font-mono text-sm">{result.domain || dnorm}</span> — before you spend another dollar on ads
-              or headcount, close what strangers can already exploit for free.
+              <span className="font-mono text-sm">{result.domain || dnorm}</span>. While you read this, automated tooling
+              is still hammering the same URLs. Every day you wait is a day someone else might move first.
               <br />
               <br />
-              We are queuing the expanded write-up with remediation you can hand to IT or your MSP.
+              We will send the expanded write-up with remediation you can hand to IT or your MSP — the version we do not
+              put on a public webpage.
               <br />
               <br />
-              Drop your work email — we will send the full report shortly. No spam. No cold calls unless you ask.
+              <strong>Work email below.</strong> We send the report. No spam. No cold calls unless you ask. Or skip the
+              inbox and <Link href="/portal/login" className="font-semibold text-accent underline-offset-2 hover:underline">create an account</Link>{" "}
+              and go straight to Shield.
             </p>
             {emailSent ? (
               <p className="mt-4 text-sm text-accent font-medium">
@@ -616,7 +628,7 @@ export function HomeScanner() {
                   className="h-12 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
                 />
                 <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
-                  Send Me The Full Report
+                  Send the full report — free
                 </Button>
               </form>
             )}

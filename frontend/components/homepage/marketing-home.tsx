@@ -15,7 +15,7 @@ function NavScanButton({ className }: { className?: string }) {
       href="#scan"
       className={`${className} bg-accent hover:bg-accent/90 text-white shadow-sm transition-colors`}
     >
-      Scan My Domain Free
+      See what attackers see
     </a>
   );
 }
@@ -66,16 +66,16 @@ export function MarketingHome() {
         <section id="scan" className="scroll-mt-28 bg-white border-b border-slate-200 px-4 py-20 sm:px-6 sm:py-32">
           <div className="mx-auto max-w-4xl text-center">
             <h1 className="text-balance text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
-              Your business has security vulnerabilities right now. Here is what attackers can see.
+              Strangers can probe your business for free, right now. Most owners do not know what is exposed.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-slate-600 sm:text-xl">
-              HAWK monitors and tests Canadian small businesses daily. Follow our recommendations and if you still get breached — we cover the response costs. In writing. No other company will say that.
+              Run one scan. Watch the same signals ransomware crews and credential-stuffing bots harvest before they ever email you. Then get continuous monitoring and a breach-response guarantee in writing — because hoping nobody notices is not a plan.
             </p>
             <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-xl backdrop-blur-sm sm:p-6">
               <HomeScanner />
             </div>
             <p className="mx-auto mt-8 max-w-lg text-sm leading-relaxed text-slate-500">
-              No account required · Results in seconds · Used by dental clinics, law firms & accountants across Canada
+              No account required · Real external scan · If it stings, that is the point — then sign up and we help you fix it
             </p>
           </div>
         </section>
