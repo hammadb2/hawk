@@ -33,7 +33,7 @@ export function TeamDirectory() {
   const [form, setForm] = useState({
     email: "",
     full_name: "",
-    role: "sales_rep" as "sales_rep" | "team_lead",
+    role: "sales_rep" as "sales_rep" | "team_lead" | "va_manager" | "va",
     whatsapp_number: "",
     team_lead_id: "",
   });
@@ -234,10 +234,12 @@ export function TeamDirectory() {
               <select
                 className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
                 value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as "sales_rep" | "team_lead" }))}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as "sales_rep" | "team_lead" | "va_manager" | "va" }))}
               >
                 <option value="sales_rep">Sales rep</option>
                 <option value="team_lead">Team lead</option>
+                <option value="va_manager">VA Manager</option>
+                <option value="va">VA</option>
               </select>
             </div>
             <div>
