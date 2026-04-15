@@ -91,10 +91,14 @@ const PROGRESS_LINES = [
   { text: "How an opportunistic attacker would rank you vs the business next door…", emoji: "🎯" },
 ];
 
+/** Homepage uses fast scan — keep progress animation aligned with typical wall clock. */
+const HOME_SCAN_TICK_MS = 700;
+const HOME_SCAN_SLOW_LEAD_MS = 22_000;
+
 const WAITING_TIPS = [
   "Bots and affiliate crews do not sleep. They run this same class of checks against thousands of domains a night.",
   "Most breaches you read about started with something boring and public: mail, TLS, or a forgotten subdomain.",
-  "If this feels slow, it is because we are stacking evidence — not giving you a green checkmark from a DNS ping.",
+  "This pass skips the slowest deep probes so you get signal now — upgrade for continuous full-template coverage.",
   "Uncomfortable results are a gift. Incident response invoices are worse.",
 ];
 
@@ -152,7 +156,7 @@ export function HomeScanner() {
     if (phase !== "scanning") return;
     const id = setInterval(() => {
       setTipIndex((i) => (i + 1) % WAITING_TIPS.length);
-    }, 3800);
+    }, 5200);
     return () => clearInterval(id);
   }, [phase]);
 
@@ -172,14 +176,14 @@ export function HomeScanner() {
 
     slowTimerRef.current = setTimeout(() => {
       if (!resultRef.current) setShowSlowLead(true);
-    }, 42000);
+    }, HOME_SCAN_SLOW_LEAD_MS);
 
     const tick = setInterval(() => {
       setTickSlot((s) => Math.min(s + 1, 40));
-    }, 2400);
+    }, HOME_SCAN_TICK_MS);
 
     try {
-      const res = await scansApi.startPublic({ domain: d, scan_depth: "full" });
+      const res = await scansApi.startPublic({ domain: d, scan_depth: "fast" });
       resultRef.current = res;
       setResult(res);
       setShowSlowLead(false);
@@ -235,7 +239,7 @@ export function HomeScanner() {
   };
 
   const progressPct =
-    phase === "scanning" ? Math.min(94, 6 + tickSlot * 2.2 + (tickSlot > 12 ? 8 : 0)) : 100;
+    phase === "scanning" ? Math.min(94, 8 + tickSlot * 3.4 + (tickSlot > 10 ? 10 : 0)) : 100;
 
   return (
     <div className="w-full max-w-xl mx-auto px-1 sm:px-0">
@@ -343,7 +347,8 @@ export function HomeScanner() {
                   Scanning <span className="text-accent">{preview || "your domain"}</span>
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Full-depth pass — usually 45s–3 min. Attackers are not polite either; we match their visibility.
+                  Fast exposure pass — usually under a minute. Same mail, TLS, breach, and surface signals attackers
+                  start from; Shield adds continuous deep scans.
                 </p>
                 <AnimatePresence mode="wait">
                   <motion.p
@@ -609,13 +614,16 @@ export function HomeScanner() {
               put on a public webpage.
               <br />
               <br />
-              <strong>Work email below.</strong> We send the report. No spam. No cold calls unless you ask. Or skip the
-              inbox and <Link href="/portal/login" className="font-semibold text-accent underline-offset-2 hover:underline">create an account</Link>{" "}
+              <strong>Work email below.</strong> We send the expanded report (adds slower deep checks). No spam. No cold
+              calls unless you ask. Or skip the inbox and{" "}
+              <Link href="/portal/login" className="font-semibold text-accent underline-offset-2 hover:underline">
+                create an account
+              </Link>{" "}
               and go straight to Shield.
             </p>
             {emailSent ? (
               <p className="mt-4 text-sm text-accent font-medium">
-                Check your inbox in 5 minutes. We are running your full security analysis now.
+                Check your inbox shortly — we are queuing the full write-up with deep probes now.
               </p>
             ) : (
               <form onSubmit={onSubmitMainEmail} className="mt-6 flex flex-col gap-3 sm:flex-row">
