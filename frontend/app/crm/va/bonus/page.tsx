@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useCrmAuth } from "@/components/crm/auth/crm-auth-context";
+import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import Link from "next/link";
 
 interface BonusMonth {
