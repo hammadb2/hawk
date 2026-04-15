@@ -115,7 +115,7 @@ export function CeoLiveDashboard({
       if (!latestByVa.has(row.va_id)) latestByVa.set(row.va_id, row.standing);
     }
     const vaStandings: VaStandingSummary = { green: 0, yellow: 0, red: 0 };
-    for (const st of latestByVa.values()) {
+    for (const st of Array.from(latestByVa.values())) {
       if (st === "green") vaStandings.green++;
       else if (st === "yellow") vaStandings.yellow++;
       else if (st === "red") vaStandings.red++;
