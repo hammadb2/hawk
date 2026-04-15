@@ -22,7 +22,7 @@ Or from `backend/`: `python main.py` (reload on port 8000).
 - `HAWK_SCANNER_RELAY_URL` — Scanner service base URL (backend appends `/scan`, `/v1/scan/async`, `/v1/jobs/{id}`). Set on Railway **hawk-production** to your **hawk-scanner-v2** URL (HTTPS, no path).
 - `HAWK_SCANNER_TIMEOUT` — **Set `300` on Railway hawk-production** (seconds) so sync `/scan` calls used by legacy paths don’t abort before the worker finishes; CRM uses async queue + short API calls.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` — Stripe.
-- `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` — Ask HAWK (DeepSeek R1).
+- `OPENAI_API_KEY`, `OPENAI_MODEL` — Ask HAWK and other OpenAI-backed features (portal advisor, Charlotte, etc.).
 - `HAWK_BASE_URL` — Frontend URL for Stripe redirects (default `https://securedbyhawk.com`).
 
 ## Endpoints

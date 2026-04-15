@@ -241,7 +241,7 @@ def charlotte_daily_run(
 ):
     """
     Charlotte automation — daily ~8am MST via cron-job.org:
-    Apollo (200) → ZeroBounce → suppressions + CRM dedupe → Scanner (10 concurrent) → Claude → Smartlead → charlotte_runs + CEO SMS (OpenPhone).
+    Apollo (200) → ZeroBounce → suppressions + CRM dedupe → Scanner (10 concurrent) → OpenAI → Smartlead → charlotte_runs + CEO SMS (OpenPhone).
 
     Header: X-Cron-Secret (same as other CRM crons: HAWK_CRM_CRON_SECRET / HAWK_CRON_SECRET / CRON_SECRET).
     Set CHARLOTTE_AUTOMATION_DRY_RUN=1 on the API to skip external calls (smoke test).
@@ -281,7 +281,7 @@ def weekly_threat_digest(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
     """
-    Phase 2 — Weekly AI threat briefing (Claude) per portal client; email + portal.
+    Phase 2 — Weekly AI threat briefing (OpenAI) per portal client; email + portal.
     Schedule: Mondays ~14:00 UTC (~7am America/Edmonton MST in winter). Same secret as other CRM crons.
     """
     _require_secret(x_cron_secret)
@@ -374,7 +374,7 @@ def enterprise_domain_scans_cron(
 def weekly_attacker_simulation_cron(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
-    """Phase 4 — Monday narrative: Claude attacker simulation → client_attacker_simulation_reports."""
+    """Phase 4 — Monday narrative: OpenAI attacker simulation → client_attacker_simulation_reports."""
     _require_secret(x_cron_secret)
     try:
         return run_weekly_attacker_simulations()

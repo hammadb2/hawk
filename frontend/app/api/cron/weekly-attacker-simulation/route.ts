@@ -14,7 +14,7 @@ function cronAuthorized(request: Request): boolean {
   return false;
 }
 
-/** Weekly Claude attacker simulation → client_attacker_simulation_reports (Phase 4). */
+/** Weekly OpenAI attacker simulation → client_attacker_simulation_reports (Phase 4). */
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

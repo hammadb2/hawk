@@ -1,5 +1,5 @@
 """
-Charlotte daily automation: Apollo → ZeroBounce → suppressions / CRM dedupe → Scanner → Claude → Smartlead → Supabase log → CEO WhatsApp.
+Charlotte daily automation: Apollo → ZeroBounce → suppressions / CRM dedupe → Scanner → OpenAI → Smartlead → Supabase log → CEO WhatsApp.
 
 Triggered by POST /api/crm/cron/charlotte-run (X-Cron-Secret).
 Set CHARLOTTE_AUTOMATION_DRY_RUN=1 to skip external APIs (smoke test structure only).
@@ -18,6 +18,10 @@ from typing import Any
 
 import httpx
 
+from config import OPENAI_MODEL
+
+from services.openai_chat import chat_text_async
+
 logger = logging.getLogger(__name__)
 
 MST = zoneinfo.ZoneInfo("America/Edmonton")
@@ -26,7 +30,9 @@ APOLLO_BASE = os.environ.get("APOLLO_API_BASE", "https://api.apollo.io/api/v1").
 SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.ai/api/v1").rstrip("/")
 ZEROBOUNCE_VALIDATE = "https://api.zerobounce.net/v2/validate"
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CHARLOTTE_OPENAI_MODEL = (
+    os.environ.get("CHARLOTTE_OPENAI_MODEL", "").strip() or OPENAI_MODEL
+)
 SCAN_TIMEOUT = 120.0
 MAX_TOKENS = 500
 SCAN_CONCURRENCY = 10
@@ -659,8 +665,8 @@ async def _scan_one(
             return None
 
 
-async def _claude_one(
-    client: Any, row: dict[str, Any], scan: dict[str, Any], vertical_label: str
+async def _openai_email_one(
+    openai_key: str, row: dict[str, Any], scan: dict[str, Any], vertical_label: str
 ) -> dict[str, str] | None:
     findings_raw = scan.get("findings") or []
     findings = [dict(f) for f in findings_raw if isinstance(f, dict)]
@@ -693,15 +699,13 @@ async def _claude_one(
     )
     for attempt in range(2):
         try:
-            msg = await client.messages.create(
-                model=CLAUDE_MODEL,
+            text = await chat_text_async(
+                api_key=openai_key,
+                system=None,
+                user_messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS,
-                messages=[{"role": "user", "content": prompt}],
+                model=CHARLOTTE_OPENAI_MODEL,
             )
-            text = ""
-            for block in msg.content:
-                if block.type == "text":
-                    text += block.text
             parsed = _parse_claude_json(text)
             if parsed:
                 parsed["subject"] = _sanitize_no_hyphens(parsed["subject"])
@@ -712,7 +716,7 @@ async def _claude_one(
         except Exception as e:
             if attempt == 0:
                 continue
-            logger.warning("Claude failed: %s", e)
+            logger.warning("OpenAI email generation failed: %s", e)
             return None
     return None
 
@@ -793,12 +797,9 @@ def _sequence_bodies(
 async def _process_pipeline_async(
     leads: list[dict[str, Any]],
     vertical_label: str,
-    anthropic_key: str,
+    openai_key: str,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Scan up to SCAN_CONCURRENCY in parallel; then Claude + validation per successful scan."""
-    import anthropic
-
-    ac = anthropic.AsyncAnthropic(api_key=anthropic_key)
+    """Scan up to SCAN_CONCURRENCY in parallel; then OpenAI + validation per successful scan."""
     sem = asyncio.Semaphore(SCAN_CONCURRENCY)
     counts = {
         "domains_scanned": 0,
@@ -825,7 +826,7 @@ async def _process_pipeline_async(
                 counts["scan_skipped"] += 1
                 continue
             counts["domains_scanned"] += 1
-            ce = await _claude_one(ac, row, scan, vertical_label)
+            ce = await _openai_email_one(openai_key, row, scan, vertical_label)
             if not ce:
                 counts["email_failed"] += 1
                 continue
@@ -847,7 +848,7 @@ def run_charlotte_daily() -> dict[str, Any]:
     zb_key = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
     sl_key = os.environ.get("SMARTLEAD_API_KEY", "").strip()
     sl_cid = os.environ.get("SMARTLEAD_CAMPAIGN_ID", "").strip()
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
     stats = {
         "ok": True,
@@ -881,11 +882,11 @@ def run_charlotte_daily() -> dict[str, Any]:
         _ceo_sms_summary(stats)
         return stats
 
-    if not apollo_key or not zb_key or not sl_key or not anthropic_key:
+    if not apollo_key or not zb_key or not sl_key or not openai_key:
         return {
             **stats,
             "ok": False,
-            "error": "Missing APOLLO_API_KEY, ZEROBOUNCE_API_KEY, SMARTLEAD_API_KEY, or ANTHROPIC_API_KEY",
+            "error": "Missing APOLLO_API_KEY, ZEROBOUNCE_API_KEY, SMARTLEAD_API_KEY, or OPENAI_API_KEY",
         }
 
     if not sl_cid:
@@ -952,9 +953,9 @@ def run_charlotte_daily() -> dict[str, Any]:
 
     stats["emails_suppressed"] = sup_count
 
-    # Scan + Claude (async)
+    # Scan + OpenAI (async)
     enriched, counts = asyncio.run(
-        _process_pipeline_async(ready, industry_cfg["label"], anthropic_key)
+        _process_pipeline_async(ready, industry_cfg["label"], openai_key)
     )
     stats["domains_scanned"] = counts["domains_scanned"]
     stats["scan_failures"] = counts["scan_failures"]

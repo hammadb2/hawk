@@ -12,6 +12,10 @@ class ScanStartRequest(BaseModel):
         default=None,
         description="fast (Charlotte-tier, quicker) or full (all layers). Omitted on /api/scan/public defaults to full.",
     )
+    remediation_acknowledged: bool = Field(
+        default=False,
+        description="Authenticated scans only: attest fixes applied for certified (relaxed-floor) scoring.",
+    )
 
 
 class ScanEnqueueRequest(BaseModel):

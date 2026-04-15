@@ -73,7 +73,7 @@ def _run_peer_scan_scores(domains: list[str]) -> tuple[list[float], list[str]]:
     kept: list[str] = []
     for d in domains:
         try:
-            r = run_scan(d, scan_id=None, scan_depth="fast")
+            r = run_scan(d, scan_id=None, scan_depth="fast", trust_level="public")
             s = r.get("score")
             if isinstance(s, (int, float)):
                 scores.append(float(s))
@@ -143,7 +143,7 @@ def portal_chat(body: PortalChatBody, uid: str = Depends(require_supabase_uid)):
 
 @router.get("/attack-paths")
 def portal_attack_paths(uid: str = Depends(require_supabase_uid)):
-    """Latest scan: Claude-derived attack path chains (same data as CRM scan view)."""
+    """Latest scan: LLM-derived attack path chains (same data as CRM scan view)."""
     bundle = load_portal_client_bundle(uid)
     if not bundle:
         raise HTTPException(status_code=404, detail="Portal profile not found")

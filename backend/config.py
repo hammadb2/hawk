@@ -59,7 +59,11 @@ STRIPE_PRICE_SHIELD_TEST = os.environ.get("STRIPE_PRICE_SHIELD_TEST", "").strip(
 # Shield onboarding — booking link in WhatsApp / email (Cal.com or similar)
 CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "https://cal.com").strip().rstrip("/")
 
-# DeepSeek (Ask HAWK)
+# OpenAI — portal AI, Charlotte emails, attacker simulation, Ask HAWK, scanner interpretation (when wired to API)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
+
+# Legacy DeepSeek (optional; Ask HAWK uses OpenAI when OPENAI_API_KEY is set)
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_CHAT_MODEL = "deepseek-chat"
@@ -76,8 +80,7 @@ BASE_URL = os.environ.get("HAWK_BASE_URL", DEFAULT_PUBLIC_SITE_URL).strip().rstr
 # HaveIBeenPwned (breach check)
 HIBP_API_KEY = os.environ.get("HIBP_API_KEY", "")
 
-# Optional — wire when used (CRM/AI integrations)
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+# Optional — CRM integrations
 SMARTLEAD_API_KEY = os.environ.get("SMARTLEAD_API_KEY", "")
 
 # CRM (Supabase Auth JWT for FastAPI — same as Dashboard > Settings > API > JWT Secret)

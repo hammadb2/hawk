@@ -1,4 +1,4 @@
-"""Phase 4 — Weekly attacker-style narrative for portal clients (Claude)."""
+"""Phase 4 — Weekly attacker-style narrative for portal clients (OpenAI)."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-import anthropic
 import httpx
 
-from config import ANTHROPIC_API_KEY
+from config import OPENAI_API_KEY
+from services.openai_chat import chat_text_sync
 from services.portal_ai import (
-    CLAUDE_MODEL,
+    PORTAL_LLM_MODEL,
     _findings_for_prompt,
     load_portal_client_bundle_by_client_id,
     monday_week_start,
@@ -53,16 +53,13 @@ def _generate_body_md(bundle: dict[str, Any]) -> tuple[str, str]:
         "Use short bullets where helpful. Stay under 900 words."
     )
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY or "")
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
+    text = chat_text_sync(
+        api_key=OPENAI_API_KEY,
+        system=None,
+        user_messages=[{"role": "user", "content": prompt}],
         max_tokens=2200,
-        messages=[{"role": "user", "content": prompt}],
+        model=PORTAL_LLM_MODEL,
     )
-    text = ""
-    for block in msg.content:
-        if hasattr(block, "text"):
-            text += block.text
     title = f"Week of {monday_week_start().isoformat()} — attacker view"
     return title.strip(), (text or "").strip()
 
@@ -70,8 +67,8 @@ def _generate_body_md(bundle: dict[str, Any]) -> tuple[str, str]:
 def run_weekly_attacker_simulations() -> dict[str, Any]:
     if not SUPABASE_URL or not SERVICE_KEY:
         return {"ok": False, "error": "supabase not configured", "written": 0}
-    if not ANTHROPIC_API_KEY:
-        return {"ok": False, "error": "ANTHROPIC_API_KEY not configured", "written": 0}
+    if not OPENAI_API_KEY:
+        return {"ok": False, "error": "OPENAI_API_KEY not configured", "written": 0}
 
     ws = monday_week_start()
     week_s = ws.isoformat()

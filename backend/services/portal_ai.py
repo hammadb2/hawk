@@ -1,4 +1,4 @@
-"""Phase 2 — Portal AI Advisor + threat briefings + benchmark copy (Claude)."""
+"""Phase 2 — Portal AI Advisor + threat briefings + benchmark copy (OpenAI)."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-import anthropic
 import httpx
 
-from config import ANTHROPIC_API_KEY, SUPABASE_URL
+from config import OPENAI_API_KEY, OPENAI_MODEL, SUPABASE_URL
+from services.openai_chat import chat_text_sync
 
 logger = logging.getLogger(__name__)
 
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-CLAUDE_MODEL = os.environ.get("HAWK_PORTAL_CLAUDE_MODEL", "claude-sonnet-4-20250514")
+PORTAL_LLM_MODEL = (os.environ.get("HAWK_PORTAL_OPENAI_MODEL") or OPENAI_MODEL).strip()
 
 # Rough sector averages for benchmarking narrative (real competitor scans = later phase).
 INDUSTRY_BENCHMARK_AVG: dict[str, dict[str, float]] = {
@@ -243,19 +243,10 @@ def build_advisor_system_prompt(bundle: dict[str, Any]) -> str:
 """
 
 
-def _anthropic_text(msg: Any) -> str:
-    parts: list[str] = []
-    for block in msg.content:
-        if block.type == "text":
-            parts.append(block.text)
-    return "".join(parts).strip()
-
-
 def advisor_chat(*, system: str, user_message: str, conversation_history: list[dict[str, Any]]) -> str:
-    if not ANTHROPIC_API_KEY:
-        return "HAWK AI Advisor is not configured yet (missing ANTHROPIC_API_KEY on the API)."
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    messages: list[dict[str, Any]] = []
+    if not OPENAI_API_KEY:
+        return "HAWK AI Advisor is not configured yet (missing OPENAI_API_KEY on the API)."
+    user_messages: list[dict[str, str]] = []
     for h in conversation_history[-8:]:
         role = h.get("role", "user")
         if role not in ("user", "assistant"):
@@ -263,15 +254,15 @@ def advisor_chat(*, system: str, user_message: str, conversation_history: list[d
         content = str(h.get("content") or "").strip()
         if not content:
             continue
-        messages.append({"role": role, "content": content})
-    messages.append({"role": "user", "content": user_message})
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4096,
+        user_messages.append({"role": role, "content": content})
+    user_messages.append({"role": "user", "content": user_message})
+    return chat_text_sync(
+        api_key=OPENAI_API_KEY,
         system=system,
-        messages=messages,
+        user_messages=user_messages,
+        max_tokens=4096,
+        model=PORTAL_LLM_MODEL,
     )
-    return _anthropic_text(msg)
 
 
 def generate_weekly_threat_briefing_md(bundle: dict[str, Any]) -> tuple[str, str]:
@@ -289,17 +280,16 @@ def generate_weekly_threat_briefing_md(bundle: dict[str, Any]) -> tuple[str, str
                 str(x.get("layer") or x.get("title") or "") for x in fl[:5] if isinstance(x, dict)
             )
 
-    if not ANTHROPIC_API_KEY:
+    if not OPENAI_API_KEY:
         body = (
             f"### Weekly threat briefing\n\n"
             f"Week of {date.today().isoformat()} — **{company}** ({industry}).\n\n"
             f"HAWK is monitoring **{domain or 'your domain'}** for external exposure. "
-            f"Configure ANTHROPIC_API_KEY on the API for full AI-generated sector intelligence.\n\n"
+            f"Configure OPENAI_API_KEY on the API for full AI-generated sector intelligence.\n\n"
             f"**Action:** review open findings in your portal and patch critical items within 24–48 hours.\n"
         )
         return f"Weekly briefing — {company}", body
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     prompt = f"""Write a **weekly threat intelligence briefing** for a Canadian business.
 
 Company: {company}
@@ -315,12 +305,13 @@ Surfaces we watch (from last scan): {top_layers or "general perimeter, email aut
 
 Output ONLY the markdown."""
 
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
+    text = chat_text_sync(
+        api_key=OPENAI_API_KEY,
+        system=None,
+        user_messages=[{"role": "user", "content": prompt}],
         max_tokens=2048,
-        messages=[{"role": "user", "content": prompt}],
+        model=PORTAL_LLM_MODEL,
     )
-    text = _anthropic_text(msg)
     title_m = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
     title = title_m.group(1).strip() if title_m else f"Weekly briefing — {company}"
     return title, text
@@ -337,10 +328,9 @@ def discover_competitor_domains(bundle: dict[str, Any], *, max_domains: int = 3)
     company = str(prospect.get("company_name") or cpp.get("company_name") or "")
     industry = str(prospect.get("industry") or "business")
     city = str(prospect.get("city") or "")
-    if not ANTHROPIC_API_KEY:
+    if not OPENAI_API_KEY:
         return []
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     prompt = f"""Suggest up to {max_domains} **plausible competitor website domains** for passive external security benchmarking.
 
 Context (do not output this text verbatim):
@@ -355,12 +345,13 @@ Rules:
 
 JSON only, no markdown."""
 
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
+    text = chat_text_sync(
+        api_key=OPENAI_API_KEY,
+        system=None,
+        user_messages=[{"role": "user", "content": prompt}],
         max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
+        model=PORTAL_LLM_MODEL,
     )
-    text = _anthropic_text(msg)
     try:
         m = re.search(r"\{[\s\S]*\}", text)
         if not m:
@@ -423,7 +414,7 @@ def generate_competitor_benchmark(
 
     internal_domains = list(peer_domains or [])
 
-    if not ANTHROPIC_API_KEY:
+    if not OPENAI_API_KEY:
         extra = ""
         if peer_avg is not None:
             extra = f" Anonymized peer scan average from similar local businesses: **{peer_avg:.1f}/100** (n={len(peer_scores)})."
@@ -433,7 +424,6 @@ def generate_competitor_benchmark(
         )
         return {"scores": scores, "narrative_md": narrative, "competitor_domains": internal_domains}
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     peer_line = ""
     if peer_avg is not None:
         peer_line = (
@@ -455,12 +445,13 @@ Write 2 short paragraphs of markdown:
 
 Never name specific competitor companies or their domains. Frame peer scans as anonymized market samples."""
 
-    msg = client.messages.create(
-        model=CLAUDE_MODEL,
+    narrative = chat_text_sync(
+        api_key=OPENAI_API_KEY,
+        system=None,
+        user_messages=[{"role": "user", "content": prompt}],
         max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+        model=PORTAL_LLM_MODEL,
     )
-    narrative = _anthropic_text(msg)
     return {"scores": scores, "narrative_md": narrative, "competitor_domains": internal_domains}
 
 

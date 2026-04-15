@@ -48,19 +48,19 @@ export default function PortalAskPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Ask HAWK AI Advisor</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-2xl font-semibold text-slate-900">Ask HAWK AI Advisor</h1>
+        <p className="mt-1 text-sm text-slate-600">
           Answers use your latest scan, industry, and Canadian privacy context (PIPEDA / C-27). Not legal advice.
         </p>
-        <Link href="/portal" className="mt-2 inline-block text-sm text-[#00C48C] hover:underline">
+        <Link href="/portal" className="mt-2 inline-block text-sm text-emerald-600 hover:underline">
           ← Back to overview
         </Link>
       </div>
 
-      <div className="flex min-h-[420px] flex-col rounded-2xl border border-zinc-800 bg-zinc-900/40">
+      <div className="flex min-h-[420px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {messages.length === 0 && (
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-slate-600">
               Ask about your findings, email security, what to fix first, or how PIPEDA applies to your situation.
             </p>
           )}
@@ -68,11 +68,13 @@ export default function PortalAskPage() {
             <div
               key={i}
               className={`rounded-xl px-4 py-3 text-sm ${
-                msg.role === "user" ? "ml-8 bg-zinc-800 text-zinc-100" : "mr-8 border border-zinc-800 bg-[#07060C] text-zinc-200"
+                msg.role === "user"
+                  ? "ml-8 bg-slate-100 text-slate-900"
+                  : "mr-8 border border-slate-200 bg-white text-slate-800 shadow-sm"
               }`}
             >
               {msg.role === "assistant" ? (
-                <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-headings:text-zinc-100">
+                <div className="prose prose-slate prose-sm prose-headings:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 max-w-none prose-p:leading-relaxed prose-headings:text-slate-900">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               ) : (
@@ -80,17 +82,17 @@ export default function PortalAskPage() {
               )}
             </div>
           ))}
-          {loading && <p className="text-xs text-zinc-500">Thinking…</p>}
+          {loading && <p className="text-xs text-slate-600">Thinking…</p>}
         </div>
-        <div className="flex gap-2 border-t border-zinc-800 p-4">
+        <div className="flex gap-2 border-t border-slate-200 p-4">
           <Input
-            className="border-zinc-700 bg-zinc-950"
+            className="border-slate-200 bg-white"
             placeholder="Ask anything about your security posture…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void send()}
           />
-          <Button className="shrink-0 bg-[#00C48C] text-[#07060C]" disabled={loading} onClick={() => void send()}>
+          <Button className="shrink-0 bg-emerald-500 text-white" disabled={loading} onClick={() => void send()}>
             Send
           </Button>
         </div>

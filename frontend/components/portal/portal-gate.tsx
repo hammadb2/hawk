@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { portalApi } from "@/lib/api";
+import { portal } from "@/lib/portal-ui";
 
 /** Login + OAuth callback only — no session/bootstrap logic here. */
 function isPortalAuthPublicPath(pathname: string | null): boolean {
@@ -107,8 +108,8 @@ export function PortalGate({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-zinc-500">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+        <div className={portal.spinner} />
       </div>
     );
   }

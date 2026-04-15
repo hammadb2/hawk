@@ -1,7 +1,9 @@
 """Scan DTOs — compatible with Specter `specter_scanner.py` response shape."""
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Finding(BaseModel):
@@ -57,3 +59,14 @@ class ScanRequest(BaseModel):
         default="full",
         description="full = all pipeline layers; fast = Charlotte tier (email, TLS, breach, subdomains)",
     )
+    trust_level: Literal["public", "subscriber", "certified"] = Field(
+        default="public",
+        description="public = strict marketing-style scoring; subscriber = paid+domain verified; certified = + remediation attested",
+    )
+
+    @field_validator("trust_level", mode="before")
+    @classmethod
+    def _coerce_trust_level(cls, v: object) -> str:
+        allowed = {"public", "subscriber", "certified"}
+        x = str(v or "public").strip().lower()
+        return x if x in allowed else "public"

@@ -11,9 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const BG = "#0A0A1A";
-const CARD = "#1a1a2e";
-const ACCENT = "#00C48C";
+const ACCENT = "#10b981";
 
 const SHIELD_FEATURES = [
   "Daily monitoring",
@@ -138,36 +136,36 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
       <div>
-        <Label className="text-zinc-400">Full name</Label>
+        <Label className="text-slate-600">Full name</Label>
         <Input
           type="text"
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Dr. Jane Smith"
-          className="mt-1.5 border-zinc-700 bg-[#0F0E17] text-zinc-100 placeholder:text-zinc-600"
+          className="mt-1.5 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
         />
       </div>
       <div>
-        <Label className="text-zinc-400">Account email</Label>
+        <Label className="text-slate-600">Account email</Label>
         <Input
           type="email"
           readOnly
           value={email}
-          className="mt-1.5 border-zinc-700 bg-zinc-900/50 text-zinc-400"
+          className="mt-1.5 border-slate-200 bg-slate-50 text-slate-600"
         />
-        <p className="mt-1 text-xs text-zinc-500">Must match your portal sign-in. Charged to this account.</p>
+        <p className="mt-1 text-xs text-slate-600">Must match your portal sign-in. Charged to this account.</p>
       </div>
       <div>
-        <Label className="text-zinc-400">Card details</Label>
-        <div className="mt-1.5 rounded-lg border border-zinc-700 bg-[#0F0E17] px-3 py-3">
+        <Label className="text-slate-600">Card details</Label>
+        <div className="mt-1.5 rounded-lg border border-slate-200 bg-white px-3 py-3">
           <CardElement
             options={{
               style: {
                 base: {
                   fontSize: "16px",
-                  color: "#f4f4f8",
-                  "::placeholder": { color: "#9090A8" },
+                  color: "#0f172a",
+                  "::placeholder": { color: "#94a3b8" },
                 },
                 invalid: { color: "#ff6b6b" },
               },
@@ -175,15 +173,15 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
           />
         </div>
       </div>
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <Button
         type="submit"
         disabled={!stripe || loading || !email}
-        className="w-full bg-[#00C48C] font-semibold text-[#07060C] hover:bg-[#00d69a] disabled:opacity-60"
+        className="w-full bg-emerald-500 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60"
       >
         {loading ? "Processing…" : buttonLabel}
       </Button>
-      <p className="text-center text-xs text-zinc-500">
+      <p className="text-center text-xs text-slate-600">
         Backed by our breach response guarantee. Cancel anytime.
       </p>
     </form>
@@ -245,8 +243,8 @@ function PortalBillingContent() {
 
   if (paidCheck === "loading" || paidCheck === "paid") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-zinc-500">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+      <div className="flex min-h-[50vh] items-center justify-center text-slate-600">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -254,28 +252,28 @@ function PortalBillingContent() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold text-zinc-100">Subscribe</h1>
-        <Link href="/#pricing" className="text-sm text-zinc-500 hover:text-[#00C48C]">
+        <h1 className="text-lg font-semibold text-slate-900">Subscribe</h1>
+        <Link href="/#pricing" className="text-sm text-slate-600 hover:text-emerald-600">
           ← Back to pricing
         </Link>
       </div>
 
-      <p className="mb-6 text-center text-sm text-zinc-400">
+      <p className="mb-6 text-center text-sm text-slate-600">
         Activate your subscription to open the full HAWK client portal.
       </p>
 
       {!stripePromise ? (
-        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-200">
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-800">
           Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
         </p>
       ) : (
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-          <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
-            <h2 className="text-2xl font-bold text-zinc-50">{title}</h2>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm sm:p-8">
+            <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
             <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
               {price}
             </p>
-            <ul className="mt-6 space-y-2 text-sm text-zinc-300">
+            <ul className="mt-6 space-y-2 text-sm text-slate-700">
               {features.map((f) => (
                 <li key={f} className="flex gap-2">
                   <span style={{ color: ACCENT }}>✓</span>
@@ -283,15 +281,15 @@ function PortalBillingContent() {
                 </li>
               ))}
             </ul>
-            <p className="mt-8 text-sm leading-relaxed text-zinc-500">
+            <p className="mt-8 text-sm leading-relaxed text-slate-600">
               Backed by our breach response guarantee.
               <br />
               Cancel anytime.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-zinc-800 p-6 sm:p-8" style={{ backgroundColor: CARD }}>
-            <h2 className="mb-6 text-lg font-semibold text-zinc-100">Payment</h2>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm sm:p-8">
+            <h2 className="mb-6 text-lg font-semibold text-slate-900">Payment</h2>
             <Elements stripe={stripePromise}>
               <PortalBillingFormInner plan={plan} />
             </Elements>
@@ -306,8 +304,8 @@ export default function PortalBillingPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: BG }}>
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
         </div>
       }
     >

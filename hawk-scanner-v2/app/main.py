@@ -9,7 +9,7 @@ from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
 from arq.jobs import Job, JobStatus
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import asyncio
 
@@ -69,6 +69,7 @@ async def scan_dnstwist_only(req: ScanRequest) -> dict[str, Any]:
                 scan_id=req.scan_id,
                 industry=req.industry,
                 company_name=req.company_name,
+                trust_level=req.trust_level,
             ),
             timeout=180.0,
         )
@@ -84,6 +85,17 @@ class AsyncScanBody(BaseModel):
     prospect_id: str | None = Field(None, description="If set + Supabase env, worker inserts crm_prospect_scans")
     scan_id: str | None = None
     scan_depth: str = Field(default="full", description="full | fast")
+    trust_level: str = Field(
+        default="public",
+        description="Scoring trust tier (public | subscriber | certified). Queued jobs should match API caller policy.",
+    )
+
+    @field_validator("trust_level", mode="before")
+    @classmethod
+    def _coerce_async_trust(cls, v: object) -> str:
+        allowed = {"public", "subscriber", "certified"}
+        x = str(v or "public").strip().lower()
+        return x if x in allowed else "public"
 
 
 @app.post("/v1/scan/async")
@@ -98,6 +110,7 @@ async def enqueue_scan(body: AsyncScanBody) -> dict[str, str]:
         body.scan_id,
         body.company_name,
         body.scan_depth or "full",
+        (body.trust_level or "public").strip().lower(),
     )
     if job is None:
         raise HTTPException(status_code=409, detail="Job id conflict or duplicate enqueue")
@@ -124,6 +137,7 @@ async def job_result(job_id: str) -> dict[str, Any]:
 
 async def _sync_scan_body(req: ScanRequest) -> dict[str, Any]:
     depth = (req.scan_depth or "full").strip().lower()
+    trust = req.trust_level
     budget = SCAN_JOB_TIMEOUT_FAST_SEC if depth == "fast" else SCAN_JOB_TIMEOUT_FULL_SEC
     if depth == "fast":
         coro = run_scan_fast(
@@ -131,6 +145,7 @@ async def _sync_scan_body(req: ScanRequest) -> dict[str, Any]:
             scan_id=req.scan_id,
             industry=req.industry,
             company_name=req.company_name,
+            trust_level=trust,
         )
     else:
         coro = run_scan(
@@ -138,6 +153,7 @@ async def _sync_scan_body(req: ScanRequest) -> dict[str, Any]:
             scan_id=req.scan_id,
             industry=req.industry,
             company_name=req.company_name,
+            trust_level=trust,
         )
     try:
         result = await asyncio.wait_for(coro, timeout=budget)

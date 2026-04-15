@@ -115,8 +115,16 @@ def fix_finding(
     if not domain_str:
         raise HTTPException(status_code=404, detail="Finding not found")
     from services.scanner import run_scan
+    from services.scanner_trust import scanner_trust_level
+
     new_id = str(uuid4())
-    result = run_scan(domain_str, scan_id=new_id)
+    trust = scanner_trust_level(
+        db,
+        user,
+        domain_str,
+        remediation_acknowledged=True,
+    )
+    result = run_scan(domain_str, scan_id=new_id, trust_level=trust)
     from datetime import datetime, timezone
     new_scan = Scan(
         id=new_id,

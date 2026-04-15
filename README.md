@@ -94,11 +94,11 @@ See **backend/.env.example**. Main ones:
 - `DATABASE_URL` — SQLite or PostgreSQL
 - `HAWK_SCANNER_RELAY_URL` — Ghost relay (default 178.104.27.211:8002)
 - `STRIPE_*` — Billing
-- `DEEPSEEK_API_KEY` — Ask HAWK
+- `OPENAI_API_KEY`, `OPENAI_MODEL` — Ask HAWK, portal AI, Charlotte, scanner interpretation (when API hosts those features)
 - `CHARLOTTE_*` — Transactional email (Revenue-Ops)
 - `HAWK_CRON_SECRET` or `CRON_SECRET` — Cron endpoints (same header value)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRM_EMAIL_WEBHOOK_SECRET` — CRM webhooks (backend only)
-- `ANTHROPIC_API_KEY`, `SMARTLEAD_API_KEY` — optional; reserved for future integrations
+- `SMARTLEAD_API_KEY` — optional; Charlotte / Smartlead when enabled
 
 ---
 

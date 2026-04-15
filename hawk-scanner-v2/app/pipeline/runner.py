@@ -217,11 +217,12 @@ async def run_scan(
     industry: str | None = None,
     company_name: str | None = None,
     settings: Settings | None = None,
+    trust_level: str = "public",
 ) -> ScanResponse:
     settings = settings or get_settings()
     domain = _normalize_domain(domain)
     started = _iso_now()
-    raw_layers: dict[str, Any] = {}
+    raw_layers: dict[str, Any] = {"scoring_trust_level": trust_level}
 
     # Subfinder only gates naabu (host list). Everything else is domain-only — run in parallel.
     l1_task = subfinder.run(domain, settings)
@@ -357,7 +358,7 @@ async def run_scan(
     _merge_interpretations(all_findings, interpreted)
     raw_layers["attack_paths_count"] = len(paths)
 
-    score, grade, mult = compute_score(all_findings, industry)
+    score, grade, mult = compute_score(all_findings, industry, trust_level=trust_level, settings=settings)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)
 
@@ -390,6 +391,7 @@ async def run_scan_fast(
     industry: str | None = None,
     company_name: str | None = None,
     settings: Settings | None = None,
+    trust_level: str = "public",
 ) -> ScanResponse:
     """
     Fast tier for homepage / Charlotte: email + TLS + breach + subdomains, plus a **bounded**
@@ -399,7 +401,7 @@ async def run_scan_fast(
     settings = settings or get_settings()
     domain = _normalize_domain(domain)
     started = _iso_now()
-    raw_layers: dict[str, Any] = {}
+    raw_layers: dict[str, Any] = {"scoring_trust_level": trust_level}
 
     l_sub_task = subfinder.run(domain, settings)
     l7_task = email_security.analyze(domain)
@@ -488,7 +490,7 @@ async def run_scan_fast(
             }
         )
 
-    score, grade, mult = compute_score(all_findings, industry)
+    score, grade, mult = compute_score(all_findings, industry, trust_level=trust_level, settings=settings)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)
     completed = _iso_now()
@@ -520,15 +522,16 @@ async def run_dnstwist_only(
     industry: str | None = None,
     company_name: str | None = None,
     settings: Settings | None = None,
+    trust_level: str = "public",
 ) -> ScanResponse:
     """Lightweight job: dnstwist only (Shield daily lookalike pass)."""
     settings = settings or get_settings()
     domain = _normalize_domain(domain)
     started = _iso_now()
     l5 = await dnstwist.run(domain, settings)
-    raw_layers: dict[str, Any] = {"dnstwist": l5}
+    raw_layers: dict[str, Any] = {"dnstwist": l5, "scoring_trust_level": trust_level}
     all_findings = _dnstwist_findings(domain, l5)
-    score, grade, mult = compute_score(all_findings, industry)
+    score, grade, mult = compute_score(all_findings, industry, trust_level=trust_level, settings=settings)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)
     completed = _iso_now()

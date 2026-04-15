@@ -154,8 +154,8 @@ export default function PortalFindingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[30vh] items-center justify-center text-zinc-500">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+      <div className="flex min-h-[30vh] items-center justify-center text-slate-600">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -163,23 +163,23 @@ export default function PortalFindingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Remediation tracking</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Set status per finding. When you mark <strong className="text-zinc-300">Fixed</strong>, we automatically run a
-          fast verification scan; you can also tap <strong className="text-zinc-300">Verify fix</strong> to re-check
+        <h1 className="text-2xl font-semibold text-slate-900">Remediation tracking</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Set status per finding. When you mark <strong className="text-slate-700">Fixed</strong>, we automatically run a
+          fast verification scan; you can also tap <strong className="text-slate-700">Verify fix</strong> to re-check
           manually. Score updates and WhatsApp streak messages fire when verification succeeds.
         </p>
-        <Link href="/portal" className="mt-2 inline-block text-sm text-[#00C48C] hover:underline">
+        <Link href="/portal" className="mt-2 inline-block text-sm text-emerald-600 hover:underline">
           ← Back to overview
         </Link>
       </div>
 
       {findings.length === 0 ? (
-        <p className="text-sm text-zinc-500">No findings in the latest scan.</p>
+        <p className="text-sm text-slate-600">No findings in the latest scan.</p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/80 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-600">
               <tr>
                 <th className="px-4 py-3">Severity</th>
                 <th className="px-4 py-3">Finding</th>
@@ -187,31 +187,31 @@ export default function PortalFindingsPage() {
                 <th className="px-4 py-3">Verify</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody className="divide-y divide-slate-200">
               {findings.filter((f) => f.id).map((f) => {
                 const fid = String(f.id);
                 const st = statusMap[fid]?.status || "open";
                 return (
-                  <tr key={fid} className="bg-zinc-950/40">
-                    <td className="px-4 py-3 capitalize text-zinc-300">{f.severity || "—"}</td>
-                    <td className="max-w-md px-4 py-3 text-zinc-200">
+                  <tr key={fid} className="bg-slate-50/90">
+                    <td className="px-4 py-3 capitalize text-slate-700">{f.severity || "—"}</td>
+                    <td className="max-w-md px-4 py-3 text-slate-800">
                       <div className="font-medium">{f.title || "Finding"}</div>
-                      {f.description && <p className="mt-1 text-xs text-zinc-500 line-clamp-3">{f.description}</p>}
+                      {f.description && <p className="mt-1 text-xs text-slate-600 line-clamp-3">{f.description}</p>}
                       {f.screenshot_data_url && f.screenshot_data_url.startsWith("data:image") && (
                         <div className="mt-3">
-                          <p className="mb-1 text-[10px] font-medium uppercase text-zinc-500">Live view</p>
+                          <p className="mb-1 text-[10px] font-medium uppercase text-slate-600">Live view</p>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={f.screenshot_data_url}
                             alt=""
-                            className="max-h-48 max-w-full rounded border border-zinc-700 object-contain"
+                            className="max-h-48 max-w-full rounded border border-slate-200 object-contain"
                           />
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <select
-                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-800 shadow-sm"
                         value={st}
                         onChange={(e) => void setStatus(fid, e.target.value as (typeof STATUSES)[number])}
                       >
@@ -226,14 +226,14 @@ export default function PortalFindingsPage() {
                       {st === "fixed" ? (
                         <Button
                           size="sm"
-                          className="bg-[#00C48C] text-[#07060C]"
+                          className="bg-emerald-500 text-white"
                           disabled={verifying === fid}
                           onClick={() => void verifyNow(fid)}
                         >
                           {verifying === fid ? "Scanning…" : "Verify fix"}
                         </Button>
                       ) : (
-                        <span className="text-zinc-600">—</span>
+                        <span className="text-slate-500">—</span>
                       )}
                       {statusMap[fid]?.verified_at && (
                         <p className="mt-1 text-xs text-emerald-500/90">Verified</p>

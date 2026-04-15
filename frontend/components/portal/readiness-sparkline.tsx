@@ -29,18 +29,18 @@ export function ReadinessSparkline({
 
   return (
     <div className="mt-3 w-full">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Readiness history</p>
+      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Readiness history</p>
       <svg
         width={w}
         height={h}
         viewBox={`0 0 ${w} ${h}`}
-        className="mt-1 text-[#00C48C]"
+        className="mt-1 text-emerald-600"
         role="img"
         aria-label="Readiness score over time"
       >
         <path d={path} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
       </svg>
-      <p className="mt-1 text-[10px] text-zinc-600">
+      <p className="mt-1 text-[10px] text-slate-500">
         From guarantee monitoring events. More points appear as Shield scans update your score.
       </p>
     </div>

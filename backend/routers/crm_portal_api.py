@@ -232,7 +232,12 @@ def finding_verify_core(
         depth = "fast"
 
     try:
-        fresh = run_scan(str(domain).strip().lower(), scan_id=None, scan_depth=depth)
+        fresh = run_scan(
+            str(domain).strip().lower(),
+            scan_id=None,
+            scan_depth=depth,
+            trust_level="public",
+        )
     except Exception as e:
         logger.exception("verify rescan failed")
         raise HTTPException(status_code=502, detail=f"Rescan failed: {e}") from e

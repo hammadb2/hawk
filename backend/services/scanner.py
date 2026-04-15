@@ -10,16 +10,28 @@ from config import SCANNER_RELAY_URL, SCANNER_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
+_TRUST_LEVELS = frozenset({"public", "subscriber", "certified"})
+
+
+def _normalize_trust_level(raw: str | None) -> str:
+    x = (raw or "public").strip().lower()
+    return x if x in _TRUST_LEVELS else "public"
+
 
 def enqueue_async_scan(
     domain: str,
     industry: str | None = None,
     company_name: str | None = None,
     scan_depth: str = "full",
+    trust_level: str = "public",
 ) -> str:
     """POST /v1/scan/async — returns job_id (do not pass prospect_id; CRM persists via finalize)."""
     url = f"{SCANNER_RELAY_URL.rstrip('/')}/v1/scan/async"
-    body: dict = {"domain": domain, "scan_depth": scan_depth or "full"}
+    body: dict = {
+        "domain": domain,
+        "scan_depth": scan_depth or "full",
+        "trust_level": _normalize_trust_level(trust_level),
+    }
     if industry and industry.strip():
         body["industry"] = industry.strip()
     if company_name and company_name.strip():
@@ -67,16 +79,25 @@ def poll_scan_job(
     raise TimeoutError(f"scan job {job_id} timed out after {timeout_sec}s (last={last_status})")
 
 
-def run_dnstwist_scan(domain: str) -> dict:
+def run_dnstwist_scan(domain: str, *, trust_level: str = "public") -> dict:
     """POST dnstwist-only job (lookalike monitoring)."""
     url = f"{SCANNER_RELAY_URL.rstrip('/')}/v1/scan/dnstwist"
     with httpx.Client(timeout=min(SCANNER_TIMEOUT, 180.0)) as client:
-        r = client.post(url, json={"domain": domain.strip().lower()})
+        r = client.post(
+            url,
+            json={"domain": domain.strip().lower(), "trust_level": _normalize_trust_level(trust_level)},
+        )
         r.raise_for_status()
         return r.json()
 
 
-def run_scan(domain: str, scan_id: str | None = None, *, scan_depth: str = "full") -> dict:
+def run_scan(
+    domain: str,
+    scan_id: str | None = None,
+    *,
+    scan_depth: str = "full",
+    trust_level: str = "public",
+) -> dict:
     """
     POST to scanner relay; returns scan response (score, grade, findings).
     scan_depth: "full" (all layers) or "fast" (~Charlotte tier, quicker).
@@ -90,7 +111,12 @@ def run_scan(domain: str, scan_id: str | None = None, *, scan_depth: str = "full
         with httpx.Client(timeout=SCANNER_TIMEOUT) as client:
             r = client.post(
                 url,
-                json={"domain": domain, "scan_id": scan_id, "scan_depth": depth},
+                json={
+                    "domain": domain,
+                    "scan_id": scan_id,
+                    "scan_depth": depth,
+                    "trust_level": _normalize_trust_level(trust_level),
+                },
             )
             r.raise_for_status()
             return r.json()

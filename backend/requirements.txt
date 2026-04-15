@@ -10,7 +10,7 @@ pydantic-settings>=2.0.0
 email-validator>=2.0.0
 httpx>=0.26.0
 redis>=5.0.0
-anthropic>=0.40.0
+openai>=1.40.0
 stripe>=8.0.0
 python-multipart>=0.0.6
 # PDF — user scan reports (ReportLab); PIPEDA / CRM monthly still use WeasyPrint — see backend/Dockerfile for Railway.

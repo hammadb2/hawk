@@ -10,7 +10,7 @@ import secrets
 import re
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ from database import get_db
 from models import User, Scan, Domain, Report
 from schemas import ScanEnqueueRequest, ScanStartRequest, ScanResponse, ScanListItem
 from services.scanner import enqueue_async_scan, get_async_job, run_scan
+from services.scanner_trust import scanner_trust_level
 from services.charlotte import critical_finding_alert, weekly_digest_email, monthly_report_ready_email
 from config import PLAN_DOMAINS
 
@@ -206,7 +207,7 @@ def start_scan_public(req: ScanStartRequest, request: Request):
     if depth not in ("fast", "full"):
         depth = "full"
     try:
-        result = run_scan(domain_clean, scan_id=None, scan_depth=depth)
+        result = run_scan(domain_clean, scan_id=None, scan_depth=depth, trust_level="public")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Scanner error: {e}") from e
     if req.full_result:
@@ -284,8 +285,14 @@ def start_scan(
     depth = (req.scan_depth or "full").strip().lower()
     if depth not in ("fast", "full"):
         depth = "full"
+    trust = scanner_trust_level(
+        db,
+        user,
+        domain_clean,
+        remediation_acknowledged=bool(req.remediation_acknowledged),
+    )
     try:
-        result = run_scan(domain_clean, scan_id=scan_id, scan_depth=depth)
+        result = run_scan(domain_clean, scan_id=scan_id, scan_depth=depth, trust_level=trust)
     except Exception as e:
         scan.status = "failed"
         db.commit()
@@ -338,6 +345,10 @@ def list_scans(
 @router.post("/api/scan/{scan_id}/rescan")
 def rescan(
     scan_id: str,
+    remediation_acknowledged: bool = Query(
+        False,
+        description="If true, use certified scoring tier (paid + domain + attestation).",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -363,8 +374,14 @@ def rescan(
     new_scan = Scan(id=new_id, user_id=user.id, domain_id=scan.domain_id, scanned_domain=domain_str, triggered_by="user", status="pending")
     db.add(new_scan)
     db.commit()
+    trust = scanner_trust_level(
+        db,
+        user,
+        domain_str,
+        remediation_acknowledged=bool(remediation_acknowledged),
+    )
     try:
-        result = run_scan(domain_str, scan_id=new_id)
+        result = run_scan(domain_str, scan_id=new_id, trust_level=trust)
     except Exception as e:
         new_scan.status = "failed"
         db.commit()
@@ -426,8 +443,15 @@ def run_scheduled_scans(
         scan = Scan(id=scan_id, user_id=dom.user_id, domain_id=dom.id, scanned_domain=dom.domain, triggered_by="schedule", status="pending")
         db.add(scan)
         db.commit()
+        user = db.query(User).filter(User.id == dom.user_id).first()
+        trust = scanner_trust_level(
+            db,
+            user,
+            dom.domain,
+            remediation_acknowledged=False,
+        )
         try:
-            result = run_scan(dom.domain, scan_id=scan_id)
+            result = run_scan(dom.domain, scan_id=scan_id, trust_level=trust)
         except Exception:
             scan.status = "failed"
             db.commit()
@@ -439,7 +463,6 @@ def run_scheduled_scans(
         scan.started_at = datetime.fromisoformat(result["started_at"].replace("Z", "+00:00")) if result.get("started_at") else now
         scan.completed_at = datetime.fromisoformat(result["completed_at"].replace("Z", "+00:00")) if result.get("completed_at") else now
         db.commit()
-        user = db.query(User).filter(User.id == dom.user_id).first()
         if user:
             _maybe_alert_critical(user, dom.domain, scan_id, result.get("findings", []))
         triggered.append({"domain": dom.domain, "scan_id": scan_id})

@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.settings import Settings
 
 # Per-finding deductions (applied before industry multiplier)
 SEVERITY_DEDUCTION = {
@@ -44,17 +48,47 @@ def normalize_severity(raw: str) -> str:
     return "medium"
 
 
-def compute_score(findings: list[dict], industry: str | None = None) -> tuple[int, str, float]:
+def _normalize_trust_level(raw: str | None) -> str:
+    t = (raw or "public").strip().lower()
+    if t in ("subscriber", "certified"):
+        return t
+    return "public"
+
+
+def compute_score(
+    findings: list[dict],
+    industry: str | None = None,
+    *,
+    trust_level: str = "public",
+    settings: "Settings | None" = None,
+) -> tuple[int, str, float]:
     """
     Start at 100; subtract weighted deductions times industry multiplier; clamp to 0–100.
-    Returns (score, letter_grade, multiplier_used).
+
+    trust_level:
+      - public: minimum deduction floor (strict) so clean external passes rarely show A/B.
+      - subscriber: softer floor for paid customers scanning a domain on their account.
+      - certified: no floor — raw deductions only (remediation attested via HAWK API).
     """
+    from app.settings import get_settings
+
+    s = settings or get_settings()
+    tl = _normalize_trust_level(trust_level)
     mult = industry_multiplier(industry)
     total_deduction = 0.0
     for f in findings:
         sev = normalize_severity(str(f.get("severity", "low")))
         base = float(SEVERITY_DEDUCTION.get(sev, 8))
         total_deduction += base * mult
+
+    if tl == "certified":
+        floor_pts = 0.0
+    elif tl == "subscriber":
+        floor_pts = float(s.strict_score_floor_subscriber) * mult
+    else:
+        floor_pts = float(s.strict_score_floor_public) * mult
+    total_deduction = max(total_deduction, floor_pts)
+
     score = int(round(max(0.0, min(100.0, 100.0 - total_deduction))))
 
     if score >= 90:

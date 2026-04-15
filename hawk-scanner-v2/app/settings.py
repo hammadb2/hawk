@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # Nuclei
     nuclei_templates_dir: str = ""  # empty = default template path in image
 
+    # Scoring trust tiers (see app.scoring.compute_score)
+    strict_score_floor_public: float = 28.0  # min deduction × mult for anonymous / non-trusted scans
+    strict_score_floor_subscriber: float = 13.0  # paid + domain on account, before remediation attestation
+
 
 @lru_cache
 def get_settings() -> Settings:

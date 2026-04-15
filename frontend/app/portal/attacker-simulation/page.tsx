@@ -62,8 +62,8 @@ export default function PortalAttackerSimulationPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-zinc-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-[#00C48C]" />
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
       </div>
     );
   }
@@ -71,29 +71,29 @@ export default function PortalAttackerSimulationPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Attacker simulation</h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <h1 className="text-2xl font-semibold text-slate-900">Attacker simulation</h1>
+        <p className="mt-2 text-sm text-slate-600">
           A weekly red-team style narrative based on your latest HAWK findings — not a guarantee of how a real actor
           would behave, but a structured way to prioritize fixes.
         </p>
         {weekStart && (
-          <p className="mt-1 text-xs text-zinc-600">Week starting {weekStart}</p>
+          <p className="mt-1 text-xs text-slate-500">Week starting {weekStart}</p>
         )}
       </div>
 
       {!bodyMd ? (
-        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-8 text-center text-sm text-zinc-500">
+        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">
           No briefing yet. After your first scheduled run, this page will show the latest narrative.
         </p>
       ) : (
-        <article className="prose prose-invert prose-sm max-w-none rounded-xl border border-zinc-800 bg-zinc-950/50 p-6 prose-headings:text-zinc-100 prose-p:text-zinc-300 prose-li:text-zinc-300">
-          {title && <h2 className="!mt-0 text-lg font-semibold text-zinc-100">{title}</h2>}
+        <article className="prose prose-slate prose-sm prose-headings:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 max-w-none rounded-xl border border-slate-200 bg-white p-6 prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700">
+          {title && <h2 className="!mt-0 text-lg font-semibold text-slate-900">{title}</h2>}
           <ReactMarkdown>{bodyMd}</ReactMarkdown>
         </article>
       )}
 
-      <p className="text-center text-sm text-zinc-600">
-        <Link href="/portal" className="text-[#00C48C] hover:underline">
+      <p className="text-center text-sm text-slate-500">
+        <Link href="/portal" className="text-emerald-600 hover:underline">
           Back to portal home
         </Link>
       </p>

@@ -95,10 +95,14 @@ async def run_scan_task(
     scan_id: str | None = None,
     company_name: str | None = None,
     scan_depth: str = "full",
+    trust_level: str = "public",
 ) -> dict[str, Any]:
     settings = get_settings()
     job_id = str(ctx.get("job_id", ""))
     depth = (scan_depth or "full").strip().lower()
+    tl = (trust_level or "public").strip().lower()
+    if tl not in ("public", "subscriber", "certified"):
+        tl = "public"
 
     async def _execute():
         if depth == "fast":
@@ -108,6 +112,7 @@ async def run_scan_task(
                 industry=industry,
                 company_name=company_name,
                 settings=settings,
+                trust_level=tl,
             )
         return await run_scan(
             domain,
@@ -115,6 +120,7 @@ async def run_scan_task(
             industry=industry,
             company_name=company_name,
             settings=settings,
+            trust_level=tl,
         )
 
     budget = JOB_TIMEOUT_FAST_SEC if depth == "fast" else JOB_TIMEOUT_FULL_SEC

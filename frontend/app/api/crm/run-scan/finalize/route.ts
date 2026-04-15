@@ -24,7 +24,7 @@ function asFindingRecord(f: unknown): Record<string, unknown> | null {
   return f as Record<string, unknown>;
 }
 
-/** Persist Claude rows even if the job payload nests them under raw_layers or only merged into findings[]. */
+/** Persist interpreted / attack-path rows even if the job payload nests them under raw_layers or only merged into findings[]. */
 function resolveInterpretedFindings(r: ScanResult, findingsList: unknown[]): unknown[] {
   const direct = r.interpreted_findings;
   if (Array.isArray(direct) && direct.length > 0) return direct;
