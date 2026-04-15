@@ -117,10 +117,16 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
     patch: dict[str, Any] = {
         "full_name": body.full_name.strip(),
         "role": body.role,
-        "whatsapp_number": body.whatsapp_number.strip(),
         "status": "invited",
         "email": email,
     }
+    if body.whatsapp_number:
+        patch["whatsapp_number"] = body.whatsapp_number.strip()
+    # Set role_type for VA roles
+    if body.role == "va_manager":
+        patch["role_type"] = "va_manager"
+    elif body.role == "va":
+        patch["role_type"] = "va_outreach"
     if body.team_lead_id:
         patch["team_lead_id"] = body.team_lead_id
 
@@ -144,6 +150,24 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
         )
         if pr.status_code >= 400:
             raise HTTPException(status_code=400, detail=pr.text[:500])
+
+    # For VA roles, also create a va_profiles row so RLS user_id linkage works
+    if body.role == "va":
+        va_row: dict[str, Any] = {
+            "user_id": uid,
+            "full_name": body.full_name.strip(),
+            "email": email,
+            "role": "reply_book",
+            "status": "active",
+        }
+        vr = httpx.post(
+            f"{SUPABASE_URL}/rest/v1/va_profiles",
+            headers={**_sb_headers(), "Prefer": "return=minimal"},
+            json=va_row,
+            timeout=20.0,
+        )
+        if vr.status_code >= 400:
+            logger.warning("va_profiles upsert for existing user failed: %s %s", vr.status_code, vr.text[:300])
 
     redir = f"{CRM_PUBLIC_BASE_URL}/crm/onboarding" if CRM_PUBLIC_BASE_URL else None
     recover_json: dict[str, Any] = {"email": email}
@@ -188,6 +212,11 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
         meta["whatsapp_number"] = body.whatsapp_number.strip()
     if body.team_lead_id:
         meta["crm_team_lead_id"] = body.team_lead_id
+    # Map invite role → profiles.role_type so the auth trigger sets it correctly
+    if body.role == "va_manager":
+        meta["crm_role_type"] = "va_manager"
+    elif body.role == "va":
+        meta["crm_role_type"] = "va_outreach"
 
     # VA roles land on different pages
     if body.role == "va_manager":

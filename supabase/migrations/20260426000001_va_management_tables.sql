@@ -529,5 +529,98 @@ create policy "va_alerts_update_va_manager" on public.va_alerts for update
   );
 
 -- ---------------------------------------------------------------------------
+-- 10) Auth trigger — extend to auto-create va_profiles row for VA invites
+-- ---------------------------------------------------------------------------
+create or replace function public.crm_handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  initial_status text;
+  wa text;
+  tl uuid;
+  portal_cid text;
+  meta_rt text;
+  crm_role text;
+  va_role_type text;
+begin
+  portal_cid := nullif(trim(coalesce(new.raw_user_meta_data->>'portal_client_id', '')), '');
+  if portal_cid is not null and portal_cid <> '' then
+    insert into public.profiles (id, email, full_name, role, status, role_type)
+    values (
+      new.id,
+      new.email,
+      coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+      'client',
+      'active',
+      'client'
+    )
+    on conflict (id) do update
+      set email = excluded.email,
+          full_name = coalesce(excluded.full_name, public.profiles.full_name),
+          role = 'client',
+          role_type = 'client',
+          status = 'active';
+    return new;
+  end if;
+
+  initial_status := nullif(trim(lower(coalesce(new.raw_user_meta_data->>'crm_initial_status', ''))), '');
+  wa := nullif(trim(coalesce(new.raw_user_meta_data->>'whatsapp_number', '')), '');
+  begin
+    tl := (new.raw_user_meta_data->>'crm_team_lead_id')::uuid;
+  exception when others then
+    tl := null;
+  end;
+
+  meta_rt := nullif(trim(lower(coalesce(new.raw_user_meta_data->>'crm_role_type', ''))), '');
+  if meta_rt not in ('ceo', 'closer', 'va_outreach', 'va_manager', 'csm', 'client') then
+    meta_rt := null;
+  end if;
+
+  crm_role := coalesce(new.raw_user_meta_data->>'crm_role', 'sales_rep');
+
+  insert into public.profiles (id, email, full_name, role, status, whatsapp_number, team_lead_id, role_type)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    crm_role,
+    case
+      when initial_status in ('invited', 'onboarding') then initial_status
+      else 'active'
+    end,
+    wa,
+    tl,
+    coalesce(meta_rt, 'closer')
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        full_name = coalesce(excluded.full_name, public.profiles.full_name);
+
+  -- Auto-create va_profiles row for VA invites so RLS user_id linkage works
+  if crm_role = 'va' then
+    va_role_type := coalesce(
+      nullif(trim(lower(new.raw_user_meta_data->>'va_role')), ''),
+      'reply_book'
+    );
+    insert into public.va_profiles (user_id, full_name, email, role, status, start_date)
+    values (
+      new.id,
+      coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+      new.email,
+      va_role_type,
+      'active',
+      current_date
+    )
+    on conflict do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Done — all VA management tables created with RLS
 -- ---------------------------------------------------------------------------
