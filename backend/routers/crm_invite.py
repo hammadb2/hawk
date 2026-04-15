@@ -157,7 +157,7 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
             "user_id": uid,
             "full_name": body.full_name.strip(),
             "email": email,
-            "role": "reply_book",
+            "role": body.va_sub_role or "reply_book",
             "status": "active",
         }
         vr = httpx.post(
@@ -195,11 +195,19 @@ class InviteBody(BaseModel):
     role: Literal["sales_rep", "team_lead", "va_manager", "va"] = "sales_rep"
     whatsapp_number: str = Field(default="", max_length=40)
     team_lead_id: str | None = None
+    va_sub_role: Literal["list_qa", "reply_book"] | None = None
 
 
 @router.post("/invite")
 def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
     _require_privileged(uid)
+
+    # va_manager can only invite va role
+    caller = _profile(uid)
+    if caller and caller.get("role") not in ("ceo", "hos"):
+        if caller.get("role_type") == "va_manager" and body.role != "va":
+            raise HTTPException(status_code=403, detail="VA managers can only invite VA roles")
+
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
@@ -217,6 +225,9 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
         meta["crm_role_type"] = "va_manager"
     elif body.role == "va":
         meta["crm_role_type"] = "va_outreach"
+    # Pass VA sub-role (list_qa / reply_book) for va_profiles creation in trigger
+    if body.role == "va" and body.va_sub_role:
+        meta["va_role"] = body.va_sub_role
 
     # VA roles land on different pages
     if body.role == "va_manager":
@@ -271,12 +282,39 @@ class DeactivateBody(BaseModel):
     profile_id: str
 
 
+def _ban_auth_user(user_id: str) -> None:
+    """Ban a Supabase auth user so they can no longer log in."""
+    r = httpx.put(
+        f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+        headers=_sb_headers(),
+        json={"ban_duration": "876600h"},  # ~100 years
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("ban auth user %s failed: %s %s", user_id, r.status_code, r.text[:300])
+
+
 @router.post("/rep/deactivate")
 def deactivate_rep(body: DeactivateBody, uid: str = Depends(require_supabase_uid)):
-    _require_privileged(uid)
+    """CEO-only: deactivate any team member (except other CEOs) + revoke auth."""
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
+    # CEO only
+    caller = _profile(uid)
+    if not caller or caller.get("role") != "ceo":
+        raise HTTPException(status_code=403, detail="CEO only")
+
+    # Load target profile
+    target = _get_profile_row(body.profile_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    # Cannot deactivate other CEOs
+    if target.get("role") == "ceo":
+        raise HTTPException(status_code=403, detail="Cannot deactivate a CEO account")
+
+    # 1. Set profiles.status = inactive
     r = httpx.patch(
         f"{SUPABASE_URL}/rest/v1/profiles",
         headers=_sb_headers(),
@@ -285,6 +323,20 @@ def deactivate_rep(body: DeactivateBody, uid: str = Depends(require_supabase_uid
         timeout=20.0,
     )
     r.raise_for_status()
+
+    # 2. Ban auth user
+    _ban_auth_user(body.profile_id)
+
+    # 3. If target is a VA, also deactivate their va_profiles row
+    if target.get("role") in ("va",):
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/va_profiles",
+            headers=_sb_headers(),
+            params={"user_id": f"eq.{body.profile_id}"},
+            json={"status": "inactive"},
+            timeout=20.0,
+        )
+
     return {"ok": True}
 
 

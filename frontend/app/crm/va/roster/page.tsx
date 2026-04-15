@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import type { VaProfile, VaScore, VaAlert } from "@/lib/crm/types";
 
 export default function VaRosterPage() {
@@ -49,23 +50,45 @@ export default function VaRosterPage() {
       toast.error("Name and email required");
       return;
     }
+    if (!session?.access_token) {
+      toast.error("Not signed in");
+      return;
+    }
     setInviting(true);
-    const { error } = await supabase.from("va_profiles").insert({
-      full_name: invFullName.trim(),
-      email: invEmail.trim().toLowerCase(),
-      role: invRole,
-      status: "active",
-    });
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("VA added to roster");
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: invEmail.trim(),
+          full_name: invFullName.trim(),
+          role: "va",
+          va_sub_role: invRole,
+        }),
+      });
+      if (!r.ok) {
+        let msg = (await r.text()).slice(0, 240);
+        try {
+          const j = JSON.parse(msg) as { detail?: string };
+          if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* plain text */
+        }
+        toast.error(msg);
+        return;
+      }
+      const j = (await r.json()) as { message?: string; existing_user?: boolean };
+      toast.success(j.message || (j.existing_user ? "VA linked — check email for magic link." : "VA invite sent"));
       setInvFullName("");
       setInvEmail("");
       setShowInvite(false);
       void load();
+    } finally {
+      setInviting(false);
     }
-    setInviting(false);
   }
 
   async function ackAlert(id: string) {
@@ -99,13 +122,13 @@ export default function VaRosterPage() {
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           onClick={() => setShowInvite(!showInvite)}
         >
-          {showInvite ? "Cancel" : "+ Add VA"}
+          {showInvite ? "Cancel" : "+ Invite VA"}
         </button>
       </div>
 
       {showInvite && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-          <h3 className="text-sm font-medium text-slate-800">Add VA to roster</h3>
+          <h3 className="text-sm font-medium text-slate-800">Invite VA</h3>
           <div className="grid gap-3 sm:grid-cols-3">
             <input
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
@@ -135,7 +158,7 @@ export default function VaRosterPage() {
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
             onClick={() => void handleInvite()}
           >
-            {inviting ? "Adding…" : "Add VA"}
+            {inviting ? "Sending…" : "Send Invite"}
           </button>
         </div>
       )}

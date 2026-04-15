@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -97,6 +97,117 @@ def update_va_status(va_id: str, body: VaStatusBody, uid: str = Depends(require_
     )
     if r.status_code >= 400:
         raise HTTPException(status_code=400, detail=r.text[:500])
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Deactivate VA — sets inactive + revokes Supabase auth
+# ---------------------------------------------------------------------------
+
+
+def _get_caller_profile(uid: str) -> dict[str, Any]:
+    """Return caller's profile row."""
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/profiles",
+        headers=_sb_headers(),
+        params={"id": f"eq.{uid}", "select": "id,role,role_type", "limit": "1"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    if not rows:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    return rows[0]
+
+
+def _get_va_profile(va_id: str) -> dict[str, Any]:
+    """Return va_profiles row by id."""
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/va_profiles",
+        headers=_sb_headers(),
+        params={"id": f"eq.{va_id}", "select": "id,user_id,full_name,email,role,status", "limit": "1"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    if not rows:
+        raise HTTPException(status_code=404, detail="VA not found")
+    return rows[0]
+
+
+def _ban_auth_user(user_id: str) -> None:
+    """Ban a Supabase auth user (effectively disables login permanently)."""
+    r = httpx.put(
+        f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+        headers=_sb_headers(),
+        json={"ban_duration": "876600h"},  # ~100 years
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("ban auth user %s failed: %s %s", user_id, r.status_code, r.text[:300])
+
+
+class DeactivateVaBody(BaseModel):
+    va_id: str
+
+
+@router.post("/deactivate")
+def deactivate_va(body: DeactivateVaBody, uid: str = Depends(require_supabase_uid)):
+    """Deactivate a VA — set inactive + revoke auth. VA managers can only deactivate VAs, not other managers."""
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    caller = _get_caller_profile(uid)
+    caller_role = caller.get("role") or ""
+    is_ceo_or_hos = caller_role in ("ceo", "hos")
+    is_va_manager = caller.get("role_type") == "va_manager"
+
+    if not is_ceo_or_hos and not is_va_manager:
+        raise HTTPException(status_code=403, detail="VA manager, CEO, or HoS only")
+
+    va = _get_va_profile(body.va_id)
+
+    # va_manager can only deactivate VAs — not other va_managers or higher
+    if is_va_manager and not is_ceo_or_hos:
+        va_user_id = va.get("user_id")
+        if va_user_id:
+            # Check the profiles row to ensure target is a plain VA
+            pr = httpx.get(
+                f"{SUPABASE_URL}/rest/v1/profiles",
+                headers=_sb_headers(),
+                params={"id": f"eq.{va_user_id}", "select": "id,role,role_type", "limit": "1"},
+                timeout=20.0,
+            )
+            pr.raise_for_status()
+            target_profiles = pr.json()
+            if target_profiles:
+                tp = target_profiles[0]
+                if tp.get("role") in ("ceo", "hos", "team_lead") or tp.get("role_type") == "va_manager":
+                    raise HTTPException(status_code=403, detail="VA managers cannot deactivate non-VA users")
+
+    # 1. Set va_profiles.status = inactive
+    r = httpx.patch(
+        f"{SUPABASE_URL}/rest/v1/va_profiles",
+        headers=_sb_headers(),
+        params={"id": f"eq.{body.va_id}"},
+        json={"status": "inactive"},
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=400, detail=r.text[:500])
+
+    # 2. Also set profiles.status = inactive and ban auth user
+    va_user_id = va.get("user_id")
+    if va_user_id:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=_sb_headers(),
+            params={"id": f"eq.{va_user_id}"},
+            json={"status": "inactive"},
+            timeout=20.0,
+        )
+        _ban_auth_user(va_user_id)
+
     return {"ok": True}
 
 

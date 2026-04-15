@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import type { VaProfile, VaDailyReport, VaScore, VaCoachingNote } from "@/lib/crm/types";
 
 export default function VaProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const supabase = createClient();
   const { authReady, session, profile: myProfile } = useCrmAuth();
   const [va, setVa] = useState<VaProfile | null>(null);
@@ -22,6 +24,10 @@ export default function VaProfilePage() {
   const [noteText, setNoteText] = useState("");
   const [noteType, setNoteType] = useState<"coaching" | "pip" | "commendation">("coaching");
   const [saving, setSaving] = useState(false);
+
+  /* deactivate confirmation */
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -62,13 +68,44 @@ export default function VaProfilePage() {
     setSaving(false);
   }
 
-  async function updateStatus(newStatus: "active" | "pip" | "inactive") {
+  async function updateStatus(newStatus: "active" | "pip") {
     if (!id) return;
     const { error } = await supabase.from("va_profiles").update({ status: newStatus }).eq("id", id);
     if (error) toast.error(error.message);
     else {
       toast.success(`Status updated to ${newStatus}`);
       void load();
+    }
+  }
+
+  async function handleDeactivateVa() {
+    if (!id || !session?.access_token) return;
+    setDeactivating(true);
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/va/deactivate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ va_id: id }),
+      });
+      if (!r.ok) {
+        let msg = (await r.text()).slice(0, 240);
+        try {
+          const j = JSON.parse(msg) as { detail?: string };
+          if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* plain text */
+        }
+        toast.error(msg);
+        return;
+      }
+      toast.success("VA deactivated — access revoked");
+      setShowDeactivateConfirm(false);
+      router.push("/crm/va/roster");
+    } finally {
+      setDeactivating(false);
     }
   }
 
@@ -109,25 +146,66 @@ export default function VaProfilePage() {
           <p className="text-sm text-slate-600">
             {va.email} · {va.role === "list_qa" ? "List QA" : "Reply & Book"} · Started {va.start_date}
           </p>
+          <span
+            className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium ${
+              va.status === "active"
+                ? "bg-emerald-100 text-emerald-800"
+                : va.status === "pip"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {va.status.toUpperCase()}
+          </span>
         </div>
         <div className="flex gap-2">
-          {va.status !== "active" && (
+          {va.status !== "active" && va.status !== "inactive" && (
             <button type="button" className="rounded-lg border border-emerald-600 px-3 py-1 text-xs text-emerald-600 hover:bg-emerald-50" onClick={() => void updateStatus("active")}>
               Set Active
             </button>
           )}
-          {va.status !== "pip" && (
+          {va.status !== "pip" && va.status !== "inactive" && (
             <button type="button" className="rounded-lg border border-amber-500 px-3 py-1 text-xs text-amber-600 hover:bg-amber-50" onClick={() => void updateStatus("pip")}>
               Put on PIP
             </button>
           )}
           {va.status !== "inactive" && (
-            <button type="button" className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50" onClick={() => void updateStatus("inactive")}>
-              Deactivate
+            <button type="button" className="rounded-lg border border-rose-300 px-3 py-1 text-xs text-rose-600 hover:bg-rose-50" onClick={() => setShowDeactivateConfirm(true)}>
+              Deactivate VA
             </button>
           )}
         </div>
       </div>
+
+      {/* Deactivate confirmation modal */}
+      {showDeactivateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Deactivate {va.full_name}?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This will set their status to inactive and revoke their login access. Historical data (daily reports, scores) will be preserved. This action cannot be easily undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                onClick={() => setShowDeactivateConfirm(false)}
+                disabled={deactivating}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                onClick={() => void handleDeactivateVa()}
+                disabled={deactivating}
+              >
+                {deactivating ? "Deactivating\u2026" : "Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Score history */}
       <div className="rounded-xl border border-slate-200 bg-white p-4">
