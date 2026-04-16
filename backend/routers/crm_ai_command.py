@@ -185,6 +185,133 @@ FUNCTION_DEFINITIONS = [
         "description": "Get total MRR, client count, and breakdown by plan.",
         "parameters": {"type": "object", "properties": {}},
     },
+    # ── Phase 9: Pattern learning ─────────────────────────────────────────
+    {
+        "name": "detect_business_patterns",
+        "description": "Analyze CRM data to detect business patterns, trends, and insights. Returns actionable patterns with confidence scores.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_recent_patterns",
+        "description": "Get recently detected business patterns and insights.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max patterns to return (default 10)"},
+            },
+        },
+    },
+    # ── Phase 10: A/B testing ─────────────────────────────────────────────
+    {
+        "name": "create_ab_experiment",
+        "description": "Create an A/B test experiment for email campaigns with two subject/body variants.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Experiment name"},
+                "variant_a_subject": {"type": "string", "description": "Subject line for variant A"},
+                "variant_b_subject": {"type": "string", "description": "Subject line for variant B"},
+                "variant_a_body": {"type": "string", "description": "Email body for variant A"},
+                "variant_b_body": {"type": "string", "description": "Email body for variant B"},
+                "campaign_id": {"type": "string", "description": "Optional Smartlead campaign ID"},
+            },
+            "required": ["name", "variant_a_subject", "variant_b_subject", "variant_a_body", "variant_b_body"],
+        },
+    },
+    {
+        "name": "generate_ab_variants",
+        "description": "Use AI to generate A/B test variants from an original email.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "original_subject": {"type": "string", "description": "Original email subject"},
+                "original_body": {"type": "string", "description": "Original email body"},
+                "test_element": {"type": "string", "description": "Element to test: subject, body, cta, tone"},
+            },
+            "required": ["original_subject", "original_body"],
+        },
+    },
+    {
+        "name": "list_ab_experiments",
+        "description": "List recent A/B test experiments and their status.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    # ── Phase 11: Competitive intelligence ────────────────────────────────
+    {
+        "name": "research_competitors",
+        "description": "Research competitors and market landscape for Hawk Security. Provides pricing analysis, strengths/weaknesses, and opportunities.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Optional specific research question"},
+            },
+        },
+    },
+    {
+        "name": "analyze_competitor_pricing",
+        "description": "Analyze competitor pricing for a specific vertical (dental, legal, accounting).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "vertical": {"type": "string", "description": "Target vertical: dental, legal, or accounting"},
+            },
+            "required": ["vertical"],
+        },
+    },
+    # ── Phase 12: File/image intelligence ─────────────────────────────────
+    {
+        "name": "analyze_document",
+        "description": "Analyze a document's text content. Supports contracts, compliance docs, reports, and email threads.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text_content": {"type": "string", "description": "The document text to analyze"},
+                "doc_type": {"type": "string", "description": "Type: general, contract, compliance, report, email_thread"},
+                "prompt": {"type": "string", "description": "Optional specific analysis prompt"},
+            },
+            "required": ["text_content"],
+        },
+    },
+    # ── Phase 14: Sales playbook ──────────────────────────────────────────
+    {
+        "name": "build_sales_playbook",
+        "description": "Analyze won/lost deals, activities, and replies to build a comprehensive sales playbook with ICP, objection handlers, and email templates.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_objection_handler",
+        "description": "Get a ready-to-use response for a specific prospect objection using the sales playbook.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "objection": {"type": "string", "description": "The prospect's objection text"},
+            },
+            "required": ["objection"],
+        },
+    },
+    # ── Phase 15: CEO Dashboard ───────────────────────────────────────────
+    {
+        "name": "get_ceo_dashboard",
+        "description": "Get the God Mode CEO dashboard with all KPIs: revenue, pipeline, activity, client health, and team metrics with AI narration.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    # ── Phase 19: Onboarding trainer ──────────────────────────────────────
+    {
+        "name": "start_training_session",
+        "description": "Start an interactive sales training roleplay session. Scenarios: cold_call, objection_handling, discovery_call, product_demo, upsell, product_knowledge.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "scenario_type": {"type": "string", "description": "Type of scenario: cold_call, objection_handling, discovery_call, product_demo, upsell, product_knowledge"},
+            },
+            "required": ["scenario_type"],
+        },
+    },
+    {
+        "name": "list_training_scenarios",
+        "description": "List available training roleplay scenarios.",
+        "parameters": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -209,6 +336,25 @@ def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
             continue
         if name == "get_client_mrr_summary" and not permissions.get("financials"):
             continue
+        # Phase 9: patterns require reports permission
+        if name in ("detect_business_patterns", "get_recent_patterns") and not permissions.get("reports"):
+            continue
+        # Phase 10: A/B testing requires prospect_data
+        if name in ("create_ab_experiment", "generate_ab_variants", "list_ab_experiments") and not permissions.get("prospect_data"):
+            continue
+        # Phase 11: competitive intel requires reports
+        if name in ("research_competitors", "analyze_competitor_pricing") and not permissions.get("reports"):
+            continue
+        # Phase 12: document analysis requires reports
+        if name == "analyze_document" and not permissions.get("reports"):
+            continue
+        # Phase 14: playbook requires prospect_data
+        if name in ("build_sales_playbook", "get_objection_handler") and not permissions.get("prospect_data"):
+            continue
+        # Phase 15: CEO dashboard requires financials
+        if name == "get_ceo_dashboard" and not permissions.get("financials"):
+            continue
+        # Phase 19: training available to all with AI access
         available.append(fn)
     return available
 
@@ -238,6 +384,73 @@ def _execute_function(
             return _fn_flag_va_for_pip(args, uid, headers)
         elif name == "get_client_mrr_summary":
             return _fn_get_client_mrr_summary(headers)
+        # ── Phase 9: Pattern learning ────────────────────────────────
+        elif name == "detect_business_patterns":
+            from services.aria_patterns import run_pattern_detection
+            return json.dumps(run_pattern_detection())
+        elif name == "get_recent_patterns":
+            from services.aria_patterns import get_recent_patterns
+            limit = args.get("limit", 10)
+            return json.dumps(get_recent_patterns(limit=limit))
+        # ── Phase 10: A/B testing ────────────────────────────────────
+        elif name == "create_ab_experiment":
+            from services.aria_ab_testing import create_ab_experiment
+            return json.dumps(create_ab_experiment(
+                name=args.get("name", ""),
+                variant_a_subject=args.get("variant_a_subject", ""),
+                variant_b_subject=args.get("variant_b_subject", ""),
+                variant_a_body=args.get("variant_a_body", ""),
+                variant_b_body=args.get("variant_b_body", ""),
+                campaign_id=args.get("campaign_id"),
+            ))
+        elif name == "generate_ab_variants":
+            from services.aria_ab_testing import generate_variants
+            return json.dumps(generate_variants(
+                original_subject=args.get("original_subject", ""),
+                original_body=args.get("original_body", ""),
+                test_element=args.get("test_element", "subject"),
+            ))
+        elif name == "list_ab_experiments":
+            from services.aria_ab_testing import list_experiments
+            return json.dumps(list_experiments())
+        # ── Phase 11: Competitive intelligence ───────────────────────
+        elif name == "research_competitors":
+            from services.aria_competitive_intel import research_competitors
+            return json.dumps(research_competitors(query=args.get("query")))
+        elif name == "analyze_competitor_pricing":
+            from services.aria_competitive_intel import analyze_competitor_pricing
+            return json.dumps(analyze_competitor_pricing(vertical=args.get("vertical", "dental")))
+        # ── Phase 12: Document analysis ──────────────────────────────
+        elif name == "analyze_document":
+            from services.aria_vision import analyze_document_text
+            return json.dumps(analyze_document_text(
+                text_content=args.get("text_content", ""),
+                doc_type=args.get("doc_type", "general"),
+                prompt=args.get("prompt"),
+            ))
+        # ── Phase 14: Sales playbook ─────────────────────────────────
+        elif name == "build_sales_playbook":
+            from services.aria_playbook import build_playbook_from_deals
+            return json.dumps(build_playbook_from_deals())
+        elif name == "get_objection_handler":
+            from services.aria_playbook import get_objection_handler
+            return json.dumps(get_objection_handler(objection=args.get("objection", "")))
+        # ── Phase 15: CEO Dashboard ──────────────────────────────────
+        elif name == "get_ceo_dashboard":
+            from services.aria_ceo_dashboard import get_dashboard_data, generate_narration
+            data = get_dashboard_data()
+            narration = generate_narration(data)
+            return json.dumps({"dashboard": data, "narration": narration})
+        # ── Phase 19: Training ───────────────────────────────────────
+        elif name == "start_training_session":
+            from services.aria_onboarding_trainer import start_training_session
+            return json.dumps(start_training_session(
+                user_id=uid,
+                scenario_type=args.get("scenario_type", "cold_call"),
+            ))
+        elif name == "list_training_scenarios":
+            from services.aria_onboarding_trainer import list_scenarios
+            return json.dumps(list_scenarios())
         else:
             return json.dumps({"error": f"Unknown function: {name}"})
     except Exception as exc:
