@@ -61,7 +61,7 @@ export default function PortalAskPage() {
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {messages.length === 0 && (
             <p className="text-sm text-slate-600">
-              Ask about your findings, email security, what to fix first, or how PIPEDA applies to your situation.
+              Ask ARIA about your findings, email security, what to fix first, or how PIPEDA applies to your situation.
             </p>
           )}
           {messages.map((msg, i) => (

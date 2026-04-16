@@ -8,6 +8,10 @@ import { PipelineStatusTracker } from "@/components/crm/aria/pipeline-status-tra
 import { PipelineRunTrigger } from "@/components/crm/aria/pipeline-run-trigger";
 import { InlineDownloadButton } from "@/components/crm/aria/inline-download-button";
 import { ConfirmationCard } from "@/components/crm/aria/confirmation-card";
+import { InlineChart, type ChartData } from "@/components/crm/aria/inline-chart";
+import { VoiceInput } from "@/components/crm/aria/voice-input";
+import { VoiceOutput } from "@/components/crm/aria/voice-output";
+import { FileUpload } from "@/components/crm/aria/file-upload";
 
 interface ChatMessage {
   id?: string;
@@ -26,6 +30,8 @@ interface ChatMessage {
     description: string;
     action: () => Promise<void>;
   };
+  /** Chart data for inline visualization */
+  chart_data?: ChartData;
 }
 
 interface Conversation {
@@ -39,7 +45,7 @@ const BLOCKED_ROLES = ["va", "client"];
 const PIPELINE_ALLOWED_ROLES = ["ceo"];
 const PIPELINE_ALLOWED_ROLE_TYPES = ["ceo", "va_manager"];
 
-export default function AriaPage() {
+export default function AiCommandCenterPage() {
   const supabase = useMemo(() => createClient(), []);
   const { profile, session } = useCrmAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -226,6 +232,7 @@ export default function AriaPage() {
             content: data.reply,
             function_name: data.function_called,
             function_result: data.function_result ? JSON.stringify(data.function_result) : undefined,
+            chart_data: data.chart_data || undefined,
           },
         ]);
       } else {
@@ -253,7 +260,7 @@ export default function AriaPage() {
   if (profile && BLOCKED_ROLES.includes(profile.role || "")) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-slate-500">ARIA is not available for your role.</p>
+        <p className="text-slate-500">The AI Command Center is not available for your role.</p>
       </div>
     );
   }
@@ -327,16 +334,17 @@ export default function AriaPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </div>
-                                <h2 className="text-lg font-semibold text-slate-900">ARIA</h2>
-                                <p className="mt-1 text-xs text-slate-500">Automated Revenue &amp; Intelligence Assistant</p>
-                                <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
-                                  I run your outbound pipeline, pull reports, generate documents, manage your team, and monitor the business 24/7. Tell me what you need.
-                                </p>
+                <h2 className="text-lg font-semibold text-slate-900">ARIA</h2>
+                <p className="mt-1 text-xs font-medium text-emerald-600">Automated Revenue & Intelligence Assistant</p>
+                <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+                  Your chief of staff. I run pipelines, pull reports, analyze data, generate documents, and monitor the business 24/7.
+                </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {[
-                    "Show VA performance this week",
-                    "Summarize pipeline health",
-                    "Generate a weekly report PDF",
+                    "Show pipeline funnel chart",
+                    "Compare revenue this week vs last",
+                    "Show campaign health",
+                    "Detect business patterns",
                     ...(canRunPipeline ? ["Run outbound pipeline"] : []),
                   ].map((suggestion) => (
                     <button
@@ -362,7 +370,12 @@ export default function AriaPage() {
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <p className="mb-1 text-xs font-semibold text-emerald-600">ARIA</p>
+                    <div className="mb-1 flex items-center gap-1">
+                      <p className="text-xs font-semibold text-emerald-600">ARIA</p>
+                      {session?.access_token && msg.content && (
+                        <VoiceOutput text={msg.content} accessToken={session.access_token} />
+                      )}
+                    </div>
                   )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                   {msg.function_name && (
@@ -398,6 +411,9 @@ export default function AriaPage() {
                       />
                     </div>
                   )}
+                  {msg.chart_data && (
+                    <InlineChart data={msg.chart_data} />
+                  )}
                 </div>
               </div>
             ))}
@@ -432,6 +448,26 @@ export default function AriaPage() {
         {/* Input */}
         <div className="border-t border-slate-200 bg-white px-4 py-4">
           <div className="mx-auto flex max-w-3xl gap-2">
+            {session?.access_token && (
+              <VoiceInput
+                accessToken={session.access_token}
+                onTranscription={(text) => setInput(text)}
+                disabled={sending}
+              />
+            )}
+            {session?.access_token && (
+              <FileUpload
+                accessToken={session.access_token}
+                onAnalysis={(result) => {
+                  setMessages((prev) => [
+                    ...prev,
+                    { role: "user", content: `Analyze file: ${result.filename}` },
+                    { role: "assistant", content: result.analysis },
+                  ]);
+                }}
+                disabled={sending}
+              />
+            )}
             {canRunPipeline && (
               <button
                 onClick={() => setShowPipelineTrigger(!showPipelineTrigger)}
