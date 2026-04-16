@@ -22,12 +22,65 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/forgot-password" || pathname === "/reset-password") {
     return NextResponse.redirect(new URL("/portal/login", request.url));
   }
-  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // AI Onboarding Portal — allow access; guarded by its own auth inside the page
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
+    if (!url || !key) {
+      return NextResponse.next();
+    }
+
+    let supabaseResponse = NextResponse.next({ request });
+    const supabase = createServerClient(url, key, {
+      cookieOptions: crmCookieOptions(url),
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options));
+        },
+      },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Not logged in → send to CRM login with redirect back
+    if (!user) {
+      const login = new URL("/crm/login", request.url);
+      login.searchParams.set("next", pathname);
+      return NextResponse.redirect(login);
+    }
+
+    // CEO bypasses onboarding entirely → send to CRM
+    const { data: onbProf } = await supabase
+      .from("profiles")
+      .select("role,onboarding_status")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (onbProf?.role === "ceo") {
+      return NextResponse.redirect(new URL("/crm/dashboard", request.url));
+    }
+
+    // Already approved → send to CRM
+    if (onbProf?.onboarding_status === "approved") {
+      return NextResponse.redirect(new URL("/crm/dashboard", request.url));
+    }
+
+    // /onboarding/complete — only if pending_review or approved
+    if (pathname === "/onboarding/complete" && onbProf?.onboarding_status !== "pending_review" && onbProf?.onboarding_status !== "approved") {
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
+
+    return supabaseResponse;
+  }
 
   if (pathname.startsWith("/portal")) {
     if (!url || !key) {
@@ -130,7 +183,7 @@ export async function middleware(request: NextRequest) {
     if (user && !isPublic) {
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id,role")
+        .select("id,role,onboarding_status")
         .eq("id", user.id)
         .maybeSingle();
       if (prof?.role === "client") {
@@ -142,21 +195,23 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/portal", request.url));
         }
       }
-    }
 
-    if (user && (pathname === "/crm/pipeline" || pathname.startsWith("/crm/pipeline/"))) {
-      const { data: prof, error: pe } = await supabase
-        .from("profiles")
-        .select("role,onboarding_completed_at")
-        .eq("id", user.id)
-        .maybeSingle();
+      // AI Onboarding enforcement — redirect to /onboarding if not approved (CEO bypasses)
       if (
-        !pe &&
         prof &&
-        ["sales_rep", "team_lead"].includes(prof.role as string) &&
-        !(prof as { onboarding_completed_at?: string | null }).onboarding_completed_at
+        prof.role !== "ceo" &&
+        prof.onboarding_status &&
+        prof.onboarding_status !== "approved" &&
+        !pathname.startsWith("/crm/login") &&
+        !pathname.startsWith("/crm/auth") &&
+        // Allow access to onboarding review pages for privileged users
+        !pathname.startsWith("/crm/onboarding/review")
       ) {
-        return NextResponse.redirect(new URL("/crm/onboarding", request.url));
+        // Check if user is privileged (CEO/HoS) viewing review pages
+        const isPrivileged = prof.role === "ceo" || prof.role === "hos";
+        if (!isPrivileged) {
+          return NextResponse.redirect(new URL("/onboarding", request.url));
+        }
       }
     }
 
