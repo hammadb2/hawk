@@ -49,7 +49,7 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
           });
 
           const label = file.type === "application/pdf" ? "PDF document" : "image";
-          const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/chat`, {
+          const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/analyze-file`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -72,7 +72,7 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
           const text = await file.text();
           const docType = file.name.endsWith(".csv") ? "report" : "general";
 
-          const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/chat`, {
+          const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/analyze-file`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${accessToken}`,

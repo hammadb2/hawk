@@ -780,6 +780,41 @@ def get_ceo_dashboard(uid: str = Depends(require_supabase_uid)):
     return {"dashboard": dashboard, "narration": narration}
 
 
+class AnalyzeFileBody(BaseModel):
+    content: str
+    image_data: str | None = None
+
+
+@router.post("/analyze-file")
+def analyze_file(body: AnalyzeFileBody, uid: str = Depends(require_supabase_uid)):
+    """Dedicated file/image analysis endpoint — no conversation required."""
+    _require_ai_access(uid)
+
+    from services.aria_vision import analyze_image, analyze_document_text
+
+    if body.image_data:
+        # image_data is a data URL like "data:image/png;base64,..."
+        import base64 as b64mod
+
+        try:
+            header, encoded = body.image_data.split(",", 1)
+            mime = header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+            raw = b64mod.b64decode(encoded)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid image data")
+
+        result = analyze_image(raw, prompt=body.content, mime_type=mime)
+    else:
+        # Text/CSV document analysis
+        doc_type = "report" if "report" in body.content.lower() or "csv" in body.content.lower() else "general"
+        result = analyze_document_text(body.content, doc_type=doc_type)
+
+    if "error" in result:
+        raise HTTPException(status_code=503, detail=result["error"])
+
+    return {"reply": result.get("analysis", "Analysis complete.")}
+
+
 class SendMessageBody(BaseModel):
     conversation_id: str
     content: str
