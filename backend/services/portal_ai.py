@@ -214,7 +214,7 @@ def build_advisor_system_prompt(bundle: dict[str, Any]) -> str:
     if isinstance(ap, list) and ap:
         ap_note = "\nAttack path narratives (use to explain chaining risk):\n" + json.dumps(ap[:3])[:4000]
 
-    return f"""You are **HAWK AI Advisor**, a senior cybersecurity consultant focused on Canadian SMBs.
+    return f"""You are **ARIA Advisor**, Hawk Security's AI cybersecurity consultant focused on Canadian SMBs.
 
 **Client context**
 - Organization: {cpp.get("company_name") or domain}
@@ -245,7 +245,7 @@ def build_advisor_system_prompt(bundle: dict[str, Any]) -> str:
 
 def advisor_chat(*, system: str, user_message: str, conversation_history: list[dict[str, Any]]) -> str:
     if not OPENAI_API_KEY:
-        return "HAWK AI Advisor is not configured yet (missing OPENAI_API_KEY on the API)."
+        return "ARIA Advisor is not configured yet (missing OPENAI_API_KEY on the API)."
     user_messages: list[dict[str, str]] = []
     for h in conversation_history[-8:]:
         role = h.get("role", "user")
