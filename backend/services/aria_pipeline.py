@@ -1014,39 +1014,70 @@ def resume_pipeline(run_id: str, uid: str) -> dict[str, Any]:
     vertical = run.get("vertical", "dental")
     location = run.get("location", "")
 
-    # Get leads at the current stage and resume from there
-    if current_step in ("apollo_pull", "clay_enrichment"):
-        leads = _get_run_leads(run_id, "pulled")
-        if not leads:
-            leads = step_apollo_pull(run_id, vertical, location, run.get("batch_size", 50))
-        leads = step_clay_enrich(run_id, leads)
-        leads = step_zerobounce_verify(run_id, leads)
-        leads = step_hawk_scan(run_id, leads)
-        leads = step_generate_emails(run_id, leads)
-        step_smartlead_load(run_id, leads, vertical)
-    elif current_step == "zerobounce_verify":
-        leads = _get_run_leads(run_id, "enriched")
-        leads = step_zerobounce_verify(run_id, leads)
-        leads = step_hawk_scan(run_id, leads)
-        leads = step_generate_emails(run_id, leads)
-        step_smartlead_load(run_id, leads, vertical)
-    elif current_step == "hawk_scan":
-        leads = _get_run_leads(run_id, "verified")
-        leads = step_hawk_scan(run_id, leads)
-        leads = step_generate_emails(run_id, leads)
-        step_smartlead_load(run_id, leads, vertical)
-    elif current_step == "email_generation":
-        leads = _get_run_leads(run_id, "scanned")
-        leads = step_generate_emails(run_id, leads)
-        step_smartlead_load(run_id, leads, vertical)
-    elif current_step == "smartlead_load":
-        leads = _get_run_leads(run_id, "email_generated")
-        step_smartlead_load(run_id, leads, vertical)
+    try:
+        # Get leads at the current stage and resume from there
+        if current_step in ("apollo_pull", "clay_enrichment"):
+            leads = _get_run_leads(run_id, "pulled")
+            if not leads:
+                leads = step_apollo_pull(run_id, vertical, location, run.get("batch_size", 50))
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_clay_enrich(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_zerobounce_verify(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_hawk_scan(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_generate_emails(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            step_smartlead_load(run_id, leads, vertical)
+        elif current_step == "zerobounce_verify":
+            leads = _get_run_leads(run_id, "enriched")
+            leads = step_zerobounce_verify(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_hawk_scan(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_generate_emails(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            step_smartlead_load(run_id, leads, vertical)
+        elif current_step == "hawk_scan":
+            leads = _get_run_leads(run_id, "verified")
+            leads = step_hawk_scan(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            leads = step_generate_emails(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            step_smartlead_load(run_id, leads, vertical)
+        elif current_step == "email_generation":
+            leads = _get_run_leads(run_id, "scanned")
+            leads = step_generate_emails(run_id, leads)
+            if _is_run_paused(run_id):
+                return _build_summary(run_id)
+            step_smartlead_load(run_id, leads, vertical)
+        elif current_step == "smartlead_load":
+            leads = _get_run_leads(run_id, "email_generated")
+            step_smartlead_load(run_id, leads, vertical)
 
-    _update_run(run_id, {
-        "status": "completed",
-        "current_step": "completed",
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-    })
+        _update_run(run_id, {
+            "status": "completed",
+            "current_step": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    except Exception as exc:
+        logger.exception("ARIA pipeline resume failed for run %s: %s", run_id, exc)
+        _update_run(run_id, {
+            "status": "failed",
+            "error_message": str(exc)[:1000],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
 
     return _build_summary(run_id)
