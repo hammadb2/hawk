@@ -762,6 +762,24 @@ def get_messages(conversation_id: str, uid: str = Depends(require_supabase_uid))
     return r.json()
 
 
+@router.get("/dashboard")
+def get_ceo_dashboard(uid: str = Depends(require_supabase_uid)):
+    """Dedicated CEO dashboard endpoint — returns structured KPI data + narration."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role != "ceo":
+        raise HTTPException(status_code=403, detail="CEO-only endpoint")
+
+    from services.aria_ceo_dashboard import get_dashboard_data, generate_narration
+
+    dashboard = get_dashboard_data()
+    if "error" in dashboard:
+        raise HTTPException(status_code=503, detail=dashboard["error"])
+
+    narration = generate_narration(dashboard)
+    return {"dashboard": dashboard, "narration": narration}
+
+
 class SendMessageBody(BaseModel):
     conversation_id: str
     content: str

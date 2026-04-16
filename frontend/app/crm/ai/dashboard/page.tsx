@@ -104,25 +104,16 @@ export default function CEODashboardPage() {
     if (!session?.access_token) return;
     setLoading(true);
     try {
-      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/chat`, {
-        method: "POST",
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/dashboard`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content: "Show me the CEO dashboard" }),
       });
       if (r.ok) {
         const resp = await r.json();
-        // Parse the function result which contains dashboard data
-        if (resp.function_result) {
-          const result = typeof resp.function_result === "string" ? JSON.parse(resp.function_result) : resp.function_result;
-          if (result.dashboard) {
-            setData(result.dashboard);
-            setNarration(result.narration || resp.reply || "");
-          }
-        } else {
-          setNarration(resp.reply || "");
+        if (resp.dashboard) {
+          setData(resp.dashboard);
+          setNarration(resp.narration || "");
         }
       } else {
         setError("Failed to load dashboard");
