@@ -534,7 +534,13 @@ def ingest_email_event(
 
     if body.replied_at is not None:
         _notify_charlotte_reply(prospect_id=pid, body=body)
-        _trigger_aria_reply_classification(prospect_id=pid, body=body, email_event_id=eid)
+        # Run ARIA classification in a background thread to avoid blocking the webhook response
+        import threading
+        threading.Thread(
+            target=_trigger_aria_reply_classification,
+            kwargs={"prospect_id": pid, "body": body, "email_event_id": eid},
+            daemon=True,
+        ).start()
 
     return {"ok": True, "id": eid, "prospect_id": pid}
 
