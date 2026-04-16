@@ -8,6 +8,7 @@ import { PipelineStatusTracker } from "@/components/crm/aria/pipeline-status-tra
 import { PipelineRunTrigger } from "@/components/crm/aria/pipeline-run-trigger";
 import { InlineDownloadButton } from "@/components/crm/aria/inline-download-button";
 import { ConfirmationCard } from "@/components/crm/aria/confirmation-card";
+import { InlineChart, type ChartData } from "@/components/crm/aria/inline-chart";
 
 interface ChatMessage {
   id?: string;
@@ -26,6 +27,8 @@ interface ChatMessage {
     description: string;
     action: () => Promise<void>;
   };
+  /** Chart data for inline visualization */
+  chart_data?: ChartData;
 }
 
 interface Conversation {
@@ -226,6 +229,7 @@ export default function AiCommandCenterPage() {
             content: data.reply,
             function_name: data.function_called,
             function_result: data.function_result ? JSON.stringify(data.function_result) : undefined,
+            chart_data: data.chart_data || undefined,
           },
         ]);
       } else {
@@ -333,9 +337,10 @@ export default function AiCommandCenterPage() {
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {[
-                    "Show VA performance this week",
-                    "Summarize pipeline health",
-                    "Generate a weekly report PDF",
+                    "Show pipeline funnel chart",
+                    "Compare prospects this week vs last week",
+                    "Show revenue trend",
+                    "Show campaign health chart",
                     ...(canRunPipeline ? ["Run outbound pipeline"] : []),
                   ].map((suggestion) => (
                     <button
@@ -396,6 +401,9 @@ export default function AiCommandCenterPage() {
                         onCancel={() => {}}
                       />
                     </div>
+                  )}
+                  {msg.chart_data && (
+                    <InlineChart data={msg.chart_data} />
                   )}
                 </div>
               </div>

@@ -101,6 +101,9 @@ def _get_role_permissions(profile: dict[str, Any]) -> dict[str, bool]:
 
 # ── OpenAI function definitions ───────────────────────────────────────────
 
+# Chart function definitions (Phase 6) — imported from aria_charts service
+from services.aria_charts import CHART_FUNCTION_DEFINITIONS, execute_chart_function
+
 FUNCTION_DEFINITIONS = [
     {
         "name": "get_va_performance_report",
@@ -187,11 +190,17 @@ FUNCTION_DEFINITIONS = [
     },
 ]
 
+# Merge chart function definitions into the main list
+ALL_FUNCTION_DEFINITIONS = FUNCTION_DEFINITIONS + CHART_FUNCTION_DEFINITIONS
+
+# Set of chart function names for quick lookup
+_CHART_FN_NAMES = {fn["name"] for fn in CHART_FUNCTION_DEFINITIONS}
+
 
 def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
     """Filter available functions based on role permissions."""
     available = []
-    for fn in FUNCTION_DEFINITIONS:
+    for fn in ALL_FUNCTION_DEFINITIONS:
         name = fn["name"]
         if name == "get_va_performance_report" and not permissions.get("va_data"):
             continue
@@ -208,6 +217,20 @@ def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
         if name == "flag_va_for_pip" and not permissions.get("manage_team"):
             continue
         if name == "get_client_mrr_summary" and not permissions.get("financials"):
+            continue
+        # Chart functions: pipeline/campaign charts need prospect_data, VA chart needs va_data,
+        # revenue/health charts need financials or reports
+        if name == "get_pipeline_funnel_chart" and not permissions.get("prospect_data"):
+            continue
+        if name == "get_revenue_trend_chart" and not permissions.get("financials"):
+            continue
+        if name == "compare_periods_chart" and not permissions.get("reports"):
+            continue
+        if name == "get_campaign_health_chart" and not permissions.get("prospect_data"):
+            continue
+        if name == "get_va_leaderboard_chart" and not permissions.get("va_data"):
+            continue
+        if name == "get_client_health_chart" and not permissions.get("reports"):
             continue
         available.append(fn)
     return available
@@ -238,6 +261,8 @@ def _execute_function(
             return _fn_flag_va_for_pip(args, uid, headers)
         elif name == "get_client_mrr_summary":
             return _fn_get_client_mrr_summary(headers)
+        elif name in _CHART_FN_NAMES:
+            return execute_chart_function(name, args)
         else:
             return json.dumps({"error": f"Unknown function: {name}"})
     except Exception as exc:
@@ -620,6 +645,13 @@ IMPORTANT RULES:
 - Offer to help with related tasks after completing a request
 - For document generation, call the generate_document function and let the user know it's ready
 
+VISUAL CHARTS:
+- When the user asks to "show", "chart", "visualize", "compare", or "graph" any metric, use the appropriate chart function
+- Chart functions render interactive visual charts directly in the chat — always prefer them over text tables for visual data
+- Available chart functions: pipeline funnel, revenue trend, period comparison, campaign health, VA leaderboard, client health distribution
+- When comparing metrics across periods (e.g. "compare this week vs last week"), use compare_periods_chart
+- Briefly narrate the key insight from the chart data in your text response
+
 Available permissions for this user: {json.dumps(permissions)}"""
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -655,6 +687,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
     msg = response.choices[0].message
 
     # Handle function calls
+    chart_data = None  # Will hold chart JSON if a chart function is called
     if msg.tool_calls:
         for tool_call in msg.tool_calls:
             fn_name = tool_call.function.name
@@ -665,7 +698,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
             # Check permission before executing
             fn_allowed = True
-            for fn_def in FUNCTION_DEFINITIONS:
+            for fn_def in ALL_FUNCTION_DEFINITIONS:
                 if fn_def["name"] == fn_name:
                     # Re-check using filter
                     if fn_def not in available_fns:
@@ -674,6 +707,12 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
             if fn_allowed:
                 fn_result = _execute_function(fn_name, fn_args, uid, permissions)
+                # If this was a chart function, capture the chart data for the frontend
+                if fn_name in _CHART_FN_NAMES:
+                    try:
+                        chart_data = json.loads(fn_result)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
             else:
                 fn_result = json.dumps({"error": "This action is not available for your access level."})
 
@@ -743,4 +782,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
         timeout=20.0,
     )
 
-    return {"reply": final_content}
+    result: dict[str, Any] = {"reply": final_content}
+    if chart_data and isinstance(chart_data, dict) and "chart_type" in chart_data:
+        result["chart_data"] = chart_data
+    return result
