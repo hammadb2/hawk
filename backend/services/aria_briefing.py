@@ -236,19 +236,20 @@ def run_monday_briefing() -> dict[str, Any]:
     headers = _sb()
     today = date.today()
 
-    # Check if briefing already generated today
+    # Check if Monday briefing already generated today (exclude competitive briefs)
     existing = httpx.get(
         f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
         headers=headers,
         params={
             "briefing_date": f"eq.{today.isoformat()}",
+            "content": "not.like.## Competitive Intelligence*",
             "select": "id",
             "limit": "1",
         },
         timeout=15.0,
     )
     if existing.status_code < 400 and (existing.json() or []):
-        return {"ok": True, "skipped": True, "message": "briefing already generated today"}
+        return {"ok": True, "skipped": True, "message": "monday briefing already generated today"}
 
     # Gather metrics and generate briefing
     metrics = _fetch_metrics(headers)
@@ -311,6 +312,21 @@ def run_competitive_brief() -> dict[str, Any]:
 
     headers = _sb()
     today = date.today()
+
+    # Check if competitive brief already generated today
+    existing = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=headers,
+        params={
+            "briefing_date": f"eq.{today.isoformat()}",
+            "content": "like.## Competitive Intelligence*",
+            "select": "id",
+            "limit": "1",
+        },
+        timeout=15.0,
+    )
+    if existing.status_code < 400 and (existing.json() or []):
+        return {"ok": True, "skipped": True, "message": "competitive brief already generated today"}
 
     brief_content = generate_competitive_brief()
 
