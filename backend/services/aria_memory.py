@@ -356,9 +356,13 @@ def run_memory_ingestion(lookback_minutes: int = 20) -> dict[str, Any]:
     texts_to_embed = [f"{m['summary']}\n{m['detail']}" for m in new_memories]
     embeddings = get_embeddings_batch(texts_to_embed)
 
-    # Store each memory
+    # Store each memory (skip if embedding is None — will retry next cron run)
     ingested = 0
+    embed_failures = 0
     for mem, emb in zip(new_memories, embeddings):
+        if emb is None:
+            embed_failures += 1
+            continue
         ok = _store_memory(
             headers,
             event_type=mem["event_type"],
@@ -375,10 +379,14 @@ def run_memory_ingestion(lookback_minutes: int = 20) -> dict[str, Any]:
         if ok:
             ingested += 1
 
+    if embed_failures:
+        logger.warning("memory ingestion: %d events skipped due to embedding failures (will retry)", embed_failures)
+
     return {
         "ok": True,
         "ingested": ingested,
         "skipped": skipped,
+        "embed_failures": embed_failures,
         "total_events": len(all_memories),
     }
 
