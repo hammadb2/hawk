@@ -267,6 +267,7 @@ def run_monday_briefing() -> dict[str, Any]:
 
     users = pr.json() or []
     stored = 0
+    stored_uids: set[str] = set()
 
     for user in users:
         uid = user["id"]
@@ -284,11 +285,14 @@ def run_monday_briefing() -> dict[str, Any]:
         )
         if sr.status_code < 400:
             stored += 1
+            stored_uids.add(uid)
         else:
             logger.warning("briefing store failed user=%s: %s", uid, sr.text[:200])
 
-    # Also create a notification
+    # Only notify users whose briefing was successfully stored
     for user in users:
+        if user["id"] not in stored_uids:
+            continue
         httpx.post(
             f"{SUPABASE_URL}/rest/v1/notifications",
             headers={**headers, "Prefer": "return=minimal"},
