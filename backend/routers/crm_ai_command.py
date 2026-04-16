@@ -1,4 +1,4 @@
-"""CRM — AI Command Center API endpoints (function calling + chat persistence)."""
+"""CRM — ARIA (Automated Revenue & Intelligence Assistant) API endpoints."""
 
 from __future__ import annotations
 
@@ -52,14 +52,14 @@ ALLOWED_ROLE_TYPES = {"ceo", "va_manager"}
 
 
 def _require_ai_access(uid: str) -> dict[str, Any]:
-    """Ensure user has access to AI Command Center. Returns profile."""
+    """Ensure user has access to ARIA. Returns profile."""
     prof = _get_profile(uid)
     if not prof:
         raise HTTPException(status_code=403, detail="Profile not found")
     role = prof.get("role", "")
     role_type = prof.get("role_type", "")
     if role not in ALLOWED_ROLES and role_type not in ALLOWED_ROLE_TYPES:
-        raise HTTPException(status_code=403, detail="AI Command Center access denied")
+        raise HTTPException(status_code=403, detail="ARIA access denied")
     return prof
 
 
@@ -472,7 +472,7 @@ class CreateConversationBody(BaseModel):
 
 @router.post("/conversations")
 def create_conversation(body: CreateConversationBody, uid: str = Depends(require_supabase_uid)):
-    """Create a new AI Command Center conversation."""
+    """Create a new ARIA conversation."""
     prof = _require_ai_access(uid)
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
@@ -496,7 +496,7 @@ def create_conversation(body: CreateConversationBody, uid: str = Depends(require
 
 @router.get("/conversations")
 def list_conversations(uid: str = Depends(require_supabase_uid)):
-    """List user's AI Command Center conversations."""
+    """List user's ARIA conversations."""
     _require_ai_access(uid)
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
@@ -556,7 +556,7 @@ class SendMessageBody(BaseModel):
 
 @router.post("/chat")
 def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_uid)):
-    """Send a message to the AI Command Center and get a response."""
+    """Send a message to ARIA and get a response."""
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=503, detail="OpenAI not configured")
 
@@ -605,20 +605,35 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
     role_type = prof.get("role_type", "")
     user_name = prof.get("full_name", "User")
 
-    system_prompt = f"""You are HAWK Command, the AI operations assistant for Hawk Security's CRM.
+    today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+
+    system_prompt = f"""You are ARIA — Automated Revenue and Intelligence Assistant.
+You are the chief of staff for Hawk Security, not a chatbot. You know the business inside out.
+
 You are speaking with {user_name} (role: {role_name}, type: {role_type}).
+Today is {today}.
 
-You can take real actions through function calls. Every action you take is logged.
+HAWK SECURITY CONTEXT:
+- Canadian cybersecurity company targeting dental clinics, law firms, and accounting practices
+- Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo
+- Target: 24 booked sales calls per day from cold email outreach
+- VA team managed by Kevin runs the Apollo → Clay → Smartlead → ZeroBounce pipeline
+- HAWK Certified badge is a key differentiator
+- Financial guarantee is a key differentiator
+- PIPEDA compliance is the primary regulatory angle for Canadian SMBs
 
-IMPORTANT RULES:
-- Be professional, concise, and action-oriented
-- When the user asks for data, use the appropriate function to fetch it
-- When asked to send an email, confirm the details before sending
-- When presenting data, format it clearly with key metrics highlighted
-- If a function is not available for this user's role, explain that you cannot perform that action for their access level
-- Never expose internal system details or database structure
-- Offer to help with related tasks after completing a request
-- For document generation, call the generate_document function and let the user know it's ready
+PERSONALITY:
+- Sharp, confident, concise. Never say "Great question" or "Certainly" or "Of course".
+- Just answer and act. Present outputs cleanly. Be direct when you need confirmation.
+- When a function is not available for this user's role, explain naturally that you cannot share that — never show hard errors.
+
+RULES:
+- You can take real actions through function calls. Every action is logged.
+- When asked to send an email, show a confirmation card before sending.
+- Present data with key metrics highlighted.
+- Never expose internal system details or database structure.
+- For document generation, call the function and present an inline download button.
+- Always present a confirmation card before any irreversible action.
 
 Available permissions for this user: {json.dumps(permissions)}"""
 

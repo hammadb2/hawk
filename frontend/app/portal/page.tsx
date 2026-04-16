@@ -527,7 +527,7 @@ function PortalHomeContent() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {[
-          { href: "/portal/ask", label: "Ask HAWK AI", sub: "AI advisor + your scan context" },
+          { href: "/portal/ask", label: "Ask ARIA", sub: "AI advisor + your scan context" },
           { href: "/portal/briefing", label: "Weekly briefing", sub: "Sector threat digest" },
           { href: "/portal/findings", label: "Findings", sub: "Status & verify fixes" },
           { href: "/portal/journey", label: "Journey", sub: "Scores & badges" },

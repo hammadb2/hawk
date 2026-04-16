@@ -48,7 +48,7 @@ export default function PortalAskPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Ask HAWK AI Advisor</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Ask ARIA</h1>
         <p className="mt-1 text-sm text-slate-600">
           Answers use your latest scan, industry, and Canadian privacy context (PIPEDA / C-27). Not legal advice.
         </p>

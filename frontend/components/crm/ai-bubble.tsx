@@ -113,7 +113,7 @@ export function AiBubble() {
       <button
         onClick={() => setOpen(!open)}
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-all hover:scale-105"
-        title="AI Command Center"
+        title="ARIA"
       >
         {open ? (
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,8 +132,8 @@ export function AiBubble() {
           {/* Header */}
           <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-emerald-600 px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-white">HAWK AI</p>
-              <p className="text-xs text-emerald-100">Command Center</p>
+              <p className="text-sm font-semibold text-white">ARIA</p>
+              <p className="text-xs text-emerald-100">Automated Revenue &amp; Intelligence Assistant</p>
             </div>
             <div className="flex items-center gap-2">
               <Link

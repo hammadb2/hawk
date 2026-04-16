@@ -39,7 +39,7 @@ const BLOCKED_ROLES = ["va", "client"];
 const PIPELINE_ALLOWED_ROLES = ["ceo"];
 const PIPELINE_ALLOWED_ROLE_TYPES = ["ceo", "va_manager"];
 
-export default function AiCommandCenterPage() {
+export default function AriaPage() {
   const supabase = useMemo(() => createClient(), []);
   const { profile, session } = useCrmAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -253,7 +253,7 @@ export default function AiCommandCenterPage() {
   if (profile && BLOCKED_ROLES.includes(profile.role || "")) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-slate-500">The AI Command Center is not available for your role.</p>
+        <p className="text-slate-500">ARIA is not available for your role.</p>
       </div>
     );
   }
@@ -302,7 +302,7 @@ export default function AiCommandCenterPage() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
           <div>
-            <h1 className="text-sm font-semibold text-slate-900">AI Command Center</h1>
+            <h1 className="text-sm font-semibold text-slate-900">ARIA</h1>
             <p className="text-xs text-slate-500">
               {profile?.role === "ceo"
                 ? "Full access — all commands available"
@@ -327,10 +327,11 @@ export default function AiCommandCenterPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </div>
-                <h2 className="text-lg font-semibold text-slate-900">HAWK AI Command Center</h2>
-                <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
-                  Ask me anything about your operations. I can pull reports, send emails, manage team members, generate documents, run the outbound pipeline, and more.
-                </p>
+                                <h2 className="text-lg font-semibold text-slate-900">ARIA</h2>
+                                <p className="mt-1 text-xs text-slate-500">Automated Revenue &amp; Intelligence Assistant</p>
+                                <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
+                                  I run your outbound pipeline, pull reports, generate documents, manage your team, and monitor the business 24/7. Tell me what you need.
+                                </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {[
                     "Show VA performance this week",
@@ -361,7 +362,7 @@ export default function AiCommandCenterPage() {
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <p className="mb-1 text-xs font-semibold text-emerald-600">HAWK AI</p>
+                    <p className="mb-1 text-xs font-semibold text-emerald-600">ARIA</p>
                   )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                   {msg.function_name && (
@@ -403,7 +404,7 @@ export default function AiCommandCenterPage() {
             {sending && (
               <div className="flex justify-start">
                 <div className="rounded-2xl bg-slate-100 border border-slate-200 px-4 py-3">
-                  <p className="text-xs font-semibold text-emerald-600 mb-1">HAWK AI</p>
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">ARIA</p>
                   <div className="flex gap-1">
                     <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "0ms" }} />
                     <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "150ms" }} />
@@ -451,7 +452,7 @@ export default function AiCommandCenterPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
-              placeholder="Ask HAWK AI anything..."
+              placeholder="Ask ARIA anything..."
               className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400/20"
             />
             <button
