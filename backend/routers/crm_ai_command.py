@@ -605,6 +605,14 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
     role_type = prof.get("role_type", "")
     user_name = prof.get("full_name", "User")
 
+    # Retrieve semantic memory context for this query
+    from services.aria_memory import build_memory_context
+    memory_context = ""
+    try:
+        memory_context = build_memory_context(body.content)
+    except Exception:
+        pass  # memory retrieval is best-effort
+
     system_prompt = f"""You are HAWK Command, the AI operations assistant for Hawk Security's CRM.
 You are speaking with {user_name} (role: {role_name}, type: {role_type}).
 
@@ -621,6 +629,9 @@ IMPORTANT RULES:
 - For document generation, call the generate_document function and let the user know it's ready
 
 Available permissions for this user: {json.dumps(permissions)}"""
+
+    if memory_context:
+        system_prompt += f"\n\n{memory_context}"
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in history:
@@ -744,3 +755,30 @@ Available permissions for this user: {json.dumps(permissions)}"""
     )
 
     return {"reply": final_content}
+
+
+# ── Memory search endpoint ───────────────────────────────────────────────
+
+class MemorySearchBody(BaseModel):
+    query: str
+    match_count: int = 8
+    filter_event_type: str | None = None
+    filter_subject_type: str | None = None
+
+
+@router.post("/memory/search")
+def search_aria_memory(body: MemorySearchBody, uid: str = Depends(require_supabase_uid)):
+    """Search ARIA semantic memory (CEO/HoS only)."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos"):
+        raise HTTPException(status_code=403, detail="Memory search is only available to CEO and HoS roles")
+
+    from services.aria_memory import search_memories
+    results = search_memories(
+        body.query,
+        match_count=body.match_count,
+        filter_event_type=body.filter_event_type,
+        filter_subject_type=body.filter_subject_type,
+    )
+    return {"results": results, "count": len(results)}
