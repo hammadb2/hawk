@@ -820,6 +820,51 @@ def get_messages(conversation_id: str, uid: str = Depends(require_supabase_uid))
     return r.json()
 
 
+# ── Briefing endpoints ────────────────────────────────────────────────────
+
+
+@router.get("/briefings/unread")
+def get_unread_briefings(uid: str = Depends(require_supabase_uid)):
+    """Return unread proactive briefings for the authenticated user."""
+    _require_ai_access(uid)
+    headers = _sb_headers()
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=headers,
+        params={
+            "user_id": f"eq.{uid}",
+            "read": "eq.false",
+            "select": "id,briefing_date,content,created_at",
+            "order": "created_at.desc",
+            "limit": "10",
+        },
+        timeout=15.0,
+    )
+    if r.status_code >= 400:
+        return []
+    return r.json()
+
+
+@router.post("/briefings/{briefing_id}/read")
+def mark_briefing_read(briefing_id: str, uid: str = Depends(require_supabase_uid)):
+    """Mark a briefing as read for the authenticated user."""
+    _require_ai_access(uid)
+    headers = _sb_headers()
+    r = httpx.patch(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=headers,
+        params={
+            "id": f"eq.{briefing_id}",
+            "user_id": f"eq.{uid}",
+        },
+        json={"read": True},
+        timeout=15.0,
+    )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=400, detail="Failed to mark briefing as read")
+    return {"ok": True}
+
+
 @router.get("/dashboard")
 def get_ceo_dashboard(uid: str = Depends(require_supabase_uid)):
     """Dedicated CEO dashboard endpoint — returns structured KPI data + narration."""
