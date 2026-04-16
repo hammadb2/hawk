@@ -461,13 +461,15 @@ def approve_reply(reply_id: str, reviewer_id: str, edited_body: str | None = Non
     if edited_body is not None:
         update["draft_body"] = edited_body
 
-    httpx.patch(
+    r = httpx.patch(
         f"{SUPABASE_URL}/rest/v1/aria_inbound_replies",
         headers=headers,
         params={"id": f"eq.{reply_id}"},
         json=update,
         timeout=15.0,
     )
+    if r.status_code >= 400:
+        return {"ok": False, "error": r.text[:300]}
 
     return {"ok": True, "reply_id": reply_id, "status": "approved"}
 
