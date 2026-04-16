@@ -303,7 +303,7 @@ def _fn_schedule_action(args: dict[str, Any], uid: str, headers: dict[str, str])
         "scheduled_for": args.get("scheduled_for", ""),
     }
     r = httpx.post(
-        f"{SUPABASE_URL}/rest/v1/scheduled_ai_actions",
+        f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
         headers={**headers, "Prefer": "return=representation"},
         json=payload,
         timeout=20.0,
@@ -447,16 +447,16 @@ def _fn_get_client_mrr_summary(headers: dict[str, str]) -> str:
 
 
 def _log_action(uid: str, action_type: str, payload: dict, result: str) -> None:
-    """Log AI action to ai_action_log."""
+    """Log AI action to aria_action_log."""
     try:
         httpx.post(
-            f"{SUPABASE_URL}/rest/v1/ai_action_log",
+            f"{SUPABASE_URL}/rest/v1/aria_action_log",
             headers=_sb_headers(),
             json={
                 "triggered_by": uid,
                 "action_type": action_type,
                 "action_payload": payload,
-                "result": result,
+                "action_result": result,
             },
             timeout=15.0,
         )
@@ -483,7 +483,7 @@ def create_conversation(body: CreateConversationBody, uid: str = Depends(require
         "title": body.title or "New conversation",
     }
     r = httpx.post(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_conversations",
+        f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers={**headers, "Prefer": "return=representation"},
         json=payload,
         timeout=20.0,
@@ -502,7 +502,7 @@ def list_conversations(uid: str = Depends(require_supabase_uid)):
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
     r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_conversations",
+        f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers=_sb_headers(),
         params={
             "user_id": f"eq.{uid}",
@@ -526,7 +526,7 @@ def get_messages(conversation_id: str, uid: str = Depends(require_supabase_uid))
     # Verify ownership
     headers = _sb_headers()
     cr = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_conversations",
+        f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers=headers,
         params={"id": f"eq.{conversation_id}", "user_id": f"eq.{uid}", "select": "id", "limit": "1"},
         timeout=20.0,
@@ -535,7 +535,7 @@ def get_messages(conversation_id: str, uid: str = Depends(require_supabase_uid))
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_messages",
+        f"{SUPABASE_URL}/rest/v1/aria_messages",
         headers=headers,
         params={
             "conversation_id": f"eq.{conversation_id}",
@@ -566,7 +566,7 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
 
     # Verify conversation ownership
     cr = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_conversations",
+        f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers=headers,
         params={"id": f"eq.{body.conversation_id}", "user_id": f"eq.{uid}", "select": "id", "limit": "1"},
         timeout=20.0,
@@ -576,7 +576,7 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
 
     # Save user message
     httpx.post(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_messages",
+        f"{SUPABASE_URL}/rest/v1/aria_messages",
         headers=headers,
         json={
             "conversation_id": body.conversation_id,
@@ -588,7 +588,7 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
 
     # Get conversation history
     hist_r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_messages",
+        f"{SUPABASE_URL}/rest/v1/aria_messages",
         headers=headers,
         params={
             "conversation_id": f"eq.{body.conversation_id}",
@@ -679,7 +679,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
             # Save function call message
             httpx.post(
-                f"{SUPABASE_URL}/rest/v1/ai_chat_messages",
+                f"{SUPABASE_URL}/rest/v1/aria_messages",
                 headers=headers,
                 json={
                     "conversation_id": body.conversation_id,
@@ -693,7 +693,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
             # Save function result
             httpx.post(
-                f"{SUPABASE_URL}/rest/v1/ai_chat_messages",
+                f"{SUPABASE_URL}/rest/v1/aria_messages",
                 headers=headers,
                 json={
                     "conversation_id": body.conversation_id,
@@ -724,7 +724,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
     # Save assistant response
     httpx.post(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_messages",
+        f"{SUPABASE_URL}/rest/v1/aria_messages",
         headers=headers,
         json={
             "conversation_id": body.conversation_id,
@@ -736,7 +736,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
     # Update conversation timestamp and title if first message
     httpx.patch(
-        f"{SUPABASE_URL}/rest/v1/ai_chat_conversations",
+        f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers=headers,
         params={"id": f"eq.{body.conversation_id}"},
         json={"updated_at": datetime.now(timezone.utc).isoformat()},

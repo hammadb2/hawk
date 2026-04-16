@@ -6,15 +6,13 @@ for the ARIA autonomous outbound pipeline.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from config import SUPABASE_URL
