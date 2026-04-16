@@ -32,7 +32,7 @@ export default function OnboardingReviewPage() {
       });
       if (r.ok) {
         const data = await r.json();
-        setItems(data.items || []);
+        setItems(Array.isArray(data) ? data : (data.items || []));
       }
     } catch (err) {
       console.error("Failed to load review queue:", err);

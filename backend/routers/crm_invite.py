@@ -169,7 +169,7 @@ def _create_onboarding_session(profile_id: str, agreed_terms: dict[str, Any], he
     try:
         payload = {
             "profile_id": profile_id,
-            "status": "not_started",
+            "status": "in_progress",
             "current_step": 0,
             "agreed_terms": agreed_terms,
         }

@@ -73,7 +73,7 @@ export default function AiCommandCenterPage() {
       });
       if (r.ok) {
         const data = await r.json();
-        setMessages(data.messages || []);
+        setMessages(Array.isArray(data) ? data : (data.messages || []));
       }
     } catch (err) {
       console.error("Failed to load messages:", err);

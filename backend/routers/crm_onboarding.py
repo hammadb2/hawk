@@ -51,8 +51,8 @@ def _require_ceo_or_va_manager(uid: str) -> dict[str, Any]:
         raise HTTPException(status_code=403, detail="Profile not found")
     role = prof.get("role", "")
     role_type = prof.get("role_type", "")
-    if role != "ceo" and role_type != "va_manager":
-        raise HTTPException(status_code=403, detail="CEO or VA Manager only")
+    if role not in ("ceo", "hos") and role_type != "va_manager":
+        raise HTTPException(status_code=403, detail="CEO, HoS, or VA Manager only")
     return prof
 
 
@@ -691,7 +691,7 @@ def list_review_queue(
         "order": "created_at.desc",
         "limit": "100",
     }
-    if status:
+    if status and status != "all":
         params["status"] = f"eq.{status}"
 
     r = httpx.get(
