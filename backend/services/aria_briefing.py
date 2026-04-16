@@ -242,7 +242,7 @@ def run_monday_briefing() -> dict[str, Any]:
         headers=headers,
         params={
             "briefing_date": f"eq.{today.isoformat()}",
-            "content": "not.like.## Competitive Intelligence*",
+            "content": "not.like.## Competitive Intelligence%",
             "select": "id",
             "limit": "1",
         },
@@ -319,7 +319,7 @@ def run_competitive_brief() -> dict[str, Any]:
         headers=headers,
         params={
             "briefing_date": f"eq.{today.isoformat()}",
-            "content": "like.## Competitive Intelligence*",
+            "content": "like.## Competitive Intelligence%",
             "select": "id",
             "limit": "1",
         },
