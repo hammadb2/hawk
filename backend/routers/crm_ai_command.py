@@ -605,13 +605,14 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
     role_type = prof.get("role_type", "")
     user_name = prof.get("full_name", "User")
 
-    # Retrieve semantic memory context for this query
+    # Retrieve semantic memory context for this query (CEO/HoS only — contains sensitive CRM data)
     from services.aria_memory import build_memory_context
     memory_context = ""
-    try:
-        memory_context = build_memory_context(body.content)
-    except Exception:
-        pass  # memory retrieval is best-effort
+    if role_name in ("ceo", "hos"):
+        try:
+            memory_context = build_memory_context(body.content)
+        except Exception:
+            pass  # memory retrieval is best-effort
 
     system_prompt = f"""You are HAWK Command, the AI operations assistant for Hawk Security's CRM.
 You are speaking with {user_name} (role: {role_name}, type: {role_type}).

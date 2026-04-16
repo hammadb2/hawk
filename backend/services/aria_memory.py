@@ -214,12 +214,12 @@ def _build_prospect_memories(prospects: list[dict[str, Any]]) -> list[dict[str, 
         hawk_score = p.get("hawk_score")
 
         summary = f"Prospect {company} is at stage '{stage}'"
-        if hawk_score:
+        if hawk_score is not None:
             summary += f" with hawk score {hawk_score}"
 
         detail = f"Prospect {company} (domain: {p.get('domain', 'N/A')}) "
         detail += f"is in pipeline stage '{stage}'. "
-        if hawk_score:
+        if hawk_score is not None:
             detail += f"Hawk security score: {hawk_score}/100. "
         if p.get("email"):
             detail += f"Contact email: {p['email']}. "
