@@ -93,7 +93,7 @@ function RevenueTrend({ chart }: { chart: ChartData }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
         <XAxis dataKey={chart.x_key} tick={{ fontSize: 11, fill: "#64748b" }} />
         <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-        <Tooltip {...tooltipStyle} formatter={(v: number) => [`$${v.toLocaleString()}`, chart.y_label || "MRR"]} />
+        <Tooltip {...tooltipStyle} formatter={(v) => [`$${Number(v).toLocaleString()}`, chart.y_label || "MRR"]} />
         <Area
           type="monotone"
           dataKey="mrr"

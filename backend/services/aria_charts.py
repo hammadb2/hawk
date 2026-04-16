@@ -179,22 +179,20 @@ def compare_periods(metric: str, period1: str, period2: str) -> dict[str, Any]:
     r2_start, r2_end = _period_range(period2)
 
     def _count_metric(start: str, end: str) -> int:
+        date_filter = f"(created_at.gte.{start},created_at.lte.{end})"
         if metric == "calls_booked":
             return _count_rows("activities", {
                 "type": "eq.call_booked",
-                "created_at": f"gte.{start}",
-                "created_at": f"lte.{end}",
+                "and": date_filter,
             })
         elif metric == "emails_sent":
             return _count_rows("activities", {
                 "type": "eq.email_sent",
-                "created_at": f"gte.{start}",
-                "created_at": f"lte.{end}",
+                "and": date_filter,
             })
         elif metric == "prospects_added":
             return _count_rows("prospects", {
-                "created_at": f"gte.{start}",
-                "created_at": f"lte.{end}",
+                "and": date_filter,
             })
         elif metric == "revenue":
             clients = _fetch_rows("clients", {
