@@ -540,6 +540,8 @@ def send_approved_reply(reply_id: str) -> dict[str, Any]:
         body=reply["draft_body"],
         prospect=prospect,
     )
+    if smartlead_id is None:
+        return {"ok": False, "error": "Smartlead send failed — no message ID returned. Campaign mapping may not be established yet."}
 
     now = datetime.now(timezone.utc)
     httpx.patch(
