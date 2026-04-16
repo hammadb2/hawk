@@ -236,26 +236,7 @@ def run_monday_briefing() -> dict[str, Any]:
     headers = _sb()
     today = date.today()
 
-    # Check if Monday briefing already generated today (exclude competitive briefs)
-    existing = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
-        headers=headers,
-        params={
-            "briefing_date": f"eq.{today.isoformat()}",
-            "content": "not.like.## Competitive Intelligence%",
-            "select": "id",
-            "limit": "1",
-        },
-        timeout=15.0,
-    )
-    if existing.status_code < 400 and (existing.json() or []):
-        return {"ok": True, "skipped": True, "message": "monday briefing already generated today"}
-
-    # Gather metrics and generate briefing
-    metrics = _fetch_metrics(headers)
-    briefing_content = generate_monday_briefing(metrics)
-
-    # Find CEO and HoS users
+    # Find CEO and HoS users first
     pr = httpx.get(
         f"{SUPABASE_URL}/rest/v1/profiles",
         headers=headers,
@@ -266,10 +247,35 @@ def run_monday_briefing() -> dict[str, Any]:
         return {"ok": False, "error": "failed to fetch profiles"}
 
     users = pr.json() or []
+
+    # Check which users already have a Monday briefing today (partial-failure safe)
+    existing = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=headers,
+        params={
+            "briefing_date": f"eq.{today.isoformat()}",
+            "content": "not.like.## Competitive Intelligence%",
+            "select": "user_id",
+            "limit": "100",
+        },
+        timeout=15.0,
+    )
+    already_stored: set[str] = set()
+    if existing.status_code < 400:
+        already_stored = {r["user_id"] for r in (existing.json() or [])}
+
+    pending_users = [u for u in users if u["id"] not in already_stored]
+    if not pending_users:
+        return {"ok": True, "skipped": True, "message": "monday briefing already generated today for all users"}
+
+    # Gather metrics and generate briefing
+    metrics = _fetch_metrics(headers)
+    briefing_content = generate_monday_briefing(metrics)
+
     stored = 0
     stored_uids: set[str] = set()
 
-    for user in users:
+    for user in pending_users:
         uid = user["id"]
         payload = {
             "user_id": uid,
@@ -317,23 +323,6 @@ def run_competitive_brief() -> dict[str, Any]:
     headers = _sb()
     today = date.today()
 
-    # Check if competitive brief already generated today
-    existing = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
-        headers=headers,
-        params={
-            "briefing_date": f"eq.{today.isoformat()}",
-            "content": "like.## Competitive Intelligence%",
-            "select": "id",
-            "limit": "1",
-        },
-        timeout=15.0,
-    )
-    if existing.status_code < 400 and (existing.json() or []):
-        return {"ok": True, "skipped": True, "message": "competitive brief already generated today"}
-
-    brief_content = generate_competitive_brief()
-
     # Store for CEO only
     pr = httpx.get(
         f"{SUPABASE_URL}/rest/v1/profiles",
@@ -345,9 +334,32 @@ def run_competitive_brief() -> dict[str, Any]:
         return {"ok": False, "error": "failed to fetch CEO profiles"}
 
     ceos = pr.json() or []
+
+    # Check which CEOs already have a competitive brief today (partial-failure safe)
+    existing = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=headers,
+        params={
+            "briefing_date": f"eq.{today.isoformat()}",
+            "content": "like.## Competitive Intelligence%",
+            "select": "user_id",
+            "limit": "100",
+        },
+        timeout=15.0,
+    )
+    already_stored: set[str] = set()
+    if existing.status_code < 400:
+        already_stored = {r["user_id"] for r in (existing.json() or [])}
+
+    pending_ceos = [c for c in ceos if c["id"] not in already_stored]
+    if not pending_ceos:
+        return {"ok": True, "skipped": True, "message": "competitive brief already generated today for all CEOs"}
+
+    brief_content = generate_competitive_brief()
+
     stored = 0
 
-    for ceo in ceos:
+    for ceo in pending_ceos:
         payload = {
             "user_id": ceo["id"],
             "briefing_date": today.isoformat(),
