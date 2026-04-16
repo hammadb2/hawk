@@ -383,4 +383,100 @@ def weekly_attacker_simulation_cron(
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+@router.post("/scheduled-ai-actions")
+def scheduled_ai_actions_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    AI Command Center — execute scheduled actions where executed = false and scheduled_for <= now().
+    Runs every minute via cron-job.org or Railway cron.
+    """
+    _require_secret(x_cron_secret)
+
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return {"ok": True, "mode": "stub", "executed": 0}
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Fetch due actions
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/scheduled_ai_actions",
+        headers=headers,
+        params={
+            "executed": "eq.false",
+            "scheduled_for": f"lte.{now}",
+            "select": "*",
+            "limit": "50",
+        },
+        timeout=30.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("scheduled_ai_actions fetch failed: %s", r.text[:300])
+        return {"ok": False, "error": r.text[:300]}
+
+    actions = r.json() or []
+    executed_count = 0
+
+    for action in actions:
+        action_id = action["id"]
+        action_type = action.get("action_type", "")
+        payload = action.get("action_payload", {})
+
+        try:
+            if action_type == "send_email":
+                _execute_scheduled_email(payload, headers)
+            elif action_type == "send_reminder":
+                _execute_scheduled_email(payload, headers)
+            else:
+                logger.warning("Unknown scheduled action type: %s", action_type)
+
+            # Mark as executed
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/scheduled_ai_actions",
+                headers=headers,
+                params={"id": f"eq.{action_id}"},
+                json={"executed": True, "executed_at": datetime.now(timezone.utc).isoformat()},
+                timeout=20.0,
+            ).raise_for_status()
+            executed_count += 1
+        except Exception as exc:
+            logger.exception("Failed to execute scheduled action %s: %s", action_id, exc)
+
+    return {"ok": True, "mode": "live", "due": len(actions), "executed": executed_count}
+
+
+def _execute_scheduled_email(payload: dict, headers: dict) -> None:
+    """Execute a scheduled email action."""
+    from services.crm_portal_email import send_resend, _wrap, _esc
+
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    body_text = payload.get("body", "")
+
+    if not to or not subject:
+        logger.warning("Scheduled email missing 'to' or 'subject'")
+        return
+
+    inner = f"""
+      <tr>
+        <td style="padding:40px 48px 32px;">
+          <p style="margin:0 0 24px;font-size:15px;color:#9090A8;line-height:1.6;">
+            {_esc(body_text)}
+          </p>
+        </td>
+      </tr>
+"""
+    send_resend(
+        to_email=to,
+        subject=subject,
+        html=_wrap(inner),
+        tags=[{"name": "category", "value": "scheduled_ai_action"}],
+    )
+
+
 # scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).

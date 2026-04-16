@@ -1,0 +1,309 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import toast from "react-hot-toast";
+
+interface ReviewDetail {
+  session: {
+    id: string;
+    profile_id: string;
+    status: string;
+    agreed_terms: Record<string, unknown> | null;
+    current_step: number;
+    created_at: string;
+  };
+  profile: {
+    full_name: string;
+    email: string;
+    role: string;
+    role_type: string;
+  };
+  personal_details: Record<string, string> | null;
+  bank_details: Record<string, string> | null;
+  documents: { document_type: string; signed_at: string; file_url: string }[];
+  quiz_results: { module: string; score: number; passed: boolean }[];
+  submission: { government_id_url: string | null } | null;
+}
+
+export default function OnboardingReviewDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const { profile, session } = useCrmAuth();
+  const [detail, setDetail] = useState<ReviewDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [showReject, setShowReject] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const sessionId = params.id as string;
+
+  const load = useCallback(async () => {
+    if (!session?.access_token || !sessionId) return;
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/onboarding/review/${sessionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (r.ok) {
+        setDetail(await r.json());
+      }
+    } catch (err) {
+      console.error("Failed to load review detail:", err);
+    }
+    setLoading(false);
+  }, [session?.access_token, sessionId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function handleAction(action: "approve" | "reject") {
+    if (!session?.access_token) return;
+    setSubmitting(true);
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/onboarding/review`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          action,
+          reason: action === "reject" ? rejectionReason : undefined,
+        }),
+      });
+      if (r.ok) {
+        toast.success(action === "approve" ? "Onboarding approved" : "Onboarding rejected");
+        router.push("/crm/onboarding/review");
+      } else {
+        const err = await r.json();
+        toast.error(err.detail || "Action failed");
+      }
+    } catch {
+      toast.error("Network error");
+    }
+    setSubmitting(false);
+  }
+
+  if (!profile || (profile.role !== "ceo" && profile.role !== "hos" && profile.role_type !== "va_manager")) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-slate-500">You do not have permission to view this page.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-slate-500">Submission not found.</p>
+      </div>
+    );
+  }
+
+  const { profile: hireProfile, personal_details, bank_details, documents, quiz_results, submission } = detail;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <button
+            onClick={() => router.push("/crm/onboarding/review")}
+            className="mb-2 text-xs text-emerald-600 hover:text-emerald-700"
+          >
+            &larr; Back to queue
+          </button>
+          <h1 className="text-xl font-semibold text-slate-900">
+            {hireProfile.full_name}&apos;s Onboarding
+          </h1>
+          <p className="text-sm text-slate-500">
+            {hireProfile.email} &middot; {hireProfile.role_type || hireProfile.role}
+          </p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            detail.session.status === "pending_review"
+              ? "bg-amber-100 text-amber-700"
+              : detail.session.status === "approved"
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-red-100 text-red-700"
+          }`}
+        >
+          {detail.session.status === "pending_review" ? "Pending Review" : detail.session.status}
+        </span>
+      </div>
+
+      {/* Personal Details */}
+      <Section title="Personal Details">
+        {personal_details ? (
+          <div className="grid grid-cols-2 gap-3">
+            {Object.entries(personal_details).map(([k, v]) => (
+              <div key={k}>
+                <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
+                <p className="text-sm text-slate-900">{v || "—"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">Not submitted yet.</p>
+        )}
+      </Section>
+
+      {/* Bank Details */}
+      <Section title="Bank Details">
+        {bank_details ? (
+          <div className="grid grid-cols-2 gap-3">
+            {Object.entries(bank_details).map(([k, v]) => (
+              <div key={k}>
+                <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
+                <p className="text-sm text-slate-900">{v || "—"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">Not submitted yet.</p>
+        )}
+      </Section>
+
+      {/* Government ID */}
+      <Section title="Government ID">
+        {submission?.government_id_url ? (
+          <a
+            href={submission.government_id_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-emerald-600 hover:underline"
+          >
+            View uploaded ID
+          </a>
+        ) : (
+          <p className="text-sm text-slate-400">Not uploaded yet.</p>
+        )}
+      </Section>
+
+      {/* Signed Documents */}
+      <Section title="Signed Documents">
+        {documents.length > 0 ? (
+          <div className="space-y-2">
+            {documents.map((doc) => (
+              <div key={doc.document_type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <span className="text-sm font-medium text-slate-700">{doc.document_type.replace("_", " ")}</span>
+                <div className="flex items-center gap-3">
+                  {doc.file_url && (
+                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
+                      View PDF
+                    </a>
+                  )}
+                  <span className="text-xs text-slate-500">
+                    Signed {new Date(doc.signed_at).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No documents signed yet.</p>
+        )}
+      </Section>
+
+      {/* Quiz Results */}
+      <Section title="Quiz Results">
+        {quiz_results.length > 0 ? (
+          <div className="space-y-2">
+            {quiz_results.map((q) => (
+              <div key={q.module} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <span className="text-sm text-slate-700">{q.module.replace(/_/g, " ")}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${q.passed ? "text-emerald-600" : "text-red-600"}`}>
+                    {q.score}%
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${q.passed ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                    {q.passed ? "Passed" : "Failed"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No quizzes completed yet.</p>
+        )}
+      </Section>
+
+      {/* Agreed Terms */}
+      {detail.session.agreed_terms && (
+        <Section title="Agreed Terms">
+          <div className="grid grid-cols-2 gap-3">
+            {Object.entries(detail.session.agreed_terms).map(([k, v]) => (
+              <div key={k}>
+                <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
+                <p className="text-sm text-slate-900">{String(v) || "—"}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Actions */}
+      {detail.session.status === "pending_review" && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => void handleAction("approve")}
+              disabled={submitting}
+              className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => setShowReject(!showReject)}
+              disabled={submitting}
+              className="rounded-lg bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition"
+            >
+              Reject
+            </button>
+          </div>
+          {showReject && (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Reason for rejection (required)..."
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none"
+                rows={3}
+              />
+              <button
+                onClick={() => void handleAction("reject")}
+                disabled={submitting || !rejectionReason.trim()}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition"
+              >
+                Confirm Rejection
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="mb-3 text-sm font-semibold text-slate-900">{title}</h2>
+      {children}
+    </div>
+  );
+}
