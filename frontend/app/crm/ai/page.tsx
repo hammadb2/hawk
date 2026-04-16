@@ -51,7 +51,7 @@ export default function AiCommandCenterPage() {
       });
       if (r.ok) {
         const data = await r.json();
-        setConversations(data.conversations || []);
+        setConversations(Array.isArray(data) ? data : (data.conversations || []));
       }
     } catch (err) {
       console.error("Failed to load conversations:", err);
@@ -132,7 +132,9 @@ export default function AiCommandCenterPage() {
           setActiveConvId(convId);
           void loadConversations();
         } else {
-          setMessages((prev) => [...prev, { role: "assistant", content: "Failed to start conversation. Please try again." }]);
+          const errData = await cr.json().catch(() => ({ detail: `HTTP ${cr.status}` }));
+          const errMsg = typeof errData?.detail === "string" ? errData.detail : `HTTP ${cr.status}`;
+          setMessages((prev) => [...prev, { role: "assistant", content: `Failed to start conversation: ${errMsg}` }]);
           setSending(false);
           return;
         }

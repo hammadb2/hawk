@@ -57,7 +57,9 @@ export function AiBubble() {
           convId = cd.id;
           setConversationId(convId);
         } else {
-          setMessages((prev) => [...prev, { role: "assistant", content: "Failed to start conversation. Please try again." }]);
+          const errData = await cr.json().catch(() => ({ detail: `HTTP ${cr.status}` }));
+          const errMsg = typeof errData?.detail === "string" ? errData.detail : `HTTP ${cr.status}`;
+          setMessages((prev) => [...prev, { role: "assistant", content: `Failed to start conversation: ${errMsg}` }]);
           setSending(false);
           return;
         }
