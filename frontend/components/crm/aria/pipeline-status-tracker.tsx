@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 
 interface PipelineStep {
@@ -11,10 +11,10 @@ interface PipelineStep {
 
 const PIPELINE_STEPS: PipelineStep[] = [
   { key: "apollo_pull", label: "Apollo Pull", description: "Pulling leads from Apollo" },
-  { key: "clay_enrich", label: "Clay Enrichment", description: "Enriching via Clay API" },
+  { key: "clay_enrichment", label: "Clay Enrichment", description: "Enriching via Clay API" },
   { key: "zerobounce_verify", label: "ZeroBounce Verify", description: "Verifying emails" },
   { key: "hawk_scan", label: "Hawk Domain Scan", description: "Scanning domains for vulnerabilities" },
-  { key: "generate_emails", label: "Email Generation", description: "Generating personalized emails" },
+  { key: "email_generation", label: "Email Generation", description: "Generating personalized emails" },
   { key: "smartlead_load", label: "Smartlead Load", description: "Loading into Smartlead campaign" },
   { key: "completed", label: "Complete", description: "Pipeline run completed" },
 ];
@@ -49,8 +49,12 @@ function getStepIndex(step: string): number {
 export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props) {
   const [status, setStatus] = useState<PipelineStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const doneRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const fetchStatus = useCallback(async () => {
+    if (doneRef.current) return;
     try {
       const r = await fetch(`${CRM_API_BASE_URL}/api/crm/aria/pipeline/${runId}/status`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -59,7 +63,8 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
         const data = await r.json();
         setStatus(data);
         if (data.status === "completed" || data.status === "failed") {
-          onComplete?.(data);
+          doneRef.current = true;
+          onCompleteRef.current?.(data);
         }
       } else {
         const err = await r.json().catch(() => ({ detail: "Failed to fetch status" }));
@@ -68,23 +73,19 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
     } catch {
       setError("Connection error fetching pipeline status");
     }
-  }, [runId, accessToken, onComplete]);
+  }, [runId, accessToken]);
 
   useEffect(() => {
     void fetchStatus();
-    // Poll every 3 seconds while running
     const interval = setInterval(() => {
+      if (doneRef.current) {
+        clearInterval(interval);
+        return;
+      }
       void fetchStatus();
     }, 3000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
-
-  // Stop polling when done
-  useEffect(() => {
-    if (status?.status === "completed" || status?.status === "failed") {
-      // No more polling needed
-    }
-  }, [status?.status]);
 
   if (error) {
     return (
@@ -189,10 +190,10 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
                 {isDone && (
                   <span className="text-xs text-slate-500 font-mono">
                     {step.key === "apollo_pull" && status.leads_pulled > 0 && `${status.leads_pulled} leads`}
-                    {step.key === "clay_enrich" && status.leads_enriched > 0 && `${status.leads_enriched} enriched`}
+                    {step.key === "clay_enrichment" && status.leads_enriched > 0 && `${status.leads_enriched} enriched`}
                     {step.key === "zerobounce_verify" && status.leads_verified > 0 && `${status.leads_verified} verified`}
                     {step.key === "hawk_scan" && status.leads_scanned > 0 && `${status.leads_scanned} scanned`}
-                    {step.key === "generate_emails" && status.emails_generated > 0 && `${status.emails_generated} emails`}
+                    {step.key === "email_generation" && status.emails_generated > 0 && `${status.emails_generated} emails`}
                     {step.key === "smartlead_load" && status.emails_sent > 0 && `${status.emails_sent} sent`}
                   </span>
                 )}
