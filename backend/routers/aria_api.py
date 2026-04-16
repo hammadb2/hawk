@@ -64,14 +64,17 @@ def _validate_api_key(request: Request) -> dict[str, Any]:
 
     key_record = rows[0]
 
-    # Update last_used
-    httpx.patch(
-        f"{SUPABASE_URL}/rest/v1/aria_api_keys",
-        headers=_sb(),
-        params={"id": f"eq.{key_record['id']}"},
-        json={"last_used_at": datetime.now(timezone.utc).isoformat()},
-        timeout=10.0,
-    )
+    # Update last_used (non-critical — don't fail the request for a timestamp update)
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/aria_api_keys",
+            headers=_sb(),
+            params={"id": f"eq.{key_record['id']}"},
+            json={"last_used_at": datetime.now(timezone.utc).isoformat()},
+            timeout=10.0,
+        )
+    except Exception:
+        pass
 
     return key_record
 

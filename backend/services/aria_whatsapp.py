@@ -264,14 +264,17 @@ def approve_and_send(queue_id: str) -> dict[str, Any]:
     # Send the message
     result = send_text_message(item["phone"], item["drafted_reply"])
 
-    # Update final status
+    # Update final status (log warning on failure so item doesn't stay stuck in 'sending')
     new_status = "sent" if result.get("sent") else "failed"
-    httpx.patch(
-        f"{SUPABASE_URL}/rest/v1/aria_whatsapp_queue",
-        headers=_sb(),
-        params={"id": f"eq.{queue_id}"},
-        json={"status": new_status, "sent_at": datetime.now(timezone.utc).isoformat()},
-        timeout=15.0,
-    )
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/aria_whatsapp_queue",
+            headers=_sb(),
+            params={"id": f"eq.{queue_id}"},
+            json={"status": new_status, "sent_at": datetime.now(timezone.utc).isoformat()},
+            timeout=15.0,
+        )
+    except Exception as exc:
+        logger.warning("Failed to update queue status for %s: %s", queue_id, exc)
 
     return result
