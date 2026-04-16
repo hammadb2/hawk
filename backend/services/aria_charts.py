@@ -129,7 +129,7 @@ def get_revenue_trend(months: int = 6) -> dict[str, Any]:
         for c in clients:
             created = c.get("created_at", "")
             if created and created < month_end.isoformat():
-                mrr += c.get("mrr_cents", 0)
+                mrr += c.get("mrr_cents") or 0
                 count += 1
 
         data.append({
@@ -206,7 +206,7 @@ def compare_periods(metric: str, period1: str, period2: str) -> dict[str, Any]:
                 "select": "mrr_cents",
                 "limit": "500",
             })
-            return sum(c.get("mrr_cents", 0) for c in clients) // 100
+            return sum(c.get("mrr_cents") or 0 for c in clients) // 100
         return 0
 
     v1 = _count_metric(r1_start, r1_end)
@@ -288,7 +288,7 @@ def get_va_leaderboard() -> dict[str, Any]:
 
     data = []
     for va in vas:
-        name = va.get("full_name", "Unknown")
+        name = va.get("full_name") or "Unknown"
         # Shorten name for chart display
         parts = name.split()
         short = f"{parts[0]} {parts[1][0]}." if len(parts) > 1 else name
