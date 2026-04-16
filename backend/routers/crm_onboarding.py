@@ -584,7 +584,7 @@ def review_submission(body: ReviewBody, uid: str = Depends(require_supabase_uid)
     if not hire_profile:
         raise HTTPException(status_code=404, detail="Hire profile not found")
 
-    if reviewer.get("role") != "ceo" and reviewer.get("role_type") == "va_manager":
+    if reviewer.get("role") not in ("ceo", "hos") and reviewer.get("role_type") == "va_manager":
         if hire_profile.get("role_type") not in ("va_outreach", "va_manager"):
             raise HTTPException(status_code=403, detail="VA Manager can only review VA onboarding")
 
@@ -721,7 +721,7 @@ def list_review_queue(
     result = []
     for s in sessions:
         prof_info = profiles_map.get(s["profile_id"], {})
-        if reviewer.get("role") != "ceo" and reviewer.get("role_type") == "va_manager":
+        if reviewer.get("role") not in ("ceo", "hos") and reviewer.get("role_type") == "va_manager":
             if prof_info.get("role_type") not in ("va_outreach", "va_manager"):
                 continue
         result.append({**s, "profile": prof_info})
