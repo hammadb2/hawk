@@ -222,7 +222,7 @@ def register_webhook(
     webhook = {
         "url": body.url,
         "events": body.events,
-        "secret_hash": hashlib.sha256(body.secret.encode()).hexdigest() if body.secret else None,
+        "signing_secret": body.secret if body.secret else None,
         "api_key_id": key["id"],
         "active": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -270,7 +270,7 @@ def fire_webhook_event(event: str, payload: dict[str, Any]) -> int:
         params={
             "active": "eq.true",
             "events": f"cs.{json.dumps([event])}",
-            "select": "id,url,secret_hash",
+            "select": "id,url,signing_secret",
         },
         timeout=15.0,
     )
@@ -281,8 +281,8 @@ def fire_webhook_event(event: str, payload: dict[str, Any]) -> int:
         try:
             body = json.dumps({"event": event, "timestamp": datetime.now(timezone.utc).isoformat(), "data": payload})
             headers: dict[str, str] = {"Content-Type": "application/json"}
-            if wh.get("secret_hash"):
-                sig = hmac.new(wh["secret_hash"].encode(), body.encode(), hashlib.sha256).hexdigest()
+            if wh.get("signing_secret"):
+                sig = hmac.new(wh["signing_secret"].encode(), body.encode(), hashlib.sha256).hexdigest()
                 headers["X-ARIA-Signature"] = sig
 
             httpx.post(wh["url"], content=body, headers=headers, timeout=10.0)

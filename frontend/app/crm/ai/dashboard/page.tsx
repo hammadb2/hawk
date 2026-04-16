@@ -137,7 +137,15 @@ export default function CEODashboardPage() {
     void fetchDashboard();
   }, [fetchDashboard]);
 
-  if (profile?.role !== "ceo") {
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  if (profile.role !== "ceo") {
     return (
       <div className="flex items-center justify-center p-12">
         <p className="text-slate-500">God Mode Dashboard is CEO-only.</p>

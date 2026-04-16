@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS aria_webhooks (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     url text NOT NULL,
     events jsonb NOT NULL DEFAULT '[]'::jsonb,
-    secret_hash text,
+    signing_secret text,
     api_key_id uuid REFERENCES aria_api_keys(id) ON DELETE CASCADE,
     active boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now()
