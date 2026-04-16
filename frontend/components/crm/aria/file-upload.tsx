@@ -42,8 +42,9 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
         if (file.type.startsWith("image/") || file.type === "application/pdf") {
           // Image and PDF analysis via vision (base64 encoded)
           const reader = new FileReader();
-          const base64 = await new Promise<string>((resolve) => {
+          const base64 = await new Promise<string>((resolve, reject) => {
             reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Failed to read file"));
             reader.readAsDataURL(file);
           });
 

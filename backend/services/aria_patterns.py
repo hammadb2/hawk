@@ -149,7 +149,7 @@ def store_patterns(patterns: list[dict[str, Any]]) -> int:
 
     for p in patterns:
         try:
-            httpx.post(
+            r = httpx.post(
                 f"{SUPABASE_URL}/rest/v1/aria_user_patterns",
                 headers=_sb(),
                 json={
@@ -159,7 +159,8 @@ def store_patterns(patterns: list[dict[str, Any]]) -> int:
                 },
                 timeout=15.0,
             )
-            stored += 1
+            if r.status_code < 400:
+                stored += 1
         except Exception as exc:
             logger.warning("Failed to store pattern: %s", exc)
 
