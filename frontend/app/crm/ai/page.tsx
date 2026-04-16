@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { PipelineStatusTracker } from "@/components/crm/aria/pipeline-status-tracker";
+import { PipelineRunTrigger } from "@/components/crm/aria/pipeline-run-trigger";
+import { InlineDownloadButton } from "@/components/crm/aria/inline-download-button";
+import { ConfirmationCard } from "@/components/crm/aria/confirmation-card";
 
 interface ChatMessage {
   id?: string;
@@ -11,6 +15,17 @@ interface ChatMessage {
   content: string;
   function_name?: string;
   function_result?: string;
+  /** Pipeline run ID — renders live status tracker */
+  pipeline_run_id?: string;
+  /** Download URL for inline PDF report button */
+  download_url?: string;
+  download_filename?: string;
+  /** Confirmation card */
+  confirmation?: {
+    title: string;
+    description: string;
+    action: () => Promise<void>;
+  };
 }
 
 interface Conversation {
@@ -21,6 +36,8 @@ interface Conversation {
 }
 
 const BLOCKED_ROLES = ["va", "client"];
+const PIPELINE_ALLOWED_ROLES = ["ceo"];
+const PIPELINE_ALLOWED_ROLE_TYPES = ["ceo", "va_manager"];
 
 export default function AiCommandCenterPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -31,7 +48,13 @@ export default function AiCommandCenterPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingConvs, setLoadingConvs] = useState(true);
+  const [showPipelineTrigger, setShowPipelineTrigger] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const canRunPipeline = profile && (
+    PIPELINE_ALLOWED_ROLES.includes(profile.role || "") ||
+    PIPELINE_ALLOWED_ROLE_TYPES.includes(profile.role_type || "")
+  );
 
   const headers = useMemo((): Record<string, string> => {
     if (!session?.access_token) return {};
@@ -103,6 +126,47 @@ export default function AiCommandCenterPage() {
       }
     } catch (err) {
       console.error("Failed to create conversation:", err);
+    }
+  }
+
+  /* ── Pipeline run handlers ──────────────────────────────────────────── */
+
+  function handlePipelineStarted(runId: string, vertical: string, location: string) {
+    setShowPipelineTrigger(false);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Run outbound pipeline: ${vertical} in ${location}` },
+      {
+        role: "assistant",
+        content: `Pipeline started for ${vertical} in ${location}.`,
+        pipeline_run_id: runId,
+        function_name: "run_outbound_pipeline",
+      },
+    ]);
+  }
+
+  async function handlePipelineComplete(runId: string) {
+    if (!session?.access_token) return;
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/aria/pipeline/${runId}/report`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.download_url) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "Pipeline complete. Download your report below.",
+              download_url: data.download_url,
+              download_filename: data.filename || `aria-pipeline-${runId.slice(0, 8)}.pdf`,
+            },
+          ]);
+        }
+      }
+    } catch {
+      // Report generation failed silently
     }
   }
 
@@ -265,14 +329,14 @@ export default function AiCommandCenterPage() {
                 </div>
                 <h2 className="text-lg font-semibold text-slate-900">HAWK AI Command Center</h2>
                 <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
-                  Ask me anything about your operations. I can pull reports, send emails, manage team members, generate documents, and more.
+                  Ask me anything about your operations. I can pull reports, send emails, manage team members, generate documents, run the outbound pipeline, and more.
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {[
                     "Show VA performance this week",
                     "Summarize pipeline health",
                     "Generate a weekly report PDF",
-                    "Show pending onboarding submissions",
+                    ...(canRunPipeline ? ["Run outbound pipeline"] : []),
                   ].map((suggestion) => (
                     <button
                       key={suggestion}
@@ -307,6 +371,32 @@ export default function AiCommandCenterPage() {
                       </p>
                     </div>
                   )}
+                  {msg.pipeline_run_id && session?.access_token && (
+                    <div className="mt-3">
+                      <PipelineStatusTracker
+                        runId={msg.pipeline_run_id}
+                        accessToken={session.access_token}
+                        onComplete={() => void handlePipelineComplete(msg.pipeline_run_id!)}
+                      />
+                    </div>
+                  )}
+                  {msg.download_url && msg.download_filename && (
+                    <InlineDownloadButton
+                      url={msg.download_url}
+                      filename={msg.download_filename}
+                      label={`Download ${msg.download_filename}`}
+                    />
+                  )}
+                  {msg.confirmation && (
+                    <div className="mt-3">
+                      <ConfirmationCard
+                        title={msg.confirmation.title}
+                        description={msg.confirmation.description}
+                        onConfirm={msg.confirmation.action}
+                        onCancel={() => {}}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -326,9 +416,36 @@ export default function AiCommandCenterPage() {
           </div>
         </div>
 
+        {/* Pipeline trigger form */}
+        {showPipelineTrigger && session?.access_token && (
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="mx-auto max-w-3xl">
+              <PipelineRunTrigger
+                accessToken={session.access_token}
+                onRunStarted={handlePipelineStarted}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Input */}
         <div className="border-t border-slate-200 bg-white px-4 py-4">
           <div className="mx-auto flex max-w-3xl gap-2">
+            {canRunPipeline && (
+              <button
+                onClick={() => setShowPipelineTrigger(!showPipelineTrigger)}
+                className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
+                  showPipelineTrigger
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:text-emerald-600"
+                }`}
+                title="Run outbound pipeline"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </button>
+            )}
             <input
               type="text"
               value={input}
