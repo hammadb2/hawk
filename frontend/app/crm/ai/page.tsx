@@ -118,12 +118,32 @@ export default function AiCommandCenterPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
+      // Auto-create conversation if none exists
+      let convId = activeConvId;
+      if (!convId) {
+        const cr = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/conversations`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ title: "New conversation" }),
+        });
+        if (cr.ok) {
+          const cd = await cr.json();
+          convId = cd.id;
+          setActiveConvId(convId);
+          void loadConversations();
+        } else {
+          setMessages((prev) => [...prev, { role: "assistant", content: "Failed to start conversation. Please try again." }]);
+          setSending(false);
+          return;
+        }
+      }
+
       const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/chat`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          conversation_id: activeConvId,
-          message: userMessage,
+          conversation_id: convId,
+          content: userMessage,
         }),
       });
 
