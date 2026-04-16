@@ -219,8 +219,9 @@ export default function AriaRepliesPage() {
 
   /* ── Access check ─────────────────────────────────────────────────── */
 
-  const role = profile?.role || profile?.role_type || "";
-  if (!["ceo", "hos", "va_manager"].includes(role)) {
+  const role = profile?.role || "";
+  const roleType = profile?.role_type || "";
+  if (!["ceo", "hos"].includes(role) && roleType !== "va_manager") {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <p className="text-slate-500">Reply queue access restricted to CEO, HoS, and VA Manager.</p>

@@ -531,14 +531,15 @@ def send_approved_reply(reply_id: str) -> dict[str, Any]:
         return {"ok": False, "error": "No email address for prospect"}
 
     # Send via Smartlead if configured
-    smartlead_id = None
-    if SMARTLEAD_API_KEY:
-        smartlead_id = _send_via_smartlead(
-            to_email=to_email,
-            subject=reply.get("draft_subject") or "Re: Hawk Security",
-            body=reply["draft_body"],
-            prospect=prospect,
-        )
+    if not SMARTLEAD_API_KEY:
+        return {"ok": False, "error": "Smartlead API key not configured — cannot send"}
+
+    smartlead_id = _send_via_smartlead(
+        to_email=to_email,
+        subject=reply.get("draft_subject") or "Re: Hawk Security",
+        body=reply["draft_body"],
+        prospect=prospect,
+    )
 
     now = datetime.now(timezone.utc)
     httpx.patch(
