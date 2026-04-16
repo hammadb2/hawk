@@ -744,3 +744,71 @@ Available permissions for this user: {json.dumps(permissions)}"""
     )
 
     return {"reply": final_content}
+
+
+# ── Briefings endpoints ──────────────────────────────────────────────────
+
+@router.get("/briefings/unread")
+def get_unread_briefings(uid: str = Depends(require_supabase_uid)):
+    """Fetch unread ARIA proactive briefings for the current user."""
+    _require_ai_access(uid)
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=_sb_headers(),
+        params={
+            "user_id": f"eq.{uid}",
+            "read": "eq.false",
+            "select": "id,briefing_date,content,created_at",
+            "order": "briefing_date.desc",
+            "limit": "5",
+        },
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+@router.post("/briefings/{briefing_id}/read")
+def mark_briefing_read(briefing_id: str, uid: str = Depends(require_supabase_uid)):
+    """Mark a briefing as read."""
+    _require_ai_access(uid)
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    r = httpx.patch(
+        f"{SUPABASE_URL}/rest/v1/aria_proactive_briefings",
+        headers=_sb_headers(),
+        params={"id": f"eq.{briefing_id}", "user_id": f"eq.{uid}"},
+        json={"read": True},
+        timeout=15.0,
+    )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=400, detail=r.text[:300])
+    return {"ok": True}
+
+
+@router.get("/client-health")
+def get_client_health_scores(uid: str = Depends(require_supabase_uid)):
+    """Fetch all client health scores (CEO/HoS only)."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos"):
+        raise HTTPException(status_code=403, detail="Client health scores are only available to CEO and HoS roles")
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_client_health_scores",
+        headers=_sb_headers(),
+        params={
+            "select": "client_id,score,factors,at_risk,updated_at",
+            "order": "score.asc",
+            "limit": "100",
+        },
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    return r.json()

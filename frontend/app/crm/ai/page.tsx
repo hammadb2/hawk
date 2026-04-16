@@ -28,6 +28,13 @@ interface ChatMessage {
   };
 }
 
+interface Briefing {
+  id: string;
+  briefing_date: string;
+  content: string;
+  created_at: string;
+}
+
 interface Conversation {
   id: string;
   title: string;
@@ -49,6 +56,8 @@ export default function AiCommandCenterPage() {
   const [sending, setSending] = useState(false);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [showPipelineTrigger, setShowPipelineTrigger] = useState(false);
+  const [unreadBriefings, setUnreadBriefings] = useState<Briefing[]>([]);
+  const [dismissedBriefingIds, setDismissedBriefingIds] = useState<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const canRunPipeline = profile && (
@@ -85,6 +94,42 @@ export default function AiCommandCenterPage() {
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
+
+  /* ── Load unread briefings ──────────────────────────────────────────── */
+
+  const loadUnreadBriefings = useCallback(async () => {
+    if (!session?.access_token) return;
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/briefings/unread`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setUnreadBriefings(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Failed to load briefings:", err);
+    }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    void loadUnreadBriefings();
+  }, [loadUnreadBriefings]);
+
+  async function dismissBriefing(briefingId: string) {
+    setDismissedBriefingIds((prev) => new Set(prev).add(briefingId));
+    if (!session?.access_token) return;
+    try {
+      await fetch(`${CRM_API_BASE_URL}/api/crm/ai/briefings/${briefingId}/read`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+    } catch (err) {
+      console.error("Failed to mark briefing as read:", err);
+    }
+  }
+
+  const visibleBriefings = unreadBriefings.filter((b) => !dismissedBriefingIds.has(b.id));
 
   /* ── Load messages for active conversation ──────────────────────────── */
 
@@ -320,6 +365,30 @@ export default function AiCommandCenterPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto max-w-3xl space-y-4">
+            {/* Unread briefing banner */}
+            {visibleBriefings.map((briefing) => (
+              <div
+                key={briefing.id}
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">
+                      Briefing — {new Date(briefing.briefing_date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                    </p>
+                    <div className="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed max-h-60 overflow-y-auto">
+                      {briefing.content}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => void dismissBriefing(briefing.id)}
+                    className="flex-shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-100 transition"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
             {messages.length === 0 && (
               <div className="text-center py-12">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
