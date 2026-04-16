@@ -113,8 +113,13 @@ def get_revenue_trend(months: int = 6) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     data = []
     for i in range(months - 1, -1, -1):
-        # First day of month (i months ago)
-        month_date = now.replace(day=1) - timedelta(days=i * 30)
+        # Calculate month offset using calendar arithmetic
+        target_month = now.month - i
+        target_year = now.year
+        while target_month <= 0:
+            target_month += 12
+            target_year -= 1
+        month_date = now.replace(year=target_year, month=target_month, day=1, hour=0, minute=0, second=0, microsecond=0)
         month_end = (month_date.replace(day=28) + timedelta(days=4)).replace(day=1)
         month_label = month_date.strftime("%b %Y")
 
