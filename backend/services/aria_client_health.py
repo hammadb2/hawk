@@ -179,7 +179,7 @@ def run_client_health_scores() -> dict[str, Any]:
     er = httpx.get(
         f"{SUPABASE_URL}/rest/v1/aria_client_health_scores",
         headers=headers,
-        params={"select": "client_id,score,at_risk", "limit": "500"},
+        params={"select": "client_id,score,at_risk", "client_id": f"in.({','.join(client_ids)})", "limit": "500"},
         timeout=30.0,
     )
     if er.status_code < 400:
