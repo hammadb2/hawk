@@ -20,6 +20,7 @@ _CORS_ORIGINS = [o.strip() for o in _CORS_ORIGINS_RAW.split(",") if o.strip()] i
 
 from routers import auth, scans, findings, domains, reports, billing, hawk, agency, notifications, breach_check, marketing, guarantee_access
 from routers import (
+    aria_pipeline,
     crm_ai_command,
     crm_client_portal,
     crm_cron,
@@ -82,6 +83,7 @@ app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
 app.include_router(crm_onboarding.router)
 app.include_router(crm_ai_command.router)
+app.include_router(aria_pipeline.router)
 app.include_router(crm_payment.router)
 app.include_router(monitor.router)
 

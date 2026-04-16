@@ -83,6 +83,11 @@ HIBP_API_KEY = os.environ.get("HIBP_API_KEY", "")
 # Optional — CRM integrations
 SMARTLEAD_API_KEY = os.environ.get("SMARTLEAD_API_KEY", "")
 
+# ARIA Pipeline — outbound automation API keys
+APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "").strip()
+CLAY_API_KEY = os.environ.get("CLAY_API_KEY", "").strip()
+ZEROBOUNCE_API_KEY = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
+
 # CRM (Supabase Auth JWT for FastAPI — same as Dashboard > Settings > API > JWT Secret)
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")

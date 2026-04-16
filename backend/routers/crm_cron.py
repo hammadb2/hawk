@@ -388,8 +388,9 @@ def scheduled_ai_actions_cron(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
     """
-    AI Command Center — execute scheduled actions where executed = false and scheduled_for <= now().
+    ARIA — execute scheduled actions where executed = false and scheduled_for <= now().
     Runs every minute via cron-job.org or Railway cron.
+    Handles both legacy email actions and ARIA pipeline runs.
     """
     _require_secret(x_cron_secret)
 
@@ -403,9 +404,9 @@ def scheduled_ai_actions_cron(
     }
     now = datetime.now(timezone.utc).isoformat()
 
-    # Fetch due actions
+    # Fetch due actions (table renamed to aria_scheduled_actions)
     r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/scheduled_ai_actions",
+        f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
         headers=headers,
         params={
             "executed": "eq.false",
@@ -416,7 +417,7 @@ def scheduled_ai_actions_cron(
         timeout=30.0,
     )
     if r.status_code >= 400:
-        logger.warning("scheduled_ai_actions fetch failed: %s", r.text[:300])
+        logger.warning("aria_scheduled_actions fetch failed: %s", r.text[:300])
         return {"ok": False, "error": r.text[:300]}
 
     actions = r.json() or []
@@ -432,12 +433,14 @@ def scheduled_ai_actions_cron(
                 _execute_scheduled_email(payload, headers)
             elif action_type == "send_reminder":
                 _execute_scheduled_email(payload, headers)
+            elif action_type == "run_outbound_pipeline":
+                _execute_scheduled_pipeline(action, headers)
             else:
                 logger.warning("Unknown scheduled action type: %s", action_type)
 
             # Mark as executed
             httpx.patch(
-                f"{SUPABASE_URL}/rest/v1/scheduled_ai_actions",
+                f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
                 headers=headers,
                 params={"id": f"eq.{action_id}"},
                 json={"executed": True, "executed_at": datetime.now(timezone.utc).isoformat()},
@@ -477,6 +480,54 @@ def _execute_scheduled_email(payload: dict, headers: dict) -> None:
         html=_wrap(inner),
         tags=[{"name": "category", "value": "scheduled_ai_action"}],
     )
+
+
+def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
+    """Execute a scheduled ARIA outbound pipeline run."""
+    import threading
+    from services.aria_pipeline import run_outbound_pipeline
+
+    payload = action.get("action_payload", {})
+    vertical = payload.get("vertical", "dental")
+    location = payload.get("location", "Canada")
+    batch_size = payload.get("batch_size", 50)
+    uid = action.get("triggered_by", "")
+
+    # Create pipeline run record
+    run_payload = {
+        "triggered_by": uid,
+        "vertical": vertical,
+        "location": location,
+        "batch_size": batch_size,
+        "status": "running",
+        "current_step": "apollo_pull",
+    }
+    r = httpx.post(
+        f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
+        headers={**headers, "Prefer": "return=representation"},
+        json=run_payload,
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        logger.error("Failed to create scheduled pipeline run: %s", r.text[:300])
+        return
+
+    run_data = r.json()
+    run_id = run_data[0]["id"] if isinstance(run_data, list) and run_data else run_data.get("id", "")
+    if not run_id:
+        logger.error("Failed to get run ID for scheduled pipeline")
+        return
+
+    # Execute in background thread
+    def _run() -> None:
+        try:
+            run_outbound_pipeline(run_id, vertical, location, batch_size)
+        except Exception as exc:
+            logger.exception("Scheduled pipeline run failed: %s", exc)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    logger.info("Scheduled ARIA pipeline run started: %s (vertical=%s, location=%s)", run_id, vertical, location)
 
 
 # scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
