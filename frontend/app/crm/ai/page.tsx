@@ -8,6 +8,7 @@ import { PipelineStatusTracker } from "@/components/crm/aria/pipeline-status-tra
 import { PipelineRunTrigger } from "@/components/crm/aria/pipeline-run-trigger";
 import { InlineDownloadButton } from "@/components/crm/aria/inline-download-button";
 import { ConfirmationCard } from "@/components/crm/aria/confirmation-card";
+import Link from "next/link";
 
 interface ChatMessage {
   id?: string;
@@ -309,12 +310,20 @@ export default function AiCommandCenterPage() {
                 : `${profile?.role_type || profile?.role || ""} access`}
             </p>
           </div>
-          <button
-            onClick={() => void createConversation()}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition lg:hidden"
-          >
-            + New
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/crm/ai/replies"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-emerald-300 hover:text-emerald-600 transition"
+            >
+              Reply Queue
+            </Link>
+            <button
+              onClick={() => void createConversation()}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition lg:hidden"
+            >
+              + New
+            </button>
+          </div>
         </div>
 
         {/* Messages */}

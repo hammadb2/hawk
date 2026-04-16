@@ -12,7 +12,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config import SUPABASE_URL, OPENAI_API_KEY, OPENAI_MODEL, RESEND_API_KEY
+from config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, OPENAI_MODEL, RESEND_API_KEY
 from routers.crm_auth import require_supabase_uid
 from services.crm_portal_email import send_resend, _wrap, _esc
 
@@ -744,3 +744,153 @@ Available permissions for this user: {json.dumps(permissions)}"""
     )
 
     return {"reply": final_content}
+
+
+# ── Inbound reply approval queue (Phase 5) ───────────────────────────────
+
+def _service_headers() -> dict[str, str]:
+    """Headers using service role key (for querying aria_inbound_replies)."""
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+
+@router.get("/replies/pending")
+def list_pending_replies(
+    status: str = "pending_review",
+    limit: int = 50,
+    uid: str = Depends(require_supabase_uid),
+):
+    """List inbound replies awaiting review (CEO/HoS/VA Manager)."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos", "va_manager"):
+        raise HTTPException(status_code=403, detail="Reply queue access restricted")
+
+    valid_statuses = (
+        "pending_classification",
+        "pending_review",
+        "approved",
+        "sent",
+        "rejected",
+        "auto_handled",
+        "skipped",
+    )
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status filter: {status}")
+
+    headers = _service_headers()
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_inbound_replies",
+        headers=headers,
+        params={
+            "status": f"eq.{status}",
+            "select": "*, prospects:prospect_id(id,company_name,domain,contact_name,contact_email,industry,hawk_score,stage)",
+            "order": "created_at.desc",
+            "limit": str(limit),
+        },
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Failed to fetch replies")
+
+    return {"replies": r.json() or [], "count": len(r.json() or [])}
+
+
+@router.get("/replies/stats")
+def reply_queue_stats(uid: str = Depends(require_supabase_uid)):
+    """Get counts of replies by status (CEO/HoS/VA Manager)."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos", "va_manager"):
+        raise HTTPException(status_code=403, detail="Reply queue access restricted")
+
+    headers = _service_headers()
+    stats: dict[str, int] = {}
+    for s in ("pending_review", "approved", "sent", "rejected", "auto_handled"):
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/aria_inbound_replies",
+            headers={**headers, "Prefer": "count=exact"},
+            params={"status": f"eq.{s}", "select": "id", "limit": "0"},
+            timeout=15.0,
+        )
+        if r.status_code < 400:
+            count_header = r.headers.get("content-range", "")
+            # content-range format: "0-0/123" or "*/0"
+            if "/" in count_header:
+                total = count_header.split("/")[-1]
+                stats[s] = int(total) if total.isdigit() else 0
+            else:
+                stats[s] = 0
+
+    return {"stats": stats}
+
+
+class ApproveReplyBody(BaseModel):
+    edited_body: str | None = None
+
+
+@router.post("/replies/{reply_id}/approve")
+def approve_reply_endpoint(
+    reply_id: str,
+    body: ApproveReplyBody,
+    uid: str = Depends(require_supabase_uid),
+):
+    """Approve a pending reply draft. Optionally edit the body before approval."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos", "va_manager"):
+        raise HTTPException(status_code=403, detail="Only CEO, HoS, or VA Manager can approve replies")
+
+    from services.aria_reply_classifier import approve_reply
+    result = approve_reply(reply_id, uid, edited_body=body.edited_body)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Approval failed"))
+
+    return result
+
+
+class RejectReplyBody(BaseModel):
+    note: str | None = None
+
+
+@router.post("/replies/{reply_id}/reject")
+def reject_reply_endpoint(
+    reply_id: str,
+    body: RejectReplyBody,
+    uid: str = Depends(require_supabase_uid),
+):
+    """Reject a pending reply draft."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos", "va_manager"):
+        raise HTTPException(status_code=403, detail="Only CEO, HoS, or VA Manager can reject replies")
+
+    from services.aria_reply_classifier import reject_reply
+    result = reject_reply(reply_id, uid, note=body.note)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Rejection failed"))
+
+    return result
+
+
+@router.post("/replies/{reply_id}/send")
+def send_reply_endpoint(
+    reply_id: str,
+    uid: str = Depends(require_supabase_uid),
+):
+    """Send an approved reply via Smartlead."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role not in ("ceo", "hos", "va_manager"):
+        raise HTTPException(status_code=403, detail="Only CEO, HoS, or VA Manager can send replies")
+
+    from services.aria_reply_classifier import send_approved_reply
+    result = send_approved_reply(reply_id)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Send failed"))
+
+    return result
