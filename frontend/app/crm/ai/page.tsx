@@ -374,7 +374,7 @@ export default function AiCommandCenterPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <p className="text-xs font-semibold text-amber-700 mb-1">
-                      Briefing — {new Date(briefing.briefing_date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                      Briefing — {new Date(briefing.briefing_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
                     </p>
                     <div className="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed max-h-60 overflow-y-auto">
                       {briefing.content}

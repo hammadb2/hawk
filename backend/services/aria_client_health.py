@@ -164,7 +164,7 @@ def run_client_health_scores() -> dict[str, Any]:
                 "select": "client_id,created_at",
                 "client_id": f"in.({','.join(client_ids)})",
                 "order": "created_at.desc",
-                "limit": "500",
+                "limit": "5000",
             },
             timeout=30.0,
         )
