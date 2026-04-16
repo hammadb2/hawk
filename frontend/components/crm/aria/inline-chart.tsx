@@ -169,7 +169,6 @@ function CampaignHealth({ chart }: { chart: ChartData }) {
 }
 
 function VaLeaderboard({ chart }: { chart: ChartData }) {
-  const color = chart.colors[0] || PALETTE[2];
   return (
     <ResponsiveContainer width="100%" height={Math.max(180, chart.data.length * 32)}>
       <BarChart data={chart.data} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>

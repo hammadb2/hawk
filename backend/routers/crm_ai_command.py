@@ -101,9 +101,6 @@ def _get_role_permissions(profile: dict[str, Any]) -> dict[str, bool]:
 
 # ── OpenAI function definitions ───────────────────────────────────────────
 
-# Chart function definitions (Phase 6) — imported from aria_charts service
-from services.aria_charts import CHART_FUNCTION_DEFINITIONS, execute_chart_function
-
 FUNCTION_DEFINITIONS = [
     {
         "name": "get_va_performance_report",
@@ -188,19 +185,165 @@ FUNCTION_DEFINITIONS = [
         "description": "Get total MRR, client count, and breakdown by plan.",
         "parameters": {"type": "object", "properties": {}},
     },
+    # ── Phase 1: Outbound pipeline ────────────────────────────────────────
+    {
+        "name": "run_outbound_pipeline",
+        "description": "Run the full ARIA outbound pipeline: Apollo lead pull, Clay enrichment, ZeroBounce verification, Hawk domain scan, personalized email generation, and Smartlead loading. Requires vertical and location.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "vertical": {"type": "string", "description": "Target vertical: dental, legal, or accounting"},
+                "location": {"type": "string", "description": "Geographic location, e.g. 'Toronto, Canada' or 'Ontario'"},
+                "batch_size": {"type": "integer", "description": "Number of leads to pull (default 50)"},
+            },
+            "required": ["vertical", "location"],
+        },
+    },
+    {
+        "name": "get_pipeline_run_status",
+        "description": "Get live status of a running or completed pipeline run.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "run_id": {"type": "string", "description": "Pipeline run ID"},
+            },
+            "required": ["run_id"],
+        },
+    },
+    # ── Phase 9: Pattern learning ─────────────────────────────────────────
+    {
+        "name": "detect_business_patterns",
+        "description": "Analyze CRM data to detect business patterns, trends, and insights. Returns actionable patterns with confidence scores.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_recent_patterns",
+        "description": "Get recently detected business patterns and insights.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max patterns to return (default 10)"},
+            },
+        },
+    },
+    # ── Phase 10: A/B testing ─────────────────────────────────────────────
+    {
+        "name": "create_ab_experiment",
+        "description": "Create an A/B test experiment for email campaigns with two subject/body variants.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Experiment name"},
+                "variant_a_subject": {"type": "string", "description": "Subject line for variant A"},
+                "variant_b_subject": {"type": "string", "description": "Subject line for variant B"},
+                "variant_a_body": {"type": "string", "description": "Email body for variant A"},
+                "variant_b_body": {"type": "string", "description": "Email body for variant B"},
+                "campaign_id": {"type": "string", "description": "Optional Smartlead campaign ID"},
+            },
+            "required": ["name", "variant_a_subject", "variant_b_subject", "variant_a_body", "variant_b_body"],
+        },
+    },
+    {
+        "name": "generate_ab_variants",
+        "description": "Use AI to generate A/B test variants from an original email.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "original_subject": {"type": "string", "description": "Original email subject"},
+                "original_body": {"type": "string", "description": "Original email body"},
+                "test_element": {"type": "string", "description": "Element to test: subject, body, cta, tone"},
+            },
+            "required": ["original_subject", "original_body"],
+        },
+    },
+    {
+        "name": "list_ab_experiments",
+        "description": "List recent A/B test experiments and their status.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    # ── Phase 11: Competitive intelligence ────────────────────────────────
+    {
+        "name": "research_competitors",
+        "description": "Research competitors and market landscape for Hawk Security. Provides pricing analysis, strengths/weaknesses, and opportunities.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Optional specific research question"},
+            },
+        },
+    },
+    {
+        "name": "analyze_competitor_pricing",
+        "description": "Analyze competitor pricing for a specific vertical (dental, legal, accounting).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "vertical": {"type": "string", "description": "Target vertical: dental, legal, or accounting"},
+            },
+            "required": ["vertical"],
+        },
+    },
+    # ── Phase 12: File/image intelligence ─────────────────────────────────
+    {
+        "name": "analyze_document",
+        "description": "Analyze a document's text content. Supports contracts, compliance docs, reports, and email threads.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text_content": {"type": "string", "description": "The document text to analyze"},
+                "doc_type": {"type": "string", "description": "Type: general, contract, compliance, report, email_thread"},
+                "prompt": {"type": "string", "description": "Optional specific analysis prompt"},
+            },
+            "required": ["text_content"],
+        },
+    },
+    # ── Phase 14: Sales playbook ──────────────────────────────────────────
+    {
+        "name": "build_sales_playbook",
+        "description": "Analyze won/lost deals, activities, and replies to build a comprehensive sales playbook with ICP, objection handlers, and email templates.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_objection_handler",
+        "description": "Get a ready-to-use response for a specific prospect objection using the sales playbook.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "objection": {"type": "string", "description": "The prospect's objection text"},
+            },
+            "required": ["objection"],
+        },
+    },
+    # ── Phase 15: CEO Dashboard ───────────────────────────────────────────
+    {
+        "name": "get_ceo_dashboard",
+        "description": "Get the God Mode CEO dashboard with all KPIs: revenue, pipeline, activity, client health, and team metrics with AI narration.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    # ── Phase 19: Onboarding trainer ──────────────────────────────────────
+    {
+        "name": "start_training_session",
+        "description": "Start an interactive sales training roleplay session. Scenarios: cold_call, objection_handling, discovery_call, product_demo, upsell, product_knowledge.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "scenario_type": {"type": "string", "description": "Type of scenario: cold_call, objection_handling, discovery_call, product_demo, upsell, product_knowledge"},
+            },
+            "required": ["scenario_type"],
+        },
+    },
+    {
+        "name": "list_training_scenarios",
+        "description": "List available training roleplay scenarios.",
+        "parameters": {"type": "object", "properties": {}},
+    },
 ]
-
-# Merge chart function definitions into the main list
-ALL_FUNCTION_DEFINITIONS = FUNCTION_DEFINITIONS + CHART_FUNCTION_DEFINITIONS
-
-# Set of chart function names for quick lookup
-_CHART_FN_NAMES = {fn["name"] for fn in CHART_FUNCTION_DEFINITIONS}
 
 
 def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
     """Filter available functions based on role permissions."""
     available = []
-    for fn in ALL_FUNCTION_DEFINITIONS:
+    for fn in FUNCTION_DEFINITIONS:
         name = fn["name"]
         if name == "get_va_performance_report" and not permissions.get("va_data"):
             continue
@@ -218,20 +361,28 @@ def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
             continue
         if name == "get_client_mrr_summary" and not permissions.get("financials"):
             continue
-        # Chart functions: pipeline/campaign charts need prospect_data, VA chart needs va_data,
-        # revenue/health charts need financials or reports
-        if name == "get_pipeline_funnel_chart" and not permissions.get("prospect_data"):
+        # Phase 9: patterns require reports permission
+        if name in ("detect_business_patterns", "get_recent_patterns") and not permissions.get("reports"):
             continue
-        if name == "get_revenue_trend_chart" and not permissions.get("financials"):
+        # Phase 1: pipeline requires prospect_data
+        if name in ("run_outbound_pipeline", "get_pipeline_run_status") and not permissions.get("prospect_data"):
             continue
-        if name == "compare_periods_chart" and not permissions.get("reports"):
+        # Phase 10: A/B testing requires prospect_data
+        if name in ("create_ab_experiment", "generate_ab_variants", "list_ab_experiments") and not permissions.get("prospect_data"):
             continue
-        if name == "get_campaign_health_chart" and not permissions.get("prospect_data"):
+        # Phase 11: competitive intel requires reports
+        if name in ("research_competitors", "analyze_competitor_pricing") and not permissions.get("reports"):
             continue
-        if name == "get_va_leaderboard_chart" and not permissions.get("va_data"):
+        # Phase 12: document analysis requires reports
+        if name == "analyze_document" and not permissions.get("reports"):
             continue
-        if name == "get_client_health_chart" and not permissions.get("reports"):
+        # Phase 14: playbook requires prospect_data
+        if name in ("build_sales_playbook", "get_objection_handler") and not permissions.get("prospect_data"):
             continue
+        # Phase 15: CEO dashboard requires financials
+        if name == "get_ceo_dashboard" and not permissions.get("financials"):
+            continue
+        # Phase 19: training available to all with AI access
         available.append(fn)
     return available
 
@@ -261,8 +412,103 @@ def _execute_function(
             return _fn_flag_va_for_pip(args, uid, headers)
         elif name == "get_client_mrr_summary":
             return _fn_get_client_mrr_summary(headers)
-        elif name in _CHART_FN_NAMES:
-            return execute_chart_function(name, args)
+        # ── Phase 1: Outbound pipeline ────────────────────────────────
+        elif name == "run_outbound_pipeline":
+            from services.aria_pipeline import run_outbound_pipeline as _run_pipeline
+            vertical = args.get("vertical", "dental")
+            location = args.get("location", "")
+            batch_size = args.get("batch_size", 50)
+            # Create the pipeline run record first
+            run_payload = {
+                "triggered_by": uid,
+                "vertical": vertical,
+                "location": location,
+                "status": "running",
+                "current_step": "initializing",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+            r = httpx.post(
+                f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
+                headers={**headers, "Prefer": "return=representation"},
+                json=run_payload,
+                timeout=20.0,
+            )
+            if r.status_code >= 400:
+                return json.dumps({"error": "Failed to create pipeline run", "detail": r.text[:300]})
+            run_row = r.json()[0] if isinstance(r.json(), list) else r.json()
+            run_id = run_row["id"]
+            result = _run_pipeline(run_id, vertical, location, batch_size)
+            return json.dumps(result)
+        elif name == "get_pipeline_run_status":
+            from services.aria_pipeline import _build_summary
+            return json.dumps(_build_summary(args.get("run_id", "")))
+        # ── Phase 9: Pattern learning ────────────────────────────────
+        elif name == "detect_business_patterns":
+            from services.aria_patterns import run_pattern_detection
+            return json.dumps(run_pattern_detection())
+        elif name == "get_recent_patterns":
+            from services.aria_patterns import get_recent_patterns
+            limit = args.get("limit", 10)
+            return json.dumps(get_recent_patterns(limit=limit))
+        # ── Phase 10: A/B testing ────────────────────────────────────
+        elif name == "create_ab_experiment":
+            from services.aria_ab_testing import create_ab_experiment
+            return json.dumps(create_ab_experiment(
+                name=args.get("name", ""),
+                variant_a_subject=args.get("variant_a_subject", ""),
+                variant_b_subject=args.get("variant_b_subject", ""),
+                variant_a_body=args.get("variant_a_body", ""),
+                variant_b_body=args.get("variant_b_body", ""),
+                campaign_id=args.get("campaign_id"),
+            ))
+        elif name == "generate_ab_variants":
+            from services.aria_ab_testing import generate_variants
+            return json.dumps(generate_variants(
+                original_subject=args.get("original_subject", ""),
+                original_body=args.get("original_body", ""),
+                test_element=args.get("test_element", "subject"),
+            ))
+        elif name == "list_ab_experiments":
+            from services.aria_ab_testing import list_experiments
+            return json.dumps(list_experiments())
+        # ── Phase 11: Competitive intelligence ───────────────────────
+        elif name == "research_competitors":
+            from services.aria_competitive_intel import research_competitors
+            return json.dumps(research_competitors(query=args.get("query")))
+        elif name == "analyze_competitor_pricing":
+            from services.aria_competitive_intel import analyze_competitor_pricing
+            return json.dumps(analyze_competitor_pricing(vertical=args.get("vertical", "dental")))
+        # ── Phase 12: Document analysis ──────────────────────────────
+        elif name == "analyze_document":
+            from services.aria_vision import analyze_document_text
+            return json.dumps(analyze_document_text(
+                text_content=args.get("text_content", ""),
+                doc_type=args.get("doc_type", "general"),
+                prompt=args.get("prompt"),
+            ))
+        # ── Phase 14: Sales playbook ─────────────────────────────────
+        elif name == "build_sales_playbook":
+            from services.aria_playbook import build_playbook_from_deals
+            return json.dumps(build_playbook_from_deals())
+        elif name == "get_objection_handler":
+            from services.aria_playbook import get_objection_handler
+            return json.dumps(get_objection_handler(objection=args.get("objection", "")))
+        # ── Phase 15: CEO Dashboard ──────────────────────────────────
+        elif name == "get_ceo_dashboard":
+            from services.aria_ceo_dashboard import get_dashboard_data, generate_narration
+            data = get_dashboard_data()
+            narration = generate_narration(data)
+            return json.dumps({"dashboard": data, "narration": narration})
+        # ── Phase 19: Training ───────────────────────────────────────
+        elif name == "start_training_session":
+            from services.aria_onboarding_trainer import start_training_session
+            return json.dumps(start_training_session(
+                user_id=uid,
+                scenario_type=args.get("scenario_type", "cold_call"),
+            ))
+        elif name == "list_training_scenarios":
+            from services.aria_onboarding_trainer import list_scenarios
+            return json.dumps(list_scenarios())
         else:
             return json.dumps({"error": f"Unknown function: {name}"})
     except Exception as exc:
@@ -574,6 +820,59 @@ def get_messages(conversation_id: str, uid: str = Depends(require_supabase_uid))
     return r.json()
 
 
+@router.get("/dashboard")
+def get_ceo_dashboard(uid: str = Depends(require_supabase_uid)):
+    """Dedicated CEO dashboard endpoint — returns structured KPI data + narration."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    if role != "ceo":
+        raise HTTPException(status_code=403, detail="CEO-only endpoint")
+
+    from services.aria_ceo_dashboard import get_dashboard_data, generate_narration
+
+    dashboard = get_dashboard_data()
+    if "error" in dashboard:
+        raise HTTPException(status_code=503, detail=dashboard["error"])
+
+    narration = generate_narration(dashboard)
+    return {"dashboard": dashboard, "narration": narration}
+
+
+class AnalyzeFileBody(BaseModel):
+    content: str
+    image_data: str | None = None
+
+
+@router.post("/analyze-file")
+def analyze_file(body: AnalyzeFileBody, uid: str = Depends(require_supabase_uid)):
+    """Dedicated file/image analysis endpoint — no conversation required."""
+    _require_ai_access(uid)
+
+    from services.aria_vision import analyze_image, analyze_document_text
+
+    if body.image_data:
+        # image_data is a data URL like "data:image/png;base64,..."
+        import base64 as b64mod
+
+        try:
+            header, encoded = body.image_data.split(",", 1)
+            mime = header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+            raw = b64mod.b64decode(encoded)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid image data")
+
+        result = analyze_image(raw, prompt=body.content, mime_type=mime)
+    else:
+        # Text/CSV document analysis
+        doc_type = "report" if "report" in body.content.lower() or "csv" in body.content.lower() else "general"
+        result = analyze_document_text(body.content, doc_type=doc_type)
+
+    if "error" in result:
+        raise HTTPException(status_code=503, detail=result["error"])
+
+    return {"reply": result.get("analysis", "Analysis complete.")}
+
+
 class SendMessageBody(BaseModel):
     conversation_id: str
     content: str
@@ -630,27 +929,34 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
     role_type = prof.get("role_type", "")
     user_name = prof.get("full_name", "User")
 
-    system_prompt = f"""You are HAWK Command, the AI operations assistant for Hawk Security's CRM.
+    today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+
+    system_prompt = f"""You are ARIA — Automated Revenue and Intelligence Assistant — the chief of staff for Hawk Security's CRM.
 You are speaking with {user_name} (role: {role_name}, type: {role_type}).
+Today is {today}.
 
-You can take real actions through function calls. Every action you take is logged.
+Hawk Security is a Canadian cybersecurity company targeting dental clinics, law firms, and accounting practices.
+Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo.
+Target: 24 booked sales calls per day from cold email outreach.
+VA team managed by Kevin, runs Apollo, Clay, Smartlead, ZeroBounce pipeline.
+HAWK Certified badge and financial guarantee are key differentiators.
+PIPEDA compliance is the primary regulatory angle for Canadian SMBs.
 
-IMPORTANT RULES:
-- Be professional, concise, and action-oriented
-- When the user asks for data, use the appropriate function to fetch it
-- When asked to send an email, confirm the details before sending
-- When presenting data, format it clearly with key metrics highlighted
-- If a function is not available for this user's role, explain that you cannot perform that action for their access level
+You take real actions through function calls. Every action is logged.
+
+PERSONALITY:
+- Sharp, confident, concise. Never say "Great question" or "Certainly" or "Of course".
+- Just answer and act. Present data cleanly. Be direct about confirmations.
+- When you generate something, present it cleanly. When you need confirmation, be direct.
+
+RULES:
+- Use the appropriate function when the user asks for data
+- Confirm details before sending emails or taking irreversible actions
+- Present data with key metrics highlighted
+- If a function is not available for this user's role, say you cannot share that — no hard errors
 - Never expose internal system details or database structure
-- Offer to help with related tasks after completing a request
-- For document generation, call the generate_document function and let the user know it's ready
-
-VISUAL CHARTS:
-- When the user asks to "show", "chart", "visualize", "compare", or "graph" any metric, use the appropriate chart function
-- Chart functions render interactive visual charts directly in the chat — always prefer them over text tables for visual data
-- Available chart functions: pipeline funnel, revenue trend, period comparison, campaign health, VA leaderboard, client health distribution
-- When comparing metrics across periods (e.g. "compare this week vs last week"), use compare_periods_chart
-- Briefly narrate the key insight from the chart data in your text response
+- When chart data is appropriate (comparisons, trends, funnels), prefer charts over text tables
+- For document generation, call generate_document and let the user know it is ready
 
 Available permissions for this user: {json.dumps(permissions)}"""
 
@@ -687,7 +993,8 @@ Available permissions for this user: {json.dumps(permissions)}"""
     msg = response.choices[0].message
 
     # Handle function calls
-    chart_data = None  # Will hold chart JSON if a chart function is called
+    last_fn_name: str | None = None
+    last_fn_result: str | None = None
     if msg.tool_calls:
         for tool_call in msg.tool_calls:
             fn_name = tool_call.function.name
@@ -698,7 +1005,7 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
             # Check permission before executing
             fn_allowed = True
-            for fn_def in ALL_FUNCTION_DEFINITIONS:
+            for fn_def in FUNCTION_DEFINITIONS:
                 if fn_def["name"] == fn_name:
                     # Re-check using filter
                     if fn_def not in available_fns:
@@ -707,14 +1014,11 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
             if fn_allowed:
                 fn_result = _execute_function(fn_name, fn_args, uid, permissions)
-                # If this was a chart function, capture the chart data for the frontend
-                if fn_name in _CHART_FN_NAMES:
-                    try:
-                        chart_data = json.loads(fn_result)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
             else:
                 fn_result = json.dumps({"error": "This action is not available for your access level."})
+
+            last_fn_name = fn_name
+            last_fn_result = fn_result
 
             # Save function call message
             httpx.post(
@@ -773,16 +1077,56 @@ Available permissions for this user: {json.dumps(permissions)}"""
         timeout=20.0,
     )
 
-    # Update conversation timestamp and title if first message
+    # Update conversation timestamp — and auto-generate a title on the first message
+    patch_payload: dict[str, Any] = {"updated_at": datetime.now(timezone.utc).isoformat()}
+
+    # If this is the first exchange (history only had the user message we just saved),
+    # generate a short descriptive title from the user's message.
+    is_first_message = len([m for m in history if m.get("role") == "user"]) <= 1
+    if is_first_message:
+        try:
+            title_resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Generate a short conversation title (max 6 words) that summarizes the user's request. "
+                            "No quotes, no punctuation at the end. Just the title."
+                        ),
+                    },
+                    {"role": "user", "content": body.content},
+                ],
+                max_tokens=20,
+                temperature=0.3,
+            )
+            auto_title = (title_resp.choices[0].message.content or "").strip().strip('"').strip("'")
+            if auto_title:
+                patch_payload["title"] = auto_title
+        except Exception:
+            pass  # Non-critical — keep the default title
+
     httpx.patch(
         f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers=headers,
         params={"id": f"eq.{body.conversation_id}"},
-        json={"updated_at": datetime.now(timezone.utc).isoformat()},
+        json=patch_payload,
         timeout=20.0,
     )
 
     result: dict[str, Any] = {"reply": final_content}
-    if chart_data and isinstance(chart_data, dict) and "chart_type" in chart_data:
-        result["chart_data"] = chart_data
+
+    # Attach function metadata so the frontend can render inline components
+    if last_fn_name:
+        result["function_called"] = last_fn_name
+        if last_fn_result:
+            try:
+                parsed = json.loads(last_fn_result)
+                # Pass chart_data through if the function returned it
+                if isinstance(parsed, dict) and "chart_data" in parsed:
+                    result["chart_data"] = parsed["chart_data"]
+                result["function_result"] = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+
     return result
