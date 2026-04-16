@@ -6,6 +6,7 @@ import { CrmTopbar } from "@/components/crm/layout/topbar";
 import { CrmMobileNav } from "@/components/crm/layout/mobile-nav";
 import { Toaster } from "react-hot-toast";
 import { SentryClientInit } from "@/components/crm/sentry-client";
+import { AiBubble } from "@/components/crm/ai-bubble";
 import { lightShell } from "@/lib/portal-ui";
 
 export function CrmShell({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
         <main className="min-h-[calc(100vh-7rem)] p-3 pb-24">{children}</main>
         <CrmMobileNav />
       </div>
+      <AiBubble />
     </div>
   );
 }

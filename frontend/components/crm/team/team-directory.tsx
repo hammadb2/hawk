@@ -17,7 +17,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { AgreedTermsModal } from "@/components/crm/agreed-terms-modal";
 import { cn } from "@/lib/utils";
+
+type InviteRole = "sales_rep" | "team_lead" | "closer" | "client" | "va_manager" | "va";
+type InviteRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | "csm" | "client" | "sales_rep" | "team_lead" | "";
 
 function roleLabel(r: string): string {
   return r.replace("_", " ");
@@ -34,10 +38,12 @@ export function TeamDirectory() {
   const [form, setForm] = useState({
     email: "",
     full_name: "",
-    role: "sales_rep" as "sales_rep" | "team_lead" | "va_manager" | "va",
+    role: "sales_rep" as InviteRole,
+    role_type: "" as InviteRoleType,
     whatsapp_number: "",
     team_lead_id: "",
   });
+  const [showTerms, setShowTerms] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,12 +80,21 @@ export function TeamDirectory() {
     if (authReady && session && profile) void load();
   }, [authReady, session, profile, load]);
 
-  async function submitInvite() {
+  function handleInviteClick() {
+    if (!form.email.trim() || !form.full_name.trim() || !form.whatsapp_number.trim()) {
+      toast.error("Fill in all required fields");
+      return;
+    }
+    setShowTerms(true);
+  }
+
+  async function submitInviteWithTerms(agreedTerms?: Record<string, unknown>) {
     if (!session?.access_token) {
       toast.error("Not signed in");
       return;
     }
     setInviting(true);
+    setShowTerms(false);
     try {
       const body: Record<string, unknown> = {
         email: form.email.trim(),
@@ -88,6 +103,8 @@ export function TeamDirectory() {
         whatsapp_number: form.whatsapp_number.trim(),
       };
       if (form.team_lead_id) body.team_lead_id = form.team_lead_id;
+      if (form.role_type) body.role_type = form.role_type;
+      if (agreedTerms) body.agreed_terms = agreedTerms;
 
       const r = await fetch(`${CRM_API_BASE_URL}/api/crm/invite`, {
         method: "POST",
@@ -111,7 +128,7 @@ export function TeamDirectory() {
       const j = (await r.json()) as { message?: string; existing_user?: boolean };
       toast.success(j.message || (j.existing_user ? "Rep linked — check email for magic link." : "Invite sent"));
       setInviteOpen(false);
-      setForm({ email: "", full_name: "", role: "sales_rep", whatsapp_number: "", team_lead_id: "" });
+      setForm({ email: "", full_name: "", role: "sales_rep", role_type: "", whatsapp_number: "", team_lead_id: "" });
       await load();
     } finally {
       setInviting(false);
@@ -261,12 +278,28 @@ export function TeamDirectory() {
               <select
                 className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
                 value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as "sales_rep" | "team_lead" | "va_manager" | "va" }))}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as InviteRole }))}
               >
                 <option value="sales_rep">Sales rep</option>
                 <option value="team_lead">Team lead</option>
+                <option value="closer">Closer</option>
+                <option value="client">Client</option>
                 <option value="va_manager">VA Manager</option>
                 <option value="va">VA</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-slate-600">Role type (optional)</Label>
+              <select
+                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+                value={form.role_type}
+                onChange={(e) => setForm((f) => ({ ...f, role_type: e.target.value as InviteRoleType }))}
+              >
+                <option value="">Default</option>
+                <option value="va_outreach">VA Outreach</option>
+                <option value="va_manager">VA Manager</option>
+                <option value="csm">CSM</option>
+                <option value="closer">Closer</option>
               </select>
             </div>
             <div>
@@ -297,12 +330,20 @@ export function TeamDirectory() {
             <Button variant="outline" className="border-slate-200" onClick={() => setInviteOpen(false)}>
               Cancel
             </Button>
-            <Button className="bg-emerald-600" disabled={inviting} onClick={() => void submitInvite()}>
-              {inviting ? "Sending…" : "Send invite"}
+            <Button className="bg-emerald-600" disabled={inviting} onClick={handleInviteClick}>
+              {inviting ? "Sending…" : "Next: Set terms"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AgreedTermsModal
+        open={showTerms}
+        onClose={() => setShowTerms(false)}
+        onConfirm={(terms) => void submitInviteWithTerms(terms)}
+        hireName={form.full_name}
+        hireRole={form.role_type || form.role}
+      />
 
       <Dialog open={!!reassignFrom} onOpenChange={(o) => !o && setReassignFrom(null)}>
         <DialogContent className="border-slate-200 bg-white">

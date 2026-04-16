@@ -385,6 +385,153 @@ def weekly_attacker_simulation_cron(
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+@router.post("/scheduled-ai-actions")
+def scheduled_ai_actions_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    ARIA — execute scheduled actions where executed = false and scheduled_for <= now().
+    Runs every minute via cron-job.org or Railway cron.
+    Handles both legacy email actions and ARIA pipeline runs.
+    """
+    _require_secret(x_cron_secret)
+
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return {"ok": True, "mode": "stub", "executed": 0}
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Fetch due actions (table renamed to aria_scheduled_actions)
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
+        headers=headers,
+        params={
+            "executed": "eq.false",
+            "scheduled_for": f"lte.{now}",
+            "select": "*",
+            "limit": "50",
+        },
+        timeout=30.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("aria_scheduled_actions fetch failed: %s", r.text[:300])
+        return {"ok": False, "error": r.text[:300]}
+
+    actions = r.json() or []
+    executed_count = 0
+
+    for action in actions:
+        action_id = action["id"]
+        action_type = action.get("action_type", "")
+        payload = action.get("action_payload", {})
+
+        try:
+            if action_type == "send_email":
+                _execute_scheduled_email(payload, headers)
+            elif action_type == "send_reminder":
+                _execute_scheduled_email(payload, headers)
+            elif action_type == "run_outbound_pipeline":
+                _execute_scheduled_pipeline(action, headers)
+            else:
+                logger.warning("Unknown scheduled action type: %s", action_type)
+
+            # Mark as executed
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
+                headers=headers,
+                params={"id": f"eq.{action_id}"},
+                json={"executed": True, "executed_at": datetime.now(timezone.utc).isoformat()},
+                timeout=20.0,
+            ).raise_for_status()
+            executed_count += 1
+        except Exception as exc:
+            logger.exception("Failed to execute scheduled action %s: %s", action_id, exc)
+
+    return {"ok": True, "mode": "live", "due": len(actions), "executed": executed_count}
+
+
+def _execute_scheduled_email(payload: dict, headers: dict) -> None:
+    """Execute a scheduled email action."""
+    from services.crm_portal_email import send_resend, _wrap, _esc
+
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    body_text = payload.get("body", "")
+
+    if not to or not subject:
+        logger.warning("Scheduled email missing 'to' or 'subject'")
+        return
+
+    inner = f"""
+      <tr>
+        <td style="padding:40px 48px 32px;">
+          <p style="margin:0 0 24px;font-size:15px;color:#9090A8;line-height:1.6;">
+            {_esc(body_text)}
+          </p>
+        </td>
+      </tr>
+"""
+    send_resend(
+        to_email=to,
+        subject=subject,
+        html=_wrap(inner),
+        tags=[{"name": "category", "value": "scheduled_ai_action"}],
+    )
+
+
+def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
+    """Execute a scheduled ARIA outbound pipeline run."""
+    import threading
+    from services.aria_pipeline import run_outbound_pipeline
+
+    payload = action.get("action_payload", {})
+    vertical = payload.get("vertical", "dental")
+    location = payload.get("location", "Canada")
+    batch_size = payload.get("batch_size", 50)
+    uid = action.get("triggered_by", "")
+
+    # Create pipeline run record
+    run_payload = {
+        "triggered_by": uid,
+        "vertical": vertical,
+        "location": location,
+        "batch_size": batch_size,
+        "status": "running",
+        "current_step": "apollo_pull",
+    }
+    r = httpx.post(
+        f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
+        headers={**headers, "Prefer": "return=representation"},
+        json=run_payload,
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        logger.error("Failed to create scheduled pipeline run: %s", r.text[:300])
+        return
+
+    run_data = r.json()
+    run_id = run_data[0]["id"] if isinstance(run_data, list) and run_data else run_data.get("id", "")
+    if not run_id:
+        logger.error("Failed to get run ID for scheduled pipeline")
+        return
+
+    # Execute in background thread
+    def _run() -> None:
+        try:
+            run_outbound_pipeline(run_id, vertical, location, batch_size)
+        except Exception as exc:
+            logger.exception("Scheduled pipeline run failed: %s", exc)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    logger.info("Scheduled ARIA pipeline run started: %s (vertical=%s, location=%s)", run_id, vertical, location)
+
+
 @router.post("/va-weekly-scoring")
 def va_weekly_scoring(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
@@ -409,6 +556,7 @@ def va_daily_alerts(
     except Exception as e:
         logger.exception("va daily alerts failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
+
 
 
 # scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).

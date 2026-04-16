@@ -119,6 +119,7 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
         "role": body.role,
         "status": "invited",
         "email": email,
+        "onboarding_status": "not_started",
     }
     if body.whatsapp_number:
         patch["whatsapp_number"] = body.whatsapp_number.strip()
@@ -129,6 +130,8 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
         patch["role_type"] = "va_outreach"
     if body.team_lead_id:
         patch["team_lead_id"] = body.team_lead_id
+    if body.role_type:
+        patch["role_type"] = body.role_type
 
     if existing:
         pr = httpx.patch(
@@ -169,8 +172,18 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
         if vr.status_code >= 400:
             logger.warning("va_profiles upsert for existing user failed: %s %s", vr.status_code, vr.text[:300])
 
-    redir = f"{CRM_PUBLIC_BASE_URL}/crm/onboarding" if CRM_PUBLIC_BASE_URL else None
+    # VA roles land on different pages
+    if body.role == "va_manager":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/roster" if CRM_PUBLIC_BASE_URL else None
+    elif body.role == "va":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/input" if CRM_PUBLIC_BASE_URL else None
+    else:
+        redir = f"{CRM_PUBLIC_BASE_URL}/onboarding" if CRM_PUBLIC_BASE_URL else None
     recover_json: dict[str, Any] = {"email": email}
+
+    # Create onboarding session with agreed_terms for existing user
+    if body.agreed_terms and SUPABASE_URL and SERVICE_KEY:
+        _create_onboarding_session(uid, body.agreed_terms, _sb_headers())
     if redir:
         recover_json["options"] = {"email_redirect_to": redir}
     rr = httpx.post(
@@ -189,13 +202,34 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
     }
 
 
+def _create_onboarding_session(profile_id: str, agreed_terms: dict[str, Any], headers: dict[str, str]) -> None:
+    """Create an onboarding session with agreed_terms for a newly invited user."""
+    try:
+        payload = {
+            "profile_id": profile_id,
+            "status": "not_started",
+            "current_step": 0,
+            "agreed_terms": agreed_terms,
+        }
+        httpx.post(
+            f"{SUPABASE_URL}/rest/v1/onboarding_sessions",
+            headers={**headers, "Prefer": "return=representation"},
+            json=payload,
+            timeout=20.0,
+        )
+    except Exception as exc:
+        logger.warning("Failed to create onboarding session: %s", exc)
+
+
 class InviteBody(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=200)
-    role: Literal["sales_rep", "team_lead", "va_manager", "va"] = "sales_rep"
+    role: Literal["sales_rep", "team_lead", "closer", "client", "va_manager", "va"] = "sales_rep"
+    role_type: Literal["ceo", "closer", "va_outreach", "va_manager", "csm", "client", "sales_rep", "team_lead"] | None = None
     whatsapp_number: str = Field(default="", max_length=40)
     team_lead_id: str | None = None
     va_sub_role: Literal["list_qa", "reply_book"] | None = None
+    agreed_terms: dict[str, Any] | None = None
 
 
 @router.post("/invite")
@@ -221,7 +255,9 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
     if body.team_lead_id:
         meta["crm_team_lead_id"] = body.team_lead_id
     # Map invite role → profiles.role_type so the auth trigger sets it correctly
-    if body.role == "va_manager":
+    if body.role_type:
+        meta["crm_role_type"] = body.role_type
+    elif body.role == "va_manager":
         meta["crm_role_type"] = "va_manager"
     elif body.role == "va":
         meta["crm_role_type"] = "va_outreach"
@@ -235,7 +271,7 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
     elif body.role == "va":
         redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/input" if CRM_PUBLIC_BASE_URL else None
     else:
-        redir = f"{CRM_PUBLIC_BASE_URL}/crm/onboarding" if CRM_PUBLIC_BASE_URL else None
+        redir = f"{CRM_PUBLIC_BASE_URL}/onboarding" if CRM_PUBLIC_BASE_URL else None
     payload: dict = {"email": body.email.lower().strip(), "data": meta}
     if redir:
         payload["options"] = {"email_redirect_to": redir}
@@ -252,6 +288,28 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
             return _provision_existing_auth_user_as_rep(body)
         logger.warning("invite failed: %s %s", r.status_code, r.text)
         raise HTTPException(status_code=400, detail=r.text[:500])
+
+    # Create onboarding session with agreed_terms for newly invited user
+    if body.agreed_terms:
+        # The auth user was just created — look up the new user ID
+        try:
+            new_uid = _lookup_user_id_by_email(body.email.lower().strip())
+            if new_uid and SUPABASE_URL and SERVICE_KEY:
+                # Set role_type on profile if provided
+                prof_patch: dict[str, Any] = {"onboarding_status": "not_started"}
+                if body.role_type:
+                    prof_patch["role_type"] = body.role_type
+                httpx.patch(
+                    f"{SUPABASE_URL}/rest/v1/profiles",
+                    headers=_sb_headers(),
+                    params={"id": f"eq.{new_uid}"},
+                    json=prof_patch,
+                    timeout=20.0,
+                )
+                _create_onboarding_session(new_uid, body.agreed_terms, _sb_headers())
+        except Exception as exc:
+            logger.warning("Failed to create onboarding session for new invite: %s", exc)
+
     return {"ok": True, "message": "Invite sent"}
 
 

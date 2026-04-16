@@ -186,6 +186,7 @@ export type Profile = {
   last_close_at?: string | null;
   onboarding_checklist?: Record<string, boolean> | null;
   onboarding_completed_at?: string | null;
+  onboarding_status?: "not_started" | "in_progress" | "pending_review" | "approved" | "rejected" | null;
   last_assigned_at?: string | null;
   whatsapp_number?: string | null;
   health_score?: number | null;
