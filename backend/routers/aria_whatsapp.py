@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from routers.crm_ai_command import require_supabase_uid, _require_ai_access, _get_profile, _get_role_permissions
@@ -37,8 +37,13 @@ def verify_webhook(
 # ── Webhook incoming messages (POST) ────────────────────────────────────
 
 @router.post("/webhook")
-async def incoming_webhook(request: Request) -> dict[str, str]:
-    """Receive incoming WhatsApp messages with Meta signature verification."""
+async def incoming_webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, str]:
+    """Receive incoming WhatsApp messages with Meta signature verification.
+
+    Returns 200 immediately and processes messages in a background task so the
+    blocking OpenAI / Supabase calls don't hold the event loop or trigger Meta
+    webhook timeouts.
+    """
     raw_body = await request.body()
 
     # Verify Meta's X-Hub-Signature-256 header
@@ -59,8 +64,8 @@ async def incoming_webhook(request: Request) -> dict[str, str]:
 
     from services.aria_whatsapp import handle_incoming_message
 
-    result = handle_incoming_message(payload)
-    logger.info("WhatsApp webhook processed: %s", result)
+    # Offload heavy processing (OpenAI calls, DB writes) to background
+    background_tasks.add_task(handle_incoming_message, payload)
     return {"status": "ok"}
 
 

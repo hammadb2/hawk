@@ -39,14 +39,15 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
       setUploading(true);
 
       try {
-        if (file.type.startsWith("image/")) {
-          // Image analysis via vision
+        if (file.type.startsWith("image/") || file.type === "application/pdf") {
+          // Image and PDF analysis via vision (base64 encoded)
           const reader = new FileReader();
           const base64 = await new Promise<string>((resolve) => {
             reader.onload = () => resolve(reader.result as string);
             reader.readAsDataURL(file);
           });
 
+          const label = file.type === "application/pdf" ? "PDF document" : "image";
           const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/chat`, {
             method: "POST",
             headers: {
@@ -54,7 +55,7 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              content: `Analyze this uploaded image: ${file.name}`,
+              content: `Analyze this uploaded ${label}: ${file.name}`,
               image_data: base64,
             }),
           });
@@ -63,12 +64,12 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
             const data = await r.json();
             onAnalysis({ filename: file.name, analysis: data.reply || "Analysis complete." });
           } else {
-            onAnalysis({ filename: file.name, analysis: "Image analysis failed. Please try again." });
+            onAnalysis({ filename: file.name, analysis: `${label} analysis failed. Please try again.` });
           }
         } else {
-          // Text/PDF analysis via document function
+          // Text/CSV analysis via document function
           const text = await file.text();
-          const docType = file.name.endsWith(".pdf") ? "report" : file.name.endsWith(".csv") ? "report" : "general";
+          const docType = file.name.endsWith(".csv") ? "report" : "general";
 
           const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/chat`, {
             method: "POST",
