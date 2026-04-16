@@ -185,6 +185,31 @@ FUNCTION_DEFINITIONS = [
         "description": "Get total MRR, client count, and breakdown by plan.",
         "parameters": {"type": "object", "properties": {}},
     },
+    # ── Phase 1: Outbound pipeline ────────────────────────────────────────
+    {
+        "name": "run_outbound_pipeline",
+        "description": "Run the full ARIA outbound pipeline: Apollo lead pull, Clay enrichment, ZeroBounce verification, Hawk domain scan, personalized email generation, and Smartlead loading. Requires vertical and location.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "vertical": {"type": "string", "description": "Target vertical: dental, legal, or accounting"},
+                "location": {"type": "string", "description": "Geographic location, e.g. 'Toronto, Canada' or 'Ontario'"},
+                "batch_size": {"type": "integer", "description": "Number of leads to pull (default 50)"},
+            },
+            "required": ["vertical", "location"],
+        },
+    },
+    {
+        "name": "get_pipeline_run_status",
+        "description": "Get live status of a running or completed pipeline run.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "run_id": {"type": "string", "description": "Pipeline run ID"},
+            },
+            "required": ["run_id"],
+        },
+    },
     # ── Phase 9: Pattern learning ─────────────────────────────────────────
     {
         "name": "detect_business_patterns",
@@ -339,6 +364,9 @@ def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
         # Phase 9: patterns require reports permission
         if name in ("detect_business_patterns", "get_recent_patterns") and not permissions.get("reports"):
             continue
+        # Phase 1: pipeline requires prospect_data
+        if name in ("run_outbound_pipeline", "get_pipeline_run_status") and not permissions.get("prospect_data"):
+            continue
         # Phase 10: A/B testing requires prospect_data
         if name in ("create_ab_experiment", "generate_ab_variants", "list_ab_experiments") and not permissions.get("prospect_data"):
             continue
@@ -384,6 +412,36 @@ def _execute_function(
             return _fn_flag_va_for_pip(args, uid, headers)
         elif name == "get_client_mrr_summary":
             return _fn_get_client_mrr_summary(headers)
+        # ── Phase 1: Outbound pipeline ────────────────────────────────
+        elif name == "run_outbound_pipeline":
+            from services.aria_pipeline import run_outbound_pipeline as _run_pipeline
+            vertical = args.get("vertical", "dental")
+            location = args.get("location", "")
+            batch_size = args.get("batch_size", 50)
+            # Create the pipeline run record first
+            run_payload = {
+                "triggered_by": uid,
+                "vertical": vertical,
+                "location": location,
+                "status": "running",
+                "current_step": "initializing",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+            r = httpx.post(
+                f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
+                headers={**headers, "Prefer": "return=representation"},
+                json=run_payload,
+                timeout=20.0,
+            )
+            if r.status_code >= 400:
+                return json.dumps({"error": "Failed to create pipeline run", "detail": r.text[:300]})
+            run_row = r.json()[0] if isinstance(r.json(), list) else r.json()
+            run_id = run_row["id"]
+            result = _run_pipeline(run_id, vertical, location, batch_size)
+            return json.dumps(result)
+        elif name == "get_pipeline_run_status":
+            from services.aria_pipeline import _build_summary
+            return json.dumps(_build_summary(args.get("run_id", "")))
         # ── Phase 9: Pattern learning ────────────────────────────────
         elif name == "detect_business_patterns":
             from services.aria_patterns import run_pattern_detection
