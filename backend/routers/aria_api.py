@@ -193,7 +193,7 @@ def api_chat(
         return {"reply": (response.choices[0].message.content or "").strip()}
     except Exception as exc:
         logger.exception("API chat failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Chat request failed")
 
 
 # ── Webhook registration ────────────────────────────────────────────────

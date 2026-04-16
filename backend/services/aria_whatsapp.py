@@ -238,29 +238,33 @@ def get_wa_queue(status: str = "pending", limit: int = 50) -> list[dict[str, Any
 
 
 def approve_and_send(queue_id: str) -> dict[str, Any]:
-    """Approve and send a queued WhatsApp reply."""
+    """Approve and send a queued WhatsApp reply.
+
+    Uses an atomic conditional update to prevent duplicate sends from
+    concurrent requests (TOCTOU race condition).
+    """
     if not SUPABASE_URL or not SERVICE_KEY:
         return {"error": "Supabase not configured"}
 
-    # Fetch queue item
-    r = httpx.get(
+    # Atomically claim the item: PATCH status from 'pending' → 'sending'
+    # Only succeeds if item exists AND is still 'pending' (wins the race).
+    claim = httpx.patch(
         f"{SUPABASE_URL}/rest/v1/aria_whatsapp_queue",
-        headers=_sb(),
-        params={"id": f"eq.{queue_id}", "select": "*", "limit": "1"},
-        timeout=20.0,
+        headers={**_sb(), "Prefer": "return=representation"},
+        params={"id": f"eq.{queue_id}", "status": "eq.pending"},
+        json={"status": "sending"},
+        timeout=15.0,
     )
-    rows = r.json() if r.status_code < 400 else []
-    if not rows:
-        return {"error": "Queue item not found"}
+    claimed = claim.json() if claim.status_code < 400 else []
+    if not claimed:
+        return {"error": "Queue item not found or already processed"}
 
-    item = rows[0]
-    if item.get("status") != "pending":
-        return {"error": f"Item is already {item.get('status')}"}
+    item = claimed[0]
 
     # Send the message
     result = send_text_message(item["phone"], item["drafted_reply"])
 
-    # Update status
+    # Update final status
     new_status = "sent" if result.get("sent") else "failed"
     httpx.patch(
         f"{SUPABASE_URL}/rest/v1/aria_whatsapp_queue",

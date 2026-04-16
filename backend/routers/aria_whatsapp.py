@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -35,9 +38,22 @@ def verify_webhook(
 
 @router.post("/webhook")
 async def incoming_webhook(request: Request) -> dict[str, str]:
-    """Receive incoming WhatsApp messages."""
+    """Receive incoming WhatsApp messages with Meta signature verification."""
+    raw_body = await request.body()
+
+    # Verify Meta's X-Hub-Signature-256 header
+    app_secret = os.environ.get("WHATSAPP_APP_SECRET", "").strip()
+    if app_secret:
+        signature_header = request.headers.get("X-Hub-Signature-256", "")
+        expected_sig = "sha256=" + hmac.new(
+            app_secret.encode(), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature_header, expected_sig):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
     try:
-        payload = await request.json()
+        import json
+        payload = json.loads(raw_body)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
