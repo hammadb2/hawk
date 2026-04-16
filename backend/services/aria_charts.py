@@ -349,7 +349,7 @@ def get_client_health_distribution() -> dict[str, Any]:
         "data": data,
         "x_key": "range",
         "y_keys": ["count"],
-        "colors": ["#10b981", "#10b981", "#f59e0b", "#ef4444", "#ef4444"],
+        "colors": ["#ef4444", "#ef4444", "#f59e0b", "#10b981", "#10b981"],
         "at_risk_count": at_risk_count,
         "total": len(scores),
     }
