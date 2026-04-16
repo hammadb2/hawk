@@ -13,7 +13,7 @@ const icons: Record<string, string> = {
   Prospects: "◎",
   Clients: "◈",
   Scoreboard: "▲",
-  Charlotte: "✉",
+  ARIA: "✦",
   Team: "👥",
   Reports: "📊",
   Earnings: "$",

@@ -929,20 +929,34 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
     role_type = prof.get("role_type", "")
     user_name = prof.get("full_name", "User")
 
-    system_prompt = f"""You are HAWK Command, the AI operations assistant for Hawk Security's CRM.
+    today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+
+    system_prompt = f"""You are ARIA — Automated Revenue and Intelligence Assistant — the chief of staff for Hawk Security's CRM.
 You are speaking with {user_name} (role: {role_name}, type: {role_type}).
+Today is {today}.
 
-You can take real actions through function calls. Every action you take is logged.
+Hawk Security is a Canadian cybersecurity company targeting dental clinics, law firms, and accounting practices.
+Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo.
+Target: 24 booked sales calls per day from cold email outreach.
+VA team managed by Kevin, runs Apollo, Clay, Smartlead, ZeroBounce pipeline.
+HAWK Certified badge and financial guarantee are key differentiators.
+PIPEDA compliance is the primary regulatory angle for Canadian SMBs.
 
-IMPORTANT RULES:
-- Be professional, concise, and action-oriented
-- When the user asks for data, use the appropriate function to fetch it
-- When asked to send an email, confirm the details before sending
-- When presenting data, format it clearly with key metrics highlighted
-- If a function is not available for this user's role, explain that you cannot perform that action for their access level
+You take real actions through function calls. Every action is logged.
+
+PERSONALITY:
+- Sharp, confident, concise. Never say "Great question" or "Certainly" or "Of course".
+- Just answer and act. Present data cleanly. Be direct about confirmations.
+- When you generate something, present it cleanly. When you need confirmation, be direct.
+
+RULES:
+- Use the appropriate function when the user asks for data
+- Confirm details before sending emails or taking irreversible actions
+- Present data with key metrics highlighted
+- If a function is not available for this user's role, say you cannot share that — no hard errors
 - Never expose internal system details or database structure
-- Offer to help with related tasks after completing a request
-- For document generation, call the generate_document function and let the user know it's ready
+- When chart data is appropriate (comparisons, trends, funnels), prefer charts over text tables
+- For document generation, call generate_document and let the user know it is ready
 
 Available permissions for this user: {json.dumps(permissions)}"""
 
@@ -979,6 +993,8 @@ Available permissions for this user: {json.dumps(permissions)}"""
     msg = response.choices[0].message
 
     # Handle function calls
+    last_fn_name: str | None = None
+    last_fn_result: str | None = None
     if msg.tool_calls:
         for tool_call in msg.tool_calls:
             fn_name = tool_call.function.name
@@ -1000,6 +1016,9 @@ Available permissions for this user: {json.dumps(permissions)}"""
                 fn_result = _execute_function(fn_name, fn_args, uid, permissions)
             else:
                 fn_result = json.dumps({"error": "This action is not available for your access level."})
+
+            last_fn_name = fn_name
+            last_fn_result = fn_result
 
             # Save function call message
             httpx.post(
@@ -1067,4 +1086,19 @@ Available permissions for this user: {json.dumps(permissions)}"""
         timeout=20.0,
     )
 
-    return {"reply": final_content}
+    result: dict[str, Any] = {"reply": final_content}
+
+    # Attach function metadata so the frontend can render inline components
+    if last_fn_name:
+        result["function_called"] = last_fn_name
+        if last_fn_result:
+            try:
+                parsed = json.loads(last_fn_result)
+                # Pass chart_data through if the function returned it
+                if isinstance(parsed, dict) and "chart_data" in parsed:
+                    result["chart_data"] = parsed["chart_data"]
+                result["function_result"] = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    return result
