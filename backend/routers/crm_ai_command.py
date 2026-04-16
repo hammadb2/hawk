@@ -1077,12 +1077,40 @@ Available permissions for this user: {json.dumps(permissions)}"""
         timeout=20.0,
     )
 
-    # Update conversation timestamp and title if first message
+    # Update conversation timestamp — and auto-generate a title on the first message
+    patch_payload: dict[str, Any] = {"updated_at": datetime.now(timezone.utc).isoformat()}
+
+    # If this is the first exchange (history only had the user message we just saved),
+    # generate a short descriptive title from the user's message.
+    is_first_message = len([m for m in history if m.get("role") == "user"]) <= 1
+    if is_first_message:
+        try:
+            title_resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Generate a short conversation title (max 6 words) that summarizes the user's request. "
+                            "No quotes, no punctuation at the end. Just the title."
+                        ),
+                    },
+                    {"role": "user", "content": body.content},
+                ],
+                max_tokens=20,
+                temperature=0.3,
+            )
+            auto_title = (title_resp.choices[0].message.content or "").strip().strip('"').strip("'")
+            if auto_title:
+                patch_payload["title"] = auto_title
+        except Exception:
+            pass  # Non-critical — keep the default title
+
     httpx.patch(
         f"{SUPABASE_URL}/rest/v1/aria_conversations",
         headers=headers,
         params={"id": f"eq.{body.conversation_id}"},
-        json={"updated_at": datetime.now(timezone.utc).isoformat()},
+        json=patch_payload,
         timeout=20.0,
     )
 
