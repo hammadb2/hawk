@@ -21,6 +21,8 @@ from services.crm_rep_health import run_rep_health_scores
 from services.crm_enterprise_domain_scans import run_enterprise_domain_scans
 from services.crm_attacker_simulation import run_weekly_attacker_simulations
 from services.portal_milestones import ensure_portal_milestones
+from services.crm_va_scoring import run_weekly_va_scoring
+from services.crm_va_alerts import run_daily_va_alerts
 
 logger = logging.getLogger(__name__)
 
@@ -528,6 +530,33 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     logger.info("Scheduled ARIA pipeline run started: %s (vertical=%s, location=%s)", run_id, vertical, location)
+
+
+@router.post("/va-weekly-scoring")
+def va_weekly_scoring(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Weekly VA scoring — run Sunday night. Computes weighted score for each active VA."""
+    _require_secret(x_cron_secret)
+    try:
+        return run_weekly_va_scoring()
+    except Exception as e:
+        logger.exception("va weekly scoring failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/va-daily-alerts")
+def va_daily_alerts(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Daily VA alert checks — low calls, high bounce, low reply rate, missed input, red score."""
+    _require_secret(x_cron_secret)
+    try:
+        return run_daily_va_alerts()
+    except Exception as e:
+        logger.exception("va daily alerts failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
 
 
 # scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).

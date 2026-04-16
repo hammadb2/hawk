@@ -36,7 +36,7 @@ def _profile(uid: str) -> dict | None:
     r = httpx.get(
         f"{SUPABASE_URL}/rest/v1/profiles",
         headers=_sb_headers(),
-        params={"id": f"eq.{uid}", "select": "id,role", "limit": "1"},
+        params={"id": f"eq.{uid}", "select": "id,role,role_type", "limit": "1"},
         timeout=20.0,
     )
     r.raise_for_status()
@@ -45,9 +45,17 @@ def _profile(uid: str) -> dict | None:
 
 
 def _require_privileged(uid: str) -> None:
+    """CEO, HoS, or va_manager can invite."""
     p = _profile(uid)
-    if not p or p.get("role") not in ("ceo", "hos"):
-        raise HTTPException(status_code=403, detail="CEO or HoS only")
+    if not p:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    role = p.get("role") or ""
+    if role in ("ceo", "hos"):
+        return
+    # va_manager stored in role_type column (role may still be something else)
+    if p.get("role_type") == "va_manager":
+        return
+    raise HTTPException(status_code=403, detail="CEO, HoS, or VA Manager only")
 
 
 def _is_invite_duplicate_email(resp: httpx.Response) -> bool:
@@ -109,11 +117,17 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
     patch: dict[str, Any] = {
         "full_name": body.full_name.strip(),
         "role": body.role,
-        "whatsapp_number": body.whatsapp_number.strip(),
         "status": "invited",
         "email": email,
         "onboarding_status": "not_started",
     }
+    if body.whatsapp_number:
+        patch["whatsapp_number"] = body.whatsapp_number.strip()
+    # Set role_type for VA roles
+    if body.role == "va_manager":
+        patch["role_type"] = "va_manager"
+    elif body.role == "va":
+        patch["role_type"] = "va_outreach"
     if body.team_lead_id:
         patch["team_lead_id"] = body.team_lead_id
     if body.role_type:
@@ -140,7 +154,31 @@ def _provision_existing_auth_user_as_rep(body: InviteBody) -> dict[str, Any]:
         if pr.status_code >= 400:
             raise HTTPException(status_code=400, detail=pr.text[:500])
 
-    redir = f"{CRM_PUBLIC_BASE_URL}/onboarding" if CRM_PUBLIC_BASE_URL else None
+    # For VA roles, also create a va_profiles row so RLS user_id linkage works
+    if body.role == "va":
+        va_row: dict[str, Any] = {
+            "user_id": uid,
+            "full_name": body.full_name.strip(),
+            "email": email,
+            "role": body.va_sub_role or "reply_book",
+            "status": "active",
+        }
+        vr = httpx.post(
+            f"{SUPABASE_URL}/rest/v1/va_profiles",
+            headers={**_sb_headers(), "Prefer": "return=minimal"},
+            json=va_row,
+            timeout=20.0,
+        )
+        if vr.status_code >= 400:
+            logger.warning("va_profiles upsert for existing user failed: %s %s", vr.status_code, vr.text[:300])
+
+    # VA roles land on different pages
+    if body.role == "va_manager":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/roster" if CRM_PUBLIC_BASE_URL else None
+    elif body.role == "va":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/input" if CRM_PUBLIC_BASE_URL else None
+    else:
+        redir = f"{CRM_PUBLIC_BASE_URL}/onboarding" if CRM_PUBLIC_BASE_URL else None
     recover_json: dict[str, Any] = {"email": email}
 
     # Create onboarding session with agreed_terms for existing user
@@ -186,16 +224,24 @@ def _create_onboarding_session(profile_id: str, agreed_terms: dict[str, Any], he
 class InviteBody(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=200)
-    role: Literal["sales_rep", "team_lead", "closer", "client"] = "sales_rep"
+    role: Literal["sales_rep", "team_lead", "closer", "client", "va_manager", "va"] = "sales_rep"
     role_type: Literal["ceo", "closer", "va_outreach", "va_manager", "csm", "client", "sales_rep", "team_lead"] | None = None
-    whatsapp_number: str = Field(..., min_length=5, max_length=40)
+    whatsapp_number: str = Field(default="", max_length=40)
     team_lead_id: str | None = None
+    va_sub_role: Literal["list_qa", "reply_book"] | None = None
     agreed_terms: dict[str, Any] | None = None
 
 
 @router.post("/invite")
 def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
     _require_privileged(uid)
+
+    # va_manager can only invite va role
+    caller = _profile(uid)
+    if caller and caller.get("role") not in ("ceo", "hos"):
+        if caller.get("role_type") == "va_manager" and body.role != "va":
+            raise HTTPException(status_code=403, detail="VA managers can only invite VA roles")
+
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
@@ -203,15 +249,29 @@ def invite_rep(body: InviteBody, uid: str = Depends(require_supabase_uid)):
         "full_name": body.full_name.strip(),
         "crm_role": body.role,
         "crm_initial_status": "invited",
-        "whatsapp_number": body.whatsapp_number.strip(),
     }
+    if body.whatsapp_number:
+        meta["whatsapp_number"] = body.whatsapp_number.strip()
     if body.team_lead_id:
         meta["crm_team_lead_id"] = body.team_lead_id
+    # Map invite role → profiles.role_type so the auth trigger sets it correctly
     if body.role_type:
         meta["crm_role_type"] = body.role_type
+    elif body.role == "va_manager":
+        meta["crm_role_type"] = "va_manager"
+    elif body.role == "va":
+        meta["crm_role_type"] = "va_outreach"
+    # Pass VA sub-role (list_qa / reply_book) for va_profiles creation in trigger
+    if body.role == "va" and body.va_sub_role:
+        meta["va_role"] = body.va_sub_role
 
-    # Create onboarding session with agreed_terms if provided
-    redir = f"{CRM_PUBLIC_BASE_URL}/onboarding" if CRM_PUBLIC_BASE_URL else None
+    # VA roles land on different pages
+    if body.role == "va_manager":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/roster" if CRM_PUBLIC_BASE_URL else None
+    elif body.role == "va":
+        redir = f"{CRM_PUBLIC_BASE_URL}/crm/va/input" if CRM_PUBLIC_BASE_URL else None
+    else:
+        redir = f"{CRM_PUBLIC_BASE_URL}/onboarding" if CRM_PUBLIC_BASE_URL else None
     payload: dict = {"email": body.email.lower().strip(), "data": meta}
     if redir:
         payload["options"] = {"email_redirect_to": redir}
@@ -280,12 +340,39 @@ class DeactivateBody(BaseModel):
     profile_id: str
 
 
+def _ban_auth_user(user_id: str) -> None:
+    """Ban a Supabase auth user so they can no longer log in."""
+    r = httpx.put(
+        f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+        headers=_sb_headers(),
+        json={"ban_duration": "876600h"},  # ~100 years
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("ban auth user %s failed: %s %s", user_id, r.status_code, r.text[:300])
+
+
 @router.post("/rep/deactivate")
 def deactivate_rep(body: DeactivateBody, uid: str = Depends(require_supabase_uid)):
-    _require_privileged(uid)
+    """CEO-only: deactivate any team member (except other CEOs) + revoke auth."""
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
+    # CEO only
+    caller = _profile(uid)
+    if not caller or caller.get("role") != "ceo":
+        raise HTTPException(status_code=403, detail="CEO only")
+
+    # Load target profile
+    target = _get_profile_row(body.profile_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    # Cannot deactivate other CEOs
+    if target.get("role") == "ceo":
+        raise HTTPException(status_code=403, detail="Cannot deactivate a CEO account")
+
+    # 1. Set profiles.status = inactive
     r = httpx.patch(
         f"{SUPABASE_URL}/rest/v1/profiles",
         headers=_sb_headers(),
@@ -294,6 +381,20 @@ def deactivate_rep(body: DeactivateBody, uid: str = Depends(require_supabase_uid
         timeout=20.0,
     )
     r.raise_for_status()
+
+    # 2. Ban auth user
+    _ban_auth_user(body.profile_id)
+
+    # 3. If target is a VA, also deactivate their va_profiles row
+    if target.get("role") in ("va",):
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/va_profiles",
+            headers=_sb_headers(),
+            params={"user_id": f"eq.{body.profile_id}"},
+            json={"status": "inactive"},
+            timeout=20.0,
+        )
+
     return {"ok": True}
 
 

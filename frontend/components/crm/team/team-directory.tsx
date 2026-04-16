@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
@@ -19,7 +20,7 @@ import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { AgreedTermsModal } from "@/components/crm/agreed-terms-modal";
 import { cn } from "@/lib/utils";
 
-type InviteRole = "sales_rep" | "team_lead" | "closer" | "client";
+type InviteRole = "sales_rep" | "team_lead" | "closer" | "client" | "va_manager" | "va";
 type InviteRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | "csm" | "client" | "sales_rep" | "team_lead" | "";
 
 function roleLabel(r: string): string {
@@ -28,7 +29,7 @@ function roleLabel(r: string): string {
 
 export function TeamDirectory() {
   const supabase = useMemo(() => createClient(), []);
-  const { authReady, session, profile } = useCrmAuth();
+  const { authReady, profileFetched, session, profile } = useCrmAuth();
   const [rows, setRows] = useState<Profile[]>([]);
   const [tlNames, setTlNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -51,7 +52,7 @@ export function TeamDirectory() {
       .select(
         "id, email, full_name, role, team_lead_id, status, monthly_close_target, last_close_at, created_at, onboarding_completed_at, whatsapp_number"
       )
-      .in("role", ["sales_rep", "team_lead"] as CrmRole[])
+      .in("role", ["sales_rep", "team_lead", "va_manager", "va"] as CrmRole[])
       .order("full_name", { ascending: true, nullsFirst: false });
     if (error) {
       toast.error(error.message);
@@ -148,25 +149,43 @@ export function TeamDirectory() {
     else toast.success("Email sent");
   }
 
-  async function deactivateRep(id: string) {
-    if (!session?.access_token || !confirm("Deactivate this rep?")) return;
-    const r = await fetch(`${CRM_API_BASE_URL}/api/crm/rep/deactivate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ profile_id: id }),
-    });
-    if (!r.ok) toast.error((await r.text()).slice(0, 200));
-    else {
-      toast.success("Updated");
-      await load();
+  async function deactivateRep() {
+    if (!session?.access_token || !deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/rep/deactivate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ profile_id: deactivateTarget.id }),
+      });
+      if (!r.ok) {
+        let msg = (await r.text()).slice(0, 240);
+        try {
+          const j = JSON.parse(msg) as { detail?: string };
+          if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* plain text */
+        }
+        toast.error(msg);
+      } else {
+        toast.success("Deactivated — access revoked");
+        setDeactivateTarget(null);
+        await load();
+      }
+    } finally {
+      setDeactivating(false);
     }
   }
 
   const [reassignFrom, setReassignFrom] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState("");
+
+  /* deactivate confirmation modal */
+  const [deactivateTarget, setDeactivateTarget] = useState<Profile | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   async function submitReassign() {
     if (!reassignFrom || !reassignTo || !session?.access_token) return;
@@ -187,10 +206,18 @@ export function TeamDirectory() {
     }
   }
 
-  if (!authReady || !session || !profile) {
+  if (!authReady || !profileFetched) {
     return (
       <div className="flex min-h-[200px] items-center justify-center text-slate-600">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      </div>
+    );
+  }
+
+  if (!session || !profile) {
+    return (
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-6 text-sm text-amber-700">
+        Please sign in to view the team directory.
       </div>
     );
   }
@@ -257,6 +284,8 @@ export function TeamDirectory() {
                 <option value="team_lead">Team lead</option>
                 <option value="closer">Closer</option>
                 <option value="client">Client</option>
+                <option value="va_manager">VA Manager</option>
+                <option value="va">VA</option>
               </select>
             </div>
             <div>
@@ -350,11 +379,34 @@ export function TeamDirectory() {
         </DialogContent>
       </Dialog>
 
+      {/* Deactivate confirmation modal */}
+      <Dialog open={!!deactivateTarget} onOpenChange={(o) => !o && setDeactivateTarget(null)}>
+        <DialogContent className="border-slate-200 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900">
+              Deactivate {deactivateTarget?.full_name ?? deactivateTarget?.email ?? "this user"}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">
+            This will set their status to inactive and permanently revoke their login access.
+            All historical data will be preserved. This action cannot be easily undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" className="border-slate-200" onClick={() => setDeactivateTarget(null)} disabled={deactivating}>
+              Cancel
+            </Button>
+            <Button className="bg-rose-600 hover:bg-rose-700" disabled={deactivating} onClick={() => void deactivateRep()}>
+              {deactivating ? "Deactivating\u2026" : "Deactivate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {loading ? (
         <div className="py-16 text-center text-slate-600">Loading…</div>
       ) : rows.length === 0 ? (
         <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-10 text-center text-sm text-slate-600">
-          No sales reps or team leads found.
+          No team members found.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -375,7 +427,11 @@ export function TeamDirectory() {
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
-                  <td className="px-3 py-2 font-medium text-slate-900">{p.full_name ?? "—"}</td>
+                  <td className="px-3 py-2 font-medium text-slate-900">
+                    <Link href={`/crm/team/${p.id}`} className="text-emerald-600 hover:underline">
+                      {p.full_name ?? "—"}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2 text-slate-600">{p.email ?? "—"}</td>
                   <td className="px-3 py-2 capitalize text-slate-700">{roleLabel(p.role)}</td>
                   <td className="px-3 py-2 text-slate-600">
@@ -400,22 +456,22 @@ export function TeamDirectory() {
                       </button>
                     )}
                     {["ceo", "hos"].includes(profile.role) && (
-                      <>
-                        <button
-                          type="button"
-                          className="text-xs text-slate-600 underline"
-                          onClick={() => setReassignFrom(p.id)}
-                        >
-                          Reassign
-                        </button>
-                        <button
-                          type="button"
-                          className="text-xs text-rose-400 underline"
-                          onClick={() => void deactivateRep(p.id)}
-                        >
-                          Deactivate
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-600 underline"
+                        onClick={() => setReassignFrom(p.id)}
+                      >
+                        Reassign
+                      </button>
+                    )}
+                    {isCeo && p.role !== "ceo" && (
+                      <button
+                        type="button"
+                        className="text-xs text-rose-400 underline"
+                        onClick={() => setDeactivateTarget(p)}
+                      >
+                        Deactivate
+                      </button>
                     )}
                   </td>
                 </tr>

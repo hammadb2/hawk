@@ -23,6 +23,13 @@ const icons: Record<string, string> = {
   Replies: "↩",
   Guarantees: "🛡",
   Health: "◆",
+  "VA Team": "👤",
+  "VA Daily Input": "📝",
+  "Campaign Health": "💊",
+  "A/B Tests": "⚗",
+  "Objection Bank": "💬",
+  "Bonus Tracker": "💰",
+  "Audit log": "📋",
 };
 
 export function CrmSidebar() {

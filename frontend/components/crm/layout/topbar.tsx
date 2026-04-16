@@ -30,6 +30,7 @@ export function CrmTopbar() {
   const [notifs, setNotifs] = useState<CrmNotificationRow[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const notifOpenRef = useRef(false);
   notifOpenRef.current = notifOpen;
 
@@ -254,8 +255,8 @@ export function CrmTopbar() {
             <button
               type="button"
               className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1 text-left text-sm"
-              onClick={() => signOut()}
-              title="Sign out"
+              onClick={() => setProfileMenuOpen((v) => !v)}
+              title="Profile menu"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-medium">
                 {(profile?.full_name ?? profile?.email ?? "?").slice(0, 2).toUpperCase()}
@@ -265,6 +266,27 @@ export function CrmTopbar() {
                 <span className="block truncate text-[11px] uppercase tracking-wide text-slate-600">{roleLabel}</span>
               </span>
             </button>
+            {profileMenuOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+                <Link
+                  href={`/crm/profile/${profile?.id ?? ""}`}
+                  className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                  onClick={() => setProfileMenuOpen(false)}
+                >
+                  My Profile
+                </Link>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    void signOut();
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
