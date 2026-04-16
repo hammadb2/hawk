@@ -32,7 +32,13 @@ export default function OnboardingReviewPage() {
       });
       if (r.ok) {
         const data = await r.json();
-        setItems(data.items || []);
+        const raw = Array.isArray(data) ? data : (data.items || []);
+            setItems(raw.map((item: Record<string, unknown>) => ({
+              ...item,
+              profile_name: (item.profile as Record<string, unknown>)?.full_name ?? item.profile_name ?? "",
+              profile_email: (item.profile as Record<string, unknown>)?.email ?? item.profile_email ?? "",
+              profile_role: (item.profile as Record<string, unknown>)?.role ?? item.profile_role ?? "",
+            })) as ReviewItem[]);
       }
     } catch (err) {
       console.error("Failed to load review queue:", err);
