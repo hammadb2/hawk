@@ -48,7 +48,7 @@ export default function PortalAskPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Ask HAWK AI Advisor</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Ask ARIA</h1>
         <p className="mt-1 text-sm text-slate-600">
           Answers use your latest scan, industry, and Canadian privacy context (PIPEDA / C-27). Not legal advice.
         </p>
@@ -61,7 +61,7 @@ export default function PortalAskPage() {
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {messages.length === 0 && (
             <p className="text-sm text-slate-600">
-              Ask about your findings, email security, what to fix first, or how PIPEDA applies to your situation.
+              Ask ARIA about your findings, email security, what to fix first, or how PIPEDA applies to your situation.
             </p>
           )}
           {messages.map((msg, i) => (
