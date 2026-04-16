@@ -125,7 +125,7 @@ export default function AriaRepliesPage() {
         setReplies([]);
       } else {
         const data = await r.json();
-        setReplies(data.replies || []);
+        setReplies(data);
       }
     } catch (e) {
       setErr("Network error loading replies");
@@ -139,7 +139,7 @@ export default function AriaRepliesPage() {
       const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/replies/stats`, { headers });
       if (r.ok) {
         const data = await r.json();
-        setStats(data.stats || null);
+        setStats(data || null);
       }
     } catch {
       // stats are non-critical
@@ -221,10 +221,10 @@ export default function AriaRepliesPage() {
 
   const role = profile?.role || "";
   const roleType = profile?.role_type || "";
-  if (!["ceo", "hos"].includes(role) && roleType !== "va_manager") {
+  if (!["ceo", "hos", "team_lead"].includes(role) && !["ceo", "hos", "team_lead"].includes(roleType)) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <p className="text-slate-500">Reply queue access restricted to CEO, HoS, and VA Manager.</p>
+        <p className="text-slate-500">Reply queue access restricted to CEO, HoS, and Team Lead.</p>
       </div>
     );
   }
