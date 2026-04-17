@@ -88,6 +88,12 @@ APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "").strip()
 CLAY_API_KEY = os.environ.get("CLAY_API_KEY", "").strip()
 ZEROBOUNCE_API_KEY = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
 
+# Unified pipeline — nightly build + morning dispatch
+GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
+PROSPEO_API_KEY = os.environ.get("PROSPEO_API_KEY", "").strip()
+MXTOOLBOX_API_KEY = os.environ.get("MXTOOLBOX_API_KEY", "").strip()
+CRM_SMARTLEAD_WEBHOOK_SECRET = os.environ.get("CRM_SMARTLEAD_WEBHOOK_SECRET", "").strip()
+
 # ARIA Phase 18 — WhatsApp Business Cloud API
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "").strip()
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "").strip()
