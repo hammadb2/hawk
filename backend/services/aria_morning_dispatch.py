@@ -177,12 +177,12 @@ def _smartlead_lead_payload(lead: dict[str, Any]) -> dict[str, Any]:
 def _bulk_upload_to_smartlead(
     campaign_id: str,
     leads: list[dict[str, Any]],
-) -> int:
-    """Bulk upload leads to a Smartlead campaign. Returns count of uploaded."""
+) -> list[dict[str, Any]]:
+    """Bulk upload leads to a Smartlead campaign. Returns list of successfully uploaded leads."""
     if not SMARTLEAD_API_KEY or not campaign_id:
-        return 0
+        return []
 
-    uploaded = 0
+    uploaded_leads: list[dict[str, Any]] = []
 
     for i in range(0, len(leads), SMARTLEAD_BULK_LIMIT):
         batch = leads[i:i + SMARTLEAD_BULK_LIMIT]
@@ -196,14 +196,14 @@ def _bulk_upload_to_smartlead(
                 timeout=60.0,
             )
             if r.status_code < 300:
-                uploaded += len(batch)
+                uploaded_leads.extend(batch)
                 logger.info("Smartlead bulk upload: %d leads to campaign %s", len(batch), campaign_id)
             else:
-                logger.error("Smartlead bulk upload failed: %s", r.text[:500])
+                logger.error("Smartlead bulk upload failed (batch %d-%d): %s", i, i + len(batch), r.text[:500])
         except Exception as exc:
-            logger.exception("Smartlead bulk upload error: %s", exc)
+            logger.exception("Smartlead bulk upload error (batch %d-%d): %s", i, i + len(batch), exc)
 
-    return uploaded
+    return uploaded_leads
 
 
 # ── Add Email Sequences to Campaign ─────────────────────────────────────
@@ -305,15 +305,15 @@ def run_morning_dispatch() -> dict[str, Any]:
             _ensure_campaign_sequence(campaign_id, v_leads)
 
             # Bulk upload
-            uploaded = _bulk_upload_to_smartlead(campaign_id, v_leads)
+            uploaded_leads = _bulk_upload_to_smartlead(campaign_id, v_leads)
 
-            # Mark as dispatched
-            lead_ids = [lead["id"] for lead in v_leads[:uploaded] if lead.get("id")]
+            # Mark only actually-uploaded leads as dispatched
+            lead_ids = [lead["id"] for lead in uploaded_leads if lead.get("id")]
             dispatched = mark_leads_dispatched(lead_ids, campaign_id)
 
             stats["by_vertical"][vertical] = {
                 "campaign_id": campaign_id,
-                "uploaded": uploaded,
+                "uploaded": len(uploaded_leads),
                 "dispatched": dispatched,
             }
             stats["dispatched_total"] += dispatched
