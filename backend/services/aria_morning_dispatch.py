@@ -164,6 +164,8 @@ def _smartlead_lead_payload(lead: dict[str, Any]) -> dict[str, Any]:
             "google_rating": str(lead.get("google_rating") or ""),
             "review_count": str(lead.get("review_count") or ""),
             "inventory_id": str(lead.get("id", "")),
+            "email_subject": lead.get("email_subject", ""),
+            "email_body": lead.get("email_body", ""),
         },
     }
 
@@ -242,8 +244,8 @@ def _ensure_campaign_sequence(
             json={
                 "seq_number": 1,
                 "seq_delay_details": {"delay_in_days": 0},
-                "subject": "{{subject}}",
-                "email_body": "{{body}}",
+                "subject": "{{email_subject}}",
+                "email_body": "{{email_body}}",
                 "variant_distribution": [],
             },
             timeout=20.0,

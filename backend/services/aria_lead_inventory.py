@@ -387,13 +387,17 @@ async def step_find_emails(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 # ── Step 4: Bulk ZeroBounce Verification ────────────────────────────────
 
-async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Verify emails using ZeroBounce bulk API."""
+async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Verify emails using ZeroBounce bulk API.
+
+    Returns (verified_leads, suppressed_leads) so suppressed leads can be
+    stored in inventory with status='suppressed' to prevent re-processing.
+    """
     if not leads or not ZEROBOUNCE_API_KEY:
         logger.warning("ZeroBounce not configured — skipping verification, keeping all leads")
         for lead in leads:
             lead["zero_bounce_result"] = "valid"
-        return leads
+        return leads, []
 
     # Build CSV content for bulk upload
     csv_lines = ["email"]
@@ -429,7 +433,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> list[dict[str,
                 # Fallback: keep all leads as valid
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
-                return leads
+                return leads, []
 
             upload_data = r.json()
             file_id = upload_data.get("file_id")
@@ -437,7 +441,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> list[dict[str,
                 logger.error("ZeroBounce bulk upload returned no file_id: %s", upload_data)
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
-                return leads
+                return leads, []
 
             logger.info("ZeroBounce bulk submitted file_id=%s (%d emails)", file_id, len(csv_lines) - 1)
 
@@ -474,14 +478,14 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> list[dict[str,
                 logger.error("ZeroBounce bulk results download failed: %s", result_r.text[:500])
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
-                return leads
+                return leads, []
 
             # Parse CSV results
             result_lines = result_r.text.strip().split("\n")
             if len(result_lines) < 2:
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
-                return leads
+                return leads, []
 
             # Find email and status column indices from header
             header = result_lines[0].lower().split(",")
@@ -512,6 +516,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> list[dict[str,
                     zb_map[email] = status
 
             verified: list[dict[str, Any]] = []
+            suppressed: list[dict[str, Any]] = []
             for lead in leads:
                 email = (lead.get("contact_email") or "").lower()
                 zb_status = zb_map.get(email, "valid")
@@ -526,20 +531,22 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> list[dict[str,
                     lead["zero_bounce_result"] = "invalid"
                     lead["status"] = "suppressed"
                     lead["suppression_reason"] = f"zerobounce_{zb_status}"
+                    suppressed.append(lead)
                 else:
                     lead["zero_bounce_result"] = "removed"
                     lead["status"] = "suppressed"
                     lead["suppression_reason"] = f"zerobounce_{zb_status}"
+                    suppressed.append(lead)
 
-            logger.info("ZeroBounce bulk: %d verified, %d removed", len(verified), len(leads) - len(verified))
-            return verified
+            logger.info("ZeroBounce bulk: %d verified, %d suppressed", len(verified), len(suppressed))
+            return verified, suppressed
 
     except Exception as exc:
         logger.exception("ZeroBounce bulk verification failed: %s", exc)
         # Fallback: keep all leads
         for lead in leads:
             lead["zero_bounce_result"] = "valid"
-        return leads
+        return leads, []
 
 
 # ── Step 5: Domain Scanning (30 concurrent) ─────────────────────────────
@@ -941,8 +948,15 @@ async def run_nightly_pipeline() -> dict[str, Any]:
             return {**stats, "ok": True, "message": "No emails found for discovered leads"}
 
         # Step 4: Bulk ZeroBounce verification
-        leads = await step_bulk_verify_emails(leads)
+        leads, suppressed_leads = await step_bulk_verify_emails(leads)
         stats["leads_verified"] = len(leads)
+        stats["leads_suppressed"] = len(suppressed_leads)
+
+        # Store suppressed leads immediately so dedup catches them next run
+        if suppressed_leads:
+            suppressed_stored = step_store_inventory(suppressed_leads, run_date)
+            logger.info("Stored %d suppressed leads in inventory for dedup", suppressed_stored)
+
         if not leads:
             return {**stats, "ok": True, "message": "All leads failed email verification"}
 
