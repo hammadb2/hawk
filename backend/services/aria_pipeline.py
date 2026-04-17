@@ -937,9 +937,9 @@ def _load_inventory_leads_to_pipeline(
             "contact_email": inv.get("contact_email") or "",
             "vertical": vertical,
             "apollo_data": {"source": "inventory", "inventory_id": inv.get("id")},
-            "scan_result": {"vulnerability": inv.get("vulnerability_found"), "no_finding": inv.get("no_finding")},
+            "vulnerability_found": inv.get("vulnerability_found"),
             "email_subject": inv.get("email_subject"),
-            "email_body": inv.get("email_body"),
+            "email_content": inv.get("email_body"),
             "status": "email_generated",
         })
 

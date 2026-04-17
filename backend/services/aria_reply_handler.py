@@ -248,6 +248,26 @@ def process_reply_event(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _extract_sending_domain(event: dict[str, Any]) -> str:
+    """Extract the sending (from) domain from a Smartlead webhook event.
+
+    Smartlead may provide the sending email in various fields depending on
+    webhook version. We try several common field names and fall back to empty.
+    """
+    for key in ("from_email", "email_account", "sender_email", "from"):
+        val = event.get(key)
+        if isinstance(val, str) and "@" in val:
+            return val.strip().lower().split("@")[-1]
+    # Some payloads nest it under email_account_id or account
+    account = event.get("email_account") or event.get("account") or {}
+    if isinstance(account, dict):
+        for key in ("email", "from_email", "sender_email"):
+            val = account.get(key)
+            if isinstance(val, str) and "@" in val:
+                return val.strip().lower().split("@")[-1]
+    return ""
+
+
 def process_bounce_event(event: dict[str, Any]) -> dict[str, Any]:
     """Process a Smartlead bounce webhook event."""
     lead_data = event.get("lead") or {}
@@ -258,10 +278,12 @@ def process_bounce_event(event: dict[str, Any]) -> dict[str, Any]:
         _add_to_suppressions(email, domain, "bounce")
         _suppress_inventory_lead(email, "bounce")
 
-    # Update domain health metrics
-    _increment_domain_bounce(domain)
+    # Update sending domain health metrics (not prospect domain)
+    sending_domain = _extract_sending_domain(event)
+    if sending_domain:
+        _increment_domain_bounce(sending_domain)
 
-    return {"ok": True, "event": "bounce", "email": email}
+    return {"ok": True, "event": "bounce", "email": email, "sending_domain": sending_domain}
 
 
 def process_spam_complaint_event(event: dict[str, Any]) -> dict[str, Any]:
@@ -274,10 +296,12 @@ def process_spam_complaint_event(event: dict[str, Any]) -> dict[str, Any]:
         _add_to_suppressions(email, domain, "spam_complaint")
         _suppress_inventory_lead(email, "spam_complaint")
 
-    # Update domain health metrics
-    _increment_domain_spam(domain)
+    # Update sending domain health metrics (not prospect domain)
+    sending_domain = _extract_sending_domain(event)
+    if sending_domain:
+        _increment_domain_spam(sending_domain)
 
-    return {"ok": True, "event": "spam_complaint", "email": email}
+    return {"ok": True, "event": "spam_complaint", "email": email, "sending_domain": sending_domain}
 
 
 # ── Database Helpers ────────────────────────────────────────────────────

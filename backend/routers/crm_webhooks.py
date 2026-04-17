@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Body, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from config import CRM_PUBLIC_BASE_URL
@@ -519,7 +519,7 @@ def _require_smartlead_webhook_secret(x_secret: str | None) -> None:
 
 @router.post("/smartlead")
 def smartlead_webhook(
-    body: dict[str, Any] = {},
+    body: dict[str, Any] = Body(default_factory=dict),
     x_smartlead_webhook_secret: str | None = Header(
         default=None, alias="X-Smartlead-Webhook-Secret"
     ),
