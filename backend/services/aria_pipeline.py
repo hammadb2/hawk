@@ -883,6 +883,97 @@ def _get_or_create_smartlead_campaign(vertical: str) -> str | None:
 
 # ── Full Pipeline Orchestrator ───────────────────────────────────────────
 
+def _check_inventory_for_ready_leads(
+    vertical: str,
+    location: str,
+    batch_size: int,
+) -> list[dict[str, Any]]:
+    """
+    Check aria_lead_inventory for ready leads matching vertical + location.
+
+    Returns matching leads or empty list if inventory is empty for this combo.
+    This enables chat-triggered pipeline to be instant when inventory has pre-built leads.
+    """
+    if not SUPABASE_URL:
+        return []
+
+    try:
+        from services.aria_lead_inventory import get_ready_leads
+
+        leads = get_ready_leads(vertical=vertical, city=location, limit=batch_size)
+        if not leads:
+            return []
+
+        logger.info(
+            "Inventory hit: %d ready leads for %s in %s",
+            len(leads),
+            vertical,
+            location,
+        )
+        return leads
+    except Exception as exc:
+        logger.warning("Inventory check failed (falling back to on-demand): %s", exc)
+        return []
+
+
+def _load_inventory_leads_to_pipeline(
+    run_id: str,
+    inventory_leads: list[dict[str, Any]],
+    vertical: str,
+) -> dict[str, Any]:
+    """
+    Take pre-built leads from inventory and load them into the on-demand pipeline
+    (skip Apollo, Clay, ZeroBounce, scan, email gen — all already done in nightly).
+    Just loads into Smartlead and marks dispatched.
+    """
+    # Insert into pipeline leads table for tracking
+    pipeline_leads = []
+    for inv in inventory_leads:
+        pipeline_leads.append({
+            "run_id": run_id,
+            "company_name": inv.get("business_name") or inv.get("company_name") or "",
+            "domain": inv.get("domain") or "",
+            "contact_name": inv.get("contact_name") or "",
+            "contact_email": inv.get("contact_email") or "",
+            "vertical": vertical,
+            "apollo_data": {"source": "inventory", "inventory_id": inv.get("id")},
+            "vulnerability_found": inv.get("vulnerability_found"),
+            "email_subject": inv.get("email_subject"),
+            "email_content": inv.get("email_body"),
+            "status": "email_generated",
+        })
+
+    inserted = _insert_leads(pipeline_leads)
+    _update_run(run_id, {
+        "leads_pulled": len(inserted),
+        "leads_enriched": len(inserted),
+        "leads_verified": len(inserted),
+        "leads_scanned": len(inserted),
+        "emails_generated": len(inserted),
+        "current_step": "smartlead_load",
+    })
+
+    # Load into Smartlead
+    step_smartlead_load(run_id, inserted, vertical)
+
+    # Mark inventory leads as dispatched
+    try:
+        from services.aria_lead_inventory import mark_leads_dispatched
+        inventory_ids = [inv["id"] for inv in inventory_leads if inv.get("id")]
+        if inventory_ids:
+            mark_leads_dispatched(inventory_ids, campaign_id="chat_dispatch")
+    except Exception as exc:
+        logger.warning("Failed to mark inventory leads dispatched: %s", exc)
+
+    _update_run(run_id, {
+        "status": "completed",
+        "current_step": "completed",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return _build_summary(run_id)
+
+
 def run_outbound_pipeline(
     run_id: str,
     vertical: str,
@@ -892,9 +983,21 @@ def run_outbound_pipeline(
     """
     Execute the full ARIA outbound pipeline end-to-end.
 
+    First checks aria_lead_inventory for ready leads matching the vertical + location.
+    If inventory has leads, uses those directly (instant dispatch).
+    Falls back to on-demand discovery (Apollo → Clay → ZeroBounce → scan → email gen)
+    only if inventory is empty for that combination.
+
     Returns a summary dict suitable for chat display.
     """
     try:
+        # Try inventory first (instant path)
+        inventory_leads = _check_inventory_for_ready_leads(vertical, location, batch_size)
+        if inventory_leads:
+            _update_run(run_id, {"current_step": "inventory_dispatch"})
+            return _load_inventory_leads_to_pipeline(run_id, inventory_leads, vertical)
+
+        # Fallback: on-demand discovery via Apollo
         # Step 1: Apollo Pull
         leads = step_apollo_pull(run_id, vertical, location, batch_size)
         if not leads:

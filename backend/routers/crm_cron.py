@@ -12,7 +12,6 @@ from fastapi import APIRouter, Header, HTTPException
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_monthly_reports import run_monthly_client_reports
 from services.crm_portal_sequence_worker import process_due_onboarding_sequences
-from services.crm_charlotte_run import run_charlotte_daily
 from services.crm_shield_daily import run_daily_shield_rescans
 from services.crm_openphone import format_aging_deal_message, format_stale_deal_message, send_ceo_sms, send_sms
 from routers.portal_phase2 import run_weekly_threat_briefings_for_all_clients
@@ -240,21 +239,90 @@ def charlotte_daily_run(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
     """
-    Charlotte automation — daily ~8am MST via cron-job.org:
-    Apollo (200) → ZeroBounce → suppressions + CRM dedupe → Scanner (10 concurrent) → OpenAI → Smartlead → charlotte_runs + CEO SMS (OpenPhone).
+    DEPRECATED — Charlotte automation replaced by nightly-pipeline.
+    This endpoint now redirects to the nightly pipeline for backward compatibility.
+    Use POST /api/crm/cron/nightly-pipeline instead.
+    """
+    _require_secret(x_cron_secret)
+    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
 
-    Header: X-Cron-Secret (same as other CRM crons: HAWK_CRM_CRON_SECRET / HAWK_CRON_SECRET / CRON_SECRET).
-    Set CHARLOTTE_AUTOMATION_DRY_RUN=1 on the API to skip external calls (smoke test).
+
+@router.post("/nightly-pipeline")
+def nightly_pipeline_run(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    ARIA Unified Nightly Pipeline — runs at 11pm MST:
+    Google Places (18 cities) → Deduplicate → Prospeo/Apollo email find →
+    Bulk ZeroBounce → Domain Scan (30 concurrent) → Batched OpenAI (20 per call) →
+    CASL footer + timezone scheduling → Store in aria_lead_inventory as 'ready'.
+
+    Replaces the old Charlotte daily run.
+    Target: complete within 90 minutes for 3,000 leads.
+    """
+    _require_secret(x_cron_secret)
+    import asyncio
+    try:
+        from services.aria_lead_inventory import run_nightly_pipeline
+        result = asyncio.run(run_nightly_pipeline())
+        return result
+    except Exception as e:
+        logger.exception("nightly pipeline failed: %s", e)
+        try:
+            send_ceo_sms(f"ARIA nightly pipeline failed: {e!s}"[:1500])
+        except Exception:
+            pass
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/morning-dispatch")
+def morning_dispatch_run(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    ARIA Morning Dispatch — runs at 6:30am MST:
+    Pull 'ready' leads from aria_lead_inventory ordered by score →
+    Assign to vertical-specific Smartlead campaigns →
+    Bulk upload with timezone-aware scheduled send times →
+    Mark as 'dispatched'.
+
+    Target: complete within 5 minutes.
     """
     _require_secret(x_cron_secret)
     try:
-        return run_charlotte_daily()
+        from services.aria_morning_dispatch import run_morning_dispatch
+        return run_morning_dispatch()
     except Exception as e:
-        logger.exception("charlotte run failed: %s", e)
+        logger.exception("morning dispatch failed: %s", e)
         try:
-            send_ceo_sms(f"Charlotte run failed: {e!s}"[:1500])
+            send_ceo_sms(f"ARIA morning dispatch failed: {e!s}"[:1500])
         except Exception:
             pass
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/inbox-health")
+def inbox_health_run(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    ARIA Inbox Health Monitoring — runs daily:
+    Fetch email stats per sending domain from Smartlead →
+    Assess bounce/spam rates (2% bounce = alert, 3% = pause; 0.1% spam = alert, 0.3% = pause) →
+    Weekly MXToolbox blacklist check →
+    Update aria_domain_health → Alert CEO on warnings/paused domains.
+    """
+    _require_secret(x_cron_secret)
+    try:
+        from services.aria_inbox_health import run_inbox_health_check
+        # Weekly blacklist check on Mondays
+        import zoneinfo
+        from datetime import datetime
+        mst = zoneinfo.ZoneInfo("America/Edmonton")
+        include_blacklist = datetime.now(mst).weekday() == 0  # Monday
+        return run_inbox_health_check(include_blacklist=include_blacklist)
+    except Exception as e:
+        logger.exception("inbox health check failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
