@@ -345,8 +345,40 @@ async def _apollo_find_email(
     return None
 
 
+async def _find_email_for_lead(
+    client: httpx.AsyncClient,
+    sem: asyncio.Semaphore,
+    lead: dict[str, Any],
+    has_prospeo: bool,
+    has_apollo: bool,
+) -> dict[str, Any] | None:
+    """Find email for a single lead (Prospeo first, Apollo fallback). Returns enriched lead or None."""
+    domain = lead["domain"]
+    result = None
+
+    if has_prospeo:
+        result = await _prospeo_find_email(client, sem, domain)
+
+    if not result and has_apollo:
+        result = await _apollo_find_email(client, sem, domain, lead.get("vertical", "dental"))
+
+    if result:
+        lead["contact_email"] = result["email"]
+        lead["contact_name"] = f"{result.get('name', '')} {result.get('last_name', '')}".strip() or None
+        lead["contact_title"] = result.get("title") or None
+        lead["email_finder"] = result["source"]
+        return lead
+
+    logger.debug("No email found for domain=%s", domain)
+    return None
+
+
 async def step_find_emails(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Find contact emails using Prospeo (primary) with Apollo fallback."""
+    """Find contact emails using Prospeo (primary) with Apollo fallback.
+
+    Runs up to 10 concurrent lookups via asyncio.gather() to meet the
+    90-minute nightly pipeline target for 3,000 leads.
+    """
     if not leads:
         return leads
 
@@ -357,29 +389,20 @@ async def step_find_emails(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return leads
 
     sem = asyncio.Semaphore(10)  # 10 concurrent email lookups
-    enriched: list[dict[str, Any]] = []
 
     async with httpx.AsyncClient(timeout=60.0) as client:
-        for lead in leads:
-            domain = lead["domain"]
-            result = None
+        tasks = [
+            _find_email_for_lead(client, sem, lead, has_prospeo, has_apollo)
+            for lead in leads
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Try Prospeo first
-            if has_prospeo:
-                result = await _prospeo_find_email(client, sem, domain)
-
-            # Fallback to Apollo
-            if not result and has_apollo:
-                result = await _apollo_find_email(client, sem, domain, lead.get("vertical", "dental"))
-
-            if result:
-                lead["contact_email"] = result["email"]
-                lead["contact_name"] = f"{result.get('name', '')} {result.get('last_name', '')}".strip() or None
-                lead["contact_title"] = result.get("title") or None
-                lead["email_finder"] = result["source"]
-                enriched.append(lead)
-            else:
-                logger.debug("No email found for domain=%s", domain)
+    enriched: list[dict[str, Any]] = []
+    for r in results:
+        if isinstance(r, Exception):
+            logger.warning("Email finding task failed: %s", r)
+        elif r is not None:
+            enriched.append(r)
 
     logger.info("Email finding: %d/%d leads got emails", len(enriched), len(leads))
     return enriched

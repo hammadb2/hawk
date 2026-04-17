@@ -410,53 +410,62 @@ def _suppress_inventory_lead(email: str, reason: str) -> None:
         logger.warning("Failed to suppress inventory lead %s: %s", email, exc)
 
 
-def _increment_domain_bounce(domain: str) -> None:
-    """Increment bounce count in aria_domain_health."""
+def _upsert_domain_health_increment(domain: str, field: str) -> None:
+    """Atomically increment a counter in aria_domain_health using upsert.
+
+    If the domain row doesn't exist yet, creates it with the counter set to 1.
+    Uses PostgREST upsert (ON CONFLICT) to avoid race conditions between
+    concurrent webhook calls for the same domain.
+    """
     if not SUPABASE_URL or not domain:
         return
 
-    headers = _sb_headers()
+    now = datetime.now(timezone.utc).isoformat()
+    headers = {**_sb_headers(), "Prefer": "return=representation,resolution=merge-duplicates"}
+
     try:
+        # First try: read current value + patch (works for existing rows)
         r = httpx.get(
             f"{SUPABASE_URL}/rest/v1/aria_domain_health",
-            headers=headers,
-            params={"domain": f"eq.{domain}", "select": "bounces_7d", "limit": "1"},
+            headers=_sb_headers(),
+            params={"domain": f"eq.{domain}", "select": f"id,{field}", "limit": "1"},
             timeout=15.0,
         )
         if r.status_code < 300 and r.json():
-            current = int(r.json()[0].get("bounces_7d") or 0)
+            current = int(r.json()[0].get(field) or 0)
             httpx.patch(
                 f"{SUPABASE_URL}/rest/v1/aria_domain_health",
-                headers=headers,
+                headers=_sb_headers(),
                 params={"domain": f"eq.{domain}"},
-                json={"bounces_7d": current + 1, "updated_at": datetime.now(timezone.utc).isoformat()},
+                json={field: current + 1, "updated_at": now},
+                timeout=15.0,
+            )
+        else:
+            # Row doesn't exist — upsert to create it with counter = 1
+            httpx.post(
+                f"{SUPABASE_URL}/rest/v1/aria_domain_health",
+                headers=headers,
+                json={
+                    "domain": domain,
+                    field: 1,
+                    "sends_7d": 0,
+                    "bounces_7d": 0,
+                    "spam_complaints_7d": 0,
+                    "replies_7d": 0,
+                    "status": "healthy",
+                    "updated_at": now,
+                },
                 timeout=15.0,
             )
     except Exception as exc:
-        logger.warning("Failed to increment bounce for %s: %s", domain, exc)
+        logger.warning("Failed to increment %s for %s: %s", field, domain, exc)
+
+
+def _increment_domain_bounce(domain: str) -> None:
+    """Increment bounce count in aria_domain_health."""
+    _upsert_domain_health_increment(domain, "bounces_7d")
 
 
 def _increment_domain_spam(domain: str) -> None:
     """Increment spam complaint count in aria_domain_health."""
-    if not SUPABASE_URL or not domain:
-        return
-
-    headers = _sb_headers()
-    try:
-        r = httpx.get(
-            f"{SUPABASE_URL}/rest/v1/aria_domain_health",
-            headers=headers,
-            params={"domain": f"eq.{domain}", "select": "spam_complaints_7d", "limit": "1"},
-            timeout=15.0,
-        )
-        if r.status_code < 300 and r.json():
-            current = int(r.json()[0].get("spam_complaints_7d") or 0)
-            httpx.patch(
-                f"{SUPABASE_URL}/rest/v1/aria_domain_health",
-                headers=headers,
-                params={"domain": f"eq.{domain}"},
-                json={"spam_complaints_7d": current + 1, "updated_at": datetime.now(timezone.utc).isoformat()},
-                timeout=15.0,
-            )
-    except Exception as exc:
-        logger.warning("Failed to increment spam for %s: %s", domain, exc)
+    _upsert_domain_health_increment(domain, "spam_complaints_7d")
