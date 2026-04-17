@@ -409,7 +409,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
             email_to_lead[email.lower()] = lead
 
     if len(csv_lines) <= 1:
-        return leads
+        return leads, []
 
     csv_content = "\n".join(csv_lines)
 
