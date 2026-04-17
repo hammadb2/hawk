@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, Body, Header, HTTPException
+from fastapi import APIRouter, Body, Header, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from config import CRM_PUBLIC_BASE_URL
@@ -520,17 +520,16 @@ def _require_smartlead_webhook_secret(x_secret: str | None) -> None:
 @router.post("/smartlead")
 def smartlead_webhook(
     body: dict[str, Any] = Body(default_factory=dict),
-    x_smartlead_webhook_secret: str | None = Header(
-        default=None, alias="X-Smartlead-Webhook-Secret"
-    ),
+    secret: str | None = Query(default=None),
 ):
     """
     Smartlead inbound webhook — handles reply, bounce, and spam complaint events.
 
     Configure in Smartlead dashboard (Settings > Webhooks):
-    URL: POST https://intelligent-rejoicing-production.up.railway.app/api/crm/webhooks/smartlead
-    Header: X-Smartlead-Webhook-Secret = <CRM_SMARTLEAD_WEBHOOK_SECRET>
+    URL: POST https://intelligent-rejoicing-production.up.railway.app/api/crm/webhooks/smartlead?secret=<CRM_SMARTLEAD_WEBHOOK_SECRET>
     Events: reply received, email bounced, spam complaint.
+
+    Auth via query parameter because Smartlead webhooks do not support custom headers.
 
     Replies are classified by ARIA (sentiment, confidence, reasoning),
     a response draft is generated, and the result is stored in aria_inbound_replies
@@ -538,7 +537,7 @@ def smartlead_webhook(
 
     Bounces and spam complaints update suppressions + aria_domain_health.
     """
-    _require_smartlead_webhook_secret(x_smartlead_webhook_secret)
+    _require_smartlead_webhook_secret(secret)
 
     event_type = (
         body.get("event_type")
