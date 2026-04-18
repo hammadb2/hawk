@@ -201,7 +201,7 @@ def step_apollo_pull(
     batch_size: int,
 ) -> list[dict[str, Any]]:
     """Pull leads from Apollo by vertical and location. Returns mapped leads."""
-    _update_run(run_id, {"current_step": "apollo_pull"})
+    _update_run(run_id, {"current_step": "apify_discover"})
 
     if DRY_RUN or not APOLLO_API_KEY:
         logger.info("ARIA pipeline: Apollo dry run / no API key — generating stub leads")
