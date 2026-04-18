@@ -121,7 +121,7 @@ def trigger_pipeline(
         "location": body.location.strip(),
         "batch_size": body.batch_size,
         "status": "running",
-        "current_step": "apollo_pull",
+        "current_step": "apify_discover",
     }
 
     r = httpx.post(

@@ -10,8 +10,7 @@ interface PipelineStep {
 }
 
 const PIPELINE_STEPS: PipelineStep[] = [
-  { key: "apollo_pull", label: "Apollo Pull", description: "Pulling leads from Apollo" },
-  { key: "clay_enrichment", label: "Clay Enrichment", description: "Enriching via Clay API" },
+  { key: "apify_discover", label: "Apify Discovery", description: "Discovering leads via Google Maps + LinkedIn + Leads Finder" },
   { key: "zerobounce_verify", label: "ZeroBounce Verify", description: "Verifying emails" },
   { key: "hawk_scan", label: "Hawk Domain Scan", description: "Scanning domains for vulnerabilities" },
   { key: "email_generation", label: "Email Generation", description: "Generating personalized emails" },
@@ -189,8 +188,7 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
                 {/* Metric for completed steps */}
                 {isDone && (
                   <span className="text-xs text-slate-500 font-mono">
-                    {step.key === "apollo_pull" && status.leads_pulled > 0 && `${status.leads_pulled} leads`}
-                    {step.key === "clay_enrichment" && status.leads_enriched > 0 && `${status.leads_enriched} enriched`}
+                    {step.key === "apify_discover" && status.leads_pulled > 0 && `${status.leads_pulled} leads`}
                     {step.key === "zerobounce_verify" && status.leads_verified > 0 && `${status.leads_verified} verified`}
                     {step.key === "hawk_scan" && status.leads_scanned > 0 && `${status.leads_scanned} scanned`}
                     {step.key === "email_generation" && status.emails_generated > 0 && `${status.emails_generated} emails`}
