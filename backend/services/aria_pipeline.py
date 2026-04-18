@@ -1017,15 +1017,22 @@ def step_google_places_discover(
         raw_leads.sort(key=lambda x: x.get("lead_score", 0), reverse=True)
         raw_leads = raw_leads[:batch_size]
 
+        # Deduplicate by domain within batch (scrape_vertical_city only dedupes by place_id)
+        seen_domains: set[str] = set()
+        unique_raw: list[dict[str, Any]] = []
+        for ld in raw_leads:
+            d = ld.get("domain", "")
+            if d and d not in seen_domains:
+                seen_domains.add(d)
+                unique_raw.append(ld)
+        raw_leads = unique_raw
+
         # Deduplicate against CRM
-        raw_leads_for_crm = [
-            {"domain": ld["domain"], **ld} for ld in raw_leads
-        ]
-        raw_leads_for_crm = _dedupe_against_crm(raw_leads_for_crm)
+        raw_leads = _dedupe_against_crm(raw_leads)
 
         # Map to pipeline_leads format
         pipeline_leads: list[dict[str, Any]] = []
-        for ld in raw_leads_for_crm:
+        for ld in raw_leads:
             pipeline_leads.append({
                 "run_id": run_id,
                 "company_name": ld.get("business_name") or "",
