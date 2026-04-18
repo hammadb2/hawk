@@ -1,9 +1,9 @@
 """
 ARIA Unified Nightly Pipeline — lead inventory management.
 
-Orchestrates: Google Places scrape → deduplicate → Prospeo/Apollo email find →
-bulk ZeroBounce → domain scan (30 concurrent) → batched OpenAI email gen (20 per call) →
-store as 'ready' in aria_lead_inventory.
+Orchestrates: Apify 4-actor discovery (Google Maps + LinkedIn + Leads Finder +
+Website Crawler) → bulk ZeroBounce → domain scan (30 concurrent) →
+batched OpenAI email gen (20 per call) → store as 'ready' in aria_lead_inventory.
 
 Runs at 11pm MST via POST /api/crm/cron/nightly-pipeline.
 """
@@ -22,12 +22,9 @@ from typing import Any
 import httpx
 
 from config import (
-    APOLLO_API_KEY,
     CAL_COM_BOOKING_URL,
-    GOOGLE_PLACES_API_KEY,
     OPENAI_API_KEY,
     OPENAI_MODEL,
-    PROSPEO_API_KEY,
     SMARTLEAD_API_KEY,
     SUPABASE_URL,
     ZEROBOUNCE_API_KEY,
@@ -40,8 +37,7 @@ MST = zoneinfo.ZoneInfo("America/Edmonton")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 SCANNER_URL = os.environ.get("SCANNER_URL", "https://intelligent-rejoicing-production.up.railway.app").rstrip("/")
 SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.ai/api/v1").rstrip("/")
-APOLLO_BASE = os.environ.get("APOLLO_API_BASE", "https://api.apollo.io/api/v1").rstrip("/")
-PROSPEO_BASE = "https://api.prospeo.io"
+APIFY_API_KEY = os.environ.get("APIFY_API_KEY", "").strip()
 ZEROBOUNCE_BULK_URL = "https://bulk.zerobounce.net/v2/sendfile"
 ZEROBOUNCE_BULK_STATUS_URL = "https://bulk.zerobounce.net/v2/filestatus"
 ZEROBOUNCE_BULK_RESULT_URL = "https://bulk.zerobounce.net/v2/getfile"
@@ -152,260 +148,51 @@ def _normalize_domain(raw: str) -> str:
     return d
 
 
-# ── Step 1: Google Places Discovery ─────────────────────────────────────
+# ── Step 1: Apify 4-Actor Discovery ─────────────────────────────────
 
 async def step_discover_leads(cities: list[str]) -> list[dict[str, Any]]:
-    """Scrape Google Places for all verticals across cities."""
-    from services.aria_places_scraper import scrape_all_verticals, score_lead
+    """Discover leads using Apify 4-actor pipeline.
 
-    leads = await scrape_all_verticals(cities)
+    Actor 1 (Google Maps) runs all city x vertical combos in parallel.
+    Actors 2-4 (LinkedIn, Leads Finder, Website Crawler) find emails for
+    leads that Actor 1 didn't return an email for.
+    Replaces the old Google Places + Prospeo/Apollo flow.
+    """
+    from services.aria_apify_scraper import run_full_discovery
 
-    # Score each lead
-    for lead in leads:
-        lead["lead_score"] = score_lead(lead)
+    leads = await run_full_discovery(cities=cities)
 
-    logger.info("Discovery complete: %d leads scored", len(leads))
-    return leads
+    # Filter out suppressed leads (no email found)
+    enriched = [ld for ld in leads if ld.get("status") != "suppressed"]
+    suppressed = [ld for ld in leads if ld.get("status") == "suppressed"]
+
+    logger.info("Discovery complete: %d leads with email, %d suppressed", len(enriched), len(suppressed))
+    return enriched
 
 
-# ── Step 2: Deduplicate ─────────────────────────────────────────────────
+# ── Step 2: Deduplicate (now handled inside aria_apify_scraper) ────────
 
 async def step_deduplicate(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove leads already in inventory, prospects table, or suppressions."""
-    if not leads or not SUPABASE_URL:
-        return leads
+    """Deduplication is now handled inside aria_apify_scraper.deduplicate_leads().
 
-    headers = _sb_headers()
-    domains = list({lead["domain"] for lead in leads})
-    existing_domains: set[str] = set()
-
-    # Check aria_lead_inventory (already processed)
-    for i in range(0, len(domains), 50):
-        chunk = domains[i:i + 50]
-        domain_filter = ",".join(chunk)
-        try:
-            r = httpx.get(
-                f"{SUPABASE_URL}/rest/v1/aria_lead_inventory",
-                headers=headers,
-                params={
-                    "domain": f"in.({domain_filter})",
-                    "select": "domain",
-                    "limit": "500",
-                },
-                timeout=20.0,
-            )
-            if r.status_code < 300:
-                for row in r.json() or []:
-                    d = (row.get("domain") or "").lower()
-                    if d:
-                        existing_domains.add(d)
-        except Exception as exc:
-            logger.warning("Inventory dedup check failed: %s", exc)
-
-    # Check prospects table (already contacted)
-    for i in range(0, len(domains), 50):
-        chunk = domains[i:i + 50]
-        domain_filter = ",".join(chunk)
-        try:
-            r = httpx.get(
-                f"{SUPABASE_URL}/rest/v1/prospects",
-                headers=headers,
-                params={
-                    "domain": f"in.({domain_filter})",
-                    "select": "domain",
-                    "limit": "500",
-                },
-                timeout=20.0,
-            )
-            if r.status_code < 300:
-                for row in r.json() or []:
-                    d = (row.get("domain") or "").lower()
-                    if d:
-                        existing_domains.add(d)
-        except Exception as exc:
-            logger.warning("Prospects dedup check failed: %s", exc)
-
-    # Check suppressions table
-    for i in range(0, len(domains), 50):
-        chunk = domains[i:i + 50]
-        domain_filter = ",".join(chunk)
-        try:
-            r = httpx.get(
-                f"{SUPABASE_URL}/rest/v1/suppressions",
-                headers=headers,
-                params={
-                    "domain": f"in.({domain_filter})",
-                    "select": "domain",
-                    "limit": "500",
-                },
-                timeout=20.0,
-            )
-            if r.status_code < 300:
-                for row in r.json() or []:
-                    d = (row.get("domain") or "").lower()
-                    if d:
-                        existing_domains.add(d)
-        except Exception as exc:
-            logger.warning("Suppressions dedup check failed: %s", exc)
-
-    before = len(leads)
-    leads = [lead for lead in leads if lead["domain"] not in existing_domains]
-    logger.info("Dedup: %d → %d leads (removed %d duplicates)", before, len(leads), before - len(leads))
+    This wrapper is kept for backward compatibility with run_nightly_pipeline.
+    """
+    # Dedup already ran inside run_full_discovery(); just pass through
+    logger.info("Dedup step (pass-through): %d leads", len(leads))
     return leads
 
 
-# ── Step 3: Email Finding (Prospeo primary, Apollo fallback) ────────────
-
-async def _prospeo_find_email(
-    client: httpx.AsyncClient,
-    sem: asyncio.Semaphore,
-    domain: str,
-) -> dict[str, Any] | None:
-    """Find email via Prospeo domain search."""
-    async with sem:
-        try:
-            r = await client.post(
-                f"{PROSPEO_BASE}/api/v1/domain-search",
-                headers={
-                    "Content-Type": "application/json",
-                    "X-KEY": PROSPEO_API_KEY,
-                },
-                json={"domain": domain, "limit": 1},
-                timeout=30.0,
-            )
-            if r.status_code >= 400:
-                return None
-            data = r.json()
-            emails = data.get("response") or data.get("emails") or []
-            if isinstance(emails, list) and emails:
-                em = emails[0]
-                email_addr = em.get("email") or em.get("value") or ""
-                if email_addr and "@" in email_addr:
-                    return {
-                        "email": email_addr.lower().strip(),
-                        "name": em.get("first_name", ""),
-                        "last_name": em.get("last_name", ""),
-                        "title": em.get("title") or em.get("position") or "",
-                        "source": "prospeo",
-                    }
-        except Exception as exc:
-            logger.debug("Prospeo failed for %s: %s", domain, exc)
-    return None
-
-
-async def _apollo_find_email(
-    client: httpx.AsyncClient,
-    sem: asyncio.Semaphore,
-    domain: str,
-    vertical: str,
-) -> dict[str, Any] | None:
-    """Fallback: find email via Apollo people search."""
-    async with sem:
-        try:
-            titles = {
-                "dental": ["dentist", "owner", "clinic owner", "principal"],
-                "legal": ["lawyer", "managing partner", "owner", "principal"],
-                "accounting": ["CPA", "accountant", "owner", "principal"],
-            }
-            body = {
-                "page": 1,
-                "per_page": 1,
-                "person_titles": titles.get(vertical, titles["dental"]),
-                "q_organization_domains": domain,
-                "contact_email_status": ["verified"],
-                "has_email": True,
-            }
-            r = await client.post(
-                f"{APOLLO_BASE}/mixed_people/search",
-                headers={
-                    "Content-Type": "application/json",
-                    "Cache-Control": "no-cache",
-                    "X-Api-Key": APOLLO_API_KEY,
-                },
-                json=body,
-                timeout=30.0,
-            )
-            if r.status_code >= 400:
-                return None
-            data = r.json()
-            people = data.get("people") or data.get("contacts") or []
-            if people and isinstance(people[0], dict):
-                p = people[0]
-                email_addr = (p.get("email") or p.get("primary_email") or "").strip()
-                if email_addr and "@" in email_addr:
-                    return {
-                        "email": email_addr.lower(),
-                        "name": (p.get("first_name") or "").strip(),
-                        "last_name": (p.get("last_name") or "").strip(),
-                        "title": (p.get("title") or "").strip(),
-                        "source": "apollo",
-                    }
-        except Exception as exc:
-            logger.debug("Apollo fallback failed for %s: %s", domain, exc)
-    return None
-
-
-async def _find_email_for_lead(
-    client: httpx.AsyncClient,
-    sem: asyncio.Semaphore,
-    lead: dict[str, Any],
-    has_prospeo: bool,
-    has_apollo: bool,
-) -> dict[str, Any] | None:
-    """Find email for a single lead (Prospeo first, Apollo fallback). Returns enriched lead or None."""
-    domain = lead["domain"]
-    result = None
-
-    if has_prospeo:
-        result = await _prospeo_find_email(client, sem, domain)
-
-    if not result and has_apollo:
-        result = await _apollo_find_email(client, sem, domain, lead.get("vertical", "dental"))
-
-    if result:
-        lead["contact_email"] = result["email"]
-        lead["contact_name"] = f"{result.get('name', '')} {result.get('last_name', '')}".strip() or None
-        lead["contact_title"] = result.get("title") or None
-        lead["email_finder"] = result["source"]
-        return lead
-
-    logger.debug("No email found for domain=%s", domain)
-    return None
-
+# ── Step 3: Email Finding (now handled inside aria_apify_scraper) ──────
 
 async def step_find_emails(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Find contact emails using Prospeo (primary) with Apollo fallback.
+    """Email finding is now handled inside aria_apify_scraper (Actors 2-4).
 
-    Runs up to 10 concurrent lookups via asyncio.gather() to meet the
-    90-minute nightly pipeline target for 3,000 leads.
+    This wrapper is kept for backward compatibility. Leads arriving here
+    already have contact_email set by the Apify pipeline.
     """
-    if not leads:
-        return leads
-
-    has_prospeo = bool(PROSPEO_API_KEY)
-    has_apollo = bool(APOLLO_API_KEY)
-    if not has_prospeo and not has_apollo:
-        logger.warning("No email finder API keys configured — skipping email finding")
-        return leads
-
-    sem = asyncio.Semaphore(10)  # 10 concurrent email lookups
-
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        tasks = [
-            _find_email_for_lead(client, sem, lead, has_prospeo, has_apollo)
-            for lead in leads
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    enriched: list[dict[str, Any]] = []
-    for r in results:
-        if isinstance(r, Exception):
-            logger.warning("Email finding task failed: %s", r)
-        elif r is not None:
-            enriched.append(r)
-
-    logger.info("Email finding: %d/%d leads got emails", len(enriched), len(leads))
-    return enriched
+    with_email = [ld for ld in leads if ld.get("contact_email")]
+    logger.info("Email finding step (pass-through): %d/%d leads have emails", len(with_email), len(leads))
+    return with_email
 
 
 # ── Step 4: Bulk ZeroBounce Verification ────────────────────────────────

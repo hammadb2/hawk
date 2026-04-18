@@ -256,9 +256,10 @@ def nightly_pipeline_run(
 ):
     """
     ARIA Unified Nightly Pipeline — runs at 11pm MST:
-    Google Places (18 cities) → Deduplicate → Prospeo/Apollo email find →
-    Bulk ZeroBounce → Domain Scan (30 concurrent) → Batched OpenAI (20 per call) →
-    CASL footer + timezone scheduling → Store in aria_lead_inventory as 'ready'.
+    Apify 4-actor discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
+    → Deduplicate → Bulk ZeroBounce → Domain Scan (30 concurrent) →
+    Batched OpenAI (20 per call) → CASL footer + timezone scheduling →
+    Store in aria_lead_inventory as 'ready'.
 
     Replaces the old Charlotte daily run.
     Target: complete within 90 minutes for 3,000 leads.
@@ -571,7 +572,7 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
         "location": location,
         "batch_size": batch_size,
         "status": "running",
-        "current_step": "apollo_pull",
+        "current_step": "apify_discover",
     }
     r = httpx.post(
         f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
