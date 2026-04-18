@@ -20,6 +20,8 @@ from services.crm_rep_health import run_rep_health_scores
 from services.crm_enterprise_domain_scans import run_enterprise_domain_scans
 from services.crm_attacker_simulation import run_weekly_attacker_simulations
 from services.portal_milestones import ensure_portal_milestones
+from services.aria_client_health import run_client_health_scores
+from services.aria_briefing import run_monday_briefing, run_competitive_brief
 
 logger = logging.getLogger(__name__)
 
@@ -596,6 +598,45 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     logger.info("Scheduled ARIA pipeline run started: %s (vertical=%s, location=%s)", run_id, vertical, location)
+
+
+@router.post("/aria-client-health")
+def aria_client_health_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """ARIA Phase 3 — Every 15 minutes: update client health scores, flag at-risk, push alerts."""
+    _require_secret(x_cron_secret)
+    try:
+        return run_client_health_scores()
+    except Exception as e:
+        logger.exception("aria client health cron failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/aria-monday-briefing")
+def aria_monday_briefing_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """ARIA Phase 3 — Every Monday 8am: generate CEO/HoS business briefing."""
+    _require_secret(x_cron_secret)
+    try:
+        return run_monday_briefing()
+    except Exception as e:
+        logger.exception("aria monday briefing cron failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.post("/aria-competitive-brief")
+def aria_competitive_brief_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """ARIA Phase 3 — Weekly: generate competitive intelligence brief for CEO."""
+    _require_secret(x_cron_secret)
+    try:
+        return run_competitive_brief()
+    except Exception as e:
+        logger.exception("aria competitive brief cron failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 # scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
