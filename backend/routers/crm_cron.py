@@ -20,6 +20,7 @@ from services.crm_rep_health import run_rep_health_scores
 from services.crm_enterprise_domain_scans import run_enterprise_domain_scans
 from services.crm_attacker_simulation import run_weekly_attacker_simulations
 from services.portal_milestones import ensure_portal_milestones
+from services.aria_memory import run_memory_ingestion
 from services.aria_client_health import run_client_health_scores
 from services.aria_briefing import run_monday_briefing, run_competitive_brief
 
@@ -600,6 +601,19 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
     logger.info("Scheduled ARIA pipeline run started: %s (vertical=%s, location=%s)", run_id, vertical, location)
 
 
+@router.post("/aria-memory-ingestion")
+def aria_memory_ingestion_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """ARIA Phase 4 — Every 15 minutes: ingest recent CRM events into semantic memory."""
+    _require_secret(x_cron_secret)
+    try:
+        return run_memory_ingestion()
+    except Exception as e:
+        logger.exception("aria memory ingestion cron failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
 @router.post("/aria-client-health")
 def aria_client_health_cron(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
@@ -637,6 +651,4 @@ def aria_competitive_brief_cron(
     except Exception as e:
         logger.exception("aria competitive brief cron failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
-
-
 # scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
