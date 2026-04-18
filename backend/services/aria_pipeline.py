@@ -1032,7 +1032,7 @@ def step_google_places_discover(
 
         # Map to pipeline_leads format
         pipeline_leads: list[dict[str, Any]] = []
-        for ld in raw_leads_for_crm:
+        for ld in raw_leads:
             pipeline_leads.append({
                 "run_id": run_id,
                 "company_name": ld.get("business_name") or "",
