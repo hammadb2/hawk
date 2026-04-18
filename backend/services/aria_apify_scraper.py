@@ -193,7 +193,8 @@ async def _get_dataset_items(
         if r.status_code >= 400:
             logger.warning("Dataset fetch failed id=%s status=%d", dataset_id, r.status_code)
             return []
-        return r.json() if isinstance(r.json(), list) else []
+        data = r.json()
+        return data if isinstance(data, list) else []
     except Exception as exc:
         logger.warning("Dataset fetch error id=%s: %s", dataset_id, exc)
         return []
@@ -827,17 +828,22 @@ async def _apollo_last_resort(
 # ── Main orchestrator ─────────────────────────────────────────────────────
 
 
-async def run_full_discovery() -> list[dict[str, Any]]:
+async def run_full_discovery(
+    cities: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Run the full 4-actor discovery pipeline.
 
     Flow:
-    1. Actor 1 (Google Maps) — all 54 combinations in parallel
+    1. Actor 1 (Google Maps) — all city x vertical combinations in parallel
     2. Deduplicate against inventory + prospects + suppressions
     3. Actor 2 (LinkedIn) — for leads without email
     4. Actor 3 (Leads Finder) — for leads still without email
     5. Actor 4 (Website Crawler) — last resort for remaining leads
     6. Merge emails using priority order
     7. Return leads with emails (suppressed leads also returned for inventory storage)
+
+    Args:
+        cities: Optional list of cities to scrape. Defaults to CITIES constant (18 Canadian cities).
 
     Returns all leads with lead_score, contact_email, email_finder set.
     """
@@ -846,7 +852,7 @@ async def run_full_discovery() -> list[dict[str, Any]]:
         return []
 
     # Step 1: Actor 1 — Google Maps
-    all_leads = await run_actor1_google_maps()
+    all_leads = await run_actor1_google_maps(cities=cities)
     if not all_leads:
         logger.warning("Actor 1 returned zero leads — checking Apollo last resort")
         # Try Apollo as absolute last resort for each vertical

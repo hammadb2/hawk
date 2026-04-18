@@ -160,7 +160,7 @@ async def step_discover_leads(cities: list[str]) -> list[dict[str, Any]]:
     """
     from services.aria_apify_scraper import run_full_discovery
 
-    leads = await run_full_discovery()
+    leads = await run_full_discovery(cities=cities)
 
     # Filter out suppressed leads (no email found)
     enriched = [ld for ld in leads if ld.get("status") != "suppressed"]
