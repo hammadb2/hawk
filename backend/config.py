@@ -89,8 +89,7 @@ CLAY_API_KEY = os.environ.get("CLAY_API_KEY", "").strip()
 ZEROBOUNCE_API_KEY = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
 
 # Unified pipeline — nightly build + morning dispatch
-GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
-PROSPEO_API_KEY = os.environ.get("PROSPEO_API_KEY", "").strip()
+APIFY_API_KEY = os.environ.get("APIFY_API_KEY", "").strip()
 MXTOOLBOX_API_KEY = os.environ.get("MXTOOLBOX_API_KEY", "").strip()
 CRM_SMARTLEAD_WEBHOOK_SECRET = os.environ.get("CRM_SMARTLEAD_WEBHOOK_SECRET", "").strip()
 
