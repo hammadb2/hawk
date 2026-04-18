@@ -891,13 +891,13 @@ async def run_full_discovery(
     # Step 3: Actor 2 — LinkedIn
     actor2_results = await run_actor2_linkedin(all_leads)
     for lead in all_leads:
-        if not lead.get("_email_found") and lead["domain"] in actor2_results:
+        if not lead.get("_email_found") and lead["domain"] in actor2_results and actor2_results[lead["domain"]].get("email"):
             lead["_email_found"] = True
 
     # Step 4: Actor 3 — Leads Finder
     actor3_results = await run_actor3_leads_finder(all_leads)
     for lead in all_leads:
-        if not lead.get("_email_found") and lead["domain"] in actor3_results:
+        if not lead.get("_email_found") and lead["domain"] in actor3_results and actor3_results[lead["domain"]].get("email"):
             lead["_email_found"] = True
 
     # Step 5: Actor 4 — Website Crawler
@@ -963,13 +963,13 @@ async def run_ondemand_discovery(
     # Actor 2: LinkedIn for leads missing email
     actor2_results = await run_actor2_linkedin(leads)
     for lead in leads:
-        if not lead.get("_email_found") and lead["domain"] in actor2_results:
+        if not lead.get("_email_found") and lead["domain"] in actor2_results and actor2_results[lead["domain"]].get("email"):
             lead["_email_found"] = True
 
     # Actor 3: Leads Finder
     actor3_results = await run_actor3_leads_finder(leads)
     for lead in leads:
-        if not lead.get("_email_found") and lead["domain"] in actor3_results:
+        if not lead.get("_email_found") and lead["domain"] in actor3_results and actor3_results[lead["domain"]].get("email"):
             lead["_email_found"] = True
 
     # Actor 4: Website Crawler
