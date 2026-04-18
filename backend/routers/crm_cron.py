@@ -572,7 +572,7 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
         "location": location,
         "batch_size": batch_size,
         "status": "running",
-        "current_step": "apollo_pull",
+        "current_step": "apify_discover",
     }
     r = httpx.post(
         f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",

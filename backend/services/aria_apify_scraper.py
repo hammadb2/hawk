@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 APIFY_API_KEY = os.environ.get("APIFY_API_KEY", "").strip()
 APIFY_BASE = "https://api.apify.com/v2"
 
+
+def _apify_headers() -> dict[str, str]:
+    """Return Authorization header for Apify API calls."""
+    return {"Authorization": f"Bearer {APIFY_API_KEY}"}
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
@@ -136,9 +141,9 @@ async def _start_actor_run(
     run_input: dict[str, Any],
 ) -> str | None:
     """Start an Apify actor run. Returns the run ID or None on failure."""
-    url = f"{APIFY_BASE}/acts/{actor_id}/runs?token={APIFY_API_KEY}"
+    url = f"{APIFY_BASE}/acts/{actor_id}/runs"
     try:
-        r = await client.post(url, json=run_input, timeout=60.0)
+        r = await client.post(url, json=run_input, headers=_apify_headers(), timeout=60.0)
         if r.status_code >= 400:
             logger.warning("Apify start failed actor=%s status=%d body=%s", actor_id, r.status_code, r.text[:500])
             return None
@@ -157,13 +162,13 @@ async def _poll_actor_run(
     max_wait: int = APIFY_MAX_WAIT,
 ) -> dict[str, Any] | None:
     """Poll an Apify actor run until it completes. Returns run data or None."""
-    url = f"{APIFY_BASE}/acts/{actor_id}/runs/{run_id}?token={APIFY_API_KEY}"
+    url = f"{APIFY_BASE}/acts/{actor_id}/runs/{run_id}"
     elapsed = 0
     while elapsed < max_wait:
         await asyncio.sleep(APIFY_POLL_INTERVAL)
         elapsed += APIFY_POLL_INTERVAL
         try:
-            r = await client.get(url, timeout=30.0)
+            r = await client.get(url, headers=_apify_headers(), timeout=30.0)
             if r.status_code >= 400:
                 continue
             data = r.json()
@@ -187,9 +192,9 @@ async def _get_dataset_items(
     limit: int = 10000,
 ) -> list[dict[str, Any]]:
     """Download items from an Apify dataset."""
-    url = f"{APIFY_BASE}/datasets/{dataset_id}/items?token={APIFY_API_KEY}&limit={limit}"
+    url = f"{APIFY_BASE}/datasets/{dataset_id}/items?limit={limit}"
     try:
-        r = await client.get(url, timeout=120.0)
+        r = await client.get(url, headers=_apify_headers(), timeout=120.0)
         if r.status_code >= 400:
             logger.warning("Dataset fetch failed id=%s status=%d", dataset_id, r.status_code)
             return []
@@ -243,8 +248,8 @@ def _map_gmaps_result(item: dict[str, Any], vertical: str, city: str) -> dict[st
         return None
 
     address = item.get("address") or item.get("street") or ""
-    rating = item.get("totalScore") or item.get("rating")
-    review_count = item.get("reviewsCount") or item.get("reviews")
+    rating = item.get("totalScore") if item.get("totalScore") is not None else item.get("rating")
+    review_count = item.get("reviewsCount") if item.get("reviewsCount") is not None else item.get("reviews")
     phone = item.get("phone") or item.get("phoneUnformatted") or ""
     place_id = item.get("placeId") or item.get("cid") or ""
 
