@@ -930,7 +930,8 @@ async def run_ondemand_discovery(
     if not APIFY_API_KEY:
         logger.warning("APIFY_API_KEY not configured for on-demand discovery")
         # Try Apollo as absolute last resort
-        return await _apollo_last_resort([], vertical, city)
+        fallback = await _apollo_last_resort([], vertical, city)
+        return await deduplicate_leads(fallback) if fallback else []
 
     # Actor 1: single city + vertical
     sem = asyncio.Semaphore(10)
@@ -939,7 +940,8 @@ async def run_ondemand_discovery(
 
     if not leads:
         # Apollo last resort
-        return await _apollo_last_resort([], vertical, city)
+        fallback = await _apollo_last_resort([], vertical, city)
+        return await deduplicate_leads(fallback) if fallback else []
 
     # Score and sort, take top batch_size
     for lead in leads:
