@@ -1,7 +1,11 @@
 """
 ARIA Outbound Pipeline — full autonomous lead-to-email pipeline.
 
-Apollo → Clay → ZeroBounce → Hawk Domain Scan → OpenAI Email Gen → Smartlead.
+Google Places → Prospeo/Apollo email finding → ZeroBounce → Hawk Domain Scan
+→ OpenAI Email Gen → Smartlead.
+
+First checks aria_lead_inventory for pre-built leads (instant dispatch).
+Falls back to on-demand Google Places discovery if inventory is empty.
 
 Each step updates aria_pipeline_runs and aria_pipeline_leads in real time so
 the frontend can display a live progress tracker.
@@ -21,6 +25,7 @@ import httpx
 
 from config import (
     CAL_COM_BOOKING_URL,
+    GOOGLE_PLACES_API_KEY,
     OPENAI_API_KEY,
     OPENAI_MODEL,
     SMARTLEAD_API_KEY,
@@ -974,6 +979,158 @@ def _load_inventory_leads_to_pipeline(
     return _build_summary(run_id)
 
 
+def step_google_places_discover(
+    run_id: str,
+    vertical: str,
+    location: str,
+    batch_size: int,
+) -> list[dict[str, Any]]:
+    """Discover leads via Google Places API for on-demand pipeline.
+
+    Uses the same scraper as the nightly pipeline but targeted to a single
+    city + vertical.  Falls back to Apollo if Google Places key is missing.
+    """
+    _update_run(run_id, {"current_step": "google_places_discover"})
+
+    if not GOOGLE_PLACES_API_KEY:
+        # Fall back to Apollo if Google Places is not configured
+        logger.warning("GOOGLE_PLACES_API_KEY not set — falling back to Apollo")
+        return step_apollo_pull(run_id, vertical, location, batch_size)
+
+    try:
+        from services.aria_places_scraper import scrape_vertical_city, score_lead
+
+        async def _discover() -> list[dict[str, Any]]:
+            sem = asyncio.Semaphore(10)
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                raw = await scrape_vertical_city(client, vertical, location, sem)
+            return raw
+
+        raw_leads = asyncio.run(_discover())
+        if not raw_leads:
+            logger.info("Google Places returned 0 leads for %s in %s", vertical, location)
+            return []
+
+        # Score and sort, take top batch_size
+        for lead in raw_leads:
+            lead["lead_score"] = score_lead(lead)
+        raw_leads.sort(key=lambda x: x.get("lead_score", 0), reverse=True)
+        raw_leads = raw_leads[:batch_size]
+
+        # Deduplicate against CRM
+        raw_leads_for_crm = [
+            {"domain": ld["domain"], **ld} for ld in raw_leads
+        ]
+        raw_leads_for_crm = _dedupe_against_crm(raw_leads_for_crm)
+
+        # Map to pipeline_leads format
+        pipeline_leads: list[dict[str, Any]] = []
+        for ld in raw_leads_for_crm:
+            pipeline_leads.append({
+                "run_id": run_id,
+                "company_name": ld.get("business_name") or "",
+                "domain": ld.get("domain") or "",
+                "contact_name": "",  # Will be filled by email finding step
+                "contact_email": "",  # Will be filled by email finding step
+                "vertical": vertical,
+                "apollo_data": {
+                    "source": "google_places",
+                    "google_place_id": ld.get("google_place_id"),
+                    "google_rating": ld.get("google_rating"),
+                    "review_count": ld.get("review_count"),
+                    "city": ld.get("city"),
+                    "province": ld.get("province"),
+                    "address": ld.get("address"),
+                    "lead_score": ld.get("lead_score"),
+                },
+                "status": "pulled",
+            })
+
+        inserted = _insert_leads(pipeline_leads)
+        _update_run(run_id, {"leads_pulled": len(inserted)})
+        return inserted
+
+    except Exception as exc:
+        logger.exception("Google Places discovery failed: %s", exc)
+        # Fall back to Apollo on error
+        logger.info("Falling back to Apollo after Google Places error")
+        return step_apollo_pull(run_id, vertical, location, batch_size)
+
+
+def step_find_emails_ondemand(
+    run_id: str,
+    leads: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Find contact emails for on-demand pipeline leads using Prospeo/Apollo.
+
+    Uses the same email-finding logic as the nightly pipeline
+    (aria_lead_inventory.step_find_emails) but maps results back to the
+    aria_pipeline_leads format.
+    """
+    _update_run(run_id, {"current_step": "email_finding"})
+
+    # Skip leads that already have emails (e.g. from Apollo fallback)
+    needs_email = [ld for ld in leads if not (ld.get("contact_email") or "").strip()]
+    has_email = [ld for ld in leads if (ld.get("contact_email") or "").strip()]
+
+    if not needs_email:
+        return leads
+
+    try:
+        from services.aria_lead_inventory import step_find_emails
+
+        # Map pipeline leads to the format step_find_emails expects
+        inventory_format = []
+        for ld in needs_email:
+            inventory_format.append({
+                "domain": ld.get("domain") or "",
+                "vertical": ld.get("vertical") or "dental",
+            })
+
+        found = asyncio.run(step_find_emails(inventory_format))
+
+        # Map results back — found leads have contact_email set
+        found_by_domain: dict[str, dict[str, Any]] = {}
+        for f in found:
+            found_by_domain[f["domain"]] = f
+
+        enriched: list[dict[str, Any]] = []
+        for ld in needs_email:
+            domain = ld.get("domain") or ""
+            match = found_by_domain.get(domain)
+            if match:
+                ld["contact_email"] = match.get("contact_email") or ""
+                ld["contact_name"] = match.get("contact_name") or ""
+                _update_lead(ld["id"], {
+                    "contact_email": ld["contact_email"],
+                    "contact_name": ld["contact_name"],
+                    "status": "enriched",
+                })
+                ld["status"] = "enriched"
+                enriched.append(ld)
+            else:
+                # No email found — remove lead
+                _update_lead(ld["id"], {
+                    "status": "removed",
+                    "removed_reason": "no_email_found",
+                })
+
+        # For leads that already had emails, mark as enriched
+        for ld in has_email:
+            _update_lead(ld["id"], {"status": "enriched"})
+            ld["status"] = "enriched"
+
+        all_leads = has_email + enriched
+        _update_run(run_id, {"leads_enriched": len(all_leads)})
+        return all_leads
+
+    except Exception as exc:
+        logger.exception("Email finding failed for on-demand pipeline: %s", exc)
+        # Keep leads that already have emails
+        _update_run(run_id, {"leads_enriched": len(has_email)})
+        return has_email
+
+
 def run_outbound_pipeline(
     run_id: str,
     vertical: str,
@@ -985,8 +1142,8 @@ def run_outbound_pipeline(
 
     First checks aria_lead_inventory for ready leads matching the vertical + location.
     If inventory has leads, uses those directly (instant dispatch).
-    Falls back to on-demand discovery (Apollo → Clay → ZeroBounce → scan → email gen)
-    only if inventory is empty for that combination.
+    Falls back to on-demand discovery via Google Places (with Apollo as second fallback)
+    → Prospeo/Apollo email finding → ZeroBounce → scan → email gen → Smartlead.
 
     Returns a summary dict suitable for chat display.
     """
@@ -997,22 +1154,29 @@ def run_outbound_pipeline(
             _update_run(run_id, {"current_step": "inventory_dispatch"})
             return _load_inventory_leads_to_pipeline(run_id, inventory_leads, vertical)
 
-        # Fallback: on-demand discovery via Apollo
-        # Step 1: Apollo Pull
-        leads = step_apollo_pull(run_id, vertical, location, batch_size)
+        # Fallback: on-demand discovery via Google Places
+        # Step 1: Google Places Discovery (falls back to Apollo if no API key)
+        leads = step_google_places_discover(run_id, vertical, location, batch_size)
         if not leads:
             _update_run(run_id, {
                 "status": "completed",
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-                "error_message": "No leads found from Apollo for this vertical and location.",
+                "error_message": "No leads found for this vertical and location.",
             })
             return _build_summary(run_id)
 
         if _is_run_paused(run_id):
             return _build_summary(run_id)
 
-        # Step 2: Clay Enrichment
-        leads = step_clay_enrich(run_id, leads)
+        # Step 2: Find contact emails (Prospeo/Apollo)
+        leads = step_find_emails_ondemand(run_id, leads)
+        if not leads:
+            _update_run(run_id, {
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "error_message": "No contact emails found for discovered leads.",
+            })
+            return _build_summary(run_id)
         if _is_run_paused(run_id):
             return _build_summary(run_id)
 
@@ -1119,13 +1283,13 @@ def resume_pipeline(run_id: str, uid: str) -> dict[str, Any]:
 
     try:
         # Get leads at the current stage and resume from there
-        if current_step in ("apollo_pull", "clay_enrichment"):
+        if current_step in ("google_places_discover", "apollo_pull", "email_finding"):
             leads = _get_run_leads(run_id, "pulled")
             if not leads:
-                leads = step_apollo_pull(run_id, vertical, location, run.get("batch_size", 50))
+                leads = step_google_places_discover(run_id, vertical, location, run.get("batch_size", 50))
             if _is_run_paused(run_id):
                 return _build_summary(run_id)
-            leads = step_clay_enrich(run_id, leads)
+            leads = step_find_emails_ondemand(run_id, leads)
             if _is_run_paused(run_id):
                 return _build_summary(run_id)
             leads = step_zerobounce_verify(run_id, leads)
