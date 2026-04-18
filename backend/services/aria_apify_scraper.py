@@ -570,7 +570,7 @@ async def _run_website_crawl_batch(
             # Find matching lead
             matched_domain = None
             for ld in leads_batch:
-                if ld["domain"] == crawl_domain or crawl_domain.endswith(ld["domain"]):
+                if ld["domain"] == crawl_domain or crawl_domain.endswith("." + ld["domain"]):
                     matched_domain = ld["domain"]
                     break
 
@@ -740,6 +740,9 @@ def _merge_emails(
             lead["contact_name"] = contact_name or lead.get("contact_name") or ""
             lead["contact_title"] = contact_title or lead.get("contact_title") or ""
             lead["email_finder"] = email_finder
+            with_email.append(lead)
+        elif lead.get("contact_email") and "@" in lead["contact_email"]:
+            # Preserve pre-existing email (e.g. from Apollo fallback)
             with_email.append(lead)
         else:
             lead["status"] = "suppressed"
