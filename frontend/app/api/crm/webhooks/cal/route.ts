@@ -11,20 +11,27 @@ function crmApiBase(): string {
 
 /**
  * Proxy Cal.com → Railway FastAPI `POST /api/crm/webhooks/cal`.
- * securedbyhawk.com is Next on Vercel; Cal must hit this route so the body + signature reach FastAPI unchanged.
+ * Use raw bytes for the body so HMAC matches what Cal signed (same as Cal's Node `update(body)`).
  */
 export async function POST(req: NextRequest) {
-  const body = await req.text();
-  const signature = req.headers.get("X-Cal-Signature-256") ?? "";
+  const raw = await req.arrayBuffer();
+  const signature =
+    req.headers.get("x-cal-signature-256") ?? req.headers.get("X-Cal-Signature-256") ?? "";
   const contentType = req.headers.get("Content-Type") || "application/json";
+  const webhookVersion = req.headers.get("x-cal-webhook-version") ?? req.headers.get("X-Cal-Webhook-Version");
+
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "X-Cal-Signature-256": signature,
+  };
+  if (webhookVersion) {
+    headers["X-Cal-Webhook-Version"] = webhookVersion;
+  }
 
   const backendRes = await fetch(`${crmApiBase()}/api/crm/webhooks/cal`, {
     method: "POST",
-    headers: {
-      "Content-Type": contentType,
-      "X-Cal-Signature-256": signature,
-    },
-    body,
+    headers,
+    body: raw.byteLength ? new Uint8Array(raw) : undefined,
   });
 
   return NextResponse.json(await backendRes.json().catch(() => ({})), { status: backendRes.status });

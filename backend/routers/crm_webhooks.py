@@ -602,6 +602,7 @@ def _verify_cal_webhook_signature(raw_body: bytes, signature_header: str | None)
     if sig.lower().startswith("sha256="):
         sig = sig.split("=", 1)[-1].strip()
     mac = hmac.new(CAL_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256).digest()
+    # Cal.com: createHmac("sha256", secret).update(body).digest("hex") — see cal.com sendPayload.ts
     expected_b64 = base64.b64encode(mac).decode("ascii")
     expected_hex = mac.hex()
     return secrets.compare_digest(sig, expected_b64) or secrets.compare_digest(sig, expected_hex)
