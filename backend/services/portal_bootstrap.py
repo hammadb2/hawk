@@ -12,7 +12,12 @@ import httpx
 from fastapi import HTTPException
 
 from config import SUPABASE_URL
-from services.crm_profile_sync import ensure_client_profile
+from services.crm_profile_sync import (
+    PORTAL_TEAM_EMAIL_MESSAGE,
+    ensure_client_profile,
+    portal_email_blocks_client_portal,
+    portal_uid_blocks_client_portal,
+)
 from services.guardian_client_profiler import schedule_build_client_guardian_profile
 
 logger = logging.getLogger(__name__)
@@ -235,6 +240,11 @@ def bootstrap_portal_account(uid: str, email: str) -> dict[str, Any]:
     em = email.strip().lower()
     if "@" not in em:
         raise HTTPException(status_code=400, detail="Invalid email")
+
+    if portal_uid_blocks_client_portal(uid):
+        raise HTTPException(status_code=400, detail=PORTAL_TEAM_EMAIL_MESSAGE)
+    if portal_email_blocks_client_portal(em):
+        raise HTTPException(status_code=400, detail=PORTAL_TEAM_EMAIL_MESSAGE)
 
     domain = portal_clients_domain_for_email(em)
     company = em.split("@", 1)[0].replace(".", " ").replace("_", " ").title()[:200]

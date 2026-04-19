@@ -36,7 +36,12 @@ from config import (
 )
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
 from services.crm_openphone import send_sms
-from services.crm_profile_sync import ensure_client_profile, profile_role, staff_roles
+from services.crm_profile_sync import (
+    PORTAL_TEAM_EMAIL_MESSAGE,
+    ensure_client_profile,
+    portal_email_blocks_client_portal,
+    portal_uid_blocks_client_portal,
+)
 from services.guardian_client_profiler import schedule_build_client_guardian_profile
 from services.portal_bootstrap import portal_clients_domain_for_email
 from services.scanner import enqueue_async_scan
@@ -531,6 +536,10 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> tuple[bool, str]:
         logger.warning("portal provision: no customer email on session")
         return False, "no customer email on checkout"
 
+    if portal_email_blocks_client_portal(email):
+        logger.error("portal provision: email %s is already a CRM team profile — refusing portal", email)
+        return False, PORTAL_TEAM_EMAIL_MESSAGE
+
     cid = str(client_row["id"])
     prospect_id = client_row.get("prospect_id")
     prospect = _fetch_prospect(headers, str(prospect_id)) if prospect_id else None
@@ -590,18 +599,12 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> tuple[bool, str]:
     # Account-first: clients.portal_user_id was set at bootstrap — same person paying; do not treat as CRM staff collision.
     prelinked = str(client_row.get("portal_user_id") or "").strip() == str(uid).strip()
 
-    role = None
-    if not prelinked:
-        try:
-            role = profile_role(uid)
-        except Exception:
-            logger.exception("portal provision: profile_role lookup failed uid=%s", uid)
-        if role and role in staff_roles():
-            logger.error(
-                "portal provision: email %s maps to CRM staff profile — refusing client portal role",
-                email,
-            )
-            return False, "this email is linked to a CRM staff profile; use a different account for the client portal"
+    if not prelinked and portal_uid_blocks_client_portal(uid):
+        logger.error(
+            "portal provision: email %s maps to CRM staff profile — refusing client portal role",
+            email,
+        )
+        return False, PORTAL_TEAM_EMAIL_MESSAGE
 
     try:
         ensure_client_profile(uid, email, str(company))
