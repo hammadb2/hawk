@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { crmDialogSurface } from "@/lib/crm/crm-surface";
 
 const DEFAULT_CAL = "https://cal.com";
 
@@ -24,16 +25,16 @@ export function BookCallModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl border-slate-200 bg-white p-0">
-        <DialogHeader className="border-b border-slate-200 px-4 py-3">
-          <DialogTitle className="text-slate-900">Book a call</DialogTitle>
-          <p className="text-xs text-slate-600">Set NEXT_PUBLIC_CALCOM_URL to your Cal.com link.</p>
+      <DialogContent className={`max-h-[90vh] max-w-3xl p-0 ${crmDialogSurface}`}>
+        <DialogHeader className="border-b border-[#1e1e2e] px-4 py-3">
+          <DialogTitle className="text-white">Book a call</DialogTitle>
+          <p className="text-xs text-slate-400">Set NEXT_PUBLIC_CALCOM_URL to your Cal.com link.</p>
         </DialogHeader>
-        <div className="h-[min(70vh,640px)] w-full">
+        <div className="h-[min(70vh,640px)] w-full bg-[#0d0d14]">
           <iframe title="Cal.com" src={url} className="h-full w-full rounded-b-xl bg-white" />
         </div>
-        <div className="flex justify-end border-t border-slate-200 px-4 py-2">
-          <Button variant="outline" className="border-slate-200" onClick={() => onOpenChange(false)}>
+        <div className="flex justify-end border-t border-[#1e1e2e] px-4 py-2">
+          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
             Close
           </Button>
         </div>

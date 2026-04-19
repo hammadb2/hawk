@@ -16,6 +16,7 @@ import { readApiErrorResponse } from "@/lib/crm/api-error";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { formatUsd } from "@/lib/crm/format";
 import { PLAN_OPTIONS } from "@/lib/crm/types";
+import { crmDialogSurface, crmFieldSurface } from "@/lib/crm/crm-surface";
 
 export function CloseWonModal({
   open,
@@ -117,19 +118,19 @@ export function CloseWonModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="border-slate-200 bg-white">
+        <DialogContent className={crmDialogSurface}>
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Close won</DialogTitle>
-            <DialogDescription className="text-slate-600">
+            <DialogTitle className="text-white">Close won</DialogTitle>
+            <DialogDescription className="text-slate-400">
               We verify Stripe for a successful payment in the last 24 hours before creating commission. You can still
               close the deal and defer commission until payment clears.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-slate-700">Plan</Label>
+              <Label className="text-slate-300">Plan</Label>
               <select
-                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+                className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
                 value={planId}
                 onChange={(e) => setPlanId(e.target.value)}
               >
@@ -142,26 +143,26 @@ export function CloseWonModal({
             </div>
             {planId === "custom" && (
               <div>
-                <Label className="text-slate-700">Monthly value (USD)</Label>
+                <Label className="text-slate-300">Monthly value (USD)</Label>
                 <Input
                   type="number"
-                  className="mt-1 border-slate-200 bg-slate-50"
+                  className={`mt-1 ${crmFieldSurface}`}
                   value={customMrr}
                   onChange={(e) => setCustomMrr(e.target.value)}
                   placeholder="2500"
                 />
               </div>
             )}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <div className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-sm text-slate-300">
               <div>Monthly value: {formatUsd(mrrCents)}</div>
-              <div className="mt-1 text-emerald-600">
+              <div className="mt-1 text-emerald-400">
                 Closing commission preview (30%): {formatUsd(closingCommission)}
               </div>
             </div>
             <div>
-              <Label className="text-slate-700">Stripe customer ID (helps verification)</Label>
+              <Label className="text-slate-300">Stripe customer ID (helps verification)</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={stripeId}
                 onChange={(e) => setStripeId(e.target.value)}
                 placeholder="cus_..."
@@ -170,7 +171,7 @@ export function CloseWonModal({
             {verifyError && <p className="text-xs text-rose-400">{verifyError}</p>}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" className="border-slate-200" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
@@ -185,16 +186,16 @@ export function CloseWonModal({
       </Dialog>
 
       <Dialog open={deferPrompt} onOpenChange={setDeferPrompt}>
-        <DialogContent className="border-slate-200 bg-white">
+        <DialogContent className={crmDialogSurface}>
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Payment not verified in Stripe</DialogTitle>
-            <DialogDescription className="text-slate-600">
+            <DialogTitle className="text-white">Payment not verified in Stripe</DialogTitle>
+            <DialogDescription className="text-slate-400">
               Payment not yet confirmed in Stripe. Commission will be created automatically when payment clears (via Stripe
               webhook).
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" className="border-slate-200" onClick={() => setDeferPrompt(false)}>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => setDeferPrompt(false)}>
               Back
             </Button>
             <Button

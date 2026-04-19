@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { crmEmptyState, crmPageSubtitle, crmPageTitle, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 interface ReviewItem {
   id: string;
@@ -53,7 +54,7 @@ export default function OnboardingReviewPage() {
   if (!profile || (profile.role !== "ceo" && profile.role !== "hos" && profile.role_type !== "va_manager")) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-500">You do not have permission to view this page.</p>
+        <p className="text-slate-400">You do not have permission to view this page.</p>
       </div>
     );
   }
@@ -62,8 +63,8 @@ export default function OnboardingReviewPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Onboarding Review Queue</h1>
-          <p className="text-sm text-slate-500">Review and approve new hire onboarding submissions.</p>
+          <h1 className="text-xl font-semibold text-white">Onboarding Review Queue</h1>
+          <p className={crmPageSubtitle}>Review and approve new hire onboarding submissions.</p>
         </div>
       </div>
 
@@ -74,8 +75,8 @@ export default function OnboardingReviewPage() {
             onClick={() => setFilter(f)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
               filter === f
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40"
+                : "border border-[#1e1e2e] bg-[#111118] text-slate-400 hover:text-slate-200"
             }`}
           >
             {f === "pending_review" ? "Pending" : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -88,8 +89,8 @@ export default function OnboardingReviewPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-          <p className="text-sm text-slate-500">No submissions found.</p>
+        <div className={`p-8 text-center ${crmEmptyState}`}>
+          <p className="text-sm text-slate-400">No submissions found.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -97,25 +98,25 @@ export default function OnboardingReviewPage() {
             <Link
               key={item.id}
               href={`/crm/onboarding/review/${item.id}`}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-emerald-300 transition"
+              className={`flex items-center justify-between p-4 transition hover:border-emerald-500/40 ${crmSurfaceCard}`}
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1a1a24] text-sm font-bold text-slate-300">
                   {(item.profile_name || "?").charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">{item.profile_name || "Unknown"}</p>
-                  <p className="text-xs text-slate-500">{item.profile_email || ""} &middot; {item.profile_role || ""}</p>
+                  <p className="font-medium text-white">{item.profile_name || "Unknown"}</p>
+                  <p className="text-xs text-slate-400">{item.profile_email || ""} &middot; {item.profile_role || ""}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     item.status === "pending_review"
-                      ? "bg-amber-100 text-amber-700"
+                      ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30"
                       : item.status === "approved"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-red-100 text-red-700"
+                        ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
+                        : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30"
                   }`}
                 >
                   {item.status === "pending_review" ? "Pending" : item.status}

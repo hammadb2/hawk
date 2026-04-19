@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { crmSurfaceCard } from "@/lib/crm/crm-surface";
 import {
   BarChart,
   Bar,
@@ -253,8 +254,8 @@ export function InlineChart({ data }: { data: ChartData }) {
   }, [data.chart_type]);
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className={`mt-3 p-3 ${crmSurfaceCard}`}>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
         {data.title}
       </p>
       <ChartComponent chart={data} />

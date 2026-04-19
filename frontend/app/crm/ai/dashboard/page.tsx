@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { crmPageSubtitle, crmPageTitle, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 interface DashboardData {
   revenue: {
@@ -41,17 +42,17 @@ interface DashboardData {
 
 function KPICard({ label, value, sub, color = "emerald" }: { label: string; value: string | number; sub?: string; color?: string }) {
   const colorMap: Record<string, string> = {
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    slate: "bg-slate-50 text-slate-700 border-slate-200",
+    emerald: "border-emerald-500/30",
+    blue: "border-sky-500/30",
+    amber: "border-amber-500/30",
+    red: "border-rose-500/30",
+    slate: "border-[#1e1e2e]",
   };
   return (
-    <div className={`rounded-xl border p-4 ${colorMap[color] || colorMap.emerald}`}>
-      <p className="text-xs font-medium opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
-      {sub && <p className="mt-0.5 text-xs opacity-60">{sub}</p>}
+    <div className={`rounded-xl border bg-[#111118] p-4 ${colorMap[color] || colorMap.emerald}`}>
+      <p className="text-xs font-medium text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-white">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
     </div>
   );
 }
@@ -81,7 +82,7 @@ function StageBar({ stages }: { stages: Record<string, number> }) {
           />
         ))}
       </div>
-      <div className="flex flex-wrap gap-3 text-xs">
+      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
         {Object.entries(stages).map(([stage, count]) => (
           <span key={stage} className="flex items-center gap-1">
             <span className={`inline-block h-2 w-2 rounded-full ${colors[stage] || "bg-slate-300"}`} />
@@ -168,8 +169,8 @@ export default function CEODashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">God Mode Dashboard</h1>
-          <p className="text-sm text-slate-500">Real-time business intelligence by ARIA</p>
+          <h1 className={crmPageTitle}>God Mode Dashboard</h1>
+          <p className={crmPageSubtitle}>Real-time business intelligence by ARIA</p>
         </div>
         <button
           onClick={() => void fetchDashboard()}
@@ -181,12 +182,12 @@ export default function CEODashboardPage() {
 
       {/* AI Narration */}
       {narration && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/25 p-5">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
               A
             </div>
-            <div className="prose prose-sm prose-slate max-w-none whitespace-pre-wrap text-sm text-slate-700">
+            <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap text-sm text-slate-300">
               {narration}
             </div>
           </div>
@@ -216,10 +217,10 @@ export default function CEODashboardPage() {
           </div>
 
           {/* Pipeline */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Pipeline ({data.pipeline.total_prospects} total)</h2>
+          <div className={`p-5 ${crmSurfaceCard}`}>
+            <h2 className="mb-3 text-sm font-semibold text-white">Pipeline ({data.pipeline.total_prospects} total)</h2>
             <StageBar stages={data.pipeline.stages} />
-            <div className="mt-3 flex gap-6 text-xs text-slate-500">
+            <div className="mt-3 flex gap-6 text-xs text-slate-400">
               <span>New this week: {data.pipeline.new_this_week}</span>
               <span>Conversion rate: {data.pipeline.conversion_rate}%</span>
             </div>
@@ -227,28 +228,28 @@ export default function CEODashboardPage() {
 
           {/* Plan Breakdown + Outbound */}
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="mb-3 text-sm font-semibold text-slate-700">Revenue by Plan</h2>
+            <div className={`p-5 ${crmSurfaceCard}`}>
+              <h2 className="mb-3 text-sm font-semibold text-white">Revenue by Plan</h2>
               <div className="space-y-2">
                 {Object.entries(data.revenue.plan_breakdown).map(([plan, count]) => (
                   <div key={plan} className="flex items-center justify-between">
-                    <span className="text-sm capitalize text-slate-600">{plan}</span>
-                    <span className="text-sm font-medium text-slate-900">{count} clients</span>
+                    <span className="text-sm capitalize text-slate-400">{plan}</span>
+                    <span className="text-sm font-medium text-white">{count} clients</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="mb-3 text-sm font-semibold text-slate-700">Outbound Status</h2>
+            <div className={`p-5 ${crmSurfaceCard}`}>
+              <h2 className="mb-3 text-sm font-semibold text-white">Outbound Status</h2>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Pending replies</span>
-                  <span className="text-sm font-medium text-slate-900">{data.outbound.pending_replies}</span>
+                  <span className="text-sm text-slate-400">Pending replies</span>
+                  <span className="text-sm font-medium text-white">{data.outbound.pending_replies}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Recent pipeline runs</span>
-                  <span className="text-sm font-medium text-slate-900">{data.outbound.recent_pipeline_runs.length}</span>
+                  <span className="text-sm text-slate-400">Recent pipeline runs</span>
+                  <span className="text-sm font-medium text-white">{data.outbound.recent_pipeline_runs.length}</span>
                 </div>
               </div>
             </div>

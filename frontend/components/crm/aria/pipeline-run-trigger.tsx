@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { crmFieldSurface, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 interface Props {
   accessToken: string;
@@ -47,15 +48,15 @@ export function PipelineRunTrigger({ accessToken, onRunStarted }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-700 mb-3">Run Outbound Pipeline</h3>
+    <div className={`p-4 ${crmSurfaceCard}`}>
+      <h3 className="mb-3 text-sm font-semibold text-white">Run Outbound Pipeline</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Vertical</label>
+          <label className="mb-1 block text-xs font-medium text-slate-400">Vertical</label>
           <select
             value={vertical}
             onChange={(e) => setVertical(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-emerald-400 focus:outline-none"
+            className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
           >
             {VERTICALS.map((v) => (
               <option key={v.value} value={v.value}>{v.label}</option>
@@ -63,28 +64,28 @@ export function PipelineRunTrigger({ accessToken, onRunStarted }: Props) {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Location</label>
+          <label className="mb-1 block text-xs font-medium text-slate-400">Location</label>
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g. Ontario, Canada"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-400 focus:outline-none"
+            className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Batch Size</label>
+          <label className="mb-1 block text-xs font-medium text-slate-400">Batch Size</label>
           <input
             type="number"
             value={batchSize}
             onChange={(e) => setBatchSize(Math.max(1, Math.min(500, parseInt(e.target.value) || 50)))}
             min={1}
             max={500}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-emerald-400 focus:outline-none"
+            className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
           />
         </div>
       </div>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
       <button
         onClick={() => void triggerRun()}
         disabled={loading || !location.trim()}

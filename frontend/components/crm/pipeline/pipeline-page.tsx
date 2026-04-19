@@ -35,6 +35,7 @@ import { bottleneckStage } from "@/lib/crm/pipeline-utils";
 import toast from "react-hot-toast";
 import { provisionClientPortalAfterCloseWon } from "@/lib/crm/provision-portal";
 import { cn } from "@/lib/utils";
+import { crmSurfaceCard, crmTableRow, crmTableThead, crmTableWrap } from "@/lib/crm/crm-surface";
 
 function Column({
   stage,
@@ -346,7 +347,7 @@ export function PipelinePage() {
           <p className="text-sm text-slate-400">Drag cards between stages. Lost and Closed Won require confirmation.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-crmBorder bg-crmSurface p-0.5">
+          <div className={cn("flex p-0.5", crmSurfaceCard)}>
             {(["kanban", "list", "table"] as const).map((v) => (
               <button
                 key={v}
@@ -444,9 +445,9 @@ export function PipelinePage() {
       {pipelineView === "list" && <StageList byStage={byStage} onOpenProspect={(row) => setDrawerId(row.id)} />}
 
       {pipelineView === "table" && (
-        <div className="overflow-x-auto rounded-xl border border-crmBorder bg-crmSurface">
+        <div className={crmTableWrap}>
           <table className="w-full min-w-[800px] text-left text-sm">
-            <thead className="border-b border-crmBorder bg-crmSurface2 text-xs uppercase text-slate-500">
+            <thead className={crmTableThead}>
               <tr>
                 {(
                   [
@@ -471,7 +472,7 @@ export function PipelinePage() {
               {sortedTable.map((p) => (
                 <tr
                   key={p.id}
-                  className="cursor-pointer border-b border-crmBorder hover:bg-crmSurface2/80"
+                  className={cn("cursor-pointer", crmTableRow)}
                   onClick={() => setDrawerId(p.id)}
                 >
                   <td className="px-3 py-2 text-white">{p.company_name ?? "—"}</td>

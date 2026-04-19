@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { crmFieldSurface, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 interface Props {
   title: string;
@@ -41,24 +42,24 @@ export function ConfirmationCard({
 
   if (resolved === "confirmed") {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-        <p className="text-sm text-emerald-700 font-medium">Action confirmed and executed.</p>
+      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4">
+        <p className="text-sm font-medium text-emerald-300">Action confirmed and executed.</p>
       </div>
     );
   }
 
   if (resolved === "cancelled") {
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm text-slate-500">Action cancelled.</p>
+      <div className={`p-4 ${crmSurfaceCard}`}>
+        <p className="text-sm text-slate-400">Action cancelled.</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+    <div className={`p-4 ${crmSurfaceCard}`}>
+      <h4 className="text-sm font-semibold text-white">{title}</h4>
+      <p className="mt-1 text-sm text-slate-400">{description}</p>
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => void handleConfirm()}
@@ -74,7 +75,7 @@ export function ConfirmationCard({
         <button
           onClick={handleCancel}
           disabled={loading}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+          className={`px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-[#1a1a24] disabled:opacity-50 ${crmFieldSurface}`}
         >
           {cancelLabel}
         </button>

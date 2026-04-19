@@ -18,6 +18,7 @@ import {
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { AgreedTermsModal } from "@/components/crm/agreed-terms-modal";
 import { cn } from "@/lib/utils";
+import { crmDialogSurface, crmEmptyState, crmFieldSurface, crmTableRow, crmTableThead, crmTableWrap } from "@/lib/crm/crm-surface";
 
 type InviteRole = "sales_rep" | "team_lead" | "closer" | "client";
 type InviteRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | "csm" | "client" | "sales_rep" | "team_lead" | "";
@@ -163,7 +164,7 @@ export function TeamDirectory() {
     return (
       <div className="space-y-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-slate-100" />
+          <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-[#1a1a24]" />
         ))}
       </div>
     );
@@ -190,7 +191,7 @@ export function TeamDirectory() {
         )}
         <button
           type="button"
-          className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-3 py-1.5 text-sm text-slate-200 hover:bg-[#1a1a24]"
           onClick={() => void mutate()}
         >
           Refresh
@@ -198,32 +199,32 @@ export function TeamDirectory() {
       </div>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="border-slate-200 bg-white">
+        <DialogContent className={crmDialogSurface}>
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Invite rep</DialogTitle>
+            <DialogTitle className="text-white">Invite rep</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-slate-600">Email</Label>
+              <Label className="text-slate-400">Email</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="rep@company.com"
               />
             </div>
             <div>
-              <Label className="text-slate-600">Name</Label>
+              <Label className="text-slate-400">Name</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={form.full_name}
                 onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-slate-600">Role</Label>
+              <Label className="text-slate-400">Role</Label>
               <select
-                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+                className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as InviteRole }))}
               >
@@ -234,9 +235,9 @@ export function TeamDirectory() {
               </select>
             </div>
             <div>
-              <Label className="text-slate-600">Role type (optional)</Label>
+              <Label className="text-slate-400">Role type (optional)</Label>
               <select
-                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+                className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
                 value={form.role_type}
                 onChange={(e) => setForm((f) => ({ ...f, role_type: e.target.value as InviteRoleType }))}
               >
@@ -248,17 +249,17 @@ export function TeamDirectory() {
               </select>
             </div>
             <div>
-              <Label className="text-slate-600">WhatsApp (E.164, e.g. +15551234567)</Label>
+              <Label className="text-slate-400">WhatsApp (E.164, e.g. +15551234567)</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={form.whatsapp_number}
                 onChange={(e) => setForm((f) => ({ ...f, whatsapp_number: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-slate-600">Team lead (optional)</Label>
+              <Label className="text-slate-400">Team lead (optional)</Label>
               <select
-                className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+                className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
                 value={form.team_lead_id}
                 onChange={(e) => setForm((f) => ({ ...f, team_lead_id: e.target.value }))}
               >
@@ -272,7 +273,7 @@ export function TeamDirectory() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-slate-200" onClick={() => setInviteOpen(false)}>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => setInviteOpen(false)}>
               Cancel
             </Button>
             <Button className="bg-emerald-600" disabled={inviting} onClick={handleInviteClick}>
@@ -291,15 +292,15 @@ export function TeamDirectory() {
       />
 
       <Dialog open={!!reassignFrom} onOpenChange={(o) => !o && setReassignFrom(null)}>
-        <DialogContent className="border-slate-200 bg-white">
+        <DialogContent className={crmDialogSurface}>
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Reassign prospects</DialogTitle>
+            <DialogTitle className="text-white">Reassign prospects</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-600">Move all prospects from this rep to another active rep.</p>
+          <p className="text-sm text-slate-400">Move all prospects from this rep to another active rep.</p>
           <div>
-            <Label className="text-slate-600">Assign to</Label>
+            <Label className="text-slate-400">Assign to</Label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+              className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
               value={reassignTo}
               onChange={(e) => setReassignTo(e.target.value)}
             >
@@ -314,7 +315,7 @@ export function TeamDirectory() {
             </select>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-slate-200" onClick={() => setReassignFrom(null)}>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => setReassignFrom(null)}>
               Cancel
             </Button>
             <Button className="bg-emerald-600" disabled={!reassignTo} onClick={() => void submitReassign()}>
@@ -327,17 +328,15 @@ export function TeamDirectory() {
       {isLoading && rows.length === 0 ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-[#1a1a24]" />
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-10 text-center text-sm text-slate-600">
-          No sales reps or team leads found.
-        </p>
+        <p className={crmEmptyState}>No sales reps or team leads found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className={crmTableWrap}>
           <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Email</th>
@@ -352,26 +351,26 @@ export function TeamDirectory() {
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
-                  <td className="px-3 py-2 font-medium text-slate-900">{p.full_name ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-600">{p.email ?? "—"}</td>
-                  <td className="px-3 py-2 capitalize text-slate-700">{roleLabel(p.role)}</td>
-                  <td className="px-3 py-2 text-slate-600">
+                <tr key={p.id} className={crmTableRow}>
+                  <td className="px-3 py-2 font-medium text-white">{p.full_name ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-400">{p.email ?? "—"}</td>
+                  <td className="px-3 py-2 capitalize text-slate-300">{roleLabel(p.role)}</td>
+                  <td className="px-3 py-2 text-slate-400">
                     {p.team_lead_id ? (tlNames[p.team_lead_id] ?? p.team_lead_id.slice(0, 8)) : "—"}
                   </td>
-                  <td className={cn("px-3 py-2 font-medium capitalize", p.status === "active" ? "text-emerald-600" : "text-amber-400")}>
+                  <td className={cn("px-3 py-2 font-medium capitalize", p.status === "active" ? "text-emerald-400" : "text-amber-400")}>
                     {p.status}
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{p.whatsapp_number ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-600">{p.monthly_close_target ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-600">
+                  <td className="px-3 py-2 text-slate-400">{p.whatsapp_number ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-400">{p.monthly_close_target ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-400">
                     {p.last_close_at ? new Date(p.last_close_at).toLocaleDateString() : "—"}
                   </td>
                   <td className="space-x-2 px-3 py-2">
                     {isCeo && p.email && ["invited", "onboarding"].includes(String(p.status)) && (
                       <button
                         type="button"
-                        className="text-xs text-emerald-600 underline"
+                        className="text-xs text-emerald-400 underline"
                         onClick={() => void resendInvite(p.email)}
                       >
                         Resend

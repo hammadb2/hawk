@@ -490,7 +490,7 @@ export function ProspectProfile({
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-amber-500/20 pt-2">
               <span className="text-xs text-amber-200/80">Mark this prospect as duplicate of:</span>
               <select
-                className="rounded border border-amber-500/30 bg-white px-2 py-1 text-xs text-slate-900"
+                className="rounded border border-amber-500/40 bg-[#0d0d14] px-2 py-1 text-xs text-slate-200"
                 value={duplicateLinkTarget}
                 onChange={(e) => setDuplicateLinkTarget(e.target.value)}
               >

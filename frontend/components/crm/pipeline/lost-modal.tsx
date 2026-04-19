@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LOST_REASONS } from "@/lib/crm/types";
+import { crmDialogSurface, crmFieldSurface } from "@/lib/crm/crm-surface";
 
 export function LostReasonModal({
   open,
@@ -49,18 +50,18 @@ export function LostReasonModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-slate-200 bg-white">
+      <DialogContent className={crmDialogSurface}>
         <DialogHeader>
-          <DialogTitle className="text-slate-900">Mark as lost</DialogTitle>
-          <DialogDescription className="text-slate-600">
+          <DialogTitle className="text-white">Mark as lost</DialogTitle>
+          <DialogDescription className="text-slate-400">
             A reason is required. This update is logged on the prospect timeline.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-slate-700">Reason</Label>
+            <Label className="text-slate-300">Reason</Label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+              className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             >
@@ -72,27 +73,27 @@ export function LostReasonModal({
             </select>
           </div>
           <div>
-            <Label className="text-slate-700">Notes {needsNotes ? "(required)" : "(optional)"}</Label>
+            <Label className="text-slate-300">Notes {needsNotes ? "(required)" : "(optional)"}</Label>
             <textarea
               maxLength={500}
-              className="mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+              className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
           <div>
-            <Label className="text-slate-700">Reactivate on (optional)</Label>
+            <Label className="text-slate-300">Reactivate on (optional)</Label>
             <Input
               type="date"
-              className="mt-1 border-slate-200 bg-slate-50"
+              className={`mt-1 ${crmFieldSurface}`}
               value={reactivate}
               onChange={(e) => setReactivate(e.target.value)}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="border-slate-200" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button

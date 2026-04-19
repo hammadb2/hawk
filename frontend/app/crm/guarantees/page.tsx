@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { formatUsd } from "@/lib/crm/format";
+import { crmEmptyState, crmPageSubtitle, crmPageTitle, crmTableRow, crmTableThead, crmTableWrap } from "@/lib/crm/crm-surface";
 
 type GuaranteeClient = {
   id: string;
@@ -92,8 +93,8 @@ export default function GuaranteesPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Readiness Guarantees</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className={crmPageTitle}>Readiness Guarantees</h1>
+        <p className={crmPageSubtitle}>
           Track guarantee status across all clients. At-risk clients need attention before SLA breach.
         </p>
       </div>
@@ -102,11 +103,11 @@ export default function GuaranteesPage() {
       <div className="grid gap-3 sm:grid-cols-5">
         {(["all", "active", "at_risk", "breached", "pending"] as const).map((key) => {
           const colors = {
-            all: "text-slate-800",
-            active: "text-emerald-600",
+            all: "text-white",
+            active: "text-emerald-400",
             at_risk: "text-amber-400",
             breached: "text-rose-400",
-            pending: "text-slate-600",
+            pending: "text-slate-400",
           };
           const labels = { all: "Total", active: "Active", at_risk: "At Risk", breached: "Breached", pending: "Pending" };
           return (
@@ -114,9 +115,9 @@ export default function GuaranteesPage() {
               key={key}
               type="button"
               onClick={() => setFilter(key)}
-              className={`rounded-lg border px-4 py-3 text-left transition ${filter === key ? "border-emerald-700 bg-emerald-900/20" : "border-slate-200 bg-white hover:border-slate-200"}`}
+              className={`rounded-xl border px-4 py-3 text-left transition ${filter === key ? "border-emerald-500/40 bg-emerald-500/15" : "border-[#1e1e2e] bg-[#111118] hover:border-[#2a2a3e]"}`}
             >
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">{labels[key]}</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{labels[key]}</div>
               <div className={`mt-1 text-xl font-semibold ${colors[key]}`}>{counts[key]}</div>
             </button>
           );
@@ -128,13 +129,13 @@ export default function GuaranteesPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
         </div>
       ) : filtered.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">
+        <p className={crmEmptyState}>
           No clients match this filter.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className={crmTableWrap}>
           <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
@@ -149,22 +150,22 @@ export default function GuaranteesPage() {
               {filtered.map((c) => {
                 const v = guaranteeVariant(c.guarantee_status);
                 const badgeColors = {
-                  green: "bg-emerald-50 text-emerald-600 border-emerald-700",
+                  green: "bg-emerald-500/15 text-emerald-300 border-emerald-600/50",
                   amber: "bg-amber-900/50 text-amber-400 border-amber-700",
                   red: "bg-rose-900/50 text-rose-400 border-rose-700",
-                  zinc: "bg-slate-100 text-slate-600 border-slate-200",
+                  zinc: "bg-[#1a1a24] text-slate-400 border-[#1e1e2e]",
                 };
                 const days = daysSince(c.close_date);
-                const daysColor = days > 90 ? "text-rose-400" : days > 60 ? "text-amber-400" : "text-slate-700";
+                const daysColor = days > 90 ? "text-rose-400" : days > 60 ? "text-amber-400" : "text-slate-300";
                 return (
-                  <tr key={c.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+                  <tr key={c.id} className={crmTableRow}>
                     <td className="px-3 py-2">
                       <Link href={`/crm/clients/${c.id}/onboarding`} className="font-medium text-emerald-600 hover:underline">
                         {c.company_name ?? "—"}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{c.domain ?? "—"}</td>
-                    <td className="px-3 py-2 text-slate-800">{formatUsd(c.mrr_cents)}</td>
+                    <td className="px-3 py-2 text-slate-400">{c.domain ?? "—"}</td>
+                    <td className="px-3 py-2 text-slate-200">{formatUsd(c.mrr_cents)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${badgeColors[v]}`}>
                         {guaranteeLabel(c.guarantee_status)}

@@ -88,8 +88,8 @@ export function CrmSidebar() {
               className={cn(
                 "flex items-center gap-3 py-2.5 text-sm font-medium transition-colors xl:px-3",
                 active
-                  ? "border-l-2 border-emerald-500 bg-emerald-500/10 pl-[calc(0.5rem-2px)] text-emerald-400 xl:rounded-r-lg"
-                  : "border-l-2 border-transparent pl-2 text-slate-500 hover:bg-white/5 hover:text-slate-300 xl:rounded-lg xl:px-3"
+                  ? "border-l-2 border-emerald-500 bg-emerald-500/15 pl-[calc(0.75rem-2px)] text-emerald-300 xl:rounded-r-lg"
+                  : "border-l-2 border-transparent pl-3 text-slate-500 hover:bg-white/5 hover:text-slate-300 xl:rounded-lg xl:px-3"
               )}
               title={item.label}
             >

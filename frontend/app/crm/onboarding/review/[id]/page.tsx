@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import toast from "react-hot-toast";
+import { crmFieldSurface, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 interface ReviewDetail {
   session: {
@@ -126,20 +127,20 @@ export default function OnboardingReviewDetailPage() {
           >
             &larr; Back to queue
           </button>
-          <h1 className="text-xl font-semibold text-slate-900">
+          <h1 className="text-xl font-semibold text-white">
             {hireProfile.full_name}&apos;s Onboarding
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-400">
             {hireProfile.email} &middot; {hireProfile.role_type || hireProfile.role}
           </p>
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-medium ${
             detail.session.status === "pending_review"
-              ? "bg-amber-100 text-amber-700"
+              ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30"
               : detail.session.status === "approved"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-red-100 text-red-700"
+                ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
+                : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30"
           }`}
         >
           {detail.session.status === "pending_review" ? "Pending Review" : detail.session.status}
@@ -153,7 +154,7 @@ export default function OnboardingReviewDetailPage() {
             {Object.entries(personal_details).map(([k, v]) => (
               <div key={k}>
                 <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
-                <p className="text-sm text-slate-900">{v || "—"}</p>
+                <p className="text-sm text-slate-200">{v || "—"}</p>
               </div>
             ))}
           </div>
@@ -169,7 +170,7 @@ export default function OnboardingReviewDetailPage() {
             {Object.entries(bank_details).map(([k, v]) => (
               <div key={k}>
                 <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
-                <p className="text-sm text-slate-900">{v || "—"}</p>
+                <p className="text-sm text-slate-200">{v || "—"}</p>
               </div>
             ))}
           </div>
@@ -199,8 +200,8 @@ export default function OnboardingReviewDetailPage() {
         {documents.length > 0 ? (
           <div className="space-y-2">
             {documents.map((doc) => (
-              <div key={doc.document_type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <span className="text-sm font-medium text-slate-700">{doc.document_type.replace("_", " ")}</span>
+              <div key={doc.document_type} className={`flex items-center justify-between px-3 py-2 ${crmFieldSurface}`}>
+                <span className="text-sm font-medium text-slate-300">{doc.document_type.replace("_", " ")}</span>
                 <div className="flex items-center gap-3">
                   {doc.file_url && (
                     <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
@@ -224,13 +225,13 @@ export default function OnboardingReviewDetailPage() {
         {quiz_results.length > 0 ? (
           <div className="space-y-2">
             {quiz_results.map((q) => (
-              <div key={q.module} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <span className="text-sm text-slate-700">{q.module.replace(/_/g, " ")}</span>
+              <div key={q.module} className={`flex items-center justify-between px-3 py-2 ${crmFieldSurface}`}>
+                <span className="text-sm text-slate-300">{q.module.replace(/_/g, " ")}</span>
                 <div className="flex items-center gap-2">
                   <span className={`text-sm font-medium ${q.passed ? "text-emerald-600" : "text-red-600"}`}>
                     {q.score}%
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${q.passed ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${q.passed ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
                     {q.passed ? "Passed" : "Failed"}
                   </span>
                 </div>
@@ -249,7 +250,7 @@ export default function OnboardingReviewDetailPage() {
             {Object.entries(detail.session.agreed_terms).map(([k, v]) => (
               <div key={k}>
                 <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
-                <p className="text-sm text-slate-900">{String(v) || "—"}</p>
+                <p className="text-sm text-slate-200">{String(v) || "—"}</p>
               </div>
             ))}
           </div>
@@ -258,7 +259,7 @@ export default function OnboardingReviewDetailPage() {
 
       {/* Actions */}
       {detail.session.status === "pending_review" && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className={`p-4 ${crmSurfaceCard}`}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => void handleAction("approve")}
@@ -281,7 +282,7 @@ export default function OnboardingReviewDetailPage() {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Reason for rejection (required)..."
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none"
+                className={`w-full px-3 py-2 text-sm placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
                 rows={3}
               />
               <button
@@ -301,8 +302,8 @@ export default function OnboardingReviewDetailPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold text-slate-900">{title}</h2>
+    <div className={`p-4 ${crmSurfaceCard}`}>
+      <h2 className="mb-3 text-sm font-semibold text-white">{title}</h2>
       {children}
     </div>
   );

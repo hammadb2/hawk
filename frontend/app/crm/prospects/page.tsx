@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Prospect, ProspectPipelineStatus } from "@/lib/crm/types";
 import { PIPELINE_STATUS_LABELS, STAGE_META } from "@/lib/crm/types";
 import { useProspectsList, useProspectsRealtimeSubscription } from "@/lib/crm/hooks";
+import { crmPageSubtitle, crmPageTitle, crmTableRow, crmTableThead, crmTableWrap } from "@/lib/crm/crm-surface";
 
 type PipelineFilterValue = "all" | ProspectPipelineStatus | "active";
 
@@ -24,7 +25,7 @@ function pipelineLabel(status: string | null | undefined): string {
 
 function ProspectsTableSkeleton() {
   return (
-    <div className="overflow-x-auto rounded-xl border border-crmBorder">
+    <div className={crmTableWrap}>
       <table className="w-full min-w-[880px] text-left text-sm">
         <thead className="border-b border-crmBorder bg-crmSurface2">
           <tr>
@@ -76,8 +77,8 @@ export default function ProspectsListPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Prospects</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className={crmPageTitle}>Prospects</h1>
+          <p className={crmPageSubtitle}>
             All prospects you can access (RLS). Updates live as the ARIA pipeline writes to CRM.
           </p>
         </div>
@@ -102,9 +103,9 @@ export default function ProspectsListPage() {
       {showSkeleton ? (
         <ProspectsTableSkeleton />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-crmBorder bg-crmSurface">
+        <div className={crmTableWrap}>
           <table className="w-full min-w-[880px] text-left text-sm">
-            <thead className="border-b border-crmBorder bg-crmSurface2 text-xs uppercase text-slate-500">
+            <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
@@ -116,7 +117,7 @@ export default function ProspectsListPage() {
             </thead>
             <tbody>
               {rows.map((p: Prospect) => (
-                <tr key={p.id} className="border-b border-crmBorder hover:bg-crmSurface2/80">
+                <tr key={p.id} className={crmTableRow}>
                   <td className="px-3 py-2">
                     <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
                       {p.company_name ?? p.domain}
