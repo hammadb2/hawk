@@ -37,6 +37,16 @@ ACTOR_LINKEDIN = "dev_fusion/linkedin-profile-scraper"
 ACTOR_LEADS_FINDER = "code_crafter/leads-finder"
 ACTOR_WEBSITE_CRAWLER = "vdrmota/contact-info-scraper"
 
+
+def _actor_path(actor_id: str) -> str:
+    """Normalize an Apify actor identifier for use in a REST URL path.
+
+    The REST API identifies actors as ``{username}~{actorName}`` in URL paths.
+    A plain ``{username}/{actorName}`` results in a 404 because Apify interprets
+    the slash as a path separator.
+    """
+    return actor_id.replace("/", "~")
+
 # 18 Canadian cities
 CITIES: list[str] = [
     "Toronto", "Vancouver", "Calgary", "Edmonton", "Ottawa", "Montreal",
@@ -288,7 +298,7 @@ async def _start_actor_run(
     run_input: dict[str, Any],
 ) -> str | None:
     """Start an Apify actor run. Returns the run ID or None on failure."""
-    url = f"{APIFY_BASE}/acts/{actor_id}/runs"
+    url = f"{APIFY_BASE}/acts/{_actor_path(actor_id)}/runs"
     try:
         r = await client.post(
             url,
@@ -314,7 +324,7 @@ async def _poll_actor_run(
     max_wait: int = APIFY_MAX_WAIT,
 ) -> dict[str, Any] | None:
     """Poll an Apify actor run until it completes. Returns run data or None."""
-    url = f"{APIFY_BASE}/acts/{actor_id}/runs/{run_id}"
+    url = f"{APIFY_BASE}/acts/{_actor_path(actor_id)}/runs/{run_id}"
     elapsed = 0
     while elapsed < max_wait:
         await asyncio.sleep(APIFY_POLL_INTERVAL)
