@@ -3,8 +3,9 @@
 -- =============================================================================
 -- Generated: concatenation of supabase/migrations/*.sql in filename order, plus
 -- this header. Re-run safe after migrations 20260501000001 (enum/index/policy
--- idempotency), 20260430000001 (DROP POLICY + WITH CHECK), and 20260504000001
--- (code alignment view/table).
+-- idempotency), 20260430000001 (DROP POLICY + WITH CHECK), 20260504000001
+-- (code alignment view/table), and 20260401000002 (realtime publication add
+-- guarded via pg_publication_tables — avoids 42710 if clients is already published).
 --
 -- AUDIT SUMMARY (2026-04-18)
 -- -------------------------
@@ -763,8 +764,31 @@ create trigger trg_clients_create_commission
 alter table public.clients replica identity full;
 alter table public.crm_commissions replica identity full;
 
-alter publication supabase_realtime add table public.clients;
-alter publication supabase_realtime add table public.crm_commissions;
+do $realtime$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'clients'
+  ) then
+    alter publication supabase_realtime add table public.clients;
+  end if;
+end;
+$realtime$;
+
+do $realtime$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'crm_commissions'
+  ) then
+    alter publication supabase_realtime add table public.crm_commissions;
+  end if;
+end;
+$realtime$;
 
 -- >>> SOURCE: 20260402000001_crm_support_tickets.sql <<<
 -- Phase 8 — Internal support tickets (reps file; CEO/HoS triage via RLS + exec notifications)
