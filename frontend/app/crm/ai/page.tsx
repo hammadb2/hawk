@@ -311,9 +311,9 @@ export default function AiCommandCenterPage() {
   }
 
   return (
-    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col bg-crmBg lg:flex-row">
-      <aside className="hidden min-h-0 w-64 flex-shrink-0 border-r border-crmBorder bg-crmSurface lg:flex lg:flex-col">
-        <div className="flex items-center justify-between border-b border-crmBorder px-4 py-3">
+    <div className="flex max-h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden bg-crmBg lg:flex-row lg:items-stretch lg:overflow-hidden">
+      <aside className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r border-crmBorder bg-crmSurface lg:flex lg:h-full lg:max-h-full">
+        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder px-4 py-3">
           <h2 className="text-sm font-semibold text-white">Conversations</h2>
           <button
             type="button"
@@ -350,8 +350,8 @@ export default function AiCommandCenterPage() {
         </div>
       </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-crmBorder bg-crmSurface px-4 py-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-h-0 lg:h-full">
+        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder bg-crmSurface px-4 py-3">
           <div>
             <h1 className="text-sm font-semibold text-white">ARIA</h1>
             <p className="text-xs text-slate-500">
@@ -371,7 +371,7 @@ export default function AiCommandCenterPage() {
 
         <div
           ref={messagesScrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-crmBg px-4 py-6"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-crmBg px-4 py-6"
         >
           <div className="mx-auto max-w-3xl space-y-4">
             {/* Unread briefing banner */}
@@ -515,7 +515,7 @@ export default function AiCommandCenterPage() {
 
         {/* Pipeline trigger form */}
         {showPipelineTrigger && session?.access_token && (
-          <div className="border-t border-crmBorder bg-crmSurface px-4 py-3">
+          <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-3">
             <div className="mx-auto max-w-3xl">
               <PipelineRunTrigger
                 accessToken={session.access_token}
@@ -525,7 +525,7 @@ export default function AiCommandCenterPage() {
           </div>
         )}
 
-        <div className="border-t border-crmBorder bg-crmSurface px-4 py-4">
+        <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-4">
           <div className="mx-auto flex max-w-3xl gap-2">
             {session?.access_token && (
               <VoiceInput

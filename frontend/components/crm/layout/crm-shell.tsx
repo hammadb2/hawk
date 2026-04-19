@@ -52,12 +52,16 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
         <CrmSidebar />
         <div className="flex min-h-dvh flex-col md:pl-16 xl:pl-64">
           <CrmTopbar />
-          <main className="flex min-h-0 flex-1 flex-col bg-crmBg p-4 lg:p-6">{children}</main>
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-crmBg p-4 lg:p-6">
+            {children}
+          </main>
         </div>
       </div>
       <div className="flex min-h-dvh flex-col md:hidden">
         <CrmTopbar />
-        <main className="flex min-h-0 flex-1 flex-col bg-crmBg p-3 pb-24">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-crmBg p-3 pb-24">
+          {children}
+        </main>
         <CrmMobileNav />
       </div>
       <AiBubble />
