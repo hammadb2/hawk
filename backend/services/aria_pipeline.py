@@ -15,6 +15,7 @@ the frontend can display a live progress tracker.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import os
@@ -995,7 +996,13 @@ def step_apify_discover(
     try:
         from services.aria_apify_scraper import run_ondemand_discovery
 
-        raw_leads = asyncio.run(run_ondemand_discovery(vertical, location, batch_size))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(
+                asyncio.run,
+                run_ondemand_discovery(vertical, location, batch_size),
+            )
+            raw_leads = future.result(timeout=900)
+
         if not raw_leads:
             logger.info("Apify returned 0 leads for %s in %s", vertical, location)
             return []

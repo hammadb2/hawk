@@ -26,13 +26,7 @@ from config import APOLLO_API_KEY
 
 logger = logging.getLogger(__name__)
 
-APIFY_API_KEY = os.environ.get("APIFY_API_KEY", "").strip()
 APIFY_BASE = "https://api.apify.com/v2"
-
-
-def _apify_headers() -> dict[str, str]:
-    """Return Authorization header for Apify API calls."""
-    return {"Authorization": f"Bearer {APIFY_API_KEY}"}
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
@@ -143,7 +137,12 @@ async def _start_actor_run(
     """Start an Apify actor run. Returns the run ID or None on failure."""
     url = f"{APIFY_BASE}/acts/{actor_id}/runs"
     try:
-        r = await client.post(url, json=run_input, headers=_apify_headers(), timeout=60.0)
+        r = await client.post(
+            url,
+            json=run_input,
+            params={"token": os.environ.get("APIFY_API_KEY", "").strip()},
+            timeout=60.0,
+        )
         if r.status_code >= 400:
             logger.warning("Apify start failed actor=%s status=%d body=%s", actor_id, r.status_code, r.text[:500])
             return None
@@ -168,7 +167,11 @@ async def _poll_actor_run(
         await asyncio.sleep(APIFY_POLL_INTERVAL)
         elapsed += APIFY_POLL_INTERVAL
         try:
-            r = await client.get(url, headers=_apify_headers(), timeout=30.0)
+            r = await client.get(
+                url,
+                params={"token": os.environ.get("APIFY_API_KEY", "").strip()},
+                timeout=30.0,
+            )
             if r.status_code >= 400:
                 continue
             data = r.json()
@@ -192,9 +195,16 @@ async def _get_dataset_items(
     limit: int = 10000,
 ) -> list[dict[str, Any]]:
     """Download items from an Apify dataset."""
-    url = f"{APIFY_BASE}/datasets/{dataset_id}/items?limit={limit}"
+    url = f"{APIFY_BASE}/datasets/{dataset_id}/items"
     try:
-        r = await client.get(url, headers=_apify_headers(), timeout=120.0)
+        r = await client.get(
+            url,
+            params={
+                "token": os.environ.get("APIFY_API_KEY", "").strip(),
+                "limit": limit,
+            },
+            timeout=120.0,
+        )
         if r.status_code >= 400:
             logger.warning("Dataset fetch failed id=%s status=%d", dataset_id, r.status_code)
             return []
@@ -305,8 +315,7 @@ async def _run_google_maps_single(
             "searchStringsArray": [query],
             "maxCrawledPlacesPerSearch": 100,
             "language": "en",
-            "extractEmails": True,
-            "scrapeContacts": True,
+            "scrapeWebsiteData": True,
         }
 
         logger.info("Starting Google Maps scrape: %s", query)
@@ -331,7 +340,7 @@ async def run_actor1_google_maps(
     All 54 combinations (18 cities x 3 verticals) run concurrently.
     Target: under 10 minutes total.
     """
-    if not APIFY_API_KEY:
+    if not os.environ.get("APIFY_API_KEY", "").strip():
         logger.error("APIFY_API_KEY not configured — skipping Google Maps scrape")
         return []
 
@@ -427,7 +436,7 @@ async def run_actor2_linkedin(
     leads: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """Run Actor 2 for leads missing emails. Returns domain→contact mapping."""
-    if not APIFY_API_KEY:
+    if not os.environ.get("APIFY_API_KEY", "").strip():
         return {}
 
     needs_email = [ld for ld in leads if not ld.get("emails_from_website")]
@@ -463,7 +472,7 @@ async def run_actor3_leads_finder(
     leads: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """Run Actor 3 for leads still missing emails. Returns domain→contact mapping."""
-    if not APIFY_API_KEY:
+    if not os.environ.get("APIFY_API_KEY", "").strip():
         return {}
 
     needs_email = [ld for ld in leads if not ld.get("_email_found")]
@@ -609,7 +618,7 @@ async def run_actor4_website_crawl(
     leads: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """Run Actor 4 for leads still missing emails. Returns domain→contact mapping."""
-    if not APIFY_API_KEY:
+    if not os.environ.get("APIFY_API_KEY", "").strip():
         return {}
 
     needs_email = [ld for ld in leads if not ld.get("_email_found")]
@@ -855,7 +864,7 @@ async def run_full_discovery(
 
     Returns all leads with lead_score, contact_email, email_finder set.
     """
-    if not APIFY_API_KEY:
+    if not os.environ.get("APIFY_API_KEY", "").strip():
         logger.error("APIFY_API_KEY not configured — cannot run discovery")
         return []
 
@@ -927,7 +936,7 @@ async def run_ondemand_discovery(
 
     Same 4-actor flow but scoped to one combination.
     """
-    if not APIFY_API_KEY:
+    if not os.environ.get("APIFY_API_KEY", "").strip():
         logger.warning("APIFY_API_KEY not configured for on-demand discovery")
         # Try Apollo as absolute last resort
         fallback = await _apollo_last_resort([], vertical, city)
