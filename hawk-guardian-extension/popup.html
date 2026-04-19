@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HAWK Guardian</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Guardian</h1>
+      <label>API base (Railway)</label>
+      <input id="apiBase" type="url" placeholder="https://hawk-api.example.com" />
+      <label>Extension secret</label>
+      <input id="secret" type="password" autocomplete="off" />
+      <label>Client UUID</label>
+      <input id="clientId" type="text" autocomplete="off" />
+      <label>Expected login domain (apex)</label>
+      <input id="expectedDomain" type="text" placeholder="acmecorp.com" />
+      <button id="save" type="button">Save</button>
+      <p id="status" class="muted"></p>
+      <button id="refresh" type="button" class="secondary">Refresh profile</button>
+      <pre id="out" class="log"></pre>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

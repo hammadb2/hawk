@@ -2,6 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 import type { Prospect } from "@/lib/crm/types";
 import { STAGE_META } from "@/lib/crm/types";
 import { agingBorderClass } from "@/lib/crm/pipeline-utils";
@@ -33,41 +34,67 @@ export function ProspectCard({
   };
 
   const border = agingBorderClass(prospect.last_activity_at, now);
+  const hasVuln = !!(prospect.vulnerability_found && String(prospect.vulnerability_found).trim());
 
   if (bulkMode) {
     return (
-      <div className={cn("rounded-lg bg-slate-100 p-3 shadow-sm", border, selected && "ring-2 ring-emerald-500/80")}>
+      <div
+        className={cn(
+          "relative rounded-xl border border-[#1e1e2e] bg-[#16161f] p-3 shadow-lg",
+          border,
+          selected && "ring-2 ring-emerald-500/80",
+        )}
+      >
         <div className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 shrink-0"
-            checked={selected}
-            onChange={onToggleSelect}
-          />
+          <input type="checkbox" className="mt-1 h-4 w-4 shrink-0" checked={selected} onChange={onToggleSelect} />
           <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen(prospect)}>
-            <div className="truncate font-medium text-slate-900">{prospect.company_name ?? prospect.domain}</div>
-            <div className="truncate text-xs text-slate-600">{prospect.domain}</div>
+            <div className="truncate font-semibold text-white">{prospect.company_name ?? prospect.domain}</div>
+            <div className="truncate text-xs text-slate-500">{prospect.domain}</div>
           </button>
         </div>
+        {prospect.is_hot && (
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" title="Hot lead" />
+        )}
+        {hasVuln && (
+          <span className="mt-2 inline-block rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+            VULN FOUND
+          </span>
+        )}
       </div>
     );
   }
 
   return (
-    <div ref={setNodeRef} style={style} className={cn("flex gap-1 rounded-lg bg-slate-100 p-2 shadow-sm", border)}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn("relative flex gap-1 rounded-xl border border-[#1e1e2e] bg-[#16161f] p-3 shadow-lg", border)}
+    >
+      {prospect.is_hot && (
+        <span className="absolute right-2 top-2 z-10 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" title="Hot lead" />
+      )}
       <button
         type="button"
         {...listeners}
         {...attributes}
-        className="mt-1 flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-slate-600 hover:bg-slate-100 hover:text-slate-700 active:cursor-grabbing"
+        className="mt-0.5 flex h-8 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded text-slate-500 hover:bg-white/5 hover:text-slate-300 active:cursor-grabbing"
         aria-label="Drag to move stage"
       >
-        ⋮⋮
+        <GripVertical className="h-4 w-4" strokeWidth={2} />
       </button>
-      <button type="button" className="min-w-0 flex-1 rounded-md px-1 py-1 text-left" onClick={() => onOpen(prospect)}>
-        <div className="truncate font-medium text-slate-900">{prospect.company_name ?? prospect.domain}</div>
-        <div className="truncate text-xs text-slate-600">{prospect.domain}</div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+      <button type="button" className="min-w-0 flex-1 rounded-md px-1 py-0.5 text-left" onClick={() => onOpen(prospect)}>
+        <div className="flex flex-wrap items-start justify-between gap-2 pr-4">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold text-white">{prospect.company_name ?? prospect.domain}</div>
+            <div className="truncate text-xs text-slate-500">{prospect.domain}</div>
+          </div>
+          {hasVuln && (
+            <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+              VULN FOUND
+            </span>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
           <span
             className="rounded-full px-2 py-0.5 font-medium"
             style={{
@@ -80,10 +107,10 @@ export function ProspectCard({
           <span>Score {prospect.hawk_score}</span>
           <span>{new Date(prospect.last_activity_at).toLocaleDateString()}</span>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-600">
-          <span className="rounded border border-slate-200 px-1.5 py-0.5">Log call</span>
-          <span className="rounded border border-slate-200 px-1.5 py-0.5">Note</span>
-          <span className="rounded border border-slate-200 px-1.5 py-0.5">Scan</span>
+        <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-500">
+          <span className="rounded border border-[#1e1e2e] px-1.5 py-0.5">Log call</span>
+          <span className="rounded border border-[#1e1e2e] px-1.5 py-0.5">Note</span>
+          <span className="rounded border border-[#1e1e2e] px-1.5 py-0.5">Scan</span>
         </div>
       </button>
     </div>

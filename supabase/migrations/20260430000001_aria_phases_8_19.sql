@@ -16,9 +16,11 @@ CREATE TABLE IF NOT EXISTS aria_ab_experiments (
 );
 
 ALTER TABLE aria_ab_experiments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_ab_experiments" ON aria_ab_experiments;
 CREATE POLICY "Service role full access on aria_ab_experiments"
     ON aria_ab_experiments FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Phase 11: Competitive Intelligence ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS aria_competitive_intel (
@@ -29,9 +31,11 @@ CREATE TABLE IF NOT EXISTS aria_competitive_intel (
 );
 
 ALTER TABLE aria_competitive_intel ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_competitive_intel" ON aria_competitive_intel;
 CREATE POLICY "Service role full access on aria_competitive_intel"
     ON aria_competitive_intel FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Phase 14: Playbooks ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS aria_playbooks (
@@ -43,9 +47,11 @@ CREATE TABLE IF NOT EXISTS aria_playbooks (
 );
 
 ALTER TABLE aria_playbooks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_playbooks" ON aria_playbooks;
 CREATE POLICY "Service role full access on aria_playbooks"
     ON aria_playbooks FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Phase 17: API Keys ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS aria_api_keys (
@@ -61,9 +67,11 @@ CREATE TABLE IF NOT EXISTS aria_api_keys (
 );
 
 ALTER TABLE aria_api_keys ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_api_keys" ON aria_api_keys;
 CREATE POLICY "Service role full access on aria_api_keys"
     ON aria_api_keys FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Phase 17: Webhooks ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS aria_webhooks (
@@ -77,9 +85,11 @@ CREATE TABLE IF NOT EXISTS aria_webhooks (
 );
 
 ALTER TABLE aria_webhooks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_webhooks" ON aria_webhooks;
 CREATE POLICY "Service role full access on aria_webhooks"
     ON aria_webhooks FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Phase 18: WhatsApp Messages ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS aria_whatsapp_messages (
@@ -92,9 +102,11 @@ CREATE TABLE IF NOT EXISTS aria_whatsapp_messages (
 );
 
 ALTER TABLE aria_whatsapp_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_whatsapp_messages" ON aria_whatsapp_messages;
 CREATE POLICY "Service role full access on aria_whatsapp_messages"
     ON aria_whatsapp_messages FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 CREATE TABLE IF NOT EXISTS aria_whatsapp_queue (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -107,9 +119,11 @@ CREATE TABLE IF NOT EXISTS aria_whatsapp_queue (
 );
 
 ALTER TABLE aria_whatsapp_queue ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_whatsapp_queue" ON aria_whatsapp_queue;
 CREATE POLICY "Service role full access on aria_whatsapp_queue"
     ON aria_whatsapp_queue FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Phase 19: Training Sessions ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS aria_training_sessions (
@@ -125,9 +139,11 @@ CREATE TABLE IF NOT EXISTS aria_training_sessions (
 );
 
 ALTER TABLE aria_training_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on aria_training_sessions" ON aria_training_sessions;
 CREATE POLICY "Service role full access on aria_training_sessions"
     ON aria_training_sessions FOR ALL
-    USING (auth.role() = 'service_role');
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- ── Indices ─────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_aria_ab_experiments_status ON aria_ab_experiments(status);

@@ -17,6 +17,7 @@ import {
 import type { CrmNotificationRow, Prospect } from "@/lib/crm/types";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { Bell } from "lucide-react";
 
 export function CrmTopbar() {
   const router = useRouter();
@@ -143,19 +144,19 @@ export function CrmTopbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-sm md:px-4">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-[#1e1e2e] bg-[#0d0d14]/95 px-3 shadow-[0_1px_0_rgba(0,0,0,0.35)] backdrop-blur md:px-4">
         <Button
           variant="outline"
           size="sm"
-          className="hidden border-slate-200 bg-slate-50 text-slate-800 md:inline-flex"
+          className="hidden border-crmBorder bg-crmSurface text-slate-200 hover:bg-crmSurface2 hover:text-white md:inline-flex"
           onClick={() => setSearchOpen(true)}
         >
-          Search <kbd className="ml-2 rounded border border-slate-300 px-1 text-[10px] text-slate-600">⌘K</kbd>
+          Search <kbd className="ml-2 rounded border border-crmBorder px-1 text-[10px] text-slate-400">⌘K</kbd>
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="border-slate-200 bg-slate-50 text-slate-800 md:hidden"
+          className="border-crmBorder bg-crmSurface text-slate-200 hover:bg-crmSurface2 md:hidden"
           onClick={() => setSearchOpen(true)}
         >
           Search
@@ -166,41 +167,44 @@ export function CrmTopbar() {
             <Button
               variant="ghost"
               size="sm"
-              className="relative text-slate-700"
+              className="relative text-slate-400 hover:bg-white/5 hover:text-slate-300"
               onClick={() => setNotifOpen((v) => !v)}
               aria-label="Notifications"
             >
-              🔔
+              <Bell className="h-5 w-5" strokeWidth={1.75} />
               {unread > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-medium text-white">
-                  {unread > 9 ? "9+" : unread}
-                </span>
+                <span className="pointer-events-none absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[#0d0d14]" />
               )}
             </Button>
             {notifOpen && (
-              <div className="absolute right-0 mt-2 max-h-[min(70vh,420px)] w-80 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
-                <div className="border-b border-slate-200 px-3 py-2 text-xs font-medium text-slate-600">Notifications</div>
+              <div className="absolute right-0 mt-2 max-h-[min(70vh,420px)] w-80 overflow-hidden rounded-lg border border-crmBorder bg-crmSurface shadow-xl">
+                <div className="border-b border-crmBorder px-3 py-2 text-xs font-medium text-slate-400">Notifications</div>
                 <ul className="max-h-80 overflow-y-auto p-2">
-                  {notifs.length === 0 && <li className="px-2 py-6 text-center text-sm text-slate-600">No notifications yet.</li>}
+                  {notifs.length === 0 && <li className="px-2 py-6 text-center text-sm text-slate-500">No notifications yet.</li>}
                   {notifs.map((n) => (
                     <li key={n.id}>
                       <button
                         type="button"
                         onClick={() => void onNotifClick(n)}
                         className={cn(
-                          "w-full rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-slate-50",
-                          !n.read && "bg-slate-100"
+                          "w-full rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-white/5",
+                          !n.read && "bg-crmSurface2/80"
                         )}
                       >
-                        <div className="font-medium text-slate-800">{n.title}</div>
-                        <div className="text-xs text-slate-600">{n.message}</div>
+                        <div className="font-medium text-white">{n.title}</div>
+                        <div className="text-xs text-slate-400">{n.message}</div>
                         <div className="mt-1 text-[10px] text-slate-500">{new Date(n.created_at).toLocaleString()}</div>
                       </button>
                     </li>
                   ))}
                 </ul>
-                <div className="border-t border-slate-200 p-2">
-                  <Button size="sm" variant="outline" className="w-full border-slate-200" onClick={() => setNotifOpen(false)}>
+                <div className="border-t border-crmBorder p-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full border-crmBorder bg-transparent text-slate-300 hover:bg-white/5"
+                    onClick={() => setNotifOpen(false)}
+                  >
                     Close
                   </Button>
                 </div>
@@ -213,10 +217,10 @@ export function CrmTopbar() {
               + Quick add
             </Button>
             {menuOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-52 rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+              <div className="absolute right-0 z-20 mt-2 w-52 rounded-lg border border-crmBorder bg-crmSurface py-1 shadow-xl">
                 <button
                   type="button"
-                  className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                  className="block w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"
                   onClick={() => {
                     setMenuOpen(false);
                     if (!session?.user?.id) {
@@ -230,7 +234,7 @@ export function CrmTopbar() {
                 </button>
                 <button
                   type="button"
-                  className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                  className="block w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"
                   onClick={() => {
                     setMenuOpen(false);
                     router.push("/crm/pipeline");
@@ -241,7 +245,7 @@ export function CrmTopbar() {
                 </button>
                 <Link
                   href="/crm/tickets"
-                  className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                  className="block px-3 py-2 text-sm text-slate-200 hover:bg-white/5"
                   onClick={() => setMenuOpen(false)}
                 >
                   Support ticket
@@ -253,16 +257,18 @@ export function CrmTopbar() {
           <div className="relative">
             <button
               type="button"
-              className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1 text-left text-sm"
+              className="flex items-center gap-2 rounded-lg border border-crmBorder bg-crmSurface px-2 py-1 text-left text-sm"
               onClick={() => signOut()}
               title="Sign out"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-medium">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-crmSurface2 text-xs font-medium text-slate-200">
                 {(profile?.full_name ?? profile?.email ?? "?").slice(0, 2).toUpperCase()}
               </span>
               <span className="hidden max-w-[8rem] truncate lg:inline">
-                <span className="block truncate font-medium text-slate-900">{profile?.full_name ?? "User"}</span>
-                <span className="block truncate text-[11px] uppercase tracking-wide text-slate-600">{roleLabel}</span>
+                <span className="block truncate font-medium text-white">{profile?.full_name ?? "User"}</span>
+                <span className="block truncate text-[11px] font-medium uppercase tracking-wider text-emerald-400">
+                  {roleLabel}
+                </span>
               </span>
             </button>
           </div>
@@ -272,31 +278,31 @@ export function CrmTopbar() {
       {session?.user?.id && <AddProspectModal open={addOpen} onOpenChange={setAddOpen} sessionUserId={session.user.id} />}
 
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <DialogContent className="max-w-lg border-slate-200 bg-white">
+        <DialogContent className="max-w-lg border-crmBorder bg-crmSurface text-slate-200">
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Global search</DialogTitle>
+            <DialogTitle className="text-white">Global search</DialogTitle>
           </DialogHeader>
           <Input
             autoFocus
             placeholder="Company or domain…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="border-slate-200 bg-slate-50 text-slate-900"
+            className="border-crmBorder bg-crmSurface2 text-white placeholder:text-slate-500"
           />
           <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
             {results.map((r) => (
               <li key={r.id}>
                 <Link
                   href={`/crm/prospects/${r.id}`}
-                  className="block rounded-md px-2 py-2 hover:bg-slate-50"
+                  className="block rounded-md px-2 py-2 hover:bg-white/5"
                   onClick={() => setSearchOpen(false)}
                 >
-                  <span className="font-medium text-slate-900">{r.company_name ?? r.domain}</span>
-                  <span className="ml-2 text-slate-600">{r.domain}</span>
+                  <span className="font-medium text-white">{r.company_name ?? r.domain}</span>
+                  <span className="ml-2 text-slate-400">{r.domain}</span>
                 </Link>
               </li>
             ))}
-            {q && !results.length && <li className="px-2 py-4 text-slate-600">No matches</li>}
+            {q && !results.length && <li className="px-2 py-4 text-slate-500">No matches</li>}
           </ul>
         </DialogContent>
       </Dialog>

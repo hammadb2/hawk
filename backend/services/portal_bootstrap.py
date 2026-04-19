@@ -13,6 +13,7 @@ from fastapi import HTTPException
 
 from config import SUPABASE_URL
 from services.crm_profile_sync import ensure_client_profile
+from services.guardian_client_profiler import schedule_build_client_guardian_profile
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +202,7 @@ def _bootstrap_insert_clients_row(uid: str, company: str, domain: str) -> tuple[
                 detail="Could not link portal user to new client — check portal_user_id FK to auth.users.",
             ) from None
 
+    schedule_build_client_guardian_profile(str(row["id"]))
     return row, domain
 
 

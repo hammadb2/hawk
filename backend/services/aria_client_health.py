@@ -240,6 +240,22 @@ def run_client_health_scores() -> dict[str, Any]:
 
         # Check if newly at-risk
         prev = existing_scores.get(cid)
+        prev_score_val = prev.get("score") if prev else None
+        if prev_score_val is not None:
+            try:
+                old_s = int(prev_score_val)
+                if abs(score - old_s) > 5:
+                    from services.guardian_client_alerts import send_health_score_change_email
+
+                    send_health_score_change_email(
+                        client_id=cid,
+                        company_name=str(client.get("company_name") or client.get("domain") or cid),
+                        old_score=old_s,
+                        new_score=score,
+                        factors=factors,
+                    )
+            except Exception:
+                logger.debug("health score change email skipped for client=%s", cid, exc_info=True)
         if at_risk and (not prev or not prev.get("at_risk")):
             newly_at_risk.append({
                 "client_id": cid,

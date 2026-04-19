@@ -37,6 +37,7 @@ from config import (
 from services.crm_portal_email import shield_day0_welcome_email, welcome_portal_email
 from services.crm_openphone import send_sms
 from services.crm_profile_sync import ensure_client_profile, profile_role, staff_roles
+from services.guardian_client_profiler import schedule_build_client_guardian_profile
 from services.portal_bootstrap import portal_clients_domain_for_email
 from services.scanner import enqueue_async_scan
 
@@ -302,6 +303,9 @@ def _create_client_from_public_checkout(headers: dict[str, str], session_obj: di
             rows2 = r2.json()
             return rows2[0] if rows2 else None
         out = ins.json()
+        new_row = out[0] if isinstance(out, list) and out else out if isinstance(out, dict) else None
+        if isinstance(new_row, dict) and new_row.get("id"):
+            schedule_build_client_guardian_profile(str(new_row["id"]))
         if isinstance(out, list) and out:
             return out[0]
         if isinstance(out, dict) and out.get("id"):

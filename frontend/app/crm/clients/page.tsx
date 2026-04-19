@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { formatUsd } from "@/lib/crm/format";
 import type { CrmClientRow } from "@/lib/crm/types";
-import { useClients, useProfiles } from "@/lib/crm/hooks";
+import { useClients, useProfiles, useProspectsRealtimeSubscription } from "@/lib/crm/hooks";
 import { cn } from "@/lib/utils";
 
 function statusClass(s: string): string {
@@ -18,10 +18,29 @@ function statusClass(s: string): string {
 
 function ClientsTableSkeleton() {
   return (
-    <div className="space-y-2">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
-      ))}
+    <div className="overflow-x-auto rounded-xl border border-crmBorder">
+      <table className="w-full min-w-[800px] text-left text-sm">
+        <thead className="border-b border-crmBorder bg-crmSurface2">
+          <tr>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <th key={i} className="px-3 py-2">
+                <div className="h-3 w-16 animate-pulse rounded bg-crmSurface" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }).map((_, r) => (
+            <tr key={r} className="border-b border-crmBorder">
+              {Array.from({ length: 8 }).map((__, c) => (
+                <td key={c} className="px-3 py-2">
+                  <div className="h-4 w-full max-w-[120px] animate-pulse rounded bg-crmSurface2" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -29,7 +48,7 @@ function ClientsTableSkeleton() {
 function AuthShellSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-8 w-40 animate-pulse rounded-lg bg-slate-100" />
+      <div className="h-8 w-40 animate-pulse rounded-lg bg-crmSurface" />
       <ClientsTableSkeleton />
     </div>
   );
@@ -39,6 +58,8 @@ export default function ClientsPage() {
   const { authReady, session, profile } = useCrmAuth();
   const { data: rows = [], isLoading, error, mutate } = useClients();
   const { data: profiles = [] } = useProfiles();
+
+  useProspectsRealtimeSubscription(!!session);
 
   const repNames = useMemo(() => {
     const map: Record<string, string> = {};

@@ -9,6 +9,8 @@ import { SentryClientInit } from "@/components/crm/sentry-client";
 import { AiBubble } from "@/components/crm/ai-bubble";
 import { lightShell } from "@/lib/portal-ui";
 
+const crmAppShell = "min-h-dvh bg-crmBg text-slate-200";
+
 export function CrmShell({ children }: { children: React.ReactNode }) {
   const { authReady, session } = useCrmAuth();
 
@@ -28,12 +30,12 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className={lightShell.pageBg}>
+    <div className={crmAppShell}>
       <SentryClientInit />
       <Toaster
         position="top-center"
         toastOptions={{
-          className: "bg-white text-slate-900 border border-slate-200 shadow-sm",
+          className: "bg-crmSurface text-white border border-crmBorder shadow-lg",
         }}
       />
       <div className="hidden md:block">

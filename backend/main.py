@@ -35,6 +35,7 @@ from routers import (
     crm_portal_api,
     crm_scale,
     crm_webhooks,
+    guardian,
     monitor,
     portal_phase2,
     portal_self_serve,
@@ -94,6 +95,7 @@ app.include_router(aria_whatsapp.router)
 app.include_router(aria_api.router)
 app.include_router(crm_payment.router)
 app.include_router(monitor.router)
+app.include_router(guardian.router)
 
 
 @app.get("/health")

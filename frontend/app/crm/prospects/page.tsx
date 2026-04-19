@@ -24,10 +24,42 @@ function pipelineLabel(status: string | null | undefined): string {
 
 function ProspectsTableSkeleton() {
   return (
-    <div className="space-y-2">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
-      ))}
+    <div className="overflow-x-auto rounded-xl border border-crmBorder">
+      <table className="w-full min-w-[880px] text-left text-sm">
+        <thead className="border-b border-crmBorder bg-crmSurface2">
+          <tr>
+            {["Company", "Domain", "Stage", "Pipeline", "Lead", "Hawk"].map((label) => (
+              <th key={label} className="px-3 py-2">
+                <div className="h-3 w-20 animate-pulse rounded bg-crmSurface" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }).map((_, r) => (
+            <tr key={r} className="border-b border-crmBorder">
+              <td className="px-3 py-2">
+                <div className="h-4 w-40 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2">
+                <div className="h-4 w-32 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2">
+                <div className="h-4 w-24 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2">
+                <div className="h-4 w-28 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2 text-right">
+                <div className="ml-auto h-4 w-10 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2 text-right">
+                <div className="ml-auto h-4 w-10 animate-pulse rounded bg-crmSurface2" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -44,8 +76,8 @@ export default function ProspectsListPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Prospects</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-semibold text-white">Prospects</h1>
+          <p className="text-sm text-slate-400">
             All prospects you can access (RLS). Updates live as the ARIA pipeline writes to CRM.
           </p>
         </div>
@@ -55,7 +87,7 @@ export default function ProspectsListPage() {
           </label>
           <select
             id="pipeline-filter"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+            className="rounded-lg border border-crmBorder bg-crmSurface2 px-3 py-2 text-sm text-white shadow-sm"
             value={pipelineFilter}
             onChange={(e) => setPipelineFilter(e.target.value as PipelineFilterValue)}
           >
@@ -70,9 +102,9 @@ export default function ProspectsListPage() {
       {showSkeleton ? (
         <ProspectsTableSkeleton />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <div className="overflow-x-auto rounded-xl border border-crmBorder bg-crmSurface">
           <table className="w-full min-w-[880px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-600">
+            <thead className="border-b border-crmBorder bg-crmSurface2 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
@@ -84,19 +116,19 @@ export default function ProspectsListPage() {
             </thead>
             <tbody>
               {rows.map((p: Prospect) => (
-                <tr key={p.id} className="border-b border-slate-200/90 shadow-sm hover:bg-white">
+                <tr key={p.id} className="border-b border-crmBorder hover:bg-crmSurface2/80">
                   <td className="px-3 py-2">
-                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-600 hover:underline">
+                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
                       {p.company_name ?? p.domain}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{p.domain}</td>
-                  <td className="px-3 py-2">{STAGE_META[p.stage]?.label ?? p.stage}</td>
-                  <td className="px-3 py-2 text-slate-700">{pipelineLabel(p.pipeline_status ?? undefined)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                  <td className="px-3 py-2 text-slate-400">{p.domain}</td>
+                  <td className="px-3 py-2 text-slate-200">{STAGE_META[p.stage]?.label ?? p.stage}</td>
+                  <td className="px-3 py-2 text-slate-300">{pipelineLabel(p.pipeline_status ?? undefined)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">
                     {p.lead_score != null ? p.lead_score : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.hawk_score}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">{p.hawk_score}</td>
                 </tr>
               ))}
             </tbody>

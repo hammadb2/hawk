@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { cn } from "@/lib/utils";
 
 interface PipelineStep {
   key: string;
@@ -88,17 +90,17 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-600">{error}</p>
+      <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-4">
+        <p className="text-sm text-red-300">{error}</p>
       </div>
     );
   }
 
   if (!status) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-xl border border-crmBorder bg-crmSurface2 p-4">
         <div className="flex items-center gap-2">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
           <p className="text-sm text-slate-500">Loading pipeline status...</p>
         </div>
       </div>
@@ -112,82 +114,79 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
   const isCompleted = status.status === "completed";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-crmBorder bg-crmSurface shadow-lg">
+      <div className="flex items-center justify-between border-b border-crmBorder bg-crmSurface2 px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className={`h-2 w-2 rounded-full ${
-            isCompleted ? "bg-emerald-500" :
-            isFailed ? "bg-red-500" :
-            isPaused ? "bg-amber-500" :
-            "bg-emerald-500 animate-pulse"
-          }`} />
-          <span className="text-sm font-semibold text-slate-700">
+          <div
+            className={cn(
+              "h-2 w-2 rounded-full",
+              isCompleted ? "bg-emerald-500" : isFailed ? "bg-red-500" : isPaused ? "bg-amber-500" : "animate-pulse bg-emerald-500",
+            )}
+          />
+          <span className="text-sm font-semibold text-white">
             ARIA Pipeline — {status.vertical.charAt(0).toUpperCase() + status.vertical.slice(1)}
           </span>
         </div>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          isCompleted ? "bg-emerald-100 text-emerald-700" :
-          isFailed ? "bg-red-100 text-red-700" :
-          isPaused ? "bg-amber-100 text-amber-700" :
-          "bg-blue-100 text-blue-700"
-        }`}>
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-xs font-medium",
+            isCompleted && "bg-emerald-500/15 text-emerald-400",
+            isFailed && "bg-red-500/15 text-red-300",
+            isPaused && "bg-amber-500/15 text-amber-300",
+            !isCompleted && !isFailed && !isPaused && "bg-blue-500/15 text-blue-300",
+          )}
+        >
           {status.status.charAt(0).toUpperCase() + status.status.slice(1)}
         </span>
       </div>
 
-      {/* Steps */}
       <div className="p-4">
         <div className="space-y-3">
           {PIPELINE_STEPS.map((step, i) => {
             const isDone = isCompleted ? true : i < currentIdx;
             const isCurrent = i === currentIdx && isRunning;
-            const isPending = !isDone && !isCurrent;
 
             return (
               <div key={step.key} className="flex items-center gap-3">
-                {/* Step indicator */}
                 <div className="flex-shrink-0">
                   {isDone ? (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                      <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+                      <Check className="h-4 w-4" strokeWidth={2.5} />
                     </div>
                   ) : isCurrent ? (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                    <div className="relative flex h-7 w-7 items-center justify-center">
+                      <span className="absolute inset-0 rounded-full bg-emerald-500/25 animate-ping" />
+                      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-500/10 ring-2 ring-emerald-500/30">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      </span>
                     </div>
                   ) : isFailed && i === currentIdx ? (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100">
-                      <svg className="h-3.5 w-3.5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/15 text-red-400">
+                      <span className="text-xs font-bold">!</span>
                     </div>
                   ) : (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
-                      <div className="h-2 w-2 rounded-full bg-slate-300" />
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full border border-crmBorder bg-crmSurface2">
+                      <div className="h-2 w-2 rounded-full bg-slate-600" />
                     </div>
                   )}
                 </div>
 
-                {/* Step label */}
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${
-                    isDone ? "text-emerald-700 font-medium" :
-                    isCurrent ? "text-blue-700 font-medium" :
-                    "text-slate-400"
-                  }`}>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      "text-sm",
+                      isDone && "font-medium text-emerald-400",
+                      isCurrent && "font-medium text-emerald-300",
+                      !isDone && !isCurrent && "text-slate-500",
+                    )}
+                  >
                     {step.label}
                   </p>
-                  {isCurrent && (
-                    <p className="text-xs text-blue-500 mt-0.5">{step.description}...</p>
-                  )}
+                  {isCurrent && <p className="mt-0.5 text-xs text-slate-500">{step.description}…</p>}
                 </div>
 
-                {/* Metric for completed steps */}
                 {isDone && (
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="font-mono text-xs text-slate-500">
                     {step.key === "apify_discover" && status.leads_pulled > 0 && `${status.leads_pulled} leads`}
                     {step.key === "zerobounce_verify" && status.leads_verified > 0 && `${status.leads_verified} verified`}
                     {step.key === "hawk_scan" && status.leads_scanned > 0 && `${status.leads_scanned} scanned`}
@@ -201,32 +200,31 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
         </div>
       </div>
 
-      {/* Summary metrics */}
       {(isCompleted || isFailed) && (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
+        <div className="border-t border-crmBorder bg-crmSurface2 px-4 py-3">
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
-              <p className="text-lg font-bold text-slate-800">{status.leads_pulled}</p>
+              <p className="text-lg font-bold text-white">{status.leads_pulled}</p>
               <p className="text-xs text-slate-500">Pulled</p>
             </div>
             <div>
-              <p className="text-lg font-bold text-emerald-600">{status.vulnerabilities_found}</p>
+              <p className="text-lg font-bold text-emerald-400">{status.vulnerabilities_found}</p>
               <p className="text-xs text-slate-500">Vulns Found</p>
             </div>
             <div>
-              <p className="text-lg font-bold text-blue-600">{status.emails_sent}</p>
+              <p className="text-lg font-bold text-blue-400">{status.emails_sent}</p>
               <p className="text-xs text-slate-500">Emails Sent</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Error message */}
       {isFailed && status.error_message && (
-        <div className="border-t border-red-100 bg-red-50 px-4 py-2">
-          <p className="text-xs text-red-600">{status.error_message}</p>
+        <div className="border-t border-red-500/30 bg-red-950/30 px-4 py-2">
+          <p className="text-xs text-red-300">{status.error_message}</p>
         </div>
       )}
     </div>
   );
 }
+

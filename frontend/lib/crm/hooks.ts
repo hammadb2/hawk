@@ -138,13 +138,23 @@ export function revalidateClientsCache() {
   return swrMutate("clients", undefined, { revalidate: true });
 }
 
+/** Revalidates SWR when prospects or clients change (INSERT/UPDATE). */
 export function useProspectsRealtimeSubscription(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const channel = supabase
-      .channel("prospects-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => {
+      .channel("crm-prospects-clients-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "prospects" }, () => {
         void revalidateProspectCaches();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "prospects" }, () => {
+        void revalidateProspectCaches();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "clients" }, () => {
+        void revalidateClientsCache();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "clients" }, () => {
+        void revalidateClientsCache();
       })
       .subscribe();
     return () => {
