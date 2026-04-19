@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CrmSidebar } from "@/components/crm/layout/sidebar";
 import { CrmTopbar } from "@/components/crm/layout/topbar";
@@ -13,6 +14,15 @@ const crmAppShell = "min-h-dvh bg-crmBg text-slate-200";
 
 export function CrmShell({ children }: { children: React.ReactNode }) {
   const { authReady, session } = useCrmAuth();
+
+  useEffect(() => {
+    if (!session) {
+      document.documentElement.classList.remove("crm-route");
+      return;
+    }
+    document.documentElement.classList.add("crm-route");
+    return () => document.documentElement.classList.remove("crm-route");
+  }, [session]);
 
   if (!authReady) {
     return (
@@ -40,14 +50,14 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
       />
       <div className="hidden md:block">
         <CrmSidebar />
-        <div className="md:pl-16 xl:pl-64">
+        <div className="flex min-h-dvh flex-col md:pl-16 xl:pl-64">
           <CrmTopbar />
-          <main className="min-h-[calc(100vh-3.5rem)] p-4 lg:p-6">{children}</main>
+          <main className="flex min-h-0 flex-1 flex-col bg-crmBg p-4 lg:p-6">{children}</main>
         </div>
       </div>
-      <div className="md:hidden">
+      <div className="flex min-h-dvh flex-col md:hidden">
         <CrmTopbar />
-        <main className="min-h-[calc(100vh-7rem)] p-3 pb-24">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col bg-crmBg p-3 pb-24">{children}</main>
         <CrmMobileNav />
       </div>
       <AiBubble />

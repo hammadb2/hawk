@@ -30,6 +30,23 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+/* Applied while authenticated in CRM — prevents light html/body from showing when the page scrolls */
+html.crm-route,
+html.crm-route body {
+  background-color: #0a0a0f;
+  color-scheme: dark;
+}
+
+html.crm-route ::-webkit-scrollbar-track {
+  background: #16161f;
+}
+html.crm-route ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+html.crm-route ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
 /* Sharp, minimal scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
