@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import logging
 import os
 import re
@@ -10,13 +14,14 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, Body, Header, HTTPException, Query
+from fastapi import APIRouter, Body, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_openphone import (
     format_charlotte_reply_ceo_message,
     format_charlotte_reply_rep_message,
+    send_ceo_sms,
     send_sms,
 )
 
@@ -26,6 +31,7 @@ router = APIRouter(prefix="/api/crm/webhooks", tags=["crm-webhooks"])
 
 WEBHOOK_SECRET = os.environ.get("CRM_EMAIL_WEBHOOK_SECRET", "")
 SMARTLEAD_WEBHOOK_SECRET = os.environ.get("CRM_SMARTLEAD_WEBHOOK_SECRET", "")
+CAL_WEBHOOK_SECRET = os.environ.get("CAL_WEBHOOK_SECRET", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
@@ -83,6 +89,10 @@ class EmailEventIn(BaseModel):
     )
     company_name: Optional[str] = None
     industry: Optional[str] = None
+    sentiment: Optional[str] = Field(
+        default=None,
+        description="Optional reply sentiment (e.g. positive) for CRM prospect updates",
+    )
 
     @field_validator("domain", mode="before")
     @classmethod
@@ -332,7 +342,7 @@ def _resolve_prospect_or_create(body: EmailEventIn) -> tuple[str, bool]:
     return str(pr["id"]), True
 
 
-def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn) -> None:
+def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn, sentiment: str | None) -> None:
     """WhatsApp rep + CEO; timeline activity (reply events)."""
     prospect = _get_prospect_row(prospect_id)
     if not prospect:
@@ -389,17 +399,21 @@ def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn) -> None:
                 "New reply — "
                 f"{company} — "
                 f"{first or 'Prospect'} — "
-                f"Login to handle: securedbyhawk.com/crm/charlotte/replies",
+                "Login to handle: securedbyhawk.com/crm/ai/replies",
             )
         except Exception:
             logger.exception("SMS VA alert failed")
 
     try:
+        patch_data: dict[str, Any] = {"reply_received_at": datetime.now(timezone.utc).isoformat()}
+        if sentiment == "positive":
+            patch_data["is_hot"] = True
+            patch_data["stage"] = "replied"
         httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",
             headers=_sb_headers(),
             params={"id": f"eq.{prospect_id}"},
-            json={"reply_received_at": datetime.now(timezone.utc).isoformat()},
+            json=patch_data,
             timeout=15.0,
         ).raise_for_status()
     except Exception:
@@ -491,7 +505,10 @@ def ingest_email_event(
     eid = inserted.get("id") if isinstance(inserted, dict) else None
 
     if body.replied_at is not None:
-        _notify_charlotte_reply(prospect_id=pid, body=body)
+        md_sent = body.metadata or {}
+        raw_sent = (body.sentiment or (md_sent.get("sentiment") if isinstance(md_sent.get("sentiment"), str) else "") or "").strip().lower()
+        reply_sentiment = raw_sent or None
+        _notify_charlotte_reply(prospect_id=pid, body=body, sentiment=reply_sentiment)
 
     return {"ok": True, "id": eid, "prospect_id": pid}
 
@@ -573,3 +590,215 @@ def smartlead_webhook(
     else:
         logger.info("Smartlead webhook: unknown event_type=%r", event_type)
         return {"ok": True, "event": "unknown", "event_type": event_type}
+
+
+# ── Cal.com webhook ─────────────────────────────────────────────────────
+
+
+def _verify_cal_webhook_signature(raw_body: bytes, signature_header: str | None) -> bool:
+    if not CAL_WEBHOOK_SECRET or not signature_header:
+        return False
+    sig = signature_header.strip()
+    if sig.lower().startswith("sha256="):
+        sig = sig.split("=", 1)[-1].strip()
+    mac = hmac.new(CAL_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256).digest()
+    expected_b64 = base64.b64encode(mac).decode("ascii")
+    expected_hex = mac.hex()
+    return secrets.compare_digest(sig, expected_b64) or secrets.compare_digest(sig, expected_hex)
+
+
+def _cal_booking_payload(body: dict[str, Any]) -> dict[str, Any]:
+    p = body.get("payload")
+    if isinstance(p, dict):
+        return p
+    return body
+
+
+def _cal_primary_attendee(payload: dict[str, Any]) -> tuple[str | None, str | None]:
+    attendees = payload.get("attendees") or []
+    if not attendees or not isinstance(attendees[0], dict):
+        return None, None
+    a0 = attendees[0]
+    email = (a0.get("email") or "").strip().lower() or None
+    name = (a0.get("name") or "").strip() or None
+    return email, name
+
+
+def _cal_start_time_iso(payload: dict[str, Any]) -> str | None:
+    for key in ("startTime", "start", "start_time"):
+        v = payload.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def _log_prospect_activity(*, prospect_id: str, type_: str, notes: str, metadata: dict[str, Any] | None = None) -> None:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return
+    try:
+        httpx.post(
+            f"{SUPABASE_URL}/rest/v1/activities",
+            headers=_sb_headers(),
+            json={
+                "prospect_id": prospect_id,
+                "type": type_,
+                "notes": notes[:2000],
+                "metadata": metadata or {},
+            },
+            timeout=15.0,
+        ).raise_for_status()
+    except Exception:
+        logger.exception("Cal webhook: activity log failed prospect=%s", prospect_id)
+
+
+def _send_rep_sms_if_configured(*, rep_id: str | None, message: str) -> None:
+    if not rep_id or not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return
+    try:
+        pr = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            headers=_sb_headers(),
+            params={"id": f"eq.{rep_id}", "select": "whatsapp_number", "limit": "1"},
+            timeout=15.0,
+        )
+        pr.raise_for_status()
+        rows = pr.json()
+        if not rows:
+            return
+        wa = rows[0].get("whatsapp_number")
+        if wa:
+            send_sms(str(wa).strip(), message[:1600])
+    except Exception:
+        logger.exception("Cal webhook: rep SMS failed rep_id=%s", rep_id)
+
+
+@router.post("/cal")
+async def cal_com_webhook(
+    request: Request,
+    x_cal_signature_256: str | None = Header(default=None, alias="X-Cal-Signature-256"),
+):
+    """
+    Cal.com → CRM: booking created / cancelled / rescheduled.
+    Verifies HMAC-SHA256 (header `X-Cal-Signature-256`) with `CAL_WEBHOOK_SECRET`.
+    """
+    if not CAL_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Cal webhook not configured (CAL_WEBHOOK_SECRET)")
+    raw = await request.body()
+    if not _verify_cal_webhook_signature(raw, x_cal_signature_256):
+        raise HTTPException(status_code=401, detail="Invalid Cal.com signature")
+    try:
+        body: dict[str, Any] = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
+
+    trigger = str(
+        body.get("triggerEvent") or body.get("type") or body.get("event") or ""
+    ).upper()
+    payload = _cal_booking_payload(body)
+    attendee_email, attendee_name = _cal_primary_attendee(payload)
+    start_iso = _cal_start_time_iso(payload)
+    base = (CRM_PUBLIC_BASE_URL or "https://securedbyhawk.com").rstrip("/")
+
+    if not attendee_email:
+        return {"ok": True, "ignored": True, "reason": "no_attendee_email", "trigger": trigger}
+
+    prospect = _fetch_prospect_by_contact_email(attendee_email)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if trigger == "BOOKING_CREATED":
+        if not prospect:
+            return {"ok": True, "matched": False, "trigger": trigger}
+        pid = str(prospect["id"])
+        company = prospect.get("company_name") or prospect.get("domain") or "Prospect"
+        try:
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers=_sb_headers(),
+                params={"id": f"eq.{pid}"},
+                json={
+                    "stage": "call_booked",
+                    "is_hot": True,
+                    "call_booked_at": now_iso,
+                    "last_activity_at": now_iso,
+                },
+                timeout=20.0,
+            ).raise_for_status()
+        except Exception:
+            logger.exception("Cal BOOKING_CREATED prospect patch failed prospect=%s", pid)
+            raise HTTPException(status_code=502, detail="Prospect update failed") from None
+
+        time_note = start_iso or "time TBD"
+        _log_prospect_activity(
+            prospect_id=pid,
+            type_="call_booked",
+            notes=f"Cal.com booking — {time_note} — {attendee_name or attendee_email}",
+            metadata={"startTime": start_iso, "attendee_name": attendee_name, "attendee_email": attendee_email},
+        )
+        ceo_msg = (
+            f"HAWK — Call booked: {company}\n"
+            f"Contact: {attendee_name or '—'} ({attendee_email})\n"
+            f"Time: {time_note}\n"
+            f"CRM: {base}/crm/prospects/{pid}"
+        )
+        try:
+            send_ceo_sms(ceo_msg[:1600])
+        except Exception:
+            logger.exception("Cal BOOKING_CREATED CEO SMS failed")
+        rep_msg = (
+            f"Call booked: {company} — {attendee_name or attendee_email} @ {time_note}. "
+            f"CRM: {base}/crm/prospects/{pid}"
+        )
+        _send_rep_sms_if_configured(rep_id=prospect.get("assigned_rep_id"), message=rep_msg)
+        return {"ok": True, "matched": True, "prospect_id": pid, "trigger": trigger}
+
+    if trigger == "BOOKING_CANCELLED":
+        if not prospect:
+            return {"ok": True, "matched": False, "trigger": trigger}
+        pid = str(prospect["id"])
+        company = prospect.get("company_name") or prospect.get("domain") or "Prospect"
+        try:
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers=_sb_headers(),
+                params={"id": f"eq.{pid}"},
+                json={"stage": "replied", "last_activity_at": now_iso},
+                timeout=20.0,
+            ).raise_for_status()
+        except Exception:
+            logger.exception("Cal BOOKING_CANCELLED prospect patch failed prospect=%s", pid)
+            raise HTTPException(status_code=502, detail="Prospect update failed") from None
+        _log_prospect_activity(
+            prospect_id=pid,
+            type_="call_cancelled",
+            notes=f"Cal.com cancellation — was {start_iso or 'unknown time'}",
+            metadata={"attendee_email": attendee_email},
+        )
+        try:
+            send_ceo_sms(
+                f"HAWK — Call cancelled: {company} ({attendee_email}). CRM: {base}/crm/prospects/{pid}"[:1600]
+            )
+        except Exception:
+            logger.exception("Cal BOOKING_CANCELLED CEO SMS failed")
+        return {"ok": True, "matched": True, "prospect_id": pid, "trigger": trigger}
+
+    if trigger == "BOOKING_RESCHEDULED":
+        if not prospect:
+            return {"ok": True, "matched": False, "trigger": trigger}
+        pid = str(prospect["id"])
+        company = prospect.get("company_name") or prospect.get("domain") or "Prospect"
+        time_note = start_iso or "new time TBD"
+        _log_prospect_activity(
+            prospect_id=pid,
+            type_="call_rescheduled",
+            notes=f"Cal.com rescheduled — {time_note}",
+            metadata={"startTime": start_iso, "attendee_email": attendee_email},
+        )
+        try:
+            send_ceo_sms(
+                f"HAWK — Call rescheduled: {company} — new time: {time_note}. CRM: {base}/crm/prospects/{pid}"[:1600]
+            )
+        except Exception:
+            logger.exception("Cal BOOKING_RESCHEDULED CEO SMS failed")
+        return {"ok": True, "matched": True, "prospect_id": pid, "trigger": trigger}
+
+    return {"ok": True, "trigger": trigger, "note": "no_handler"}

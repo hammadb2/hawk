@@ -238,6 +238,7 @@ def process_reply_event(event: dict[str, Any]) -> dict[str, Any]:
     }
 
     reply_id = _store_reply(row)
+    _patch_prospect_on_smartlead_reply(prospect_email, sentiment)
 
     return {
         "ok": True,
@@ -340,6 +341,37 @@ def _find_inventory_lead(email: str, domain: str) -> dict[str, Any] | None:
             pass
 
     return None
+
+
+def _patch_prospect_on_smartlead_reply(prospect_email: str, sentiment: str) -> None:
+    """Set reply_received_at; positive replies → is_hot + stage=replied."""
+    if not SUPABASE_URL or not SERVICE_KEY or not prospect_email:
+        return
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={"contact_email": f"eq.{prospect_email.strip().lower()}", "select": "id", "limit": "1"},
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        rows = r.json()
+        if not rows:
+            return
+        pid = str(rows[0]["id"])
+        patch: dict[str, Any] = {"reply_received_at": datetime.now(timezone.utc).isoformat()}
+        if sentiment == "positive":
+            patch["is_hot"] = True
+            patch["stage"] = "replied"
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={"id": f"eq.{pid}"},
+            json=patch,
+            timeout=15.0,
+        ).raise_for_status()
+    except Exception as exc:
+        logger.warning("Prospect patch on Smartlead reply failed for %s: %s", prospect_email, exc)
 
 
 def _store_reply(row: dict[str, Any]) -> str | None:

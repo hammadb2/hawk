@@ -33,9 +33,9 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 # Actor IDs
 ACTOR_GOOGLE_MAPS = "compass/crawler-google-places"
-ACTOR_LINKEDIN = "dev_fusion/mass-linkedin-profile-scraper-with-email"
+ACTOR_LINKEDIN = "dev_fusion/linkedin-profile-scraper"
 ACTOR_LEADS_FINDER = "code_crafter/leads-finder"
-ACTOR_WEBSITE_CRAWLER = "apify/website-email-crawler"
+ACTOR_WEBSITE_CRAWLER = "vdrmota/contact-info-scraper"
 
 # 18 Canadian cities
 CITIES: list[str] = [
@@ -738,8 +738,8 @@ async def _run_website_crawl_batch(
         for item in items:
             emails_found: list[str] = []
 
-            # Website email crawler returns emails in various formats
-            for field in ("emails", "emailAddresses", "email"):
+            # Website / contact scrapers return emails in various formats
+            for field in ("emails", "emailAddresses", "email", "contactEmails", "foundEmails"):
                 val = item.get(field)
                 if isinstance(val, str) and "@" in val:
                     emails_found.append(val.lower().strip())
