@@ -543,7 +543,7 @@ def smartlead_webhook(
     Smartlead inbound webhook — handles reply, bounce, and spam complaint events.
 
     Configure in Smartlead dashboard (Settings > Webhooks):
-    URL: POST https://intelligent-rejoicing-production.up.railway.app/api/crm/webhooks/smartlead?secret=<CRM_SMARTLEAD_WEBHOOK_SECRET>
+    URL: POST https://hawk-production.up.railway.app/api/crm/webhooks/smartlead?secret=<CRM_SMARTLEAD_WEBHOOK_SECRET>
     Events: reply received, email bounced, spam complaint.
 
     Auth via query parameter because Smartlead webhooks do not support custom headers.

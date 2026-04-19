@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Misconfigured API base: set Vercel env CRM_API_BASE_URL to your Railway FastAPI origin (no trailing slash), e.g. https://intelligent-rejoicing-production.up.railway.app. Do not point it at securedbyhawk.com.",
+          "Misconfigured API base: set Vercel env CRM_API_BASE_URL to your Railway FastAPI origin (no trailing slash), e.g. https://hawk-production.up.railway.app. Do not point it at securedbyhawk.com.",
       },
       { status: 503 },
     );
