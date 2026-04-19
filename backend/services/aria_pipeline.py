@@ -1044,33 +1044,49 @@ def step_apify_discover(
     vertical: str,
     location: str,
     batch_size: int,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], str | None]:
     """Discover leads and find emails via Apify 4-actor pipeline (on-demand).
 
     Runs Google Maps scraper → LinkedIn → Leads Finder → Website Crawler
     for a single city + vertical.  Falls back to Apollo as absolute last resort.
+
+    Returns ``(inserted_leads, error_message)``. On success ``error_message`` is None.
+    On failure the list is empty and ``error_message`` is a user-facing explanation.
     """
     _update_run(run_id, {"current_step": "apify_discover"})
 
     try:
-        from services.aria_apify_scraper import run_ondemand_discovery
+        from services.aria_apify_scraper import (
+            format_discovery_empty_message,
+            run_ondemand_discovery,
+        )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(
                 asyncio.run,
                 run_ondemand_discovery(vertical, location, batch_size, pipeline_run_id=run_id),
             )
-            raw_leads = future.result(timeout=900)
+            raw_leads, discover_meta = future.result(timeout=900)
 
         if not raw_leads:
-            logger.info("Apify returned 0 leads for %s in %s", vertical, location)
-            return []
+            logger.info(
+                "On-demand discovery returned 0 leads for %s in %s meta=%s",
+                vertical,
+                location,
+                discover_meta,
+            )
+            return [], format_discovery_empty_message(discover_meta)
 
         # Filter: only leads with emails
         leads_with_email = [ld for ld in raw_leads if ld.get("contact_email")]
         if not leads_with_email:
-            logger.info("Apify found leads but none had emails for %s in %s", vertical, location)
-            return []
+            logger.info(
+                "Discovery found businesses but none with email for %s in %s meta=%s",
+                vertical,
+                location,
+                discover_meta,
+            )
+            return [], format_discovery_empty_message(discover_meta)
 
         # Map to pipeline_leads format
         pipeline_leads: list[dict[str, Any]] = []
@@ -1100,13 +1116,18 @@ def step_apify_discover(
             "leads_pulled": len(inserted),
             "leads_enriched": len(inserted),
         })
-        return inserted
+        return inserted, None
 
     except Exception as exc:
         logger.exception("Apify discovery failed: %s", exc)
         # Fall back to Apollo as absolute last resort
         logger.info("Falling back to Apollo after Apify error")
-        return step_apollo_pull(run_id, vertical, location, batch_size)
+        apollo_leads = step_apollo_pull(run_id, vertical, location, batch_size)
+        if apollo_leads:
+            return apollo_leads, None
+        return [], (
+            f"Discovery failed: {str(exc)[:500]}. Apollo fallback also returned no leads."
+        )
 
 
 def run_outbound_pipeline(
@@ -1135,12 +1156,12 @@ def run_outbound_pipeline(
         # Fallback: on-demand discovery via Apify 4-actor pipeline
         # Step 1: Apify Discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
         # Leads come back with emails already found by actors 2-4
-        leads = step_apify_discover(run_id, vertical, location, batch_size)
+        leads, discover_err = step_apify_discover(run_id, vertical, location, batch_size)
         if not leads:
             _update_run(run_id, {
                 "status": "completed",
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-                "error_message": "No leads found for this vertical and location.",
+                "error_message": discover_err or "No leads found for this vertical and location.",
             })
             return _build_summary(run_id)
 
@@ -1253,7 +1274,9 @@ def resume_pipeline(run_id: str, uid: str) -> dict[str, Any]:
         if current_step in ("apify_discover", "apollo_pull", "email_finding"):
             leads = _get_run_leads(run_id, "pulled") or _get_run_leads(run_id, "enriched")
             if not leads:
-                leads = step_apify_discover(run_id, vertical, location, run.get("batch_size", 50))
+                leads, _disc_err = step_apify_discover(
+                    run_id, vertical, location, run.get("batch_size", 50)
+                )
             if _is_run_paused(run_id):
                 return _build_summary(run_id)
             leads = step_zerobounce_verify(run_id, leads)

@@ -53,6 +53,55 @@ VERTICAL_QUERIES: dict[str, str] = {
 
 VERTICALS = list(VERTICAL_QUERIES.keys())
 
+
+def canonical_vertical(vertical: str) -> str:
+    """Map free-text / LLM vertical labels to a supported pipeline vertical."""
+    v = (vertical or "dental").strip().lower()
+    if v in VERTICAL_QUERIES:
+        return v
+    aliases: dict[str, str] = {
+        "dentist": "dental",
+        "dentists": "dental",
+        "dentistry": "dental",
+        "dental clinic": "dental",
+        "dental_clinic": "dental",
+        "law": "legal",
+        "lawyer": "legal",
+        "lawyers": "legal",
+        "attorney": "legal",
+        "law firm": "legal",
+        "law_firm": "legal",
+        "cpa": "accounting",
+        "bookkeeping": "accounting",
+        "accountant": "accounting",
+        "accountants": "accounting",
+    }
+    if v in aliases:
+        return aliases[v]
+    for canon in VERTICAL_QUERIES:
+        if canon in v or v in canon:
+            return canon
+    logger.warning("Unknown vertical %r — defaulting to dental", vertical)
+    return "dental"
+
+
+def normalize_city_for_discovery(location: str) -> str:
+    """Pick a display city string for Google Maps + dedup, from user/LLM location text."""
+    raw = (location or "").strip()
+    if not raw:
+        return "Toronto"
+    lower = raw.lower()
+    for c in CITIES:
+        cl = c.lower()
+        if cl in lower:
+            return c
+    first = raw.split(",")[0].strip()
+    for c in CITIES:
+        if c.lower() == first.lower():
+            return c
+    return first.title() if first else "Toronto"
+
+
 # Major cities for scoring bonus
 MAJOR_CITIES = {"toronto", "vancouver", "calgary", "edmonton", "ottawa"}
 
@@ -949,12 +998,30 @@ async def run_ondemand_discovery(
     *,
     pipeline_run_id: str | None = None,
     prospect_source: str = "aria_chat",
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Run discovery for a single vertical + city (on-demand pipeline).
 
     Same 4-actor flow but scoped to one combination.
+
+    Returns ``(leads, meta)`` where ``meta`` helps explain empty results (missing keys,
+    zero Google Maps rows, dedupe-only loss, or enrichment produced no emails).
     """
-    if not os.environ.get("APIFY_API_KEY", "").strip():
+    vertical = canonical_vertical(vertical)
+    city = normalize_city_for_discovery(city)
+    apify_on = bool(os.environ.get("APIFY_API_KEY", "").strip())
+    meta: dict[str, Any] = {
+        "vertical": vertical,
+        "city": city,
+        "apify_configured": apify_on,
+        "apollo_configured": bool(APOLLO_API_KEY),
+        "gmaps_raw_count": 0,
+        "after_batch_trim": 0,
+        "after_dedup": 0,
+        "with_email": 0,
+        "without_email": 0,
+    }
+
+    if not apify_on:
         logger.warning("APIFY_API_KEY not configured for on-demand discovery")
         # Try Apollo as absolute last resort
         fallback = await _apollo_last_resort([], vertical, city)
@@ -967,12 +1034,15 @@ async def run_ondemand_discovery(
                 pipeline_run_id=pipeline_run_id,
                 source=prospect_source,
             )
-        return out
+        meta["path"] = "apollo_only_no_apify"
+        return out, meta
 
     # Actor 1: single city + vertical
     sem = asyncio.Semaphore(10)
     async with httpx.AsyncClient(timeout=120.0) as client:
         leads = await _run_google_maps_single(client, sem, vertical, city)
+
+    meta["gmaps_raw_count"] = len(leads)
 
     if not leads:
         # Apollo last resort
@@ -986,18 +1056,22 @@ async def run_ondemand_discovery(
                 pipeline_run_id=pipeline_run_id,
                 source=prospect_source,
             )
-        return out
+        meta["path"] = "apollo_after_empty_gmaps"
+        return out, meta
 
     # Score and sort, take top batch_size
     for lead in leads:
         lead["lead_score"] = score_lead(lead)
     leads.sort(key=lambda x: x.get("lead_score", 0), reverse=True)
     leads = leads[:batch_size]
+    meta["after_batch_trim"] = len(leads)
 
     # Deduplicate
     leads = await deduplicate_leads(leads)
+    meta["after_dedup"] = len(leads)
     if not leads:
-        return []
+        meta["path"] = "dedup_removed_all"
+        return [], meta
 
     from services.aria_prospect_pipeline import bulk_upsert_discovered_prospects, sync_prospects_after_email_merge
 
@@ -1042,4 +1116,60 @@ async def run_ondemand_discovery(
 
     sync_prospects_after_email_merge(with_email, without_email)
 
-    return with_email + without_email
+    meta["with_email"] = len(with_email)
+    meta["without_email"] = len(without_email)
+    meta["path"] = "apify_full"
+    return with_email + without_email, meta
+
+
+def format_discovery_empty_message(meta: dict[str, Any]) -> str:
+    """Explain zero emailable leads from on-demand discovery (for CRM / ARIA chat)."""
+    v = str(meta.get("vertical") or "dental")
+    c = str(meta.get("city") or "that location")
+    apify = bool(meta.get("apify_configured"))
+    apollo = bool(meta.get("apollo_configured"))
+    path = str(meta.get("path") or "")
+
+    if not apify and not apollo:
+        return (
+            "Outbound discovery cannot run: neither APIFY_API_KEY nor APOLLO_API_KEY is set on the server. "
+            "Add APIFY_API_KEY for Google Maps scraping (recommended), or APOLLO_API_KEY as a fallback."
+        )
+
+    if path == "apollo_only_no_apify":
+        if not apollo:
+            return (
+                "APIFY_API_KEY is not set and APOLLO_API_KEY is missing, so no data source could run. "
+                "Configure at least one key in your deployment environment."
+            )
+        return (
+            f"Google Maps discovery was skipped (no APIFY_API_KEY). Apollo fallback returned no people with "
+            f"verified emails for {v} in {c}. Add APIFY_API_KEY for primary discovery, or try a broader location."
+        )
+
+    if path == "apollo_after_empty_gmaps":
+        return (
+            f"Google Maps returned no businesses with usable websites for {v} in {c}, and Apollo fallback "
+            f"found no matching contacts with email. Check Apify actor runs (compass/crawler-google-places) "
+            f"in the Apify console, or try another city."
+        )
+
+    if path == "dedup_removed_all":
+        n = int(meta.get("after_batch_trim") or 0)
+        return (
+            f"Maps returned {n} candidate businesses for {v} in {c}, but all were filtered as duplicates or "
+            f"already present in CRM/inventory. Increase batch size or pick a different area."
+        )
+
+    if path == "apify_full" and int(meta.get("with_email") or 0) == 0:
+        n = int(meta.get("without_email") or meta.get("after_dedup") or 0)
+        return (
+            f"Found {n} businesses for {v} in {c} but could not resolve a contact email after LinkedIn, "
+            f"Leads Finder, and website crawl. The pipeline only continues with an email; consider manual "
+            f"outreach for saved prospects or raising batch size."
+        )
+
+    return (
+        f"No emailable leads for {v} in {c}. "
+        f"(google_maps_rows={meta.get('gmaps_raw_count', 0)}, after_dedupe={meta.get('after_dedup', 0)}.)"
+    )
