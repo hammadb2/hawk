@@ -102,6 +102,110 @@ def normalize_city_for_discovery(location: str) -> str:
     return first.title() if first else "Toronto"
 
 
+def search_strings_for_maps(vertical: str, city: str) -> list[str]:
+    """Several Google Maps query variants for better recall (one Apify run, deduped strings)."""
+    city = (city or "").strip()
+    primary = VERTICAL_QUERIES[vertical].format(city=city)
+    extras: dict[str, list[str]] = {
+        "dental": [
+            f"dentist {city}",
+            f"dental office {city}",
+            f"dental clinic {city} Ontario",
+            f"family dentist {city}",
+            f"dentistry {city}",
+        ],
+        "legal": [
+            f"law firm {city}",
+            f"lawyers {city}",
+            f"law office {city}",
+            f"solicitor {city} Ontario",
+        ],
+        "accounting": [
+            f"CPA {city}",
+            f"accounting firm {city}",
+            f"chartered accountant {city}",
+            f"bookkeeping {city}",
+        ],
+    }
+    out: list[str] = []
+    seen: set[str] = set()
+    for s in [primary] + extras.get(vertical, []):
+        key = " ".join(s.split()).lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(" ".join(s.split()))
+    return out[:12]
+
+
+def _apollo_location_strings(city: str) -> list[str]:
+    """Apollo person_locations — include province for Canadian metros (trial order)."""
+    city = (city or "").strip()
+    lc = city.lower()
+    locs: list[str] = []
+    if "toronto" in lc or lc == "gta":
+        locs.extend(
+            [
+                "Toronto, Ontario, Canada",
+                "Toronto, ON, Canada",
+                "Greater Toronto Area, Ontario, Canada",
+            ]
+        )
+    elif "vancouver" in lc:
+        locs.extend(["Vancouver, British Columbia, Canada", "Vancouver, BC, Canada"])
+    elif "calgary" in lc:
+        locs.extend(["Calgary, Alberta, Canada", "Calgary, AB, Canada"])
+    elif "montreal" in lc or "montréal" in lc:
+        locs.extend(["Montreal, Quebec, Canada", "Montreal, QC, Canada"])
+    elif "ottawa" in lc:
+        locs.extend(["Ottawa, Ontario, Canada", "Ottawa, ON, Canada"])
+    tail = f"{city}, Canada"
+    if tail not in locs:
+        locs.append(tail)
+    deduped: list[str] = []
+    seen = set()
+    for x in locs:
+        k = x.lower()
+        if k not in seen:
+            seen.add(k)
+            deduped.append(x)
+    return deduped
+
+
+def _apollo_organization_keyword_tags(vertical: str) -> list[str]:
+    """Align with aria_pipeline VERTICAL_CONFIG keyword-style tags for mixed_people/search."""
+    tags = {
+        "dental": ["dental", "dentistry", "dentist", "dental clinic"],
+        "legal": ["law firm", "legal services", "lawyer"],
+        "accounting": ["accounting", "CPA", "bookkeeping"],
+    }
+    return tags.get(vertical, tags["dental"])[:5]
+
+
+def _extract_place_website(item: dict[str, Any]) -> str:
+    """Best-effort website URL from Apify compass/crawler-google-places row."""
+    for key in ("website", "websiteUrl", "website_url", "url"):
+        v = item.get(key)
+        if isinstance(v, str) and v.strip() and not v.startswith("tel:"):
+            return v.strip()
+    nested = item.get("websiteUrls") or item.get("websites") or item.get("links")
+    if isinstance(nested, list):
+        for entry in nested:
+            if isinstance(entry, str) and entry.strip():
+                return entry.strip()
+            if isinstance(entry, dict):
+                for k in ("url", "website", "href", "link"):
+                    u = entry.get(k)
+                    if isinstance(u, str) and u.strip():
+                        return u.strip()
+    ws = item.get("scrapeWebsiteData") or item.get("scrapedWebsite")
+    if isinstance(ws, dict):
+        for k in ("url", "website", "websiteUrl"):
+            u = ws.get(k)
+            if isinstance(u, str) and u.strip():
+                return u.strip()
+    return ""
+
+
 # Major cities for scoring bonus
 MAJOR_CITIES = {"toronto", "vancouver", "calgary", "edmonton", "ottawa"}
 
@@ -296,7 +400,7 @@ def _map_gmaps_result(item: dict[str, Any], vertical: str, city: str) -> dict[st
     if not name:
         return None
 
-    website = item.get("website") or item.get("url") or ""
+    website = _extract_place_website(item)
     domain = _normalize_domain(website)
     if not domain:
         return None
@@ -359,15 +463,15 @@ async def _run_google_maps_single(
 ) -> list[dict[str, Any]]:
     """Run Actor 1 for a single city+vertical combination."""
     async with sem:
-        query = VERTICAL_QUERIES[vertical].format(city=city)
+        queries = search_strings_for_maps(vertical, city)
         run_input = {
-            "searchStringsArray": [query],
-            "maxCrawledPlacesPerSearch": 100,
+            "searchStringsArray": queries,
+            "maxCrawledPlacesPerSearch": 80,
             "language": "en",
             "scrapeWebsiteData": True,
         }
 
-        logger.info("Starting Google Maps scrape: %s", query)
+        logger.info("Starting Google Maps scrape (%d queries): %s", len(queries), queries[:3])
         items = await _run_actor_and_get_results(client, ACTOR_GOOGLE_MAPS, run_input, max_wait=APIFY_MAX_WAIT)
 
         leads: list[dict[str, Any]] = []
@@ -376,8 +480,31 @@ async def _run_google_maps_single(
             if lead:
                 leads.append(lead)
 
-        logger.info("Google Maps scrape complete: %s → %d leads", query, len(leads))
-        return leads
+        # Dedupe by domain across multiple search strings (keep richer review stats when tied)
+        by_domain: dict[str, dict[str, Any]] = {}
+        for lead in leads:
+            d = lead.get("domain") or ""
+            if not d:
+                continue
+            prev = by_domain.get(d)
+            if prev is None:
+                by_domain[d] = lead
+                continue
+            pr = int(prev.get("review_count") or 0)
+            nr = int(lead.get("review_count") or 0)
+            gr_prev = prev.get("google_rating")
+            gr_new = lead.get("google_rating")
+            if nr > pr or (nr == pr and (gr_new or 0) > (gr_prev or 0)):
+                by_domain[d] = lead
+
+        merged = list(by_domain.values())
+        logger.info(
+            "Google Maps scrape complete: %d raw rows → %d with domain → %d deduped",
+            len(items),
+            len(leads),
+            len(merged),
+        )
+        return merged
 
 
 async def run_actor1_google_maps(
@@ -834,54 +961,87 @@ async def _apollo_last_resort(
 
     try:
         titles = {
-            "dental": ["dentist", "owner", "clinic owner", "principal"],
-            "legal": ["lawyer", "managing partner", "owner", "principal"],
-            "accounting": ["CPA", "accountant", "owner", "principal"],
+            "dental": [
+                "dentist", "owner", "clinic owner", "principal", "dental director",
+                "practice manager", "managing dentist",
+            ],
+            "legal": ["lawyer", "managing partner", "owner", "principal", "partner"],
+            "accounting": ["CPA", "accountant", "owner", "principal", "partner"],
         }
+        loc_strings = _apollo_location_strings(location)
         async with httpx.AsyncClient(timeout=60.0) as client:
-            body = {
-                "page": 1,
-                "per_page": 50,
-                "person_titles": titles.get(vertical, titles["dental"]),
-                "person_locations": [f"{location}, Canada"],
-                "has_email": True,
-            }
-            r = await client.post(
-                "https://api.apollo.io/api/v1/mixed_people/search",
-                headers={
-                    "Content-Type": "application/json",
-                    "Cache-Control": "no-cache",
-                    "X-Api-Key": APOLLO_API_KEY,
-                },
-                json=body,
-                timeout=30.0,
-            )
-            if r.status_code >= 400:
-                return []
-
-            data = r.json()
-            people = data.get("people") or data.get("contacts") or []
             results: list[dict[str, Any]] = []
-            for p in people:
-                if not isinstance(p, dict):
-                    continue
-                email = (p.get("email") or p.get("primary_email") or "").strip()
-                if not email or "@" not in email:
-                    continue
-                domain = _normalize_domain(p.get("organization", {}).get("website_url") or email.split("@")[-1])
-                results.append({
-                    "business_name": (p.get("organization", {}).get("name") or "").strip(),
-                    "domain": domain,
-                    "contact_email": email.lower(),
-                    "contact_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-                    "contact_title": (p.get("title") or "").strip(),
-                    "email_finder": "apollo_fallback",
-                    "vertical": vertical,
-                    "city": location,
-                    "province": "",
-                    "lead_score": 1,
-                    "status": "pending",
-                })
+            seen_email: set[str] = set()
+
+            for page in (1, 2):
+                body: dict[str, Any] = {
+                    "page": page,
+                    "per_page": 50,
+                    "person_titles": titles.get(vertical, titles["dental"]),
+                    "person_locations": loc_strings,
+                    "organization_num_employees_ranges": ["1,50"],
+                    "contact_email_status": ["verified", "unverified"],
+                    "has_email": True,
+                    "q_organization_keyword_tags": _apollo_organization_keyword_tags(vertical),
+                }
+                r = await client.post(
+                    "https://api.apollo.io/api/v1/mixed_people/search",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Cache-Control": "no-cache",
+                        "X-Api-Key": APOLLO_API_KEY,
+                    },
+                    json=body,
+                    timeout=45.0,
+                )
+                if r.status_code >= 400:
+                    logger.warning("Apollo last resort HTTP %s: %s", r.status_code, r.text[:400])
+                    break
+
+                data = r.json()
+                people = data.get("people") or data.get("contacts") or []
+                for p in people:
+                    if not isinstance(p, dict):
+                        continue
+                    email = (p.get("email") or p.get("primary_email") or "").strip()
+                    if not email or "@" not in email:
+                        continue
+                    el = email.lower()
+                    if el in seen_email:
+                        continue
+                    org = p.get("organization") or {}
+                    if isinstance(org, str):
+                        org = {}
+                    website = (
+                        org.get("website_url")
+                        or org.get("primary_domain")
+                        or p.get("organization_website_url")
+                        or ""
+                    )
+                    domain = _normalize_domain(str(website)) if website else ""
+                    if not domain:
+                        domain = _normalize_domain(email.split("@")[-1])
+                    if not domain:
+                        continue
+                    seen_email.add(el)
+                    results.append({
+                        "business_name": (org.get("name") or "").strip(),
+                        "domain": domain,
+                        "contact_email": el,
+                        "contact_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                        "contact_title": (p.get("title") or "").strip(),
+                        "email_finder": "apollo_fallback",
+                        "vertical": vertical,
+                        "city": location,
+                        "province": "",
+                        "lead_score": 1,
+                        "status": "pending",
+                    })
+
+                pagination = data.get("pagination") or {}
+                total_pages = int(pagination.get("total_pages") or 1)
+                if page >= total_pages or not people:
+                    break
 
             logger.info("Apollo last resort: found %d leads for %s/%s", len(results), vertical, location)
             return results
