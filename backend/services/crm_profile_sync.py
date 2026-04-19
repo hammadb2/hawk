@@ -39,7 +39,69 @@ def profile_role(uid: str) -> str | None:
 
 
 def staff_roles() -> frozenset[str]:
-    return frozenset({"ceo", "hos", "team_lead", "sales_rep", "closer"})
+    """CRM seats that are not client portal users (includes VA seats when stored as sales_rep/closer)."""
+    return frozenset({"ceo", "hos", "team_lead", "sales_rep", "closer", "va", "va_manager"})
+
+
+PORTAL_TEAM_EMAIL_MESSAGE = (
+    "This email is already a team member account and cannot be used for a client portal."
+)
+
+
+def portal_uid_blocks_client_portal(uid: str) -> bool:
+    """
+    True if this auth user already has a non-client profiles row (CRM team / invited rep / VA, any status).
+    Used to block client portal provisioning for team accounts.
+    """
+    if not SUPABASE_URL or not SERVICE_KEY or not uid:
+        return False
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/profiles",
+        headers=_headers(),
+        params={"id": f"eq.{uid}", "select": "role,role_type", "limit": "1"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    if not rows:
+        return False
+    row = rows[0]
+    role = (row.get("role") or "").lower()
+    if role == "client":
+        return False
+    rt = (row.get("role_type") or "").lower()
+    if rt in ("va_outreach", "va_manager"):
+        return True
+    return bool(role and role != "client")
+
+
+def portal_email_blocks_client_portal(email: str) -> bool:
+    """
+    True if any profiles row uses this email with a non-client CRM seat.
+    Same email cannot be both team and client portal per product rules.
+    """
+    if not SUPABASE_URL or not SERVICE_KEY:
+        return False
+    em = email.strip().lower()
+    if "@" not in em:
+        return False
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/profiles",
+        headers=_headers(),
+        params={"email": f"eq.{em}", "select": "id,role,role_type"},
+        timeout=20.0,
+    )
+    r.raise_for_status()
+    for row in r.json() or []:
+        role = (row.get("role") or "").lower()
+        if role == "client":
+            continue
+        rt = (row.get("role_type") or "").lower()
+        if rt in ("va_outreach", "va_manager"):
+            return True
+        if role and role != "client":
+            return True
+    return False
 
 
 def ensure_client_profile(uid: str, email: str, company: str) -> None:

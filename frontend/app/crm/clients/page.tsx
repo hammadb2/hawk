@@ -1,94 +1,120 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
-import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { formatUsd } from "@/lib/crm/format";
 import type { CrmClientRow } from "@/lib/crm/types";
+import { useClients, useProfiles, useProspectsRealtimeSubscription } from "@/lib/crm/hooks";
 import { cn } from "@/lib/utils";
+import {
+  crmEmptyState,
+  crmPageSubtitle,
+  crmPageTitle,
+  crmTableRow,
+  crmTableThead,
+  crmTableWrap,
+} from "@/lib/crm/crm-surface";
 
 function statusClass(s: string): string {
-  if (s === "active") return "text-emerald-600";
+  if (s === "active") return "text-emerald-400";
   if (s === "past_due") return "text-amber-400";
   if (s === "churned") return "text-rose-400";
-  return "text-slate-600";
+  return "text-slate-400";
+}
+
+function ClientsTableSkeleton() {
+  return (
+    <div className={crmTableWrap}>
+      <table className="w-full min-w-[800px] text-left text-sm">
+        <thead className="border-b border-crmBorder bg-crmSurface2">
+          <tr>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <th key={i} className="px-3 py-2">
+                <div className="h-3 w-16 animate-pulse rounded bg-crmSurface" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }).map((_, r) => (
+            <tr key={r} className="border-b border-crmBorder">
+              {Array.from({ length: 8 }).map((__, c) => (
+                <td key={c} className="px-3 py-2">
+                  <div className="h-4 w-full max-w-[120px] animate-pulse rounded bg-crmSurface2" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AuthShellSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="h-8 w-40 animate-pulse rounded-lg bg-crmSurface" />
+      <ClientsTableSkeleton />
+    </div>
+  );
 }
 
 export default function ClientsPage() {
-  const supabase = useMemo(() => createClient(), []);
   const { authReady, session, profile } = useCrmAuth();
-  const [rows, setRows] = useState<CrmClientRow[]>([]);
-  const [repNames, setRepNames] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const { data: rows = [], isLoading, error, mutate } = useClients();
+  const { data: profiles = [] } = useProfiles();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("clients")
-      .select("id, prospect_id, company_name, domain, plan, mrr_cents, stripe_customer_id, closing_rep_id, status, close_date, created_at, monitored_domains")
-      .order("close_date", { ascending: false });
-    if (error) {
-      toast.error(error.message);
-      setRows([]);
-      setLoading(false);
-      return;
+  useProspectsRealtimeSubscription(!!session);
+
+  const repNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of profiles) {
+      map[p.id] = p.full_name ?? p.email ?? p.id.slice(0, 8);
     }
-    const list = (data ?? []) as CrmClientRow[];
-    setRows(list);
-    const ids = Array.from(new Set(list.map((r) => r.closing_rep_id).filter(Boolean) as string[]));
-    if (ids.length === 0) {
-      setRepNames({});
-    } else {
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-      const map: Record<string, string> = {};
-      for (const p of profs ?? []) {
-        map[p.id] = p.full_name ?? p.email ?? p.id.slice(0, 8);
-      }
-      setRepNames(map);
-    }
-    setLoading(false);
-  }, [supabase]);
+    return map;
+  }, [profiles]);
 
   useEffect(() => {
-    if (authReady && session) void load();
-  }, [authReady, session, load]);
+    if (error) toast.error((error as Error).message);
+  }, [error]);
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="mx-auto max-w-6xl">
+        <AuthShellSkeleton />
       </div>
     );
   }
+
+  const showSkeleton = isLoading && rows.length === 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Clients</h1>
-          <p className="mt-1 text-sm text-slate-600">Accounts created when deals are marked closed won.</p>
+          <h1 className={crmPageTitle}>Clients</h1>
+          <p className={crmPageSubtitle}>Accounts created when deals are marked closed won.</p>
         </div>
         <button
           type="button"
-          className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          onClick={() => void load()}
+          className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-3 py-1.5 text-sm text-slate-300 hover:bg-[#1a1a24]"
+          onClick={() => void mutate()}
         >
           Refresh
         </button>
       </div>
 
-      {loading ? (
-        <div className="py-16 text-center text-slate-600">Loading…</div>
+      {showSkeleton ? (
+        <ClientsTableSkeleton />
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-10 text-center text-sm text-slate-600">
-          No clients yet. Win a deal from the pipeline to create one.
-        </p>
+        <p className={crmEmptyState}>No clients yet. Win a deal from the pipeline to create one.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className={crmTableWrap}>
           <table className="w-full min-w-[800px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
@@ -101,29 +127,29 @@ export default function ClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((c) => (
-                <tr key={c.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+              {rows.map((c: CrmClientRow) => (
+                <tr key={c.id} className={crmTableRow}>
                   <td className="px-3 py-2">
                     {c.prospect_id ? (
-                      <Link href={`/crm/prospects/${c.prospect_id}`} className="font-medium text-emerald-600 hover:underline">
+                      <Link href={`/crm/prospects/${c.prospect_id}`} className="font-medium text-emerald-400 hover:underline">
                         {c.company_name ?? "—"}
                       </Link>
                     ) : (
-                      <span className="font-medium text-slate-900">{c.company_name ?? "—"}</span>
+                      <span className="font-medium text-white">{c.company_name ?? "—"}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{c.domain ?? "—"}</td>
-                  <td className="px-3 py-2 capitalize text-slate-700">{c.plan ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-800">{formatUsd(c.mrr_cents)}</td>
-                  <td className="px-3 py-2 text-slate-600">
+                  <td className="px-3 py-2 text-slate-400">{c.domain ?? "—"}</td>
+                  <td className="px-3 py-2 capitalize text-slate-300">{c.plan ?? "—"}</td>
+                  <td className="px-3 py-2 text-slate-200">{formatUsd(c.mrr_cents)}</td>
+                  <td className="px-3 py-2 text-slate-400">
                     {c.closing_rep_id ? (repNames[c.closing_rep_id] ?? c.closing_rep_id.slice(0, 8)) : "—"}
                   </td>
                   <td className={cn("px-3 py-2 font-medium", statusClass(c.status))}>{c.status}</td>
-                  <td className="px-3 py-2 text-slate-600">{new Date(c.close_date).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-slate-400">{new Date(c.close_date).toLocaleDateString()}</td>
                   <td className="px-3 py-2">
                     <Link
                       href={`/crm/clients/${c.id}/enterprise`}
-                      className="text-emerald-600/90 hover:underline"
+                      className="text-emerald-400/90 hover:underline"
                     >
                       {(c.monitored_domains?.length ?? 0) > 0
                         ? `${c.monitored_domains?.length} extra`

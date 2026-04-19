@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { crmFieldSurface, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 export interface AgreedTerms {
   [key: string]: string;
@@ -39,51 +40,51 @@ export function AgreedTermsModal({ open, onClose, onConfirm, hireName, hireRole 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-900">Agreed Terms for {hireName}</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <div className={`w-full max-w-lg p-6 shadow-xl ${crmSurfaceCard}`}>
+        <h2 className="text-lg font-semibold text-white">Agreed Terms for {hireName}</h2>
+        <p className="mt-1 text-sm text-slate-400">
           These terms will be used to generate the contract during onboarding.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Role</label>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Role</label>
               <input
                 type="text"
                 value={terms.role}
                 onChange={(e) => setTerms({ ...terms, role: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-400 focus:outline-none"
+                className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Start Date</label>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Start Date</label>
               <input
                 type="date"
                 value={terms.start_date}
                 onChange={(e) => setTerms({ ...terms, start_date: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-400 focus:outline-none"
+                className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Base Rate</label>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Base Rate</label>
               <input
                 type="text"
                 placeholder="e.g. $500"
                 value={terms.base_rate}
                 onChange={(e) => setTerms({ ...terms, base_rate: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none"
+                className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Rate Frequency</label>
+              <label className="mb-1 block text-xs font-medium text-slate-400">Rate Frequency</label>
               <select
                 value={terms.rate_frequency}
                 onChange={(e) => setTerms({ ...terms, rate_frequency: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-400 focus:outline-none"
+                className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
               >
                 <option value="hourly">Hourly</option>
                 <option value="weekly">Weekly</option>
@@ -94,23 +95,23 @@ export function AgreedTermsModal({ open, onClose, onConfirm, hireName, hireRole 
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">Bonus Structure</label>
+            <label className="mb-1 block text-xs font-medium text-slate-400">Bonus Structure</label>
             <textarea
               placeholder="Describe bonus tiers, commission rates, performance bonuses..."
               value={terms.bonus_structure}
               onChange={(e) => setTerms({ ...terms, bonus_structure: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none"
+              className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
               rows={3}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">Custom Clauses (optional)</label>
+            <label className="mb-1 block text-xs font-medium text-slate-400">Custom Clauses (optional)</label>
             <textarea
               placeholder="Any additional terms or clauses..."
               value={terms.custom_clauses}
               onChange={(e) => setTerms({ ...terms, custom_clauses: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none"
+              className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
               rows={2}
             />
           </div>
@@ -119,7 +120,7 @@ export function AgreedTermsModal({ open, onClose, onConfirm, hireName, hireRole 
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:text-slate-900 transition"
+              className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white transition"
             >
               Cancel
             </button>

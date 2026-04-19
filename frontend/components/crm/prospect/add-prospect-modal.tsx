@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { crmDialogSurface, crmFieldSurface } from "@/lib/crm/crm-surface";
 
 function normalizeDomain(raw: string): string {
   let d = raw.trim().toLowerCase();
@@ -82,16 +83,16 @@ export function AddProspectModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-slate-200 bg-white">
+      <DialogContent className={crmDialogSurface}>
         <form onSubmit={(e) => void submit(e)}>
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Add prospect</DialogTitle>
+            <DialogTitle className="text-white">Add prospect</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <Label className="text-slate-600">Domain *</Label>
+              <Label className="text-slate-400">Domain *</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
                 placeholder="acme.com"
@@ -99,18 +100,18 @@ export function AddProspectModal({
               />
             </div>
             <div>
-              <Label className="text-slate-600">Company</Label>
+              <Label className="text-slate-400">Company</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Acme Inc."
               />
             </div>
             <div>
-              <Label className="text-slate-600">Industry</Label>
+              <Label className="text-slate-400">Industry</Label>
               <Input
-                className="mt-1 border-slate-200 bg-slate-50"
+                className={`mt-1 ${crmFieldSurface}`}
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
                 placeholder="Legal"
@@ -118,7 +119,7 @@ export function AddProspectModal({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" className="border-slate-200" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" className="bg-emerald-600" disabled={saving}>

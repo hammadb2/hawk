@@ -1,7 +1,12 @@
 """
 ARIA Outbound Pipeline — full autonomous lead-to-email pipeline.
 
-Apollo → Clay → ZeroBounce → Hawk Domain Scan → OpenAI Email Gen → Smartlead.
+Apify 4-actor discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
+→ ZeroBounce → Hawk Domain Scan → OpenAI Email Gen → Smartlead.
+
+First checks aria_lead_inventory for pre-built leads (instant dispatch).
+Falls back to on-demand Apify discovery if inventory is empty.
+Apollo kept as absolute last resort only.
 
 Each step updates aria_pipeline_runs and aria_pipeline_leads in real time so
 the frontend can display a live progress tracker.
@@ -10,6 +15,7 @@ the frontend can display a live progress tracker.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import os
@@ -196,7 +202,7 @@ def step_apollo_pull(
     batch_size: int,
 ) -> list[dict[str, Any]]:
     """Pull leads from Apollo by vertical and location. Returns mapped leads."""
-    _update_run(run_id, {"current_step": "apollo_pull"})
+    _update_run(run_id, {"current_step": "apify_discover"})
 
     if DRY_RUN or not APOLLO_API_KEY:
         logger.info("ARIA pipeline: Apollo dry run / no API key — generating stub leads")
@@ -417,6 +423,8 @@ def step_clay_enrich(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str,
 
 def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Verify lead emails via ZeroBounce. Removes invalid emails."""
+    from services.aria_prospect_pipeline import sync_prospect_zerobounce_chat
+
     _update_run(run_id, {"current_step": "zerobounce_verify"})
 
     if DRY_RUN or not ZEROBOUNCE_API_KEY:
@@ -426,6 +434,12 @@ def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dic
                 "zero_bounce_result": {"stub": True, "status": "valid"},
                 "status": "verified",
             })
+            sync_prospect_zerobounce_chat(
+                lead.get("domain", ""),
+                zb_payload={"stub": True, "status": "valid"},
+                zb_status="valid",
+                pipeline_ok=True,
+            )
         _update_run(run_id, {"leads_verified": len(leads)})
         return leads
 
@@ -467,11 +481,23 @@ def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dic
                     lead["zero_bounce_result"] = zb_result
                     lead["status"] = "verified"
                     verified_leads.append(lead)
+                    sync_prospect_zerobounce_chat(
+                        lead.get("domain", ""),
+                        zb_payload=zb_result,
+                        zb_status=zb_status,
+                        pipeline_ok=True,
+                    )
                 else:
                     _update_lead(lead["id"], {
                         "status": "removed",
                         "removed_reason": f"zerobounce_{zb_status}",
                     })
+                    sync_prospect_zerobounce_chat(
+                        lead.get("domain", ""),
+                        zb_payload=zb_result,
+                        zb_status=zb_status,
+                        pipeline_ok=False,
+                    )
             except Exception as exc:
                 logger.warning("ZeroBounce failed for %s: %s", email, exc)
                 # On error, keep the lead (benefit of the doubt)
@@ -481,6 +507,12 @@ def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dic
                 })
                 lead["status"] = "verified"
                 verified_leads.append(lead)
+                sync_prospect_zerobounce_chat(
+                    lead.get("domain", ""),
+                    zb_payload={"error": str(exc)[:500]},
+                    zb_status="unknown",
+                    pipeline_ok=True,
+                )
 
     _update_run(run_id, {"leads_verified": len(verified_leads)})
     return verified_leads
@@ -549,6 +581,8 @@ async def _scan_batch(domains_with_ids: list[tuple[str, str, str]]) -> dict[str,
 
 def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Run Hawk domain scanner on each lead's domain."""
+    from services.aria_prospect_pipeline import sync_prospect_scan_chat
+
     _update_run(run_id, {"current_step": "hawk_scan"})
 
     if DRY_RUN:
@@ -564,6 +598,13 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
             })
             lead["vulnerability_found"] = vuln
             lead["status"] = "scanned"
+            lead["hawk_score"] = 42
+            sync_prospect_scan_chat(
+                lead.get("domain", ""),
+                vulnerability_text=vuln or None,
+                vulnerability_type="HIGH" if vuln else None,
+                hawk_score=42,
+            )
         _update_run(run_id, {"leads_scanned": len(leads), "vulnerabilities_found": vulns_found})
         return leads
 
@@ -580,6 +621,16 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
             break
         result = scan_results.get(lead["id"], {})
         vuln_text = result.get("vulnerability_text", "")
+        top = result.get("top_finding") if isinstance(result.get("top_finding"), dict) else {}
+        vuln_type = ""
+        if isinstance(top, dict):
+            vuln_type = str(top.get("severity") or top.get("type") or "")[:200]
+        score = result.get("score")
+        if score is not None:
+            try:
+                lead["hawk_score"] = max(0, min(100, int(score)))
+            except (TypeError, ValueError):
+                lead["hawk_score"] = None
         if vuln_text:
             vulns_found += 1
 
@@ -590,6 +641,12 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
         lead["vulnerability_found"] = vuln_text
         lead["status"] = "scanned"
         scanned_leads.append(lead)
+        sync_prospect_scan_chat(
+            lead.get("domain", ""),
+            vulnerability_text=vuln_text or None,
+            vulnerability_type=vuln_type or None,
+            hawk_score=lead.get("hawk_score"),
+        )
 
     _update_run(run_id, {"leads_scanned": len(scanned_leads), "vulnerabilities_found": vulns_found})
     return scanned_leads
@@ -710,6 +767,8 @@ async def _generate_emails_batch(leads: list[dict[str, Any]]) -> dict[str, dict[
 
 def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Generate personalized cold emails for each lead via OpenAI."""
+    from services.aria_prospect_pipeline import sync_prospect_email_ready_chat
+
     _update_run(run_id, {"current_step": "email_generation"})
 
     if DRY_RUN or not OPENAI_API_KEY:
@@ -737,6 +796,7 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
             lead["email_subject"] = email["subject"]
             lead["email_content"] = email["body"]
             lead["status"] = "email_generated"
+            sync_prospect_email_ready_chat(lead.get("domain", ""), email["subject"], email["body"])
         _update_run(run_id, {"emails_generated": len(leads)})
         return leads
 
@@ -759,6 +819,7 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
             lead["email_content"] = body
             lead["status"] = "email_generated"
             generated_count += 1
+            sync_prospect_email_ready_chat(lead.get("domain", ""), subject, body)
         else:
             _update_lead(lead["id"], {
                 "status": "removed",
@@ -773,6 +834,8 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
 
 def step_smartlead_load(run_id: str, leads: list[dict[str, Any]], vertical: str) -> list[dict[str, Any]]:
     """Load leads with personalized emails into Smartlead campaign."""
+    from services.aria_prospect_pipeline import sync_prospect_smartlead_chat
+
     _update_run(run_id, {"current_step": "smartlead_load"})
 
     if DRY_RUN or not SMARTLEAD_API_KEY:
@@ -785,6 +848,7 @@ def step_smartlead_load(run_id: str, leads: list[dict[str, Any]], vertical: str)
             })
             lead["email_sent"] = True
             lead["status"] = "sent"
+            sync_prospect_smartlead_chat(lead.get("domain", ""), "dry_run_campaign")
         _update_run(run_id, {"emails_sent": len(leads)})
         return leads
 
@@ -839,6 +903,7 @@ def step_smartlead_load(run_id: str, leads: list[dict[str, Any]], vertical: str)
                     lead["smartlead_campaign_id"] = campaign_id
                     lead["status"] = "sent"
                     sent_count += 1
+                    sync_prospect_smartlead_chat(lead.get("domain", ""), str(campaign_id))
                 else:
                     logger.warning("Smartlead upload failed for %s: %s", lead.get("contact_email"), r.text[:300])
             except Exception as exc:
@@ -883,6 +948,167 @@ def _get_or_create_smartlead_campaign(vertical: str) -> str | None:
 
 # ── Full Pipeline Orchestrator ───────────────────────────────────────────
 
+def _check_inventory_for_ready_leads(
+    vertical: str,
+    location: str,
+    batch_size: int,
+) -> list[dict[str, Any]]:
+    """
+    Check aria_lead_inventory for ready leads matching vertical + location.
+
+    Returns matching leads or empty list if inventory is empty for this combo.
+    This enables chat-triggered pipeline to be instant when inventory has pre-built leads.
+    """
+    if not SUPABASE_URL:
+        return []
+
+    try:
+        from services.aria_lead_inventory import get_ready_leads
+
+        leads = get_ready_leads(vertical=vertical, city=location, limit=batch_size)
+        if not leads:
+            return []
+
+        logger.info(
+            "Inventory hit: %d ready leads for %s in %s",
+            len(leads),
+            vertical,
+            location,
+        )
+        return leads
+    except Exception as exc:
+        logger.warning("Inventory check failed (falling back to on-demand): %s", exc)
+        return []
+
+
+def _load_inventory_leads_to_pipeline(
+    run_id: str,
+    inventory_leads: list[dict[str, Any]],
+    vertical: str,
+) -> dict[str, Any]:
+    """
+    Take pre-built leads from inventory and load them into the on-demand pipeline
+    (skip Apollo, Clay, ZeroBounce, scan, email gen — all already done in nightly).
+    Just loads into Smartlead and marks dispatched.
+    """
+    # Insert into pipeline leads table for tracking
+    pipeline_leads = []
+    for inv in inventory_leads:
+        pipeline_leads.append({
+            "run_id": run_id,
+            "company_name": inv.get("business_name") or inv.get("company_name") or "",
+            "domain": inv.get("domain") or "",
+            "contact_name": inv.get("contact_name") or "",
+            "contact_email": inv.get("contact_email") or "",
+            "vertical": vertical,
+            "apollo_data": {"source": "inventory", "inventory_id": inv.get("id")},
+            "vulnerability_found": inv.get("vulnerability_found"),
+            "email_subject": inv.get("email_subject"),
+            "email_content": inv.get("email_body"),
+            "status": "email_generated",
+        })
+
+    inserted = _insert_leads(pipeline_leads)
+    _update_run(run_id, {
+        "leads_pulled": len(inserted),
+        "leads_enriched": len(inserted),
+        "leads_verified": len(inserted),
+        "leads_scanned": len(inserted),
+        "emails_generated": len(inserted),
+        "current_step": "smartlead_load",
+    })
+
+    # Load into Smartlead
+    step_smartlead_load(run_id, inserted, vertical)
+
+    # Mark inventory leads as dispatched
+    try:
+        from services.aria_lead_inventory import mark_leads_dispatched
+        inventory_ids = [inv["id"] for inv in inventory_leads if inv.get("id")]
+        if inventory_ids:
+            mark_leads_dispatched(inventory_ids, campaign_id="chat_dispatch")
+    except Exception as exc:
+        logger.warning("Failed to mark inventory leads dispatched: %s", exc)
+
+    _update_run(run_id, {
+        "status": "completed",
+        "current_step": "completed",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return _build_summary(run_id)
+
+
+def step_apify_discover(
+    run_id: str,
+    vertical: str,
+    location: str,
+    batch_size: int,
+) -> list[dict[str, Any]]:
+    """Discover leads and find emails via Apify 4-actor pipeline (on-demand).
+
+    Runs Google Maps scraper → LinkedIn → Leads Finder → Website Crawler
+    for a single city + vertical.  Falls back to Apollo as absolute last resort.
+    """
+    _update_run(run_id, {"current_step": "apify_discover"})
+
+    try:
+        from services.aria_apify_scraper import run_ondemand_discovery
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(
+                asyncio.run,
+                run_ondemand_discovery(vertical, location, batch_size, pipeline_run_id=run_id),
+            )
+            raw_leads = future.result(timeout=900)
+
+        if not raw_leads:
+            logger.info("Apify returned 0 leads for %s in %s", vertical, location)
+            return []
+
+        # Filter: only leads with emails
+        leads_with_email = [ld for ld in raw_leads if ld.get("contact_email")]
+        if not leads_with_email:
+            logger.info("Apify found leads but none had emails for %s in %s", vertical, location)
+            return []
+
+        # Map to pipeline_leads format
+        pipeline_leads: list[dict[str, Any]] = []
+        for ld in leads_with_email:
+            pipeline_leads.append({
+                "run_id": run_id,
+                "company_name": ld.get("business_name") or "",
+                "domain": ld.get("domain") or "",
+                "contact_name": ld.get("contact_name") or "",
+                "contact_email": ld.get("contact_email") or "",
+                "vertical": vertical,
+                "apollo_data": {
+                    "source": ld.get("email_finder", "apify"),
+                    "google_place_id": ld.get("google_place_id"),
+                    "google_rating": ld.get("google_rating"),
+                    "review_count": ld.get("review_count"),
+                    "city": ld.get("city"),
+                    "province": ld.get("province"),
+                    "address": ld.get("address"),
+                    "lead_score": ld.get("lead_score"),
+                },
+                "status": "enriched",
+            })
+
+        inserted = _insert_leads(pipeline_leads)
+        _update_run(run_id, {
+            "leads_pulled": len(inserted),
+            "leads_enriched": len(inserted),
+        })
+        return inserted
+
+    except Exception as exc:
+        logger.exception("Apify discovery failed: %s", exc)
+        # Fall back to Apollo as absolute last resort
+        logger.info("Falling back to Apollo after Apify error")
+        return step_apollo_pull(run_id, vertical, location, batch_size)
+
+
 def run_outbound_pipeline(
     run_id: str,
     vertical: str,
@@ -892,28 +1118,36 @@ def run_outbound_pipeline(
     """
     Execute the full ARIA outbound pipeline end-to-end.
 
+    First checks aria_lead_inventory for ready leads matching the vertical + location.
+    If inventory has leads, uses those directly (instant dispatch).
+    Falls back to on-demand discovery via Google Places (with Apollo as second fallback)
+    → Prospeo/Apollo email finding → ZeroBounce → scan → email gen → Smartlead.
+
     Returns a summary dict suitable for chat display.
     """
     try:
-        # Step 1: Apollo Pull
-        leads = step_apollo_pull(run_id, vertical, location, batch_size)
+        # Try inventory first (instant path)
+        inventory_leads = _check_inventory_for_ready_leads(vertical, location, batch_size)
+        if inventory_leads:
+            _update_run(run_id, {"current_step": "inventory_dispatch"})
+            return _load_inventory_leads_to_pipeline(run_id, inventory_leads, vertical)
+
+        # Fallback: on-demand discovery via Apify 4-actor pipeline
+        # Step 1: Apify Discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
+        # Leads come back with emails already found by actors 2-4
+        leads = step_apify_discover(run_id, vertical, location, batch_size)
         if not leads:
             _update_run(run_id, {
                 "status": "completed",
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-                "error_message": "No leads found from Apollo for this vertical and location.",
+                "error_message": "No leads found for this vertical and location.",
             })
             return _build_summary(run_id)
 
         if _is_run_paused(run_id):
             return _build_summary(run_id)
 
-        # Step 2: Clay Enrichment
-        leads = step_clay_enrich(run_id, leads)
-        if _is_run_paused(run_id):
-            return _build_summary(run_id)
-
-        # Step 3: ZeroBounce Verification
+        # Step 2: ZeroBounce Verification
         leads = step_zerobounce_verify(run_id, leads)
         if not leads:
             _update_run(run_id, {
@@ -925,12 +1159,12 @@ def run_outbound_pipeline(
         if _is_run_paused(run_id):
             return _build_summary(run_id)
 
-        # Step 4: Hawk Domain Scan
+        # Step 3: Hawk Domain Scan
         leads = step_hawk_scan(run_id, leads)
         if _is_run_paused(run_id):
             return _build_summary(run_id)
 
-        # Step 5: Generate Personalized Emails
+        # Step 4: Generate Personalized Emails
         leads = step_generate_emails(run_id, leads)
         if not leads:
             _update_run(run_id, {
@@ -942,7 +1176,7 @@ def run_outbound_pipeline(
         if _is_run_paused(run_id):
             return _build_summary(run_id)
 
-        # Step 6: Load into Smartlead
+        # Step 5: Load into Smartlead
         step_smartlead_load(run_id, leads, vertical)
 
         # Mark complete
@@ -1016,13 +1250,10 @@ def resume_pipeline(run_id: str, uid: str) -> dict[str, Any]:
 
     try:
         # Get leads at the current stage and resume from there
-        if current_step in ("apollo_pull", "clay_enrichment"):
-            leads = _get_run_leads(run_id, "pulled")
+        if current_step in ("apify_discover", "apollo_pull", "email_finding"):
+            leads = _get_run_leads(run_id, "pulled") or _get_run_leads(run_id, "enriched")
             if not leads:
-                leads = step_apollo_pull(run_id, vertical, location, run.get("batch_size", 50))
-            if _is_run_paused(run_id):
-                return _build_summary(run_id)
-            leads = step_clay_enrich(run_id, leads)
+                leads = step_apify_discover(run_id, vertical, location, run.get("batch_size", 50))
             if _is_run_paused(run_id):
                 return _build_summary(run_id)
             leads = step_zerobounce_verify(run_id, leads)

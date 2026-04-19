@@ -11,7 +11,13 @@ from fastapi import HTTPException
 
 from config import SUPABASE_URL
 from services.crm_portal_stripe import _invite_portal_user, _lookup_user_id_by_email
-from services.crm_profile_sync import ensure_client_profile, profile_role, staff_roles
+from services.crm_profile_sync import (
+    PORTAL_TEAM_EMAIL_MESSAGE,
+    ensure_client_profile,
+    portal_email_blocks_client_portal,
+    portal_uid_blocks_client_portal,
+    staff_roles,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +94,14 @@ def provision_portal_for_client(client_id: str) -> dict[str, Any]:
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Prospect has no valid contact_email — add it before close won")
 
+    if portal_email_blocks_client_portal(email):
+        raise HTTPException(status_code=400, detail=PORTAL_TEAM_EMAIL_MESSAGE)
+
     company = (client.get("company_name") or pros[0].get("company_name") or pros[0].get("domain") or "Client")[:200]
 
     if client.get("portal_user_id"):
         uid = str(client["portal_user_id"])
-        role = profile_role(uid)
-        if role and role in staff_roles():
+        if portal_uid_blocks_client_portal(uid):
             raise HTTPException(
                 status_code=409,
                 detail="Portal user id is linked to a CRM staff profile — fix profiles.role or portal linkage manually.",
@@ -108,8 +116,7 @@ def provision_portal_for_client(client_id: str) -> dict[str, Any]:
     if not uid:
         raise HTTPException(status_code=502, detail="Could not create or resolve auth user for portal invite")
 
-    role = profile_role(uid)
-    if role and role in staff_roles():
+    if portal_uid_blocks_client_portal(uid):
         raise HTTPException(
             status_code=409,
             detail="This contact email is already a CRM team account. Use a client-only email for the portal.",

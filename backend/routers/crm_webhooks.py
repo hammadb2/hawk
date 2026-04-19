@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Body, Header, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
 from config import CRM_PUBLIC_BASE_URL
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/crm/webhooks", tags=["crm-webhooks"])
 
 WEBHOOK_SECRET = os.environ.get("CRM_EMAIL_WEBHOOK_SECRET", "")
+SMARTLEAD_WEBHOOK_SECRET = os.environ.get("CRM_SMARTLEAD_WEBHOOK_SECRET", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
@@ -553,3 +554,72 @@ def webhook_health():
         "has_secret": bool(WEBHOOK_SECRET),
         "has_supabase": bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY),
     }
+
+
+# ── Smartlead Webhook (reply, bounce, spam complaint) ───────────────────
+
+
+def _require_smartlead_webhook_secret(x_secret: str | None) -> None:
+    if not SMARTLEAD_WEBHOOK_SECRET:
+        logger.warning("CRM_SMARTLEAD_WEBHOOK_SECRET not set — rejecting Smartlead webhook")
+        raise HTTPException(status_code=503, detail="Smartlead webhook not configured")
+    if not x_secret or not secrets.compare_digest(x_secret, SMARTLEAD_WEBHOOK_SECRET):
+        raise HTTPException(status_code=401, detail="Invalid Smartlead webhook secret")
+
+
+@router.post("/smartlead")
+def smartlead_webhook(
+    body: dict[str, Any] = Body(default_factory=dict),
+    secret: str | None = Query(default=None),
+):
+    """
+    Smartlead inbound webhook — handles reply, bounce, and spam complaint events.
+
+    Configure in Smartlead dashboard (Settings > Webhooks):
+    URL: POST https://intelligent-rejoicing-production.up.railway.app/api/crm/webhooks/smartlead?secret=<CRM_SMARTLEAD_WEBHOOK_SECRET>
+    Events: reply received, email bounced, spam complaint.
+
+    Auth via query parameter because Smartlead webhooks do not support custom headers.
+
+    Replies are classified by ARIA (sentiment, confidence, reasoning),
+    a response draft is generated, and the result is stored in aria_inbound_replies
+    for human review/approval.
+
+    Bounces and spam complaints update suppressions + aria_domain_health.
+    """
+    _require_smartlead_webhook_secret(secret)
+
+    event_type = (
+        body.get("event_type")
+        or body.get("event")
+        or body.get("type")
+        or ""
+    ).lower()
+
+    import threading
+    from services.aria_reply_handler import (
+        process_bounce_event,
+        process_reply_event,
+        process_spam_complaint_event,
+    )
+
+    if event_type in ("reply", "email_reply", "reply_received"):
+        # Process reply in background to avoid blocking webhook response
+        threading.Thread(
+            target=process_reply_event,
+            args=(body,),
+            daemon=True,
+        ).start()
+        return {"ok": True, "event": "reply", "status": "processing"}
+
+    elif event_type in ("bounce", "email_bounce", "email_bounced"):
+        result = process_bounce_event(body)
+        return result
+
+    elif event_type in ("spam", "spam_complaint", "complaint"):
+        result = process_spam_complaint_event(body)
+        return result
+
+    else:
+        logger.info("Smartlead webhook: unknown event_type=%r", event_type)
+        return {"ok": True, "event": "unknown", "event_type": event_type}

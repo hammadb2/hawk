@@ -7,6 +7,7 @@ import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { formatUsd } from "@/lib/crm/format";
 import type { ProspectStage } from "@/lib/crm/types";
 import { STAGE_META, STAGE_ORDER } from "@/lib/crm/types";
+import { crmFieldSurface, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 const CLOSED = new Set(["lost", "closed_won"]);
 
@@ -151,8 +152,8 @@ export function ReportsHub() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-400">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-emerald-500" />
       </div>
     );
   }
@@ -167,27 +168,27 @@ export function ReportsHub() {
           <select
             value={range}
             onChange={(e) => setRange(e.target.value as DateRange)}
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 focus:border-emerald-500 focus:outline-none"
+            className={`rounded-lg px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none ${crmFieldSurface}`}
           >
             {(Object.keys(DATE_RANGE_LABELS) as DateRange[]).map((k) => (
               <option key={k} value={k}>{DATE_RANGE_LABELS[k]}</option>
             ))}
           </select>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-400">
             Numbers respect your role: team leads see their pod; executives see the full org.
           </p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
-            className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-3 py-1.5 text-sm text-slate-200 hover:bg-[#1a1a24]"
             onClick={exportCsv}
           >
             Export CSV
           </button>
           <button
             type="button"
-            className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-3 py-1.5 text-sm text-slate-200 hover:bg-[#1a1a24]"
             onClick={() => void load()}
           >
             Refresh
@@ -196,36 +197,36 @@ export function ReportsHub() {
       </div>
 
       {loading ? (
-        <div className="py-16 text-center text-slate-600">Loading…</div>
+        <div className="py-16 text-center text-slate-400">Loading…</div>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Open pipeline</div>
-              <div className="mt-1 text-2xl font-semibold text-slate-900">{openPipeline}</div>
+            <div className={`${crmSurfaceCard} p-4`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Open pipeline</div>
+              <div className="mt-1 text-2xl font-semibold text-white">{openPipeline}</div>
               <p className="mt-1 text-xs text-slate-500">Prospects not lost / won</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">New clients</div>
+            <div className={`${crmSurfaceCard} p-4`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">New clients</div>
               <div className="mt-1 text-2xl font-semibold text-sky-400">{clientsInRange}</div>
               <p className="mt-1 text-xs text-slate-500">In selected date range</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Booked MRR (active)</div>
-              <div className="mt-1 text-2xl font-semibold text-emerald-600">{formatUsd(bookedMrrCents)}</div>
+            <div className={`${crmSurfaceCard} p-4`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Booked MRR (active)</div>
+              <div className="mt-1 text-2xl font-semibold text-emerald-400">{formatUsd(bookedMrrCents)}</div>
               <p className="mt-1 text-xs text-slate-500">Sum of active client subscriptions</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Pending commission</div>
+            <div className={`${crmSurfaceCard} p-4`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Pending commission</div>
               <div className="mt-1 text-2xl font-semibold text-amber-300">{formatUsd(pendingCommCents)}</div>
               <p className="mt-1 text-xs text-slate-500">Payroll not marked paid</p>
             </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
-              <h2 className="text-sm font-semibold text-slate-800">Pipeline funnel</h2>
-              <p className="mt-0.5 text-xs text-slate-600">Prospect count by stage ({DATE_RANGE_LABELS[range].toLowerCase()})</p>
+            <div className={`${crmSurfaceCard} p-4`}>
+              <h2 className="text-sm font-semibold text-white">Pipeline funnel</h2>
+              <p className="mt-0.5 text-xs text-slate-400">Prospect count by stage ({DATE_RANGE_LABELS[range].toLowerCase()})</p>
               <ul className="mt-4 space-y-2">
                 {STAGE_ORDER.map((st) => {
                   const n = funnel[st] ?? 0;
@@ -234,35 +235,35 @@ export function ReportsHub() {
                   const pct = Math.round((n / max) * 100);
                   return (
                     <li key={st} className="flex items-center gap-3 text-sm">
-                      <span className="w-28 shrink-0 text-slate-600">{label}</span>
-                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <span className="w-28 shrink-0 text-slate-400">{label}</span>
+                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[#1a1a24]">
                         <div
                           className="h-full rounded-full"
                           style={{ width: `${pct}%`, backgroundColor: STAGE_META[st as ProspectStage].color }}
                         />
                       </div>
-                      <span className="w-8 text-right font-mono text-slate-700">{n}</span>
+                      <span className="w-8 text-right font-mono text-slate-200">{n}</span>
                     </li>
                   );
                 })}
               </ul>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
-              <h2 className="text-sm font-semibold text-slate-800">Outcomes</h2>
-              <p className="mt-0.5 text-xs text-slate-600">Won vs lost in {DATE_RANGE_LABELS[range].toLowerCase()}</p>
+            <div className={`${crmSurfaceCard} p-4`}>
+              <h2 className="text-sm font-semibold text-white">Outcomes</h2>
+              <p className="mt-0.5 text-xs text-slate-400">Won vs lost in {DATE_RANGE_LABELS[range].toLowerCase()}</p>
               <dl className="mt-4 space-y-3 text-sm">
-                <div className="flex justify-between border-b border-slate-200/90 pb-2">
-                  <dt className="text-slate-600">Marked closed won</dt>
-                  <dd className="font-medium text-emerald-600">{wonLost.won}</dd>
+                <div className="flex justify-between border-b border-[#1e1e2e]/90 pb-2">
+                  <dt className="text-slate-400">Marked closed won</dt>
+                  <dd className="font-medium text-emerald-400">{wonLost.won}</dd>
                 </div>
-                <div className="flex justify-between border-b border-slate-200/90 pb-2">
-                  <dt className="text-slate-600">Marked lost</dt>
+                <div className="flex justify-between border-b border-[#1e1e2e]/90 pb-2">
+                  <dt className="text-slate-400">Marked lost</dt>
                   <dd className="font-medium text-rose-400">{wonLost.lost}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-600">Win rate (won / decided)</dt>
-                  <dd className="font-medium text-slate-800">{winRatePct != null ? `${winRatePct}%` : "—"}</dd>
+                  <dt className="text-slate-400">Win rate (won / decided)</dt>
+                  <dd className="font-medium text-white">{winRatePct != null ? `${winRatePct}%` : "—"}</dd>
                 </div>
               </dl>
             </div>

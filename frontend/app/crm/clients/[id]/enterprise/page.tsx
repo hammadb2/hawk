@@ -9,6 +9,7 @@ import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 
 import { readApiErrorResponse } from "@/lib/crm/api-error";
 import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
+import { crmFieldSurface, crmPageSubtitle, crmPageTitle, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 export default function ClientEnterpriseDomainsPage() {
   const params = useParams();
@@ -100,19 +101,19 @@ export default function ClientEnterpriseDomainsPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-sm text-slate-600 hover:text-emerald-600"
+          className="text-sm text-slate-400 hover:text-emerald-400"
         >
           ← Back
         </button>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Enterprise domains</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Primary domain stays <span className="text-slate-700">{primary || "—"}</span>. Add up to four extra apex
+        <h1 className={`mt-2 ${crmPageTitle}`}>Enterprise domains</h1>
+        <p className={crmPageSubtitle}>
+          Primary domain stays <span className="text-slate-300">{primary || "—"}</span>. Add up to four extra apex
           domains for monitoring and portal rollup.
         </p>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Additional apex domains</p>
+      <div className={`space-y-3 p-4 ${crmSurfaceCard}`}>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Additional apex domains</p>
         {lines.map((v, i) => (
           <input
             key={i}
@@ -124,7 +125,7 @@ export default function ClientEnterpriseDomainsPage() {
               setLines(next);
             }}
             placeholder={`example${i + 1}.com`}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-500"
+            className={`w-full px-3 py-2 text-sm placeholder:text-slate-500 ${crmFieldSurface}`}
           />
         ))}
       </div>
@@ -138,7 +139,7 @@ export default function ClientEnterpriseDomainsPage() {
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        <Link href="/crm/clients" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+        <Link href="/crm/clients" className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-4 py-2 text-sm text-slate-300 hover:bg-[#1a1a24]">
           All clients
         </Link>
       </div>

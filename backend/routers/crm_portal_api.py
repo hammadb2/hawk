@@ -1,4 +1,10 @@
-"""Client portal PDFs + CRM finding verification (2D + verify-fix)."""
+"""Client portal PDFs + CRM finding verification (2D + verify-fix).
+
+Provisioning client portal auth / client_portal_profiles rows is enforced in
+``portal_bootstrap``, ``crm_client_portal_provision``, and ``crm_portal_stripe``
+(see ``portal_uid_blocks_client_portal`` / ``portal_email_blocks_client_portal``).
+This router does not create portal accounts.
+"""
 
 from __future__ import annotations
 

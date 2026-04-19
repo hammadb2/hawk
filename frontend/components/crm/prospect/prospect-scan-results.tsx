@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { crmDialogSurface, crmFieldSurface, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 type ScanFinding = {
   id?: string;
@@ -372,17 +373,14 @@ export function ProspectScanResultsPanel({
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-500/90">Medium & low</h3>
           <ul className="space-y-2">
             {medLow.map((f, i) => (
-              <li
-                key={f.id || `ml-${i}`}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-              >
+              <li key={f.id || `ml-${i}`} className={`px-3 py-2 ${crmFieldSurface}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={cn("rounded px-2 py-0.5 text-[10px] font-semibold uppercase", severityBadgeClass(String(f.severity)))}>
                     {f.severity || "unknown"}
                   </span>
-                  <span className="text-sm font-medium text-slate-800">{f.title || "Finding"}</span>
+                  <span className="text-sm font-medium text-slate-200">{f.title || "Finding"}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-600">{f.interpretation || f.description || "—"}</p>
+                <p className="mt-1 text-xs text-slate-400">{f.interpretation || f.description || "—"}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(f.fix_guide || f.remediation) && (
                     <Button
@@ -418,7 +416,7 @@ export function ProspectScanResultsPanel({
       {(okFindings.length > 0 || sorted.length > 0) && (
         <section>
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-500/90">What&apos;s passing</h3>
-          <ul className="space-y-1 text-sm text-slate-700">
+          <ul className="space-y-1 text-sm text-slate-300">
             {okFindings.map((f, i) => (
               <li key={f.id || `ok-${i}`} className="flex gap-2">
                 <span className="text-emerald-500">✓</span>
@@ -435,19 +433,19 @@ export function ProspectScanResultsPanel({
         </section>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm ring-1 ring-slate-200/80">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-700">Closer prep</h3>
-        <div className="space-y-4 text-sm text-slate-700">
+      <section className={`p-4 ${crmSurfaceCard}`}>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-emerald-400">Closer prep</h3>
+        <div className="space-y-4 text-sm text-slate-300">
           <div>
-            <div className="text-xs font-medium text-slate-600">Opening line</div>
-            <p className="mt-1 text-slate-900">&quot;{openingLine}&quot;</p>
+            <div className="text-xs font-medium text-slate-500">Opening line</div>
+            <p className="mt-1 text-white">&quot;{openingLine}&quot;</p>
           </div>
           {baselineUsd != null && !Number.isNaN(baselineUsd) && (
-            <div className="rounded-lg border border-amber-200/90 bg-amber-50 px-3 py-2">
-              <p className="text-sm font-medium text-amber-950">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2">
+              <p className="text-sm font-medium text-amber-200">
                 Estimated breach cost for a business like yours:{" "}
-                <span className="text-amber-800">{formatMoneyUsd(baselineUsd)}</span>
-                <span className="font-normal text-slate-600">
+                <span className="text-amber-300">{formatMoneyUsd(baselineUsd)}</span>
+                <span className="font-normal text-slate-400">
                   {" "}
                   — source: IBM 2025 Cost of Data Breach Report
                 </span>
@@ -455,21 +453,21 @@ export function ProspectScanResultsPanel({
             </div>
           )}
           <div>
-            <div className="text-xs font-medium text-slate-600">
+            <div className="text-xs font-medium text-slate-500">
               Top objection ({industry || "general SMB"})
             </div>
-            <p className="mt-2 text-slate-800">
-              <span className="font-medium text-slate-900">{topObjection.objection}</span>
+            <p className="mt-2 text-slate-300">
+              <span className="font-medium text-white">{topObjection.objection}</span>
             </p>
-            <p className="mt-1 text-slate-600">{topObjection.response}</p>
+            <p className="mt-1 text-slate-400">{topObjection.response}</p>
           </div>
           {objections.length > 1 && (
             <div>
-              <div className="text-xs font-medium text-slate-600">More objections</div>
-              <ol className="mt-2 list-decimal space-y-2 pl-4 text-slate-600">
+              <div className="text-xs font-medium text-slate-500">More objections</div>
+              <ol className="mt-2 list-decimal space-y-2 pl-4 text-slate-400">
                 {objections.slice(1).map((o, i) => (
                   <li key={i}>
-                    <span className="font-medium text-slate-700">{o.objection}</span>
+                    <span className="font-medium text-slate-200">{o.objection}</span>
                     <span className="text-slate-500"> — </span>
                     {o.response}
                   </li>
@@ -481,11 +479,11 @@ export function ProspectScanResultsPanel({
       </section>
 
       <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto border-slate-200 bg-white text-slate-900">
+        <DialogContent className={`max-h-[85vh] overflow-y-auto ${crmDialogSurface}`}>
           <DialogHeader>
-            <DialogTitle>Fix guide</DialogTitle>
+            <DialogTitle className="text-white">Fix guide</DialogTitle>
           </DialogHeader>
-          <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">{guideText}</pre>
+          <pre className="whitespace-pre-wrap font-sans text-sm text-slate-300">{guideText}</pre>
         </DialogContent>
       </Dialog>
     </div>

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { formatUsd } from "@/lib/crm/format";
 import type { CrmRole } from "@/lib/crm/types";
+import { crmEmptyState, crmTableRow, crmTableThead, crmTableWrap } from "@/lib/crm/crm-surface";
 
 const CLOSED = new Set(["lost", "closed_won"]);
 
@@ -178,8 +179,8 @@ export function LiveScoreboard() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-slate-400">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-emerald-500" />
       </div>
     );
   }
@@ -187,25 +188,29 @@ export function LiveScoreboard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-400">
           Ranked by pending commission, then open pipeline count. Updates live when prospects, clients, or commissions change.
         </p>
-        <div className="flex items-center gap-3 text-xs text-slate-600">
+        <div className="flex items-center gap-3 text-xs text-slate-400">
           {updatedAt && <span>Updated {updatedAt.toLocaleTimeString()}</span>}
-          <button type="button" className="rounded border border-slate-200 px-2 py-1 text-slate-700 hover:bg-slate-50" onClick={() => void load()}>
+          <button
+            type="button"
+            className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-2 py-1 text-slate-200 hover:bg-[#1a1a24]"
+            onClick={() => void load()}
+          >
             Refresh
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-slate-600">Loading…</div>
+        <div className="py-12 text-center text-slate-400">Loading…</div>
       ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">No reps to show.</p>
+        <p className={`${crmEmptyState} py-8`}>No reps to show.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className={crmTableWrap}>
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2">#</th>
                 <th className="px-3 py-2">Rep</th>
@@ -217,13 +222,13 @@ export function LiveScoreboard() {
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={r.repId} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
-                  <td className="px-3 py-2 font-mono text-slate-600">{i + 1}</td>
-                  <td className="px-3 py-2 font-medium text-slate-900">{r.name}</td>
-                  <td className="px-3 py-2 text-slate-700">{r.pipeline}</td>
+                <tr key={r.repId} className={crmTableRow}>
+                  <td className="px-3 py-2 font-mono text-slate-500">{i + 1}</td>
+                  <td className="px-3 py-2 font-medium text-white">{r.name}</td>
+                  <td className="px-3 py-2 text-slate-300">{r.pipeline}</td>
                   <td className="px-3 py-2 text-sky-400">{r.monthlyWins}</td>
-                  <td className="px-3 py-2 text-slate-700">{r.activeClients}</td>
-                  <td className="px-3 py-2 font-medium text-emerald-600">{formatUsd(r.pendingCents)}</td>
+                  <td className="px-3 py-2 text-slate-300">{r.activeClients}</td>
+                  <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.pendingCents)}</td>
                 </tr>
               ))}
             </tbody>

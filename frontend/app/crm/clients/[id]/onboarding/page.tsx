@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { crmFieldSurface, crmPageSubtitle, crmPageTitle, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
 const CHECKLIST = [
   "Walk through portal — score, findings, guarantee status",
@@ -30,10 +31,10 @@ type ClientRow = {
 
 function StatusBadge({ label, variant }: { label: string; variant: "green" | "amber" | "red" | "zinc" }) {
   const colors = {
-    green: "bg-emerald-50 text-emerald-600 border-emerald-700",
+    green: "bg-emerald-500/15 text-emerald-300 border-emerald-600/50",
     amber: "bg-amber-900/50 text-amber-400 border-amber-700",
     red: "bg-rose-900/50 text-rose-400 border-rose-700",
-    zinc: "bg-slate-100 text-slate-600 border-slate-200",
+    zinc: "bg-[#1a1a24] text-slate-400 border-[#1e1e2e]",
   };
   return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${colors[variant]}`}>{label}</span>;
 }
@@ -94,14 +95,14 @@ export default function ClientOnboardingChecklistPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="border-slate-200" asChild>
+        <Button variant="outline" size="sm" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" asChild>
           <Link href="/crm/clients">← Clients</Link>
         </Button>
       </div>
 
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Onboarding</h1>
-        <p className="mt-1 text-sm text-slate-600">{company} · Shield onboarding</p>
+        <h1 className={crmPageTitle}>Onboarding</h1>
+        <p className={crmPageSubtitle}>{company} · Shield onboarding</p>
       </div>
 
       {loading ? (
@@ -112,8 +113,8 @@ export default function ClientOnboardingChecklistPage() {
         <>
           {/* Client status cards */}
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Account Status</div>
+            <div className={`px-4 py-3 ${crmSurfaceCard}`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Account Status</div>
               <div className="mt-1">
                 <StatusBadge
                   label={client?.status || "unknown"}
@@ -121,12 +122,12 @@ export default function ClientOnboardingChecklistPage() {
                 />
               </div>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Guarantee</div>
+            <div className={`px-4 py-3 ${crmSurfaceCard}`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Guarantee</div>
               <div className="mt-1">{guaranteeBadge(client?.guarantee_status)}</div>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-600">Portal</div>
+            <div className={`px-4 py-3 ${crmSurfaceCard}`}>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Portal</div>
               <div className="mt-1">
                 <StatusBadge
                   label={client?.portal_user_id ? "Portal linked" : "No portal account"}
@@ -137,27 +138,27 @@ export default function ClientOnboardingChecklistPage() {
           </div>
 
           {/* Onboarding milestones */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-5">
-            <h2 className="text-sm font-semibold text-slate-800">Onboarding Milestones</h2>
+          <div className={`p-5 ${crmSurfaceCard}`}>
+            <h2 className="text-sm font-semibold text-white">Onboarding Milestones</h2>
             <div className="mt-4 space-y-3">
               {milestones.map((m, i) => (
                 <div key={i} className="flex items-center gap-3 text-sm">
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${m.done ? "border-emerald-500 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-slate-100 text-slate-600"}`}>
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${m.done ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300" : "border-[#1e1e2e] bg-[#0d0d14] text-slate-500"}`}>
                     {m.done ? "\u2713" : i + 1}
                   </div>
-                  <span className={m.done ? "text-slate-700" : "text-slate-600"}>{m.label}</span>
+                  <span className={m.done ? "text-slate-300" : "text-slate-500"}>{m.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Onboarding call checklist */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-5">
+          <div className={`p-5 ${crmSurfaceCard}`}>
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-800">Onboarding Call Checklist</h2>
-              <span className="text-xs text-slate-600">{completedCount}/{CHECKLIST.length}</span>
+              <h2 className="text-sm font-semibold text-white">Onboarding Call Checklist</h2>
+              <span className="text-xs text-slate-400">{completedCount}/{CHECKLIST.length}</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#0d0d14]">
               <div
                 className="h-full rounded-full bg-emerald-500 transition-all"
                 style={{ width: `${progress}%` }}
@@ -165,7 +166,7 @@ export default function ClientOnboardingChecklistPage() {
             </div>
             <ul className="mt-4 space-y-2">
               {CHECKLIST.map((line, i) => (
-                <li key={i} className="flex items-start gap-3 rounded-lg border border-slate-200/80 bg-slate-50/80 p-3">
+                <li key={i} className={`flex items-start gap-3 p-3 ${crmFieldSurface}`}>
                   <input
                     type="checkbox"
                     className="mt-0.5 accent-emerald-500"
@@ -178,7 +179,7 @@ export default function ClientOnboardingChecklistPage() {
                       })
                     }
                   />
-                  <span className={`text-sm ${done[i] ? "text-slate-600 line-through" : "text-slate-800"}`}>{line}</span>
+                  <span className={`text-sm ${done[i] ? "text-slate-500 line-through" : "text-slate-200"}`}>{line}</span>
                 </li>
               ))}
             </ul>

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import type { SystemHealthLogRow } from "@/lib/crm/types";
+import { crmSurfaceCard, crmTableRow, crmTableThead } from "@/lib/crm/crm-surface";
 
 export function CeoHealthSection() {
   const { profile } = useCrmAuth();
@@ -29,19 +30,19 @@ export function CeoHealthSection() {
   if (profile?.role !== "ceo") return null;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-slate-50/90 p-5">
-      <h2 className="text-sm font-semibold text-slate-800">Integration monitor</h2>
-      <p className="mt-1 text-xs text-slate-600">
+    <section className={`p-5 ${crmSurfaceCard}`}>
+      <h2 className="text-sm font-semibold text-white">Integration monitor</h2>
+      <p className="mt-1 text-xs text-slate-400">
         Latest checks from <code className="text-slate-500">POST /api/monitor/health-check</code> (Railway cron +{" "}
         <code className="text-slate-500">X-Cron-Secret</code>). CEO-only.
       </p>
       {err && <p className="mt-2 text-sm text-rose-400">{err}</p>}
-      {!err && rows.length === 0 && <p className="mt-3 text-sm text-slate-600">No rows yet — run the monitor cron.</p>}
+      {!err && rows.length === 0 && <p className="mt-3 text-sm text-slate-400">No rows yet — run the monitor cron.</p>}
       {rows.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-600">
+          <table className="w-full text-left text-xs text-slate-400">
+            <thead className={crmTableThead}>
+              <tr>
                 <th className="py-2 pr-2">Time</th>
                 <th className="py-2 pr-2">Service</th>
                 <th className="py-2 pr-2">Status</th>
@@ -51,14 +52,14 @@ export function CeoHealthSection() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-slate-200/90">
-                  <td className="py-2 pr-2 whitespace-nowrap text-slate-700">{new Date(r.checked_at).toLocaleString()}</td>
-                  <td className="py-2 pr-2 font-mono text-slate-700">{r.service}</td>
+                <tr key={r.id} className={crmTableRow}>
+                  <td className="py-2 pr-2 whitespace-nowrap text-slate-300">{new Date(r.checked_at).toLocaleString()}</td>
+                  <td className="py-2 pr-2 font-mono text-slate-300">{r.service}</td>
                   <td className="py-2 pr-2">
                     <span
                       className={
                         r.status === "ok"
-                          ? "text-emerald-600"
+                          ? "text-emerald-400"
                           : r.status === "degraded"
                             ? "text-amber-400"
                             : "text-rose-400"

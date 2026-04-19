@@ -18,6 +18,26 @@ type CrmAuthContextValue = {
 const CrmAuthContext = createContext<CrmAuthContextValue | null>(null);
 
 const AUTH_READY_TIMEOUT_MS = 8000;
+const CRM_PROFILE_STORAGE_KEY = "crm_profile";
+
+/** Read cached profile JSON (caller must verify session user id matches `parsed.id`). */
+function readCachedProfileSync(): Profile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CRM_PROFILE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Profile | null;
+    if (parsed && typeof parsed === "object" && parsed.id) return parsed;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function readCachedProfile(userId: string): Profile | null {
+  const p = readCachedProfileSync();
+  return p && p.id === userId ? p : null;
+}
 
 /** Retries when Navigator Lock API reports stolen / released locks (parallel getSession races). */
 async function getSessionWithRetry(supabase: SupabaseClient) {
@@ -49,16 +69,28 @@ async function getSessionWithRetry(supabase: SupabaseClient) {
 export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   const [authReady, setAuthReady] = useState(false);
-  const [profileFetched, setProfileFetched] = useState(false);
+  const [profileFetched, setProfileFetched] = useState(() => Boolean(readCachedProfileSync()));
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(() => readCachedProfileSync());
 
   const loadProfile = useCallback(
     async (userId: string) => {
+      const cached = readCachedProfile(userId);
+      if (cached) {
+        setProfile(cached);
+        setProfileFetched(true);
+      }
       const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
       if (error) {
         console.error("[CRM auth] profiles select failed:", error.message, error.code, error.details ?? "");
-        setProfile(null);
+        if (!cached) {
+          setProfile(null);
+          try {
+            localStorage.removeItem(CRM_PROFILE_STORAGE_KEY);
+          } catch {
+            /* ignore */
+          }
+        }
         return;
       }
       if (!data) {
@@ -67,9 +99,20 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
           userId
         );
         setProfile(null);
+        try {
+          localStorage.removeItem(CRM_PROFILE_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
         return;
       }
-      setProfile(data as Profile);
+      const row = data as Profile;
+      setProfile(row);
+      try {
+        localStorage.setItem(CRM_PROFILE_STORAGE_KEY, JSON.stringify(row));
+      } catch {
+        /* ignore */
+      }
     },
     [supabase]
   );
@@ -106,9 +149,15 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s ?? null);
       setAuthReady(true);
       if (s?.user) {
+        setProfile((prev) => (prev && prev.id !== s.user!.id ? null : prev));
         await loadProfile(s.user.id);
       } else {
         setProfile(null);
+        try {
+          localStorage.removeItem(CRM_PROFILE_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
       }
       setProfileFetched(true);
 
@@ -140,6 +189,11 @@ export function CrmAuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setProfile(null);
     setProfileFetched(true);
+    try {
+      localStorage.removeItem(CRM_PROFILE_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     window.location.href = "/crm/login";
   }, [supabase]);
 

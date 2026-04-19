@@ -27,6 +27,7 @@ from routers import (
     crm_ai_command,
     crm_client_portal,
     crm_cron,
+    crm_dashboard,
     crm_enterprise,
     crm_invite,
     crm_onboarding,
@@ -34,6 +35,7 @@ from routers import (
     crm_portal_api,
     crm_scale,
     crm_webhooks,
+    guardian,
     monitor,
     portal_phase2,
     portal_self_serve,
@@ -82,6 +84,7 @@ app.include_router(crm_enterprise.router)
 app.include_router(portal_phase2.router)
 app.include_router(portal_self_serve.router)
 app.include_router(crm_scale.router)
+app.include_router(crm_dashboard.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
 app.include_router(crm_onboarding.router)
@@ -92,6 +95,7 @@ app.include_router(aria_whatsapp.router)
 app.include_router(aria_api.router)
 app.include_router(crm_payment.router)
 app.include_router(monitor.router)
+app.include_router(guardian.router)
 
 
 @app.get("/health")

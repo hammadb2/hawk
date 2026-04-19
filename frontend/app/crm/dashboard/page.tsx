@@ -1,51 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CeoLiveDashboard } from "@/components/crm/dashboard/ceo-live-dashboard";
-import type { Prospect } from "@/lib/crm/types";
+import { useHotLeads } from "@/lib/crm/hooks";
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <div className="h-8 w-48 animate-pulse rounded-lg bg-crmSurface" />
+        <div className="h-4 w-72 animate-pulse rounded-lg bg-crmSurface2" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-28 animate-pulse rounded-xl bg-crmSurface" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function CrmDashboardPage() {
   const { authReady, profileFetched, session, profile } = useCrmAuth();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [hotLeads, setHotLeads] = useState<Prospect[]>([]);
-
-  const loadHot = useCallback(async () => {
-    if (!profile || !["ceo", "hos"].includes(profile.role)) {
-      setHotLeads([]);
-      return;
-    }
-    const { data } = await supabase.from("prospects").select("*").eq("is_hot", true).order("last_activity_at", { ascending: false }).limit(8);
-    setHotLeads((data as Prospect[]) ?? []);
-  }, [profile, supabase]);
+  const showHot = !!profile && ["ceo", "hos"].includes(profile.role);
+  const { data: hotLeads = [] } = useHotLeads(showHot);
 
   useEffect(() => {
     if (!authReady) return;
     if (!session) router.replace("/crm/login");
   }, [authReady, session, router]);
 
-  useEffect(() => {
-    void loadHot();
-  }, [loadHot]);
-
   if (!authReady || !session) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!profileFetched) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!profile) {
@@ -73,34 +69,34 @@ export default function CrmDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-600">
-          Signed in as <span className="text-slate-700">{profile.full_name ?? profile.email}</span> —{" "}
-          <span className="uppercase text-emerald-600">{roleLabel}</span>
+        <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
+        <p className="text-sm text-slate-400">
+          Signed in as <span className="text-slate-200">{profile.full_name ?? profile.email}</span> —{" "}
+          <span className="font-medium uppercase tracking-wider text-emerald-400">{roleLabel}</span>
         </p>
       </div>
 
       {!onboardingDone && (
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 p-4 text-sm text-amber-950">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
           Complete your first-login checklist.{" "}
-          <Link href="/crm/onboarding" className="font-medium underline">
+          <Link href="/crm/onboarding" className="font-medium text-amber-400 underline">
             Continue onboarding
           </Link>
         </div>
       )}
 
       {["ceo", "hos"].includes(profile.role) && (
-        <CeoLiveDashboard supabase={supabase} profile={profile} />
+        <CeoLiveDashboard supabase={supabase} profile={profile} accessToken={session.access_token ?? null} />
       )}
 
       {["ceo", "hos"].includes(profile.role) && hotLeads.length > 0 && (
-        <div className="rounded-xl border border-rose-200/80 bg-rose-50/90 p-4">
-          <h2 className="text-sm font-semibold text-rose-800">Hot leads</h2>
+        <div className="rounded-xl border border-rose-500/30 bg-rose-950/40 p-4">
+          <h2 className="text-sm font-semibold text-rose-300">Hot leads</h2>
           <ul className="mt-2 space-y-2">
             {hotLeads.map((p) => (
               <li key={p.id}>
-                <Link href={`/crm/prospects/${p.id}`} className="text-sm text-slate-800 hover:text-emerald-600 hover:underline">
-                  {p.company_name ?? p.domain} <span className="text-slate-600">({p.domain})</span>
+                <Link href={`/crm/prospects/${p.id}`} className="text-sm text-slate-200 hover:text-emerald-400 hover:underline">
+                  {p.company_name ?? p.domain} <span className="text-slate-500">({p.domain})</span>
                 </Link>
               </li>
             ))}
@@ -111,17 +107,17 @@ export default function CrmDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/crm/pipeline"
-          className="rounded-xl border border-slate-200 bg-slate-50 p-5 transition-colors hover:border-emerald-500/40"
+          className="rounded-xl border border-crmBorder bg-crmSurface p-5 shadow-lg transition-colors hover:border-emerald-500/40"
         >
-          <div className="text-sm font-medium text-emerald-600">Pipeline</div>
-          <p className="mt-1 text-sm text-slate-600">Kanban, list, table — click a card for the full prospect profile.</p>
+          <div className="text-sm font-medium text-emerald-400">Pipeline</div>
+          <p className="mt-1 text-sm text-slate-400">Kanban, list, table — click a card for the full prospect profile.</p>
         </Link>
         <Link
           href="/crm/onboarding"
-          className="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-colors hover:border-emerald-500/40"
+          className="rounded-xl border border-crmBorder bg-crmSurface2 p-5 shadow-lg transition-colors hover:border-emerald-500/40"
         >
-          <div className="text-sm font-medium text-slate-700">Onboarding</div>
-          <p className="mt-1 text-sm text-slate-600">First-login checklist for new reps.</p>
+          <div className="text-sm font-medium text-white">Onboarding</div>
+          <p className="mt-1 text-sm text-slate-400">First-login checklist for new reps.</p>
         </Link>
       </div>
     </div>

@@ -14,7 +14,23 @@ export type ProspectStage =
   | "closed_won"
   | "lost";
 
-export type ProspectSource = "charlotte" | "manual" | "inbound";
+export type ProspectSource =
+  | "charlotte"
+  | "manual"
+  | "inbound"
+  | "homepage_scanner"
+  | "aria_nightly"
+  | "aria_chat";
+
+/** ARIA outbound automation stages (CRM `prospects.pipeline_status`). */
+export type ProspectPipelineStatus =
+  | "discovered"
+  | "enriched"
+  | "verified"
+  | "scanned"
+  | "ready"
+  | "contacted"
+  | "suppressed";
 
 export type ProfileStatus = "invited" | "onboarding" | "active" | "at_risk" | "inactive";
 
@@ -60,6 +76,22 @@ export type Prospect = {
   contact_name?: string | null;
   contact_email?: string | null;
   phone?: string | null;
+  /** Outbound pipeline stage when set by ARIA automation */
+  pipeline_status?: ProspectPipelineStatus | string | null;
+  lead_score?: number | null;
+  email_finder?: string | null;
+  zero_bounce_result?: string | null;
+  vulnerability_found?: string | null;
+  vulnerability_type?: string | null;
+  email_subject?: string | null;
+  email_body?: string | null;
+  smartlead_campaign_id?: string | null;
+  dispatched_at?: string | null;
+  google_rating?: number | null;
+  review_count?: number | null;
+  pipeline_run_id?: string | null;
+  address?: string | null;
+  province?: string | null;
 };
 
 export type CrmActivityRow = {
@@ -206,6 +238,17 @@ export const STAGE_META: Record<
   proposal_sent: { label: "Proposal Sent", color: "#FB923C", columnBg: "rgba(251,146,60,0.12)" },
   closed_won: { label: "Closed Won", color: "#00C48C", columnBg: "rgba(0,196,140,0.12)" },
   lost: { label: "Lost", color: "#FF4757", columnBg: "rgba(255,71,87,0.12)" },
+};
+
+/** Labels for ARIA `prospects.pipeline_status` filter chips. */
+export const PIPELINE_STATUS_LABELS: Record<ProspectPipelineStatus, string> = {
+  discovered: "Discovered",
+  enriched: "Enriched",
+  verified: "Verified",
+  scanned: "Scanned",
+  ready: "Ready",
+  contacted: "Contacted",
+  suppressed: "Suppressed",
 };
 
 export const LOST_REASONS = [

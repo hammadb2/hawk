@@ -118,8 +118,8 @@ export function FileUpload({ accessToken, onAnalysis, disabled }: FileUploadProp
         disabled={disabled || uploading}
         className={`rounded-xl border px-3 py-3 transition ${
           uploading
-            ? "border-slate-200 bg-slate-50 text-slate-400"
-            : "border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:text-emerald-600"
+            ? "border-[#1e1e2e] bg-[#0d0d14] text-slate-500"
+            : "border-[#1e1e2e] bg-[#111118] text-slate-400 hover:border-emerald-500/40 hover:text-emerald-400"
         }`}
         title={uploading ? "Uploading..." : "Upload file for analysis"}
       >

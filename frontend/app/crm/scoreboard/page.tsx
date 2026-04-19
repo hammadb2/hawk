@@ -7,6 +7,14 @@ import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { LiveScoreboard } from "@/components/crm/scoreboard/live-scoreboard";
 import { formatUsd } from "@/lib/crm/format";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  crmEmptyState,
+  crmPageSubtitle,
+  crmPageTitle,
+  crmTableRow,
+  crmTableThead,
+  crmTableWrap,
+} from "@/lib/crm/crm-surface";
 
 type MonthOption = { label: string; start: string; end: string };
 
@@ -84,14 +92,18 @@ export default function ScoreboardPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Scoreboard</h1>
-        <p className="mt-1 text-sm text-slate-600">Live team rankings and historical performance.</p>
+        <h1 className={crmPageTitle}>Scoreboard</h1>
+        <p className={crmPageSubtitle}>Live team rankings and historical performance.</p>
       </div>
 
       <Tabs defaultValue="live">
-        <TabsList>
-          <TabsTrigger value="live">Live</TabsTrigger>
-          <TabsTrigger value="history">Historical</TabsTrigger>
+        <TabsList className="border border-[#1e1e2e] bg-[#111118] text-slate-400">
+          <TabsTrigger value="live" className="data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-300">
+            Live
+          </TabsTrigger>
+          <TabsTrigger value="history" className="data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-300">
+            Historical
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="live">
@@ -104,10 +116,10 @@ export default function ScoreboardPage() {
               <button
                 key={m.start}
                 type="button"
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   selectedMonth === i
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                    : "border-[#1e1e2e] bg-[#111118] text-slate-400 hover:bg-[#1a1a24]"
                 }`}
                 onClick={() => setSelectedMonth(i)}
               >
@@ -117,15 +129,13 @@ export default function ScoreboardPage() {
           </div>
 
           {histLoading ? (
-            <div className="py-12 text-center text-slate-600">Loading…</div>
+            <div className="py-12 text-center text-slate-400">Loading…</div>
           ) : histRows.length === 0 ? (
-            <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-8 text-center text-sm text-slate-600">
-              No closed deals for {months[selectedMonth].label}.
-            </p>
+            <p className={`${crmEmptyState} py-8`}>No closed deals for {months[selectedMonth].label}.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <div className={crmTableWrap}>
               <table className="w-full min-w-[500px] text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <thead className={crmTableThead}>
                   <tr>
                     <th className="px-3 py-2">#</th>
                     <th className="px-3 py-2">Rep</th>
@@ -135,13 +145,13 @@ export default function ScoreboardPage() {
                 </thead>
                 <tbody>
                   {histRows.map((r, i) => (
-                    <tr key={r.name} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
-                      <td className="px-3 py-2 font-mono text-slate-600">
+                    <tr key={r.name} className={crmTableRow}>
+                      <td className="px-3 py-2 font-mono text-slate-500">
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
                       </td>
-                      <td className="px-3 py-2 font-medium text-slate-900">{r.name}</td>
+                      <td className="px-3 py-2 font-medium text-white">{r.name}</td>
                       <td className="px-3 py-2 text-sky-400">{r.wins}</td>
-                      <td className="px-3 py-2 font-medium text-emerald-600">{formatUsd(r.commission)}</td>
+                      <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.commission)}</td>
                     </tr>
                   ))}
                 </tbody>
