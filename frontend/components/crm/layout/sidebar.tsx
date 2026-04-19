@@ -1,29 +1,48 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import {
+  LayoutDashboard,
+  Kanban,
+  Users,
+  UserCheck,
+  Trophy,
+  MessageSquareReply,
+  ShieldCheck,
+  HeartPulse,
+  UsersRound,
+  FileBarChart2,
+  DollarSign,
+  ScrollText,
+  Settings,
+  Ticket,
+  LogOut,
+  Bot,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { navVisibleForRole } from "@/lib/crm/nav-config";
 import { Button } from "@/components/ui/button";
 
-const icons: Record<string, string> = {
-  Dashboard: "◉",
-  Pipeline: "≡",
-  Prospects: "◎",
-  Clients: "◈",
-  Scoreboard: "▲",
-  ARIA: "✦",
-  Team: "👥",
-  Reports: "📊",
-  Earnings: "$",
-  "My Earnings": "$",
-  Settings: "⚙",
-  "Support Tickets": "🎫",
-  Replies: "↩",
-  Guarantees: "🛡",
-  Health: "◆",
+const icons: Record<string, ReactNode> = {
+  Dashboard: <LayoutDashboard size={18} />,
+  Pipeline: <Kanban size={18} />,
+  Prospects: <Users size={18} />,
+  Clients: <UserCheck size={18} />,
+  Scoreboard: <Trophy size={18} />,
+  ARIA: <Bot size={18} />,
+  Replies: <MessageSquareReply size={18} />,
+  Guarantees: <ShieldCheck size={18} />,
+  Health: <HeartPulse size={18} />,
+  Team: <UsersRound size={18} />,
+  Reports: <FileBarChart2 size={18} />,
+  Earnings: <DollarSign size={18} />,
+  "Audit log": <ScrollText size={18} />,
+  Settings: <Settings size={18} />,
+  "Support Tickets": <Ticket size={18} />,
 };
 
 export function CrmSidebar() {
@@ -73,11 +92,11 @@ export function CrmSidebar() {
             >
               <span
                 className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xl leading-none",
-                  active ? "bg-emerald-100/90 text-emerald-900" : "bg-slate-50 text-slate-700"
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                  active ? "bg-emerald-100/90 text-emerald-700" : "bg-slate-50 text-slate-500"
                 )}
               >
-                {icons[item.label] ?? "•"}
+                {icons[item.label] ?? <LayoutDashboard size={18} />}
               </span>
               <span className="hidden xl:inline">{item.label}</span>
             </Link>
@@ -90,7 +109,7 @@ export function CrmSidebar() {
           className="w-full justify-center border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100 xl:justify-start"
           onClick={() => void signOut()}
         >
-          <span className="xl:mr-2">⎋</span>
+          <LogOut size={16} className="xl:mr-2" />
           <span className="hidden xl:inline">Sign out</span>
         </Button>
       </div>

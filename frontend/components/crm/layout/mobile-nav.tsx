@@ -1,16 +1,20 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { LayoutDashboard, Kanban, Plus, Trophy, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const tabs = [
-  { href: "/crm/dashboard", label: "Home", icon: "⌂" },
-  { href: "/crm/pipeline", label: "Pipeline", icon: "≡" },
-  { href: "/crm/pipeline?add=1", label: "Add", icon: "+" },
-  { href: "/crm/scoreboard", label: "Score", icon: "▲" },
-  { href: "/crm/dashboard?more=1", label: "More", icon: "⋯" },
+type Tab = { href: string; label: string; icon: ReactNode };
+
+const tabs: Tab[] = [
+  { href: "/crm/dashboard", label: "Home", icon: <LayoutDashboard size={20} /> },
+  { href: "/crm/pipeline", label: "Pipeline", icon: <Kanban size={20} /> },
+  { href: "/crm/pipeline?add=1", label: "Add", icon: <Plus size={20} /> },
+  { href: "/crm/scoreboard", label: "Score", icon: <Trophy size={20} /> },
+  { href: "/crm/dashboard?more=1", label: "More", icon: <MoreHorizontal size={20} /> },
 ];
 
 export function CrmMobileNav() {
@@ -35,7 +39,7 @@ export function CrmMobileNav() {
               active && "text-emerald-600"
             )}
           >
-            <span className="text-lg leading-none">{t.icon}</span>
+            <span className="leading-none">{t.icon}</span>
             {t.label}
           </Link>
         );
