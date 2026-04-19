@@ -847,6 +847,9 @@ async def _apollo_last_resort(
 
 async def run_full_discovery(
     cities: list[str] | None = None,
+    *,
+    pipeline_run_id: str | None = None,
+    prospect_source: str = "aria_nightly",
 ) -> list[dict[str, Any]]:
     """Run the full 4-actor discovery pipeline.
 
@@ -861,6 +864,8 @@ async def run_full_discovery(
 
     Args:
         cities: Optional list of cities to scrape. Defaults to CITIES constant (18 Canadian cities).
+        pipeline_run_id: Optional ARIA chat pipeline run UUID for CRM linkage.
+        prospect_source: `aria_nightly` (default) or `aria_chat` for `prospects.source`.
 
     Returns all leads with lead_score, contact_email, email_finder set.
     """
@@ -892,6 +897,14 @@ async def run_full_discovery(
         logger.info("All leads already in inventory/CRM after dedup")
         return []
 
+    from services.aria_prospect_pipeline import bulk_upsert_discovered_prospects, sync_prospects_after_email_merge
+
+    bulk_upsert_discovered_prospects(
+        all_leads,
+        pipeline_run_id=pipeline_run_id,
+        source=prospect_source,
+    )
+
     # Mark which leads have emails from Actor 1
     for lead in all_leads:
         if actor1_emails.get(lead["domain"]):
@@ -922,6 +935,8 @@ async def run_full_discovery(
         ld.pop("_email_found", None)
         ld.pop("emails_from_website", None)
 
+    sync_prospects_after_email_merge(with_email, without_email)
+
     # Return both — caller decides what to do with suppressed leads
     logger.info("Full discovery complete: %d with email, %d suppressed", len(with_email), len(without_email))
     return with_email + without_email
@@ -931,6 +946,9 @@ async def run_ondemand_discovery(
     vertical: str,
     city: str,
     batch_size: int = 50,
+    *,
+    pipeline_run_id: str | None = None,
+    prospect_source: str = "aria_chat",
 ) -> list[dict[str, Any]]:
     """Run discovery for a single vertical + city (on-demand pipeline).
 
@@ -940,7 +958,16 @@ async def run_ondemand_discovery(
         logger.warning("APIFY_API_KEY not configured for on-demand discovery")
         # Try Apollo as absolute last resort
         fallback = await _apollo_last_resort([], vertical, city)
-        return await deduplicate_leads(fallback) if fallback else []
+        out = await deduplicate_leads(fallback) if fallback else []
+        if out:
+            from services.aria_prospect_pipeline import bulk_upsert_enriched_prospects
+
+            bulk_upsert_enriched_prospects(
+                out,
+                pipeline_run_id=pipeline_run_id,
+                source=prospect_source,
+            )
+        return out
 
     # Actor 1: single city + vertical
     sem = asyncio.Semaphore(10)
@@ -950,7 +977,16 @@ async def run_ondemand_discovery(
     if not leads:
         # Apollo last resort
         fallback = await _apollo_last_resort([], vertical, city)
-        return await deduplicate_leads(fallback) if fallback else []
+        out = await deduplicate_leads(fallback) if fallback else []
+        if out:
+            from services.aria_prospect_pipeline import bulk_upsert_enriched_prospects
+
+            bulk_upsert_enriched_prospects(
+                out,
+                pipeline_run_id=pipeline_run_id,
+                source=prospect_source,
+            )
+        return out
 
     # Score and sort, take top batch_size
     for lead in leads:
@@ -962,6 +998,14 @@ async def run_ondemand_discovery(
     leads = await deduplicate_leads(leads)
     if not leads:
         return []
+
+    from services.aria_prospect_pipeline import bulk_upsert_discovered_prospects, sync_prospects_after_email_merge
+
+    bulk_upsert_discovered_prospects(
+        leads,
+        pipeline_run_id=pipeline_run_id,
+        source=prospect_source,
+    )
 
     # Capture Actor 1 emails
     actor1_emails: dict[str, list[str]] = {}
@@ -995,5 +1039,7 @@ async def run_ondemand_discovery(
     for ld in with_email + without_email:
         ld.pop("_email_found", None)
         ld.pop("emails_from_website", None)
+
+    sync_prospects_after_email_merge(with_email, without_email)
 
     return with_email + without_email

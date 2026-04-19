@@ -313,6 +313,14 @@ def run_morning_dispatch() -> dict[str, Any]:
             lead_ids = [lead["id"] for lead in uploaded_leads if lead.get("id")]
             dispatched = mark_leads_dispatched(lead_ids, campaign_id)
 
+            try:
+                from services.aria_prospect_pipeline import sync_prospect_smartlead_morning
+
+                for inv_lead in uploaded_leads:
+                    sync_prospect_smartlead_morning(inv_lead.get("domain", ""), str(campaign_id))
+            except Exception as exc:
+                logger.debug("Prospect Smartlead sync skipped: %s", exc)
+
             stats["by_vertical"][vertical] = {
                 "campaign_id": campaign_id,
                 "uploaded": len(uploaded_leads),

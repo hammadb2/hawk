@@ -203,10 +203,22 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
     Returns (verified_leads, suppressed_leads) so suppressed leads can be
     stored in inventory with status='suppressed' to prevent re-processing.
     """
+    from services.aria_prospect_pipeline import sync_prospect_zerobounce_nightly
+
+    def _sync_zb_prospects(rows: list[dict[str, Any]], *, all_verified: bool) -> None:
+        for row in rows:
+            dom = row.get("domain") or ""
+            if not dom:
+                continue
+            zb = str(row.get("zero_bounce_result") or "valid")
+            ok = all_verified or row.get("status") != "suppressed"
+            sync_prospect_zerobounce_nightly(dom, zb, ok=ok)
+
     if not leads or not ZEROBOUNCE_API_KEY:
         logger.warning("ZeroBounce not configured — skipping verification, keeping all leads")
         for lead in leads:
             lead["zero_bounce_result"] = "valid"
+        _sync_zb_prospects(leads, all_verified=True)
         return leads, []
 
     # Build CSV content for bulk upload
@@ -219,6 +231,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
             email_to_lead[email.lower()] = lead
 
     if len(csv_lines) <= 1:
+        _sync_zb_prospects(leads, all_verified=True)
         return leads, []
 
     csv_content = "\n".join(csv_lines)
@@ -243,6 +256,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
                 # Fallback: keep all leads as valid
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
+                _sync_zb_prospects(leads, all_verified=True)
                 return leads, []
 
             upload_data = r.json()
@@ -251,6 +265,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
                 logger.error("ZeroBounce bulk upload returned no file_id: %s", upload_data)
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
+                _sync_zb_prospects(leads, all_verified=True)
                 return leads, []
 
             logger.info("ZeroBounce bulk submitted file_id=%s (%d emails)", file_id, len(csv_lines) - 1)
@@ -288,6 +303,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
                 logger.error("ZeroBounce bulk results download failed: %s", result_r.text[:500])
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
+                _sync_zb_prospects(leads, all_verified=True)
                 return leads, []
 
             # Parse CSV results
@@ -295,6 +311,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
             if len(result_lines) < 2:
                 for lead in leads:
                     lead["zero_bounce_result"] = "valid"
+                _sync_zb_prospects(leads, all_verified=True)
                 return leads, []
 
             # Find email and status column indices from header
@@ -349,6 +366,8 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
                     suppressed.append(lead)
 
             logger.info("ZeroBounce bulk: %d verified, %d suppressed", len(verified), len(suppressed))
+            _sync_zb_prospects(verified, all_verified=True)
+            _sync_zb_prospects(suppressed, all_verified=False)
             return verified, suppressed
 
     except Exception as exc:
@@ -356,6 +375,7 @@ async def step_bulk_verify_emails(leads: list[dict[str, Any]]) -> tuple[list[dic
         # Fallback: keep all leads
         for lead in leads:
             lead["zero_bounce_result"] = "valid"
+        _sync_zb_prospects(leads, all_verified=True)
         return leads, []
 
 
@@ -427,6 +447,7 @@ async def step_scan_domains(leads: list[dict[str, Any]]) -> list[dict[str, Any]]
                 title = top.get("title") or top.get("name") or ""
                 interp = top.get("interpretation") or top.get("plain_english") or top.get("description") or ""
                 sev = (top.get("severity") or "").upper()
+                lead["vulnerability_type"] = (top.get("severity") or top.get("type") or "")[:200]
                 lead["vulnerability_found"] = f"[{sev}] {title}"
                 if interp:
                     lead["vulnerability_found"] += f" — {interp[:200]}"
@@ -436,6 +457,11 @@ async def step_scan_domains(leads: list[dict[str, Any]]) -> list[dict[str, Any]]
             lead["no_finding"] = True
 
         lead["status"] = "scanned"
+
+    from services.aria_prospect_pipeline import sync_prospect_scan_nightly
+
+    for lead in leads:
+        sync_prospect_scan_nightly(lead)
 
     logger.info("Scanning complete: %d domains scanned", len(leads))
     return leads
@@ -536,6 +562,8 @@ async def _generate_batch(
 
 async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Generate personalized emails in batches of 20."""
+    from services.aria_prospect_pipeline import sync_prospect_email_ready_nightly
+
     if not leads or not OPENAI_API_KEY:
         logger.warning("OpenAI not configured — skipping email generation")
         return leads
@@ -558,6 +586,11 @@ async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, An
                 lead["email_body"] = body_with_footer
                 lead["status"] = "personalized"
                 generated += 1
+                sync_prospect_email_ready_nightly(
+                    lead.get("domain", ""),
+                    lead["email_subject"],
+                    body_with_footer,
+                )
             else:
                 # Fallback: generate a template
                 first_name = (lead.get("contact_name") or "").split()[0] if lead.get("contact_name") else "there"
@@ -586,6 +619,11 @@ async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, An
 
                 lead["status"] = "personalized"
                 generated += 1
+                sync_prospect_email_ready_nightly(
+                    lead.get("domain", ""),
+                    lead.get("email_subject") or "",
+                    lead.get("email_body") or "",
+                )
 
     logger.info("Email generation: %d/%d leads personalized", generated, len(leads))
     return leads

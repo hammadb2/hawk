@@ -423,6 +423,8 @@ def step_clay_enrich(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str,
 
 def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Verify lead emails via ZeroBounce. Removes invalid emails."""
+    from services.aria_prospect_pipeline import sync_prospect_zerobounce_chat
+
     _update_run(run_id, {"current_step": "zerobounce_verify"})
 
     if DRY_RUN or not ZEROBOUNCE_API_KEY:
@@ -432,6 +434,12 @@ def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dic
                 "zero_bounce_result": {"stub": True, "status": "valid"},
                 "status": "verified",
             })
+            sync_prospect_zerobounce_chat(
+                lead.get("domain", ""),
+                zb_payload={"stub": True, "status": "valid"},
+                zb_status="valid",
+                pipeline_ok=True,
+            )
         _update_run(run_id, {"leads_verified": len(leads)})
         return leads
 
@@ -473,11 +481,23 @@ def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dic
                     lead["zero_bounce_result"] = zb_result
                     lead["status"] = "verified"
                     verified_leads.append(lead)
+                    sync_prospect_zerobounce_chat(
+                        lead.get("domain", ""),
+                        zb_payload=zb_result,
+                        zb_status=zb_status,
+                        pipeline_ok=True,
+                    )
                 else:
                     _update_lead(lead["id"], {
                         "status": "removed",
                         "removed_reason": f"zerobounce_{zb_status}",
                     })
+                    sync_prospect_zerobounce_chat(
+                        lead.get("domain", ""),
+                        zb_payload=zb_result,
+                        zb_status=zb_status,
+                        pipeline_ok=False,
+                    )
             except Exception as exc:
                 logger.warning("ZeroBounce failed for %s: %s", email, exc)
                 # On error, keep the lead (benefit of the doubt)
@@ -487,6 +507,12 @@ def step_zerobounce_verify(run_id: str, leads: list[dict[str, Any]]) -> list[dic
                 })
                 lead["status"] = "verified"
                 verified_leads.append(lead)
+                sync_prospect_zerobounce_chat(
+                    lead.get("domain", ""),
+                    zb_payload={"error": str(exc)[:500]},
+                    zb_status="unknown",
+                    pipeline_ok=True,
+                )
 
     _update_run(run_id, {"leads_verified": len(verified_leads)})
     return verified_leads
@@ -555,6 +581,8 @@ async def _scan_batch(domains_with_ids: list[tuple[str, str, str]]) -> dict[str,
 
 def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Run Hawk domain scanner on each lead's domain."""
+    from services.aria_prospect_pipeline import sync_prospect_scan_chat
+
     _update_run(run_id, {"current_step": "hawk_scan"})
 
     if DRY_RUN:
@@ -570,6 +598,13 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
             })
             lead["vulnerability_found"] = vuln
             lead["status"] = "scanned"
+            lead["hawk_score"] = 42
+            sync_prospect_scan_chat(
+                lead.get("domain", ""),
+                vulnerability_text=vuln or None,
+                vulnerability_type="HIGH" if vuln else None,
+                hawk_score=42,
+            )
         _update_run(run_id, {"leads_scanned": len(leads), "vulnerabilities_found": vulns_found})
         return leads
 
@@ -586,6 +621,16 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
             break
         result = scan_results.get(lead["id"], {})
         vuln_text = result.get("vulnerability_text", "")
+        top = result.get("top_finding") if isinstance(result.get("top_finding"), dict) else {}
+        vuln_type = ""
+        if isinstance(top, dict):
+            vuln_type = str(top.get("severity") or top.get("type") or "")[:200]
+        score = result.get("score")
+        if score is not None:
+            try:
+                lead["hawk_score"] = max(0, min(100, int(score)))
+            except (TypeError, ValueError):
+                lead["hawk_score"] = None
         if vuln_text:
             vulns_found += 1
 
@@ -596,6 +641,12 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
         lead["vulnerability_found"] = vuln_text
         lead["status"] = "scanned"
         scanned_leads.append(lead)
+        sync_prospect_scan_chat(
+            lead.get("domain", ""),
+            vulnerability_text=vuln_text or None,
+            vulnerability_type=vuln_type or None,
+            hawk_score=lead.get("hawk_score"),
+        )
 
     _update_run(run_id, {"leads_scanned": len(scanned_leads), "vulnerabilities_found": vulns_found})
     return scanned_leads
@@ -716,6 +767,8 @@ async def _generate_emails_batch(leads: list[dict[str, Any]]) -> dict[str, dict[
 
 def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Generate personalized cold emails for each lead via OpenAI."""
+    from services.aria_prospect_pipeline import sync_prospect_email_ready_chat
+
     _update_run(run_id, {"current_step": "email_generation"})
 
     if DRY_RUN or not OPENAI_API_KEY:
@@ -743,6 +796,7 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
             lead["email_subject"] = email["subject"]
             lead["email_content"] = email["body"]
             lead["status"] = "email_generated"
+            sync_prospect_email_ready_chat(lead.get("domain", ""), email["subject"], email["body"])
         _update_run(run_id, {"emails_generated": len(leads)})
         return leads
 
@@ -765,6 +819,7 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
             lead["email_content"] = body
             lead["status"] = "email_generated"
             generated_count += 1
+            sync_prospect_email_ready_chat(lead.get("domain", ""), subject, body)
         else:
             _update_lead(lead["id"], {
                 "status": "removed",
@@ -779,6 +834,8 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
 
 def step_smartlead_load(run_id: str, leads: list[dict[str, Any]], vertical: str) -> list[dict[str, Any]]:
     """Load leads with personalized emails into Smartlead campaign."""
+    from services.aria_prospect_pipeline import sync_prospect_smartlead_chat
+
     _update_run(run_id, {"current_step": "smartlead_load"})
 
     if DRY_RUN or not SMARTLEAD_API_KEY:
@@ -791,6 +848,7 @@ def step_smartlead_load(run_id: str, leads: list[dict[str, Any]], vertical: str)
             })
             lead["email_sent"] = True
             lead["status"] = "sent"
+            sync_prospect_smartlead_chat(lead.get("domain", ""), "dry_run_campaign")
         _update_run(run_id, {"emails_sent": len(leads)})
         return leads
 
@@ -845,6 +903,7 @@ def step_smartlead_load(run_id: str, leads: list[dict[str, Any]], vertical: str)
                     lead["smartlead_campaign_id"] = campaign_id
                     lead["status"] = "sent"
                     sent_count += 1
+                    sync_prospect_smartlead_chat(lead.get("domain", ""), str(campaign_id))
                 else:
                     logger.warning("Smartlead upload failed for %s: %s", lead.get("contact_email"), r.text[:300])
             except Exception as exc:
@@ -999,7 +1058,7 @@ def step_apify_discover(
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(
                 asyncio.run,
-                run_ondemand_discovery(vertical, location, batch_size),
+                run_ondemand_discovery(vertical, location, batch_size, pipeline_run_id=run_id),
             )
             raw_leads = future.result(timeout=900)
 
