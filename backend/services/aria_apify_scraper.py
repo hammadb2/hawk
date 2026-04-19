@@ -33,9 +33,9 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 # Actor IDs
 ACTOR_GOOGLE_MAPS = "compass/crawler-google-places"
-ACTOR_LINKEDIN = "dev_fusion/mass-linkedin-profile-scraper-with-email"
+ACTOR_LINKEDIN = "dev_fusion/linkedin-profile-scraper"
 ACTOR_LEADS_FINDER = "code_crafter/leads-finder"
-ACTOR_WEBSITE_CRAWLER = "apify/website-email-crawler"
+ACTOR_WEBSITE_CRAWLER = "vdrmota/contact-info-scraper"
 
 # 18 Canadian cities
 CITIES: list[str] = [
@@ -52,6 +52,159 @@ VERTICAL_QUERIES: dict[str, str] = {
 }
 
 VERTICALS = list(VERTICAL_QUERIES.keys())
+
+
+def canonical_vertical(vertical: str) -> str:
+    """Map free-text / LLM vertical labels to a supported pipeline vertical."""
+    v = (vertical or "dental").strip().lower()
+    if v in VERTICAL_QUERIES:
+        return v
+    aliases: dict[str, str] = {
+        "dentist": "dental",
+        "dentists": "dental",
+        "dentistry": "dental",
+        "dental clinic": "dental",
+        "dental_clinic": "dental",
+        "law": "legal",
+        "lawyer": "legal",
+        "lawyers": "legal",
+        "attorney": "legal",
+        "law firm": "legal",
+        "law_firm": "legal",
+        "cpa": "accounting",
+        "bookkeeping": "accounting",
+        "accountant": "accounting",
+        "accountants": "accounting",
+    }
+    if v in aliases:
+        return aliases[v]
+    for canon in VERTICAL_QUERIES:
+        if canon in v or v in canon:
+            return canon
+    logger.warning("Unknown vertical %r — defaulting to dental", vertical)
+    return "dental"
+
+
+def normalize_city_for_discovery(location: str) -> str:
+    """Pick a display city string for Google Maps + dedup, from user/LLM location text."""
+    raw = (location or "").strip()
+    if not raw:
+        return "Toronto"
+    lower = raw.lower()
+    for c in CITIES:
+        cl = c.lower()
+        if cl in lower:
+            return c
+    first = raw.split(",")[0].strip()
+    for c in CITIES:
+        if c.lower() == first.lower():
+            return c
+    return first.title() if first else "Toronto"
+
+
+def search_strings_for_maps(vertical: str, city: str) -> list[str]:
+    """Several Google Maps query variants for better recall (one Apify run, deduped strings)."""
+    city = (city or "").strip()
+    primary = VERTICAL_QUERIES[vertical].format(city=city)
+    extras: dict[str, list[str]] = {
+        "dental": [
+            f"dentist {city}",
+            f"dental office {city}",
+            f"dental clinic {city} Ontario",
+            f"family dentist {city}",
+            f"dentistry {city}",
+        ],
+        "legal": [
+            f"law firm {city}",
+            f"lawyers {city}",
+            f"law office {city}",
+            f"solicitor {city} Ontario",
+        ],
+        "accounting": [
+            f"CPA {city}",
+            f"accounting firm {city}",
+            f"chartered accountant {city}",
+            f"bookkeeping {city}",
+        ],
+    }
+    out: list[str] = []
+    seen: set[str] = set()
+    for s in [primary] + extras.get(vertical, []):
+        key = " ".join(s.split()).lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(" ".join(s.split()))
+    return out[:12]
+
+
+def _apollo_location_strings(city: str) -> list[str]:
+    """Apollo person_locations — include province for Canadian metros (trial order)."""
+    city = (city or "").strip()
+    lc = city.lower()
+    locs: list[str] = []
+    if "toronto" in lc or lc == "gta":
+        locs.extend(
+            [
+                "Toronto, Ontario, Canada",
+                "Toronto, ON, Canada",
+                "Greater Toronto Area, Ontario, Canada",
+            ]
+        )
+    elif "vancouver" in lc:
+        locs.extend(["Vancouver, British Columbia, Canada", "Vancouver, BC, Canada"])
+    elif "calgary" in lc:
+        locs.extend(["Calgary, Alberta, Canada", "Calgary, AB, Canada"])
+    elif "montreal" in lc or "montréal" in lc:
+        locs.extend(["Montreal, Quebec, Canada", "Montreal, QC, Canada"])
+    elif "ottawa" in lc:
+        locs.extend(["Ottawa, Ontario, Canada", "Ottawa, ON, Canada"])
+    tail = f"{city}, Canada"
+    if tail not in locs:
+        locs.append(tail)
+    deduped: list[str] = []
+    seen = set()
+    for x in locs:
+        k = x.lower()
+        if k not in seen:
+            seen.add(k)
+            deduped.append(x)
+    return deduped
+
+
+def _apollo_organization_keyword_tags(vertical: str) -> list[str]:
+    """Align with aria_pipeline VERTICAL_CONFIG keyword-style tags for mixed_people/search."""
+    tags = {
+        "dental": ["dental", "dentistry", "dentist", "dental clinic"],
+        "legal": ["law firm", "legal services", "lawyer"],
+        "accounting": ["accounting", "CPA", "bookkeeping"],
+    }
+    return tags.get(vertical, tags["dental"])[:5]
+
+
+def _extract_place_website(item: dict[str, Any]) -> str:
+    """Best-effort website URL from Apify compass/crawler-google-places row."""
+    for key in ("website", "websiteUrl", "website_url", "url"):
+        v = item.get(key)
+        if isinstance(v, str) and v.strip() and not v.startswith("tel:"):
+            return v.strip()
+    nested = item.get("websiteUrls") or item.get("websites") or item.get("links")
+    if isinstance(nested, list):
+        for entry in nested:
+            if isinstance(entry, str) and entry.strip():
+                return entry.strip()
+            if isinstance(entry, dict):
+                for k in ("url", "website", "href", "link"):
+                    u = entry.get(k)
+                    if isinstance(u, str) and u.strip():
+                        return u.strip()
+    ws = item.get("scrapeWebsiteData") or item.get("scrapedWebsite")
+    if isinstance(ws, dict):
+        for k in ("url", "website", "websiteUrl"):
+            u = ws.get(k)
+            if isinstance(u, str) and u.strip():
+                return u.strip()
+    return ""
+
 
 # Major cities for scoring bonus
 MAJOR_CITIES = {"toronto", "vancouver", "calgary", "edmonton", "ottawa"}
@@ -247,7 +400,7 @@ def _map_gmaps_result(item: dict[str, Any], vertical: str, city: str) -> dict[st
     if not name:
         return None
 
-    website = item.get("website") or item.get("url") or ""
+    website = _extract_place_website(item)
     domain = _normalize_domain(website)
     if not domain:
         return None
@@ -310,15 +463,15 @@ async def _run_google_maps_single(
 ) -> list[dict[str, Any]]:
     """Run Actor 1 for a single city+vertical combination."""
     async with sem:
-        query = VERTICAL_QUERIES[vertical].format(city=city)
+        queries = search_strings_for_maps(vertical, city)
         run_input = {
-            "searchStringsArray": [query],
-            "maxCrawledPlacesPerSearch": 100,
+            "searchStringsArray": queries,
+            "maxCrawledPlacesPerSearch": 80,
             "language": "en",
             "scrapeWebsiteData": True,
         }
 
-        logger.info("Starting Google Maps scrape: %s", query)
+        logger.info("Starting Google Maps scrape (%d queries): %s", len(queries), queries[:3])
         items = await _run_actor_and_get_results(client, ACTOR_GOOGLE_MAPS, run_input, max_wait=APIFY_MAX_WAIT)
 
         leads: list[dict[str, Any]] = []
@@ -327,8 +480,31 @@ async def _run_google_maps_single(
             if lead:
                 leads.append(lead)
 
-        logger.info("Google Maps scrape complete: %s → %d leads", query, len(leads))
-        return leads
+        # Dedupe by domain across multiple search strings (keep richer review stats when tied)
+        by_domain: dict[str, dict[str, Any]] = {}
+        for lead in leads:
+            d = lead.get("domain") or ""
+            if not d:
+                continue
+            prev = by_domain.get(d)
+            if prev is None:
+                by_domain[d] = lead
+                continue
+            pr = int(prev.get("review_count") or 0)
+            nr = int(lead.get("review_count") or 0)
+            gr_prev = prev.get("google_rating")
+            gr_new = lead.get("google_rating")
+            if nr > pr or (nr == pr and (gr_new or 0) > (gr_prev or 0)):
+                by_domain[d] = lead
+
+        merged = list(by_domain.values())
+        logger.info(
+            "Google Maps scrape complete: %d raw rows → %d with domain → %d deduped",
+            len(items),
+            len(leads),
+            len(merged),
+        )
+        return merged
 
 
 async def run_actor1_google_maps(
@@ -562,8 +738,8 @@ async def _run_website_crawl_batch(
         for item in items:
             emails_found: list[str] = []
 
-            # Website email crawler returns emails in various formats
-            for field in ("emails", "emailAddresses", "email"):
+            # Website / contact scrapers return emails in various formats
+            for field in ("emails", "emailAddresses", "email", "contactEmails", "foundEmails"):
                 val = item.get(field)
                 if isinstance(val, str) and "@" in val:
                     emails_found.append(val.lower().strip())
@@ -785,54 +961,87 @@ async def _apollo_last_resort(
 
     try:
         titles = {
-            "dental": ["dentist", "owner", "clinic owner", "principal"],
-            "legal": ["lawyer", "managing partner", "owner", "principal"],
-            "accounting": ["CPA", "accountant", "owner", "principal"],
+            "dental": [
+                "dentist", "owner", "clinic owner", "principal", "dental director",
+                "practice manager", "managing dentist",
+            ],
+            "legal": ["lawyer", "managing partner", "owner", "principal", "partner"],
+            "accounting": ["CPA", "accountant", "owner", "principal", "partner"],
         }
+        loc_strings = _apollo_location_strings(location)
         async with httpx.AsyncClient(timeout=60.0) as client:
-            body = {
-                "page": 1,
-                "per_page": 50,
-                "person_titles": titles.get(vertical, titles["dental"]),
-                "person_locations": [f"{location}, Canada"],
-                "has_email": True,
-            }
-            r = await client.post(
-                "https://api.apollo.io/api/v1/mixed_people/search",
-                headers={
-                    "Content-Type": "application/json",
-                    "Cache-Control": "no-cache",
-                    "X-Api-Key": APOLLO_API_KEY,
-                },
-                json=body,
-                timeout=30.0,
-            )
-            if r.status_code >= 400:
-                return []
-
-            data = r.json()
-            people = data.get("people") or data.get("contacts") or []
             results: list[dict[str, Any]] = []
-            for p in people:
-                if not isinstance(p, dict):
-                    continue
-                email = (p.get("email") or p.get("primary_email") or "").strip()
-                if not email or "@" not in email:
-                    continue
-                domain = _normalize_domain(p.get("organization", {}).get("website_url") or email.split("@")[-1])
-                results.append({
-                    "business_name": (p.get("organization", {}).get("name") or "").strip(),
-                    "domain": domain,
-                    "contact_email": email.lower(),
-                    "contact_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-                    "contact_title": (p.get("title") or "").strip(),
-                    "email_finder": "apollo_fallback",
-                    "vertical": vertical,
-                    "city": location,
-                    "province": "",
-                    "lead_score": 1,
-                    "status": "pending",
-                })
+            seen_email: set[str] = set()
+
+            for page in (1, 2):
+                body: dict[str, Any] = {
+                    "page": page,
+                    "per_page": 50,
+                    "person_titles": titles.get(vertical, titles["dental"]),
+                    "person_locations": loc_strings,
+                    "organization_num_employees_ranges": ["1,50"],
+                    "contact_email_status": ["verified", "unverified"],
+                    "has_email": True,
+                    "q_organization_keyword_tags": _apollo_organization_keyword_tags(vertical),
+                }
+                r = await client.post(
+                    "https://api.apollo.io/api/v1/mixed_people/search",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Cache-Control": "no-cache",
+                        "X-Api-Key": APOLLO_API_KEY,
+                    },
+                    json=body,
+                    timeout=45.0,
+                )
+                if r.status_code >= 400:
+                    logger.warning("Apollo last resort HTTP %s: %s", r.status_code, r.text[:400])
+                    break
+
+                data = r.json()
+                people = data.get("people") or data.get("contacts") or []
+                for p in people:
+                    if not isinstance(p, dict):
+                        continue
+                    email = (p.get("email") or p.get("primary_email") or "").strip()
+                    if not email or "@" not in email:
+                        continue
+                    el = email.lower()
+                    if el in seen_email:
+                        continue
+                    org = p.get("organization") or {}
+                    if isinstance(org, str):
+                        org = {}
+                    website = (
+                        org.get("website_url")
+                        or org.get("primary_domain")
+                        or p.get("organization_website_url")
+                        or ""
+                    )
+                    domain = _normalize_domain(str(website)) if website else ""
+                    if not domain:
+                        domain = _normalize_domain(email.split("@")[-1])
+                    if not domain:
+                        continue
+                    seen_email.add(el)
+                    results.append({
+                        "business_name": (org.get("name") or "").strip(),
+                        "domain": domain,
+                        "contact_email": el,
+                        "contact_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                        "contact_title": (p.get("title") or "").strip(),
+                        "email_finder": "apollo_fallback",
+                        "vertical": vertical,
+                        "city": location,
+                        "province": "",
+                        "lead_score": 1,
+                        "status": "pending",
+                    })
+
+                pagination = data.get("pagination") or {}
+                total_pages = int(pagination.get("total_pages") or 1)
+                if page >= total_pages or not people:
+                    break
 
             logger.info("Apollo last resort: found %d leads for %s/%s", len(results), vertical, location)
             return results
@@ -949,12 +1158,30 @@ async def run_ondemand_discovery(
     *,
     pipeline_run_id: str | None = None,
     prospect_source: str = "aria_chat",
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Run discovery for a single vertical + city (on-demand pipeline).
 
     Same 4-actor flow but scoped to one combination.
+
+    Returns ``(leads, meta)`` where ``meta`` helps explain empty results (missing keys,
+    zero Google Maps rows, dedupe-only loss, or enrichment produced no emails).
     """
-    if not os.environ.get("APIFY_API_KEY", "").strip():
+    vertical = canonical_vertical(vertical)
+    city = normalize_city_for_discovery(city)
+    apify_on = bool(os.environ.get("APIFY_API_KEY", "").strip())
+    meta: dict[str, Any] = {
+        "vertical": vertical,
+        "city": city,
+        "apify_configured": apify_on,
+        "apollo_configured": bool(APOLLO_API_KEY),
+        "gmaps_raw_count": 0,
+        "after_batch_trim": 0,
+        "after_dedup": 0,
+        "with_email": 0,
+        "without_email": 0,
+    }
+
+    if not apify_on:
         logger.warning("APIFY_API_KEY not configured for on-demand discovery")
         # Try Apollo as absolute last resort
         fallback = await _apollo_last_resort([], vertical, city)
@@ -967,12 +1194,15 @@ async def run_ondemand_discovery(
                 pipeline_run_id=pipeline_run_id,
                 source=prospect_source,
             )
-        return out
+        meta["path"] = "apollo_only_no_apify"
+        return out, meta
 
     # Actor 1: single city + vertical
     sem = asyncio.Semaphore(10)
     async with httpx.AsyncClient(timeout=120.0) as client:
         leads = await _run_google_maps_single(client, sem, vertical, city)
+
+    meta["gmaps_raw_count"] = len(leads)
 
     if not leads:
         # Apollo last resort
@@ -986,18 +1216,22 @@ async def run_ondemand_discovery(
                 pipeline_run_id=pipeline_run_id,
                 source=prospect_source,
             )
-        return out
+        meta["path"] = "apollo_after_empty_gmaps"
+        return out, meta
 
     # Score and sort, take top batch_size
     for lead in leads:
         lead["lead_score"] = score_lead(lead)
     leads.sort(key=lambda x: x.get("lead_score", 0), reverse=True)
     leads = leads[:batch_size]
+    meta["after_batch_trim"] = len(leads)
 
     # Deduplicate
     leads = await deduplicate_leads(leads)
+    meta["after_dedup"] = len(leads)
     if not leads:
-        return []
+        meta["path"] = "dedup_removed_all"
+        return [], meta
 
     from services.aria_prospect_pipeline import bulk_upsert_discovered_prospects, sync_prospects_after_email_merge
 
@@ -1042,4 +1276,60 @@ async def run_ondemand_discovery(
 
     sync_prospects_after_email_merge(with_email, without_email)
 
-    return with_email + without_email
+    meta["with_email"] = len(with_email)
+    meta["without_email"] = len(without_email)
+    meta["path"] = "apify_full"
+    return with_email + without_email, meta
+
+
+def format_discovery_empty_message(meta: dict[str, Any]) -> str:
+    """Explain zero emailable leads from on-demand discovery (for CRM / ARIA chat)."""
+    v = str(meta.get("vertical") or "dental")
+    c = str(meta.get("city") or "that location")
+    apify = bool(meta.get("apify_configured"))
+    apollo = bool(meta.get("apollo_configured"))
+    path = str(meta.get("path") or "")
+
+    if not apify and not apollo:
+        return (
+            "Outbound discovery cannot run: neither APIFY_API_KEY nor APOLLO_API_KEY is set on the server. "
+            "Add APIFY_API_KEY for Google Maps scraping (recommended), or APOLLO_API_KEY as a fallback."
+        )
+
+    if path == "apollo_only_no_apify":
+        if not apollo:
+            return (
+                "APIFY_API_KEY is not set and APOLLO_API_KEY is missing, so no data source could run. "
+                "Configure at least one key in your deployment environment."
+            )
+        return (
+            f"Google Maps discovery was skipped (no APIFY_API_KEY). Apollo fallback returned no people with "
+            f"verified emails for {v} in {c}. Add APIFY_API_KEY for primary discovery, or try a broader location."
+        )
+
+    if path == "apollo_after_empty_gmaps":
+        return (
+            f"Google Maps returned no businesses with usable websites for {v} in {c}, and Apollo fallback "
+            f"found no matching contacts with email. Check Apify actor runs (compass/crawler-google-places) "
+            f"in the Apify console, or try another city."
+        )
+
+    if path == "dedup_removed_all":
+        n = int(meta.get("after_batch_trim") or 0)
+        return (
+            f"Maps returned {n} candidate businesses for {v} in {c}, but all were filtered as duplicates or "
+            f"already present in CRM/inventory. Increase batch size or pick a different area."
+        )
+
+    if path == "apify_full" and int(meta.get("with_email") or 0) == 0:
+        n = int(meta.get("without_email") or meta.get("after_dedup") or 0)
+        return (
+            f"Found {n} businesses for {v} in {c} but could not resolve a contact email after LinkedIn, "
+            f"Leads Finder, and website crawl. The pipeline only continues with an email; consider manual "
+            f"outreach for saved prospects or raising batch size."
+        )
+
+    return (
+        f"No emailable leads for {v} in {c}. "
+        f"(google_maps_rows={meta.get('gmaps_raw_count', 0)}, after_dedupe={meta.get('after_dedup', 0)}.)"
+    )

@@ -6,8 +6,12 @@ SQLite (dev) / PostgreSQL (prod). JWT auth. Stripe webhooks. Scanner via Ghost r
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
@@ -41,6 +45,28 @@ from routers import (
     portal_self_serve,
 )
 
+from services.crm_apscheduler_jobs import (
+    run_aging_job,
+    run_aria_client_health_job,
+    run_aria_memory_job,
+    run_attacker_sim_job,
+    run_competitive_brief_job,
+    run_dnstwist_job,
+    run_enterprise_scans_job,
+    run_inbox_health_job,
+    run_monday_briefing_job,
+    run_monthly_reports_job,
+    run_morning_dispatch_job,
+    run_nightly_pipeline_job,
+    run_onboarding_drip_job,
+    run_portal_milestones_job,
+    run_rep_health_job,
+    run_scheduled_ai_actions_job,
+    run_shield_rescan_job,
+    run_stale_pipeline_job,
+    run_weekly_threat_job,
+)
+
 if os.environ.get("SENTRY_DSN"):
     try:
         import sentry_sdk
@@ -50,10 +76,42 @@ if os.environ.get("SENTRY_DSN"):
         pass
 
 
+MST = ZoneInfo("America/Edmonton")
+scheduler = AsyncIOScheduler(timezone=MST)
+
+scheduler.add_job(run_nightly_pipeline_job, CronTrigger(hour=23, minute=0, timezone=MST))
+scheduler.add_job(run_morning_dispatch_job, CronTrigger(hour=6, minute=30, timezone=MST))
+scheduler.add_job(run_inbox_health_job, CronTrigger(hour=7, minute=0, timezone=MST))
+scheduler.add_job(run_aging_job, CronTrigger(minute=0, timezone=MST))
+scheduler.add_job(run_stale_pipeline_job, CronTrigger(hour="*/6", minute=0, timezone=MST))
+scheduler.add_job(run_onboarding_drip_job, CronTrigger(hour=8, minute=0, timezone=MST))
+scheduler.add_job(run_shield_rescan_job, CronTrigger(hour=9, minute=0, timezone=MST))
+scheduler.add_job(run_dnstwist_job, CronTrigger(hour=10, minute=0, timezone=MST))
+scheduler.add_job(run_portal_milestones_job, CronTrigger(hour=11, minute=0, timezone=MST))
+scheduler.add_job(run_rep_health_job, CronTrigger(hour=12, minute=0, timezone=MST))
+scheduler.add_job(run_enterprise_scans_job, CronTrigger(hour=13, minute=0, timezone=MST))
+scheduler.add_job(run_monthly_reports_job, CronTrigger(day=1, hour=7, minute=0, timezone=MST))
+scheduler.add_job(run_weekly_threat_job, CronTrigger(day_of_week="mon", hour=7, minute=0, timezone=MST))
+scheduler.add_job(run_attacker_sim_job, CronTrigger(day_of_week="mon", hour=7, minute=30, timezone=MST))
+scheduler.add_job(run_monday_briefing_job, CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=MST))
+scheduler.add_job(run_competitive_brief_job, CronTrigger(day_of_week="mon", hour=8, minute=30, timezone=MST))
+scheduler.add_job(run_scheduled_ai_actions_job, CronTrigger(minute="*/15", timezone=MST))
+scheduler.add_job(run_aria_memory_job, CronTrigger(minute="*/15", timezone=MST))
+scheduler.add_job(run_aria_client_health_job, CronTrigger(minute="*/15", timezone=MST))
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    scheduler.start()
+    yield
+    scheduler.shutdown(wait=False)
+
+
 app = FastAPI(
     title="HAWK API",
     description="B2B cybersecurity SaaS for Canadian SMBs — attack surface scans, dashboard, Ask HAWK, billing.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

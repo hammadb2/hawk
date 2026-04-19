@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { CrmActivityRow, Profile } from "@/lib/crm/types";
 import { fetchCrmDashboardKpis } from "@/lib/crm/dashboard-kpis";
-import { useClients, useProfiles } from "@/lib/crm/hooks";
+import { useClients, useProfiles, useProspects } from "@/lib/crm/hooks";
 import { cn } from "@/lib/utils";
 
 type Kpis = {
@@ -85,6 +85,7 @@ export function CeoLiveDashboard({
 }) {
   const { data: clients = [] } = useClients();
   const { data: profileRows = [] } = useProfiles();
+  const { data: allProspects = [] } = useProspects();
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [activities, setActivities] = useState<CrmActivityRow[]>([]);
   const [activityFilter, setActivityFilter] = useState<string>("all");
@@ -114,6 +115,17 @@ export function CeoLiveDashboard({
       }))
       .sort((a, b) => b.mrrCents - a.mrrCents);
   }, [clients, profileRows]);
+
+  const callsBooked = useMemo(() => {
+    return allProspects
+      .filter((p) => p.stage === "call_booked")
+      .slice()
+      .sort((a, b) => {
+        const ta = a.call_booked_at ? new Date(a.call_booked_at).getTime() : 0;
+        const tb = b.call_booked_at ? new Date(b.call_booked_at).getTime() : 0;
+        return tb - ta;
+      });
+  }, [allProspects]);
 
   const repHealth = useMemo(() => {
     return profileRows
@@ -263,6 +275,45 @@ export function CeoLiveDashboard({
         />
         <KpiCard icon={<Phone className="h-5 w-5 text-emerald-400" strokeWidth={2} />} label="Calls booked today" value={kpis.callsBookedToday} />
         <KpiCard icon={<Trophy className="h-5 w-5 text-emerald-400" strokeWidth={2} />} label="Closes (MTD)" value={kpis.closesMtd} />
+      </div>
+
+      <div className="rounded-xl border border-crmBorder bg-crmSurface p-4 shadow-lg">
+        <h3 className="text-sm font-medium text-white">Calls booked</h3>
+        <p className="text-xs text-slate-500">Prospects in call_booked — next step is show rate.</p>
+        <ul className="mt-3 max-h-[280px] space-y-2 overflow-y-auto text-sm">
+          {callsBooked.length === 0 && <li className="text-slate-500">No calls booked in pipeline right now.</li>}
+          {callsBooked.map((p) => {
+            const when = p.call_booked_at
+              ? new Date(p.call_booked_at).toLocaleString(undefined, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : "—";
+            const contact = p.contact_name || p.contact_email || "—";
+            return (
+              <li
+                key={p.id}
+                className="flex flex-col gap-1 rounded-lg border border-crmBorder bg-[#111118] px-3 py-2 text-slate-300 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
+                    {p.company_name || p.domain || p.id.slice(0, 8)}
+                  </Link>
+                  <p className="text-xs text-slate-500">
+                    {contact} · Hawk {p.hawk_score ?? "—"}
+                  </p>
+                </div>
+                <div className="text-right text-xs text-slate-400">
+                  <span className="block text-slate-500">Scheduled</span>
+                  {when}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

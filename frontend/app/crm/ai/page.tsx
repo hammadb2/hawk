@@ -62,7 +62,7 @@ export default function AiCommandCenterPage() {
   const [showPipelineTrigger, setShowPipelineTrigger] = useState(false);
   const [unreadBriefings, setUnreadBriefings] = useState<Briefing[]>([]);
   const [dismissedBriefingIds, setDismissedBriefingIds] = useState<Set<string>>(new Set());
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
 
   const canRunPipeline = profile && (
     PIPELINE_ALLOWED_ROLES.includes(profile.role || "") ||
@@ -295,8 +295,10 @@ export default function AiCommandCenterPage() {
   }
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, sending]);
 
   /* ── Access control ──────────────────────────────────────────────────── */
 
@@ -309,9 +311,9 @@ export default function AiCommandCenterPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-64px)] bg-crmBg">
-      <aside className="hidden w-64 flex-shrink-0 border-r border-crmBorder bg-crmSurface lg:block">
-        <div className="flex items-center justify-between border-b border-crmBorder px-4 py-3">
+    <div className="flex max-h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden bg-crmBg lg:flex-row lg:items-stretch lg:overflow-hidden">
+      <aside className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r border-crmBorder bg-crmSurface lg:flex lg:h-full lg:max-h-full">
+        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder px-4 py-3">
           <h2 className="text-sm font-semibold text-white">Conversations</h2>
           <button
             type="button"
@@ -321,7 +323,7 @@ export default function AiCommandCenterPage() {
             + New
           </button>
         </div>
-        <div className="overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
           {loadingConvs ? (
             <div className="flex justify-center py-4">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
@@ -348,8 +350,8 @@ export default function AiCommandCenterPage() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-crmBorder bg-crmSurface px-4 py-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-h-0 lg:h-full">
+        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder bg-crmSurface px-4 py-3">
           <div>
             <h1 className="text-sm font-semibold text-white">ARIA</h1>
             <p className="text-xs text-slate-500">
@@ -367,7 +369,10 @@ export default function AiCommandCenterPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-crmBg px-4 py-6">
+        <div
+          ref={messagesScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-crmBg px-4 py-6"
+        >
           <div className="mx-auto max-w-3xl space-y-4">
             {/* Unread briefing banner */}
             {visibleBriefings.map((briefing) => (
@@ -504,13 +509,13 @@ export default function AiCommandCenterPage() {
                 </div>
               </div>
             )}
-            <div ref={chatEndRef} />
+            <div aria-hidden className="h-px shrink-0" />
           </div>
         </div>
 
         {/* Pipeline trigger form */}
         {showPipelineTrigger && session?.access_token && (
-          <div className="border-t border-crmBorder bg-crmSurface px-4 py-3">
+          <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-3">
             <div className="mx-auto max-w-3xl">
               <PipelineRunTrigger
                 accessToken={session.access_token}
@@ -520,7 +525,7 @@ export default function AiCommandCenterPage() {
           </div>
         )}
 
-        <div className="border-t border-crmBorder bg-crmSurface px-4 py-4">
+        <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-4">
           <div className="mx-auto flex max-w-3xl gap-2">
             {session?.access_token && (
               <VoiceInput

@@ -414,8 +414,10 @@ def _execute_function(
             return _fn_get_client_mrr_summary(headers)
         # ── Phase 1: Outbound pipeline ────────────────────────────────
         elif name == "run_outbound_pipeline":
+            from services.aria_apify_scraper import canonical_vertical
             from services.aria_pipeline import run_outbound_pipeline as _run_pipeline
-            vertical = args.get("vertical", "dental")
+
+            vertical = canonical_vertical(str(args.get("vertical", "dental")))
             location = args.get("location", "")
             batch_size = args.get("batch_size", 50)
             # Create the pipeline run record first

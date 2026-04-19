@@ -92,6 +92,8 @@ export type Prospect = {
   pipeline_run_id?: string | null;
   address?: string | null;
   province?: string | null;
+  reply_received_at?: string | null;
+  call_booked_at?: string | null;
 };
 
 export type CrmActivityRow = {

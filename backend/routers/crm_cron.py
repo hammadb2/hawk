@@ -46,16 +46,8 @@ def _require_secret(x_cron_secret: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid cron secret")
 
 
-@router.post("/aging")
-def aging_hourly(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    """
-    Hourly (or daily) job: prospects with no activity for 10+ days — WhatsApp nudge to assigned rep when
-    `whatsapp_number` on profile is used as SMS destination (same pattern as stale-pipeline).
-    """
-    _require_secret(x_cron_secret)
-
+def run_aging_cron_internal() -> dict:
+    """Aging WhatsApp nudges — callable from APScheduler without HTTP secret."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         return {
             "ok": True,
@@ -148,6 +140,18 @@ def aging_hourly(
     return {"ok": True, "mode": "live", "candidates": len(candidates), "sms_sent": sent}
 
 
+@router.post("/aging")
+def aging_hourly(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    Hourly (or daily) job: prospects with no activity for 10+ days — WhatsApp nudge to assigned rep when
+    `whatsapp_number` on profile is used as SMS destination (same pattern as stale-pipeline).
+    """
+    _require_secret(x_cron_secret)
+    return run_aging_cron_internal()
+
+
 @router.post("/onboarding-drip")
 def onboarding_drip(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
@@ -157,16 +161,8 @@ def onboarding_drip(
     return process_due_onboarding_sequences()
 
 
-@router.post("/stale-pipeline")
-def stale_pipeline_whatsapp(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    """
-    Phase 2C — WhatsApp assigned rep when a prospect is in Call Booked or Proposal Sent
-    with no activity for 48+ hours.
-    """
-    _require_secret(x_cron_secret)
-
+def run_stale_pipeline_cron_internal() -> dict:
+    """Stale pipeline WhatsApp — callable from APScheduler without HTTP secret."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         return {"ok": True, "mode": "stub", "sent": 0}
 
@@ -225,6 +221,18 @@ def stale_pipeline_whatsapp(
     return {"ok": True, "candidates": len(rows), "sms_sent": sent}
 
 
+@router.post("/stale-pipeline")
+def stale_pipeline_whatsapp(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    Phase 2C — WhatsApp assigned rep when a prospect is in Call Booked or Proposal Sent
+    with no activity for 48+ hours.
+    """
+    _require_secret(x_cron_secret)
+    return run_stale_pipeline_cron_internal()
+
+
 @router.post("/monthly-reports")
 def monthly_reports_pdf(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
@@ -266,9 +274,16 @@ def nightly_pipeline_run(
     """
     _require_secret(x_cron_secret)
     import asyncio
+    import concurrent.futures
+
     try:
         from services.aria_lead_inventory import run_nightly_pipeline
-        result = asyncio.run(run_nightly_pipeline())
+
+        def _run_pipeline() -> object:
+            return asyncio.run(run_nightly_pipeline())
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(_run_pipeline).result(timeout=3600)
         return result
     except Exception as e:
         logger.exception("nightly pipeline failed: %s", e)
@@ -377,12 +392,8 @@ def dnstwist_daily(
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
-@router.post("/portal-milestones")
-def portal_milestones_sweep(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    """Phase 2 — Award journey milestones (e.g. thirty_days_clean, hawk_certified) for all portal clients."""
-    _require_secret(x_cron_secret)
+def run_portal_milestones_cron_internal() -> dict:
+    """Portal milestones sweep — callable from APScheduler without HTTP secret."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         return {"ok": False, "error": "supabase not configured"}
     headers = {
@@ -414,6 +425,15 @@ def portal_milestones_sweep(
         ensure_portal_milestones(str(cid), str(pid) if pid else None)
         checked += 1
     return {"ok": True, "clients_checked": checked}
+
+
+@router.post("/portal-milestones")
+def portal_milestones_sweep(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Phase 2 — Award journey milestones (e.g. thirty_days_clean, hawk_certified) for all portal clients."""
+    _require_secret(x_cron_secret)
+    return run_portal_milestones_cron_internal()
 
 
 @router.post("/rep-health-score")
@@ -453,76 +473,6 @@ def weekly_attacker_simulation_cron(
     except Exception as e:
         logger.exception("attacker simulation cron failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
-
-
-@router.post("/scheduled-ai-actions")
-def scheduled_ai_actions_cron(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    """
-    ARIA — execute scheduled actions where executed = false and scheduled_for <= now().
-    Runs every minute via cron-job.org or Railway cron.
-    Handles both legacy email actions and ARIA pipeline runs.
-    """
-    _require_secret(x_cron_secret)
-
-    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        return {"ok": True, "mode": "stub", "executed": 0}
-
-    headers = {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-        "Content-Type": "application/json",
-    }
-    now = datetime.now(timezone.utc).isoformat()
-
-    # Fetch due actions (table renamed to aria_scheduled_actions)
-    r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
-        headers=headers,
-        params={
-            "executed": "eq.false",
-            "scheduled_for": f"lte.{now}",
-            "select": "*",
-            "limit": "50",
-        },
-        timeout=30.0,
-    )
-    if r.status_code >= 400:
-        logger.warning("aria_scheduled_actions fetch failed: %s", r.text[:300])
-        return {"ok": False, "error": r.text[:300]}
-
-    actions = r.json() or []
-    executed_count = 0
-
-    for action in actions:
-        action_id = action["id"]
-        action_type = action.get("action_type", "")
-        payload = action.get("action_payload", {})
-
-        try:
-            if action_type == "send_email":
-                _execute_scheduled_email(payload, headers)
-            elif action_type == "send_reminder":
-                _execute_scheduled_email(payload, headers)
-            elif action_type == "run_outbound_pipeline":
-                _execute_scheduled_pipeline(action, headers)
-            else:
-                logger.warning("Unknown scheduled action type: %s", action_type)
-
-            # Mark as executed
-            httpx.patch(
-                f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
-                headers=headers,
-                params={"id": f"eq.{action_id}"},
-                json={"executed": True, "executed_at": datetime.now(timezone.utc).isoformat()},
-                timeout=20.0,
-            ).raise_for_status()
-            executed_count += 1
-        except Exception as exc:
-            logger.exception("Failed to execute scheduled action %s: %s", action_id, exc)
-
-    return {"ok": True, "mode": "live", "due": len(actions), "executed": executed_count}
 
 
 def _execute_scheduled_email(payload: dict, headers: dict) -> None:
@@ -600,6 +550,81 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     logger.info("Scheduled ARIA pipeline run started: %s (vertical=%s, location=%s)", run_id, vertical, location)
+
+
+def run_scheduled_ai_actions_cron_internal() -> dict:
+    """
+    ARIA — execute scheduled actions where executed = false and scheduled_for <= now().
+    Callable from APScheduler without HTTP secret.
+    """
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return {"ok": True, "mode": "stub", "executed": 0}
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+    now = datetime.now(timezone.utc).isoformat()
+
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
+        headers=headers,
+        params={
+            "executed": "eq.false",
+            "scheduled_for": f"lte.{now}",
+            "select": "*",
+            "limit": "50",
+        },
+        timeout=30.0,
+    )
+    if r.status_code >= 400:
+        logger.warning("aria_scheduled_actions fetch failed: %s", r.text[:300])
+        return {"ok": False, "error": r.text[:300]}
+
+    actions = r.json() or []
+    executed_count = 0
+
+    for action in actions:
+        action_id = action["id"]
+        action_type = action.get("action_type", "")
+        payload = action.get("action_payload", {})
+
+        try:
+            if action_type == "send_email":
+                _execute_scheduled_email(payload, headers)
+            elif action_type == "send_reminder":
+                _execute_scheduled_email(payload, headers)
+            elif action_type == "run_outbound_pipeline":
+                _execute_scheduled_pipeline(action, headers)
+            else:
+                logger.warning("Unknown scheduled action type: %s", action_type)
+
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/aria_scheduled_actions",
+                headers=headers,
+                params={"id": f"eq.{action_id}"},
+                json={"executed": True, "executed_at": datetime.now(timezone.utc).isoformat()},
+                timeout=20.0,
+            ).raise_for_status()
+            executed_count += 1
+        except Exception as exc:
+            logger.exception("Failed to execute scheduled action %s: %s", action_id, exc)
+
+    return {"ok": True, "mode": "live", "due": len(actions), "executed": executed_count}
+
+
+@router.post("/scheduled-ai-actions")
+def scheduled_ai_actions_cron(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """
+    ARIA — execute scheduled actions where executed = false and scheduled_for <= now().
+    Runs every minute via cron-job.org or Railway cron.
+    Handles both legacy email actions and ARIA pipeline runs.
+    """
+    _require_secret(x_cron_secret)
+    return run_scheduled_ai_actions_cron_internal()
 
 
 @router.post("/aria-memory-ingestion")
