@@ -1,51 +1,41 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+/** Vercel: set to FastAPI origin (no trailing slash), e.g. https://intelligent-rejoicing-production.up.railway.app */
+function crmApiBase(): string {
+  const raw =
+    process.env.CRM_API_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    "http://localhost:8000";
+  return raw.replace(/\/$/, "");
+}
 
 /**
  * Proxy Cal.com → Railway FastAPI `POST /api/crm/webhooks/cal`.
- * Cal.com "Ping test" and production webhooks often target the public site
- * (e.g. securedbyhawk.com); Next had no route → 404 before this file existed.
- * Forwards raw body bytes unchanged so HMAC (X-Cal-Signature-256) still verifies on the API.
+ * securedbyhawk.com is Next on Vercel; Cal must hit this route so the body + signature reach FastAPI unchanged.
  */
-export async function POST(request: Request) {
-  const raw = await request.arrayBuffer();
-  const sig = request.headers.get("x-cal-signature-256");
-  const ct = request.headers.get("content-type") || "application/json";
+export async function POST(req: NextRequest) {
+  const body = await req.text();
+  const signature = req.headers.get("X-Cal-Signature-256") ?? "";
+  const contentType = req.headers.get("Content-Type") || "application/json";
 
-  const headers: HeadersInit = { "Content-Type": ct };
-  if (sig) headers["X-Cal-Signature-256"] = sig;
-
-  const res = await fetch(`${API_URL}/api/crm/webhooks/cal`, {
+  const backendRes = await fetch(`${crmApiBase()}/api/crm/webhooks/cal`, {
     method: "POST",
-    headers,
-    body: raw.byteLength ? new Uint8Array(raw) : undefined,
+    headers: {
+      "Content-Type": contentType,
+      "X-Cal-Signature-256": signature,
+    },
+    body,
   });
 
-  const text = await res.text();
-  const outCt = res.headers.get("content-type") || "application/json";
-
-  if (!res.ok) {
-    return new NextResponse(text || JSON.stringify({ detail: "upstream error" }), {
-      status: res.status,
-      headers: { "Content-Type": outCt },
-    });
-  }
-
-  try {
-    const j = text ? JSON.parse(text) : {};
-    return NextResponse.json(j, { status: res.status });
-  } catch {
-    return new NextResponse(text, { status: res.status, headers: { "Content-Type": outCt } });
-  }
+  return NextResponse.json(await backendRes.json().catch(() => ({})), { status: backendRes.status });
 }
 
-/** Optional connectivity check from browser or docs (Cal.com uses POST for ping). */
+/** Confirms this Next route exists; Cal.com ping uses POST. */
 export async function GET() {
   return NextResponse.json({
     ok: true,
     route: "/api/crm/webhooks/cal",
-    note: "Cal.com ping and events use POST; this GET only confirms the Next.js route exists.",
-    upstream: `${API_URL}/api/crm/webhooks/cal`,
+    upstream: `${crmApiBase()}/api/crm/webhooks/cal`,
+    env: process.env.CRM_API_BASE_URL ? "CRM_API_BASE_URL" : process.env.NEXT_PUBLIC_API_URL ? "NEXT_PUBLIC_API_URL" : "default localhost",
   });
 }
