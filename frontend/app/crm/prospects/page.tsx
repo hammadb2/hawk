@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import type { Prospect, ProspectPipelineStatus } from "@/lib/crm/types";
 import { PIPELINE_STATUS_LABELS, STAGE_META } from "@/lib/crm/types";
-import toast from "react-hot-toast";
+import { useProspectsList, useProspectsRealtimeSubscription } from "@/lib/crm/hooks";
 
 type PipelineFilterValue = "all" | ProspectPipelineStatus | "active";
 
@@ -23,46 +22,23 @@ function pipelineLabel(status: string | null | undefined): string {
   return PIPELINE_STATUS_LABELS[status as ProspectPipelineStatus] ?? status;
 }
 
-export default function ProspectsListPage() {
-  const supabase = useMemo(() => createClient(), []);
-  const [rows, setRows] = useState<Prospect[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pipelineFilter, setPipelineFilter] = useState<PipelineFilterValue>("all");
-
-  const load = useCallback(
-    async (opts?: { quiet?: boolean }) => {
-      if (!opts?.quiet) setLoading(true);
-      let q = supabase.from("prospects").select("*");
-      if (pipelineFilter === "active") {
-        q = q.or("pipeline_status.is.null,pipeline_status.neq.suppressed");
-      } else if (pipelineFilter !== "all") {
-        q = q.eq("pipeline_status", pipelineFilter);
-      }
-      const { data, error } = await q
-        .order("lead_score", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false });
-      if (error) toast.error(error.message);
-      setRows((data as Prospect[]) ?? []);
-      if (!opts?.quiet) setLoading(false);
-    },
-    [supabase, pipelineFilter],
+function ProspectsTableSkeleton() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+      ))}
+    </div>
   );
+}
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+export default function ProspectsListPage() {
+  const [pipelineFilter, setPipelineFilter] = useState<PipelineFilterValue>("all");
+  const { data: rows = [], isLoading } = useProspectsList(pipelineFilter);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("prospects-list-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => {
-        void load({ quiet: true });
-      })
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [supabase, load]);
+  useProspectsRealtimeSubscription(true);
+
+  const showSkeleton = isLoading && rows.length === 0;
 
   return (
     <div className="space-y-4">
@@ -91,8 +67,8 @@ export default function ProspectsListPage() {
           </select>
         </div>
       </div>
-      {loading ? (
-        <div className="flex justify-center py-12 text-slate-600">Loading…</div>
+      {showSkeleton ? (
+        <ProspectsTableSkeleton />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full min-w-[880px] text-left text-sm">
@@ -107,7 +83,7 @@ export default function ProspectsListPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((p) => (
+              {rows.map((p: Prospect) => (
                 <tr key={p.id} className="border-b border-slate-200/90 shadow-sm hover:bg-white">
                   <td className="px-3 py-2">
                     <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-600 hover:underline">

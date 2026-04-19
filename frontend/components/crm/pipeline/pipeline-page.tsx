@@ -14,6 +14,12 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
+import {
+  revalidateClientsCache,
+  useProfiles,
+  useProspects,
+  useProspectsRealtimeSubscription,
+} from "@/lib/crm/hooks";
 import { AddProspectModal } from "@/components/crm/prospect/add-prospect-modal";
 import type { Prospect, ProspectStage } from "@/lib/crm/types";
 import { STAGE_META, STAGE_ORDER } from "@/lib/crm/types";
@@ -117,10 +123,9 @@ export function PipelinePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, session } = useCrmAuth();
+  const { data: prospects = [], isLoading, mutate, error } = useProspects();
+  const { data: profileRows = [] } = useProfiles();
   const { pipelineView, setPipelineView, bulkMode, setBulkMode, filters, setFilters, resetFilters } = useCrmStore();
-  const [prospects, setProspects] = useState<Prospect[]>([]);
-  const [reps, setReps] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -143,6 +148,19 @@ export function PipelinePage() {
 
   const filterCount = countActiveFilters(filters);
 
+  const reps = useMemo(() => {
+    if (!profile || !["ceo", "hos"].includes(profile.role)) return [];
+    return profileRows
+      .filter((r) => r.role === "sales_rep" || r.role === "team_lead")
+      .map((r) => ({ id: r.id, full_name: r.full_name, email: r.email }));
+  }, [profile, profileRows]);
+
+  useProspectsRealtimeSubscription(!!session);
+
+  useEffect(() => {
+    if (error) toast.error((error as Error).message);
+  }, [error]);
+
   useEffect(() => {
     if (searchParams.get("add") === "1") {
       setAddOpen(true);
@@ -150,46 +168,10 @@ export function PipelinePage() {
     }
   }, [searchParams, router]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from("prospects").select("*").order("created_at", { ascending: false });
-    if (error) {
-      toast.error(error.message);
-      setProspects([]);
-    } else {
-      setProspects((data as Prospect[]) ?? []);
-    }
-    setLoading(false);
-  }, [supabase]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    if (!profile?.id) return;
-    const ch = supabase
-      .channel("prospects-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => void load())
-      .subscribe();
-    return () => void supabase.removeChannel(ch);
-  }, [supabase, profile?.id, load]);
-
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    if (!profile || !["ceo", "hos"].includes(profile.role)) return;
-    void supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("role", ["sales_rep", "team_lead"])
-      .then(({ data }: { data: { id: string; full_name: string | null; email: string | null }[] | null }) =>
-        setReps(data ?? [])
-      );
-  }, [profile, supabase]);
 
   const filtered = useMemo(() => {
     const base = applyClientFilters(prospects, filters);
@@ -267,6 +249,14 @@ export function PipelinePage() {
 
   async function updateStage(p: Prospect, to: ProspectStage, extra?: Partial<Prospect>) {
     const from = p.stage;
+    const snapshot = { ...p };
+    await mutate(
+      (cur) =>
+        (cur ?? []).map((x) =>
+          x.id === p.id ? { ...x, stage: to, last_activity_at: new Date().toISOString(), ...extra } : x
+        ),
+      { revalidate: false }
+    );
     const { error } = await supabase
       .from("prospects")
       .update({
@@ -276,12 +266,16 @@ export function PipelinePage() {
       })
       .eq("id", p.id);
     if (error) {
+      await mutate(
+        (cur) => (cur ?? []).map((x) => (x.id === p.id ? snapshot : x)),
+        { revalidate: false }
+      );
       toast.error(error.message);
       return;
     }
     await logActivity(p.id, "stage_changed", { from, to });
     toast.success("Stage updated");
-    await load();
+    void mutate();
   }
 
   function onDragStart(e: DragStartEvent) {
@@ -320,12 +314,19 @@ export function PipelinePage() {
     }
   }
 
-  if (loading && !prospects.length) {
+  if (isLoading && !prospects.length) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-          Loading pipeline…
+      <div className="space-y-4">
+        <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-100" />
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {STAGE_ORDER.map((stage) => (
+            <div key={stage} className="w-64 shrink-0 space-y-2">
+              <div className="h-6 w-32 animate-pulse rounded bg-slate-100" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-24 w-full animate-pulse rounded-xl bg-slate-100" />
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -496,18 +497,18 @@ export function PipelinePage() {
           await logActivity(pendingLost.id, "stage_changed", { from: pendingLost.stage, to: "lost", reason });
           toast.success("Marked as lost");
           setPendingLost(null);
-          await load();
+          void mutate();
         }}
       />
 
-      <ProspectDrawer prospectId={drawerId} onClose={() => setDrawerId(null)} onUpdated={() => void load()} />
+      <ProspectDrawer prospectId={drawerId} onClose={() => setDrawerId(null)} onUpdated={() => void mutate()} />
 
       {session?.user?.id && (
         <AddProspectModal
           open={addOpen}
           onOpenChange={setAddOpen}
           sessionUserId={session.user.id}
-          onCreated={() => void load()}
+          onCreated={() => void mutate()}
         />
       )}
 
@@ -561,7 +562,8 @@ export function PipelinePage() {
             toast.error(`Portal setup: ${prov.detail}`);
           }
           setPendingWon(null);
-          await load();
+          void mutate();
+          void revalidateClientsCache();
         }}
       />
     </div>

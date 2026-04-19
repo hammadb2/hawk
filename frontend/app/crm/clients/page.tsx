@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
-import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { formatUsd } from "@/lib/crm/format";
 import type { CrmClientRow } from "@/lib/crm/types";
+import { useClients, useProfiles } from "@/lib/crm/hooks";
 import { cn } from "@/lib/utils";
 
 function statusClass(s: string): string {
@@ -16,52 +16,51 @@ function statusClass(s: string): string {
   return "text-slate-600";
 }
 
-export default function ClientsPage() {
-  const supabase = useMemo(() => createClient(), []);
-  const { authReady, session, profile } = useCrmAuth();
-  const [rows, setRows] = useState<CrmClientRow[]>([]);
-  const [repNames, setRepNames] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+function ClientsTableSkeleton() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+      ))}
+    </div>
+  );
+}
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("clients")
-      .select("id, prospect_id, company_name, domain, plan, mrr_cents, stripe_customer_id, closing_rep_id, status, close_date, created_at, monitored_domains")
-      .order("close_date", { ascending: false });
-    if (error) {
-      toast.error(error.message);
-      setRows([]);
-      setLoading(false);
-      return;
+function AuthShellSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="h-8 w-40 animate-pulse rounded-lg bg-slate-100" />
+      <ClientsTableSkeleton />
+    </div>
+  );
+}
+
+export default function ClientsPage() {
+  const { authReady, session, profile } = useCrmAuth();
+  const { data: rows = [], isLoading, error, mutate } = useClients();
+  const { data: profiles = [] } = useProfiles();
+
+  const repNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of profiles) {
+      map[p.id] = p.full_name ?? p.email ?? p.id.slice(0, 8);
     }
-    const list = (data ?? []) as CrmClientRow[];
-    setRows(list);
-    const ids = Array.from(new Set(list.map((r) => r.closing_rep_id).filter(Boolean) as string[]));
-    if (ids.length === 0) {
-      setRepNames({});
-    } else {
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-      const map: Record<string, string> = {};
-      for (const p of profs ?? []) {
-        map[p.id] = p.full_name ?? p.email ?? p.id.slice(0, 8);
-      }
-      setRepNames(map);
-    }
-    setLoading(false);
-  }, [supabase]);
+    return map;
+  }, [profiles]);
 
   useEffect(() => {
-    if (authReady && session) void load();
-  }, [authReady, session, load]);
+    if (error) toast.error((error as Error).message);
+  }, [error]);
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="mx-auto max-w-6xl">
+        <AuthShellSkeleton />
       </div>
     );
   }
+
+  const showSkeleton = isLoading && rows.length === 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -73,14 +72,14 @@ export default function ClientsPage() {
         <button
           type="button"
           className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          onClick={() => void load()}
+          onClick={() => void mutate()}
         >
           Refresh
         </button>
       </div>
 
-      {loading ? (
-        <div className="py-16 text-center text-slate-600">Loading…</div>
+      {showSkeleton ? (
+        <ClientsTableSkeleton />
       ) : rows.length === 0 ? (
         <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-10 text-center text-sm text-slate-600">
           No clients yet. Win a deal from the pipeline to create one.
@@ -101,7 +100,7 @@ export default function ClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((c) => (
+              {rows.map((c: CrmClientRow) => (
                 <tr key={c.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
                   <td className="px-3 py-2">
                     {c.prospect_id ? (

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -14,6 +15,13 @@ const tabs = [
 
 export function CrmMobileNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  useEffect(() => {
+    router.prefetch("/crm/pipeline");
+    router.prefetch("/crm/prospects");
+    router.prefetch("/crm/clients");
+    router.prefetch("/crm/dashboard");
+  }, [router]);
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] md:hidden">
       {tabs.map((t) => {

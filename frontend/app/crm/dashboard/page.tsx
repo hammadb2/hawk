@@ -1,51 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { CeoLiveDashboard } from "@/components/crm/dashboard/ceo-live-dashboard";
-import type { Prospect } from "@/lib/crm/types";
+import { useHotLeads } from "@/lib/crm/hooks";
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-4 w-72 animate-pulse rounded-lg bg-slate-100" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-100" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function CrmDashboardPage() {
   const { authReady, profileFetched, session, profile } = useCrmAuth();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [hotLeads, setHotLeads] = useState<Prospect[]>([]);
-
-  const loadHot = useCallback(async () => {
-    if (!profile || !["ceo", "hos"].includes(profile.role)) {
-      setHotLeads([]);
-      return;
-    }
-    const { data } = await supabase.from("prospects").select("*").eq("is_hot", true).order("last_activity_at", { ascending: false }).limit(8);
-    setHotLeads((data as Prospect[]) ?? []);
-  }, [profile, supabase]);
+  const showHot = !!profile && ["ceo", "hos"].includes(profile.role);
+  const { data: hotLeads = [] } = useHotLeads(showHot);
 
   useEffect(() => {
     if (!authReady) return;
     if (!session) router.replace("/crm/login");
   }, [authReady, session, router]);
 
-  useEffect(() => {
-    void loadHot();
-  }, [loadHot]);
-
   if (!authReady || !session) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!profileFetched) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!profile) {
@@ -90,7 +86,7 @@ export default function CrmDashboardPage() {
       )}
 
       {["ceo", "hos"].includes(profile.role) && (
-        <CeoLiveDashboard supabase={supabase} profile={profile} />
+        <CeoLiveDashboard supabase={supabase} profile={profile} accessToken={session.access_token ?? null} />
       )}
 
       {["ceo", "hos"].includes(profile.role) && hotLeads.length > 0 && (

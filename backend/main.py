@@ -27,6 +27,7 @@ from routers import (
     crm_ai_command,
     crm_client_portal,
     crm_cron,
+    crm_dashboard,
     crm_enterprise,
     crm_invite,
     crm_onboarding,
@@ -82,6 +83,7 @@ app.include_router(crm_enterprise.router)
 app.include_router(portal_phase2.router)
 app.include_router(portal_self_serve.router)
 app.include_router(crm_scale.router)
+app.include_router(crm_dashboard.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
 app.include_router(crm_onboarding.router)

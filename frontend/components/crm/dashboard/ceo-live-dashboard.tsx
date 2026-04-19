@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CrmActivityRow, Prospect, Profile } from "@/lib/crm/types";
-import { sumOpenPipelineValueDollars } from "@/lib/crm/pipeline-value";
+import type { CrmActivityRow, Profile } from "@/lib/crm/types";
+import { fetchCrmDashboardKpis } from "@/lib/crm/dashboard-kpis";
 
 type Kpis = {
   emailsSentToday: number;
@@ -36,72 +36,87 @@ function localStartOfMonthIso(): string {
 export function CeoLiveDashboard({
   supabase,
   profile,
+  accessToken,
 }: {
   supabase: SupabaseClient;
   profile: Profile;
+  accessToken: string | null;
 }) {
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [activities, setActivities] = useState<CrmActivityRow[]>([]);
   const [activityFilter, setActivityFilter] = useState<string>("all");
-  const [prospectsCache, setProspectsCache] = useState<Prospect[]>([]);
+  const [prospectLabels, setProspectLabels] = useState<Record<string, string>>({});
   const [repHealth, setRepHealth] = useState<RepHealthRow[]>([]);
 
   const loadAll = useCallback(async () => {
     const startDay = localStartOfDayIso();
     const startMonth = localStartOfMonthIso();
-    const staleCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
 
-    const [evRes, actRes, clientsRes, prospectsRes, healthRes] = await Promise.all([
-      supabase.from("prospect_email_events").select("id,sent_at,replied_at,created_at").gte("created_at", startDay).limit(2000),
+    const [actRes, clientsRes, healthRes, kpiPayload] = await Promise.all([
       supabase
         .from("activities")
         .select("id,prospect_id,type,notes,metadata,created_by,created_at")
         .order("created_at", { ascending: false })
         .limit(80),
       supabase.from("clients").select("id,closing_rep_id,mrr_cents,close_date,status").eq("status", "active").limit(500),
-      supabase.from("prospects").select("*").limit(800),
       supabase
         .from("profiles")
         .select("id,full_name,email,health_score,role")
         .in("role", ["sales_rep", "closer", "team_lead"])
         .limit(100),
+      accessToken
+        ? fetchCrmDashboardKpis(accessToken, startDay, startMonth).catch((e) => {
+            console.error("[CEO dashboard] KPI API failed:", e);
+            return null;
+          })
+        : Promise.resolve(null),
     ]);
 
-    const events = evRes.data ?? [];
-    const emailsSentToday = events.length;
-    const emailRepliesToday = events.filter((e) => e.replied_at && e.replied_at >= startDay).length;
-
     const acts = (actRes.data ?? []) as CrmActivityRow[];
-    const callsBookedToday = acts.filter((a) => {
-      if (a.type !== "stage_changed") return false;
-      const to = (a.metadata as { to?: string } | null)?.to;
-      return to === "call_booked" && a.created_at >= startDay;
-    }).length;
-
-    const clients = clientsRes.data ?? [];
-    const closesMtd = clients.filter((c) => c.close_date && c.close_date >= startMonth).length;
-
-    const prospects = (prospectsRes.data ?? []) as Prospect[];
-    setProspectsCache(prospects);
-    const pipelineOpenDollars = sumOpenPipelineValueDollars(prospects);
-    const stale48h = prospects.filter((p) => {
-      if (p.stage === "lost" || p.stage === "closed_won") return false;
-      return p.last_activity_at < staleCut;
-    }).length;
-    const activeMrrCents = clients.reduce((s, c) => s + (c.mrr_cents ?? 0), 0);
-
-    setKpis({
-      emailsSentToday,
-      emailRepliesToday,
-      callsBookedToday,
-      closesMtd,
-      pipelineOpenDollars,
-      stale48h,
-      activeMrrCents,
-    });
     setActivities(acts);
 
+    if (kpiPayload) {
+      setKpis({
+        emailsSentToday: kpiPayload.emails_sent_today,
+        emailRepliesToday: kpiPayload.emails_replied_today,
+        callsBookedToday: kpiPayload.calls_booked_today,
+        closesMtd: kpiPayload.closes_mtd,
+        pipelineOpenDollars: kpiPayload.pipeline_open_dollars,
+        stale48h: kpiPayload.stale_48h_open,
+        activeMrrCents: kpiPayload.mrr_total_cents,
+      });
+    } else {
+      const clients = clientsRes.data ?? [];
+      setKpis({
+        emailsSentToday: 0,
+        emailRepliesToday: 0,
+        callsBookedToday: 0,
+        closesMtd: clients.filter((c) => c.close_date && c.close_date >= startMonth).length,
+        pipelineOpenDollars: 0,
+        stale48h: 0,
+        activeMrrCents: clients.reduce((s, c) => s + (c.mrr_cents ?? 0), 0),
+      });
+    }
+
+    const prospectIds = Array.from(
+      new Set(acts.map((a) => a.prospect_id).filter((x): x is string => typeof x === "string" && !!x))
+    );
+    if (prospectIds.length) {
+      const { data: pl } = await supabase
+        .from("prospects")
+        .select("id,company_name,domain")
+        .in("id", prospectIds);
+      const map: Record<string, string> = {};
+      for (const row of pl ?? []) {
+        map[row.id] = (row.company_name as string | null) || (row.domain as string) || row.id.slice(0, 8);
+      }
+      setProspectLabels(map);
+    } else {
+      setProspectLabels({});
+    }
+
+    const clients = clientsRes.data ?? [];
     const mtdClients = clients.filter((c) => c.close_date && c.close_date >= startMonth && c.closing_rep_id);
     const byRep = new Map<string, { closes: number; mrrCents: number }>();
     for (const c of mtdClients) {
@@ -114,21 +129,21 @@ export function CeoLiveDashboard({
     const repIds = Array.from(byRep.keys());
     if (repIds.length === 0) {
       setLeaderboard([]);
-      return;
+    } else {
+      const profRes = await supabase.from("profiles").select("id,full_name,email").in("id", repIds);
+      const profs = profRes.data ?? [];
+      const nameById = new Map(profs.map((p) => [p.id, p.full_name || p.email || p.id]));
+      setLeaderboard(
+        repIds
+          .map((id) => ({
+            repId: id,
+            name: nameById.get(id) ?? id,
+            closes: byRep.get(id)?.closes ?? 0,
+            mrrCents: byRep.get(id)?.mrrCents ?? 0,
+          }))
+          .sort((a, b) => b.mrrCents - a.mrrCents)
+      );
     }
-    const profRes = await supabase.from("profiles").select("id,full_name,email").in("id", repIds);
-    const profs = profRes.data ?? [];
-    const nameById = new Map(profs.map((p) => [p.id, p.full_name || p.email || p.id]));
-    setLeaderboard(
-      repIds
-        .map((id) => ({
-          repId: id,
-          name: nameById.get(id) ?? id,
-          closes: byRep.get(id)?.closes ?? 0,
-          mrrCents: byRep.get(id)?.mrrCents ?? 0,
-        }))
-        .sort((a, b) => b.mrrCents - a.mrrCents),
-    );
 
     const hpRows = (healthRes.data ?? []) as {
       id: string;
@@ -147,9 +162,9 @@ export function CeoLiveDashboard({
           const av = a.healthScore ?? -1;
           const bv = b.healthScore ?? -1;
           return av - bv;
-        }),
+        })
     );
-  }, [supabase]);
+  }, [supabase, accessToken]);
 
   useEffect(() => {
     void loadAll();
@@ -158,13 +173,12 @@ export function CeoLiveDashboard({
   useEffect(() => {
     const ch = supabase
       .channel("ceo-live")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "activities" },
-        () => {
-          void loadAll();
-        },
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "activities" }, () => {
+        void loadAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "prospects" }, () => {
+        void loadAll();
+      })
       .subscribe();
     return () => {
       void supabase.removeChannel(ch);
@@ -179,16 +193,24 @@ export function CeoLiveDashboard({
   const prospectLabel = useCallback(
     (pid: string | null) => {
       if (!pid) return "—";
-      const p = prospectsCache.find((x) => x.id === pid);
-      return p ? p.company_name || p.domain : pid.slice(0, 8);
+      return prospectLabels[pid] ?? pid.slice(0, 8);
     },
-    [prospectsCache],
+    [prospectLabels],
   );
 
   if (!kpis) {
     return (
-      <div className="flex min-h-[120px] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />
+          ))}
+        </div>
       </div>
     );
   }

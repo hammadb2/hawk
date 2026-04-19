@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
-import type { CrmRole, Profile } from "@/lib/crm/types";
+import type { Profile } from "@/lib/crm/types";
+import { revalidateProfilesCache, revalidateTeamDirectory, useTeamDirectory } from "@/lib/crm/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,11 +27,10 @@ function roleLabel(r: string): string {
 }
 
 export function TeamDirectory() {
-  const supabase = useMemo(() => createClient(), []);
   const { authReady, session, profile } = useCrmAuth();
-  const [rows, setRows] = useState<Profile[]>([]);
-  const [tlNames, setTlNames] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const { data: teamData, isLoading, mutate, error } = useTeamDirectory();
+  const rows = teamData?.rows ?? [];
+  const tlNames = teamData?.tlNames ?? {};
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [form, setForm] = useState({
@@ -44,40 +43,9 @@ export function TeamDirectory() {
   });
   const [showTerms, setShowTerms] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(
-        "id, email, full_name, role, team_lead_id, status, monthly_close_target, last_close_at, created_at, onboarding_completed_at, whatsapp_number"
-      )
-      .in("role", ["sales_rep", "team_lead"] as CrmRole[])
-      .order("full_name", { ascending: true, nullsFirst: false });
-    if (error) {
-      toast.error(error.message);
-      setRows([]);
-      setLoading(false);
-      return;
-    }
-    const list = (data ?? []) as Profile[];
-    setRows(list);
-    const tlIds = Array.from(new Set(list.map((p) => p.team_lead_id).filter(Boolean) as string[]));
-    if (tlIds.length === 0) {
-      setTlNames({});
-    } else {
-      const { data: tls } = await supabase.from("profiles").select("id, full_name, email").in("id", tlIds);
-      const map: Record<string, string> = {};
-      for (const t of tls ?? []) {
-        map[t.id] = t.full_name ?? t.email ?? t.id.slice(0, 8);
-      }
-      setTlNames(map);
-    }
-    setLoading(false);
-  }, [supabase]);
-
   useEffect(() => {
-    if (authReady && session && profile) void load();
-  }, [authReady, session, profile, load]);
+    if (error) toast.error((error as Error).message);
+  }, [error]);
 
   function handleInviteClick() {
     if (!form.email.trim() || !form.full_name.trim() || !form.whatsapp_number.trim()) {
@@ -128,7 +96,9 @@ export function TeamDirectory() {
       toast.success(j.message || (j.existing_user ? "Rep linked — check email for magic link." : "Invite sent"));
       setInviteOpen(false);
       setForm({ email: "", full_name: "", role: "sales_rep", role_type: "", whatsapp_number: "", team_lead_id: "" });
-      await load();
+      void revalidateTeamDirectory();
+      void revalidateProfilesCache();
+      void mutate();
     } finally {
       setInviting(false);
     }
@@ -161,7 +131,9 @@ export function TeamDirectory() {
     if (!r.ok) toast.error((await r.text()).slice(0, 200));
     else {
       toast.success("Updated");
-      await load();
+      void revalidateTeamDirectory();
+      void revalidateProfilesCache();
+      void mutate();
     }
   }
 
@@ -183,14 +155,16 @@ export function TeamDirectory() {
       toast.success("Prospects reassigned");
       setReassignFrom(null);
       setReassignTo("");
-      await load();
+      void mutate();
     }
   }
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-slate-100" />
+        ))}
       </div>
     );
   }
@@ -217,7 +191,7 @@ export function TeamDirectory() {
         <button
           type="button"
           className="rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          onClick={() => void load()}
+          onClick={() => void mutate()}
         >
           Refresh
         </button>
@@ -350,8 +324,12 @@ export function TeamDirectory() {
         </DialogContent>
       </Dialog>
 
-      {loading ? (
-        <div className="py-16 text-center text-slate-600">Loading…</div>
+      {isLoading && rows.length === 0 ? (
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+          ))}
+        </div>
       ) : rows.length === 0 ? (
         <p className="rounded-lg border border-slate-200 bg-white shadow-sm px-4 py-10 text-center text-sm text-slate-600">
           No sales reps or team leads found.

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import { navVisibleForRole } from "@/lib/crm/nav-config";
@@ -27,8 +28,16 @@ const icons: Record<string, string> = {
 
 export function CrmSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { profile, signOut } = useCrmAuth();
   const items = navVisibleForRole(profile?.role);
+
+  useEffect(() => {
+    router.prefetch("/crm/pipeline");
+    router.prefetch("/crm/prospects");
+    router.prefetch("/crm/clients");
+    router.prefetch("/crm/dashboard");
+  }, [router]);
 
   return (
     <aside
