@@ -88,6 +88,11 @@ APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "").strip()
 CLAY_API_KEY = os.environ.get("CLAY_API_KEY", "").strip()
 ZEROBOUNCE_API_KEY = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
 
+# Unified pipeline — nightly build + morning dispatch
+APIFY_API_KEY = os.environ.get("APIFY_API_KEY", "").strip()
+MXTOOLBOX_API_KEY = os.environ.get("MXTOOLBOX_API_KEY", "").strip()
+CRM_SMARTLEAD_WEBHOOK_SECRET = os.environ.get("CRM_SMARTLEAD_WEBHOOK_SECRET", "").strip()
+
 # ARIA Phase 18 — WhatsApp Business Cloud API
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "").strip()
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "").strip()
@@ -99,6 +104,11 @@ SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 # Server-side REST (portal bootstrap, JWT fallback via /auth/v1/user)
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+# Public anon key — required for PostgREST calls that enforce RLS with the user JWT (e.g. CRM KPI aggregation).
+SUPABASE_ANON_KEY = (
+    os.environ.get("SUPABASE_ANON_KEY", "").strip()
+    or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "").strip()
+)
 
 # CRM public URL for WhatsApp deep links (no trailing slash)
 CRM_PUBLIC_BASE_URL = (

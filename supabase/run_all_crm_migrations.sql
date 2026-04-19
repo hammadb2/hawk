@@ -1,4 +1,9 @@
 -- =============================================================================
+-- HAWK CRM — legacy consolidated SQL (partial; ends ~20260425).
+-- For a full, current, idempotent one-shot schema use the repo root file:
+--   hawk_complete_schema.sql
+-- (built from all supabase/migrations/*.sql in order + audit notes).
+-- =============================================================================
 -- HAWK CRM — paste this ENTIRE file into the Supabase SQL Editor and run once.
 -- Self-contained: includes all consolidated migration blocks (incl. VA/RLS + billing_status).
 -- Order follows supabase/migrations/*.sql; statements use IF NOT EXISTS / drop-if-exists where possible.

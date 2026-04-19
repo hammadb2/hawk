@@ -1,59 +1,134 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import type { Prospect } from "@/lib/crm/types";
-import { STAGE_META } from "@/lib/crm/types";
-import toast from "react-hot-toast";
+import type { Prospect, ProspectPipelineStatus } from "@/lib/crm/types";
+import { PIPELINE_STATUS_LABELS, STAGE_META } from "@/lib/crm/types";
+import { useProspectsList, useProspectsRealtimeSubscription } from "@/lib/crm/hooks";
+
+type PipelineFilterValue = "all" | ProspectPipelineStatus | "active";
+
+const PIPELINE_FILTER_OPTIONS: { value: PipelineFilterValue; label: string }[] = [
+  { value: "all", label: "All prospects" },
+  { value: "active", label: "Active pipeline (hide suppressed)" },
+  ...(Object.keys(PIPELINE_STATUS_LABELS) as ProspectPipelineStatus[]).map((k) => ({
+    value: k,
+    label: PIPELINE_STATUS_LABELS[k],
+  })),
+];
+
+function pipelineLabel(status: string | null | undefined): string {
+  if (!status) return "—";
+  return PIPELINE_STATUS_LABELS[status as ProspectPipelineStatus] ?? status;
+}
+
+function ProspectsTableSkeleton() {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-crmBorder">
+      <table className="w-full min-w-[880px] text-left text-sm">
+        <thead className="border-b border-crmBorder bg-crmSurface2">
+          <tr>
+            {["Company", "Domain", "Stage", "Pipeline", "Lead", "Hawk"].map((label) => (
+              <th key={label} className="px-3 py-2">
+                <div className="h-3 w-20 animate-pulse rounded bg-crmSurface" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }).map((_, r) => (
+            <tr key={r} className="border-b border-crmBorder">
+              <td className="px-3 py-2">
+                <div className="h-4 w-40 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2">
+                <div className="h-4 w-32 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2">
+                <div className="h-4 w-24 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2">
+                <div className="h-4 w-28 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2 text-right">
+                <div className="ml-auto h-4 w-10 animate-pulse rounded bg-crmSurface2" />
+              </td>
+              <td className="px-3 py-2 text-right">
+                <div className="ml-auto h-4 w-10 animate-pulse rounded bg-crmSurface2" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ProspectsListPage() {
-  const supabase = useMemo(() => createClient(), []);
-  const [rows, setRows] = useState<Prospect[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pipelineFilter, setPipelineFilter] = useState<PipelineFilterValue>("all");
+  const { data: rows = [], isLoading } = useProspectsList(pipelineFilter);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from("prospects").select("*").order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    setRows((data as Prospect[]) ?? []);
-    setLoading(false);
-  }, [supabase]);
+  useProspectsRealtimeSubscription(true);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const showSkeleton = isLoading && rows.length === 0;
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Prospects</h1>
-        <p className="text-sm text-slate-600">All prospects you can access (RLS). Open a row for the full profile.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Prospects</h1>
+          <p className="text-sm text-slate-400">
+            All prospects you can access (RLS). Updates live as the ARIA pipeline writes to CRM.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="pipeline-filter" className="text-xs font-medium uppercase text-slate-500">
+            Pipeline status
+          </label>
+          <select
+            id="pipeline-filter"
+            className="rounded-lg border border-crmBorder bg-crmSurface2 px-3 py-2 text-sm text-white shadow-sm"
+            value={pipelineFilter}
+            onChange={(e) => setPipelineFilter(e.target.value as PipelineFilterValue)}
+          >
+            {PIPELINE_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      {loading ? (
-        <div className="flex justify-center py-12 text-slate-600">Loading…</div>
+      {showSkeleton ? (
+        <ProspectsTableSkeleton />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-600">
+        <div className="overflow-x-auto rounded-xl border border-crmBorder bg-crmSurface">
+          <table className="w-full min-w-[880px] text-left text-sm">
+            <thead className="border-b border-crmBorder bg-crmSurface2 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-3 py-2">Company</th>
                 <th className="px-3 py-2">Domain</th>
                 <th className="px-3 py-2">Stage</th>
-                <th className="px-3 py-2">Score</th>
+                <th className="px-3 py-2">Pipeline</th>
+                <th className="px-3 py-2 text-right">Lead score</th>
+                <th className="px-3 py-2 text-right">Hawk score</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((p) => (
-                <tr key={p.id} className="border-b border-slate-200/90 hover:bg-white shadow-sm">
+              {rows.map((p: Prospect) => (
+                <tr key={p.id} className="border-b border-crmBorder hover:bg-crmSurface2/80">
                   <td className="px-3 py-2">
-                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-600 hover:underline">
+                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
                       {p.company_name ?? p.domain}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{p.domain}</td>
-                  <td className="px-3 py-2">{STAGE_META[p.stage].label}</td>
-                  <td className="px-3 py-2">{p.hawk_score}</td>
+                  <td className="px-3 py-2 text-slate-400">{p.domain}</td>
+                  <td className="px-3 py-2 text-slate-200">{STAGE_META[p.stage]?.label ?? p.stage}</td>
+                  <td className="px-3 py-2 text-slate-300">{pipelineLabel(p.pipeline_status ?? undefined)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">
+                    {p.lead_score != null ? p.lead_score : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">{p.hawk_score}</td>
                 </tr>
               ))}
             </tbody>
