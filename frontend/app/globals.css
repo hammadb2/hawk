@@ -37,6 +37,14 @@ html.crm-route body {
   color-scheme: dark;
 }
 
+/* Reduce rubber-band overscroll exposing the default light canvas (esp. Safari / iOS) */
+html.crm-route {
+  overscroll-behavior-y: none;
+}
+html.crm-route body {
+  overscroll-behavior-y: none;
+}
+
 html.crm-route ::-webkit-scrollbar-track {
   background: #16161f;
 }
