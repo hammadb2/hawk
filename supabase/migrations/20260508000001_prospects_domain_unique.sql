@@ -166,12 +166,13 @@ begin
 end $$;
 
 -- prospects.duplicate_of self-FK — if any prior duplicate_of pointed at a
--- loser, re-aim it at the keeper so the loser can be deleted safely.
+-- loser, re-aim it at the keeper so the loser can be deleted safely. If
+-- the KEEPER itself pointed at a loser of the same domain, null it out
+-- instead (can't self-reference; otherwise the DELETE would hit the FK).
 update public.prospects p
-   set duplicate_of = m.keeper_id
+   set duplicate_of = case when p.id = m.keeper_id then null else m.keeper_id end
   from _prospect_dedup_map m
- where p.duplicate_of = m.loser_id
-   and p.id <> m.keeper_id;
+ where p.duplicate_of = m.loser_id;
 
 -- 3) Delete the now-orphaned loser rows.
 delete from public.prospects p
