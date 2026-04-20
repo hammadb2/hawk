@@ -411,7 +411,28 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
     if score is not None and score >= SLA_SCORE_DROP_THRESHOLD:
         _soft_drop(prospect_id, domain, reason=f"sla_auto_score_gate:hawk_score={score}>=threshold")
         return {"prospect_id": prospect_id, "domain": domain, "score": score, "outcome": "soft_dropped"}
-    return {"prospect_id": prospect_id, "domain": domain, "score": score, "outcome": "scanned"}
+
+    # Scan succeeded + score < threshold → kick off enrichment + ZeroBounce +
+    # ARIA personalized draft in the same worker thread. Blocking here is fine
+    # because SLA_SCAN_CONCURRENCY is already capped and the SLA job only runs
+    # every couple of minutes. A failure here must not regress the scan
+    # completion itself, so swallow exceptions.
+    post_scan_outcome: str | None = None
+    try:
+        from services.aria_post_scan_pipeline import run_post_scan_sync
+
+        ps = run_post_scan_sync(prospect_id)
+        post_scan_outcome = str(ps.get("outcome") or ps.get("skipped") or "")
+    except Exception as exc:
+        logger.warning("SLA post-scan pipeline prospect=%s failed: %s", prospect_id, exc)
+
+    return {
+        "prospect_id": prospect_id,
+        "domain": domain,
+        "score": score,
+        "outcome": "scanned",
+        "post_scan": post_scan_outcome,
+    }
 
 
 def run_sla_auto_scan() -> dict[str, Any]:
