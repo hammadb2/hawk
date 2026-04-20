@@ -160,12 +160,20 @@ def _update_job_id(prospect_id: str, job_id: str) -> None:
 
 
 def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
-    """Mark prospect stage=lost + pipeline_status=suppressed, insert suppressions row."""
+    """Mark prospect stage=lost + pipeline_status=suppressed, insert suppressions row.
+
+    Only applies the stage change if the prospect is still at ``new`` or
+    ``scanned`` — we never regress a rep-advanced prospect (loom_sent,
+    replied, call_booked, proposal_sent, closed_won).
+    """
     try:
         httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",
             headers=_sb_headers(),
-            params={"id": f"eq.{prospect_id}"},
+            params={
+                "id": f"eq.{prospect_id}",
+                "stage": "in.(new,scanned)",
+            },
             json={
                 "stage": "lost",
                 "pipeline_status": "suppressed",
@@ -217,25 +225,40 @@ def _write_scan_result(prospect_id: str, result: dict[str, Any]) -> int | None:
         if interp:
             vuln_text += f" \u2014 {str(interp)[:200]}"
 
-    patch: dict[str, Any] = {
-        "pipeline_status": "scanned",
-        "stage": "scanned",
+    # Split into two PATCHes: the first unconditionally refreshes scan-state
+    # fields (score, findings, timing), the second advances stage only if the
+    # prospect hasn't been manually progressed past `new` during the poll window.
+    scan_patch: dict[str, Any] = {
         "active_scan_job_id": None,
         "scan_started_at": None,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
     }
     if score_int is not None:
-        patch["hawk_score"] = max(0, min(100, score_int))
+        scan_patch["hawk_score"] = max(0, min(100, score_int))
     if vuln_text:
-        patch["vulnerability_found"] = vuln_text[:10000]
+        scan_patch["vulnerability_found"] = vuln_text[:10000]
     if vuln_type:
-        patch["vulnerability_type"] = vuln_type[:500]
+        scan_patch["vulnerability_type"] = vuln_type[:500]
     try:
         httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",
             headers=_sb_headers(),
             params={"id": f"eq.{prospect_id}"},
-            json=patch,
+            json=scan_patch,
+            timeout=15.0,
+        )
+    except Exception as exc:
+        logger.warning("SLA scan result patch (scan fields) error prospect=%s: %s", prospect_id, exc)
+
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "id": f"eq.{prospect_id}",
+                "stage": "eq.new",  # only advance from `new`; never regress later stages
+            },
+            json={"stage": "scanned", "pipeline_status": "scanned"},
             timeout=15.0,
         )
     except Exception as exc:
