@@ -30,6 +30,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from config import SMARTLEAD_API_KEY, SUPABASE_URL
+from services.crm_bool_setting import fetch_crm_bool
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +296,8 @@ def _route_overflow_to_va_queue() -> dict[str, int]:
     repeatedly — it only targets `pipeline_status=ready` rows.
     """
     out: dict[str, int] = {}
+    if not fetch_crm_bool("va_queue_enabled", default=True):
+        return out
     if not SUPABASE_URL or not SERVICE_KEY:
         return out
 

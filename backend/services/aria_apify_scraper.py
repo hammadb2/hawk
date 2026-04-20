@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 
 from config import APOLLO_API_KEY
+from services.crm_bool_setting import fetch_crm_bool
 
 logger = logging.getLogger(__name__)
 
@@ -850,6 +851,8 @@ async def _apollo_topup_if_needed(
     shortfall = max(0, target - len(leads))
     if shortfall <= 0 or not APOLLO_API_KEY:
         return leads
+    if not fetch_crm_bool("apollo_people_topup_enabled", default=True):
+        return leads
 
     from services.apollo_enrichment import apollo_people_topup
 
@@ -936,7 +939,9 @@ async def run_ondemand_discovery(
 
     meta["gmaps_raw_count"] = len(leads)
 
-    if not leads and APOLLO_API_KEY:
+    if not leads and APOLLO_API_KEY and fetch_crm_bool(
+        "apollo_people_topup_enabled", default=True
+    ):
         from services.apollo_enrichment import apollo_people_topup
 
         leads = await apollo_people_topup(

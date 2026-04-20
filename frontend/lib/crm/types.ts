@@ -31,6 +31,8 @@ export type ProspectPipelineStatus =
   | "scanned"
   | "ready"
   | "contacted"
+  | "dispatched"
+  | "va_queue"
   | "suppressed";
 
 export type ProfileStatus = "invited" | "onboarding" | "active" | "at_risk" | "inactive";
@@ -257,6 +259,8 @@ export const PIPELINE_STATUS_LABELS: Record<ProspectPipelineStatus, string> = {
   scanned: "Scanned",
   ready: "Ready",
   contacted: "Contacted",
+  dispatched: "Dispatched",
+  va_queue: "VA queue",
   suppressed: "Suppressed",
 };
 

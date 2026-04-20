@@ -23,10 +23,20 @@ alter table public.prospects
 alter table public.prospects drop constraint if exists prospects_pipeline_status_check;
 alter table public.prospects
   add constraint prospects_pipeline_status_check
-  check (pipeline_status in (
-    'discovered', 'scanning', 'scanned', 'enriching', 'ready',
-    'dispatched', 'va_queue', 'closed'
-  ));
+  check (
+    pipeline_status is null
+    or pipeline_status in (
+      'discovered',
+      'enriched',
+      'verified',
+      'suppressed',
+      'scanned',
+      'ready',
+      'contacted',
+      'dispatched',
+      'va_queue'
+    )
+  );
 
 create index if not exists idx_prospects_pipeline_status_industry
   on public.prospects (pipeline_status, industry);
@@ -188,5 +198,8 @@ delete from public.crm_settings
  where key in (
    'apify_enable_actor2_linkedin',
    'apify_enable_actor3_leads_finder',
-   'apify_enable_actor4_website_crawl'
+   'apify_enable_actor4_website_crawl',
+   'apify_enable_leadsfinder',
+   'apify_enable_linkedin',
+   'apify_enable_website_crawler'
  );
