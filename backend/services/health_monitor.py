@@ -72,13 +72,21 @@ def _insert_log(
         return None
 
 
+_LEGACY_SERVICE_NAMES: dict[str, tuple[str, ...]] = {
+    # New name -> historical names to fall back on when the rename rolls out
+    # so consecutive-failure CEO alerts don't lose their memory for one cycle.
+    "aria_email": ("charlotte_email",),
+}
+
+
 def _fetch_previous_log(service: str) -> dict[str, Any] | None:
+    candidates = (service, *_LEGACY_SERVICE_NAMES.get(service, ()))
     try:
         r = httpx.get(
             f"{SUPABASE_URL.rstrip('/')}/rest/v1/system_health_log",
             headers=_sb_headers_read(),
             params={
-                "service": f"eq.{service}",
+                "service": f"in.({','.join(candidates)})",
                 "select": "id,status,alert_sent,checked_at",
                 "order": "checked_at.desc",
                 "limit": "1",
