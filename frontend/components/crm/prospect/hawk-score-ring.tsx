@@ -6,15 +6,23 @@ export function HawkScoreRing({
   score,
   size = 72,
   className,
+  showEmptyState = true,
 }: {
   score: number;
   size?: number;
   className?: string;
+  /**
+   * When true (default), treats score=0/null as "not scanned yet" and renders
+   * a muted ring with "—". Callers rendering a specific completed scan result
+   * should pass `false` so a legitimate score of 0 still renders with its red
+   * ring + the `0` number.
+   */
+  showEmptyState?: boolean;
 }) {
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const hasScore = typeof score === "number" && score > 0;
+  const hasScore = showEmptyState ? typeof score === "number" && score > 0 : true;
   const clamped = Math.min(100, Math.max(0, score || 0));
   const pct = clamped / 100;
   const offset = c * (1 - pct);

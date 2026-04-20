@@ -253,7 +253,7 @@ export function ProspectScanResultsPanel({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex flex-col items-center gap-1">
-          <HawkScoreRing score={score} size={120} />
+          <HawkScoreRing score={score} size={120} showEmptyState={false} />
           <div className="text-center">
             <div className="text-2xl font-bold text-slate-900">{scan.grade ?? "—"}</div>
             <div className="text-xs text-slate-600">{new Date(scan.created_at).toLocaleString()}</div>
