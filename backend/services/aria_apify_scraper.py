@@ -1123,12 +1123,29 @@ async def run_full_discovery(
 
     Returns all leads with lead_score, contact_email, email_finder set.
     """
-    if not os.environ.get("APIFY_API_KEY", "").strip():
-        logger.error("APIFY_API_KEY not configured — cannot run discovery")
+    google_places_key = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
+    apify_key = os.environ.get("APIFY_API_KEY", "").strip()
+    if not google_places_key and not apify_key:
+        logger.error(
+            "Neither GOOGLE_PLACES_API_KEY nor APIFY_API_KEY configured — cannot run discovery"
+        )
         return []
 
-    # Step 1: Actor 1 — Google Maps
-    all_leads = await run_actor1_google_maps(cities=cities)
+    # Step 1: Discovery (Google Places preferred, Apify Google Maps fallback).
+    # Google Places (New) Pro SKU is covered by the $200/month Maps Platform
+    # free credit for the nightly volume here, so it's ~free vs Apify's
+    # per-place cost. Actor 2/3/4 Apify enrichment still runs on the results.
+    if google_places_key:
+        from services.aria_google_places import discover_leads as _discover_google_places
+
+        all_leads = await _discover_google_places(cities=cities)
+        if not all_leads and apify_key:
+            logger.warning(
+                "Google Places returned 0 leads — falling back to Apify Actor 1 Google Maps"
+            )
+            all_leads = await run_actor1_google_maps(cities=cities)
+    else:
+        all_leads = await run_actor1_google_maps(cities=cities)
     if not all_leads:
         logger.warning("Actor 1 returned zero leads — checking Apollo last resort")
         # Try Apollo as absolute last resort for each vertical
