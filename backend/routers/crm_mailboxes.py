@@ -74,6 +74,97 @@ class MailboxUpdate(BaseModel):
 class BulkImportPayload(BaseModel):
     csv_text: str | None = None
     rows: list[MailboxCreate] | None = None
+    dry_run: bool = False
+
+
+# ─── Mailforge native CSV ↔ MailboxCreate field mapping ─────────────────────
+#
+# Mailforge/Salesforge exports use a different header set than our own bulk
+# import schema. Accepting either lets the CEO paste their raw provider export
+# directly into the UI — no spreadsheet reshaping required.
+_MAILFORGE_ALIASES: dict[str, str] = {
+    "from_email": "email_address",
+    "from_name": "display_name",
+    "user_name": "smtp_username",
+    "password": "smtp_password",
+    "imap_user_name": "imap_username",
+    "imap_password_": "imap_password",  # guard against trailing whitespace variants
+    "max_email_per_day": "daily_cap",
+    "signature": "notes",
+}
+_IGNORED_COLUMNS: set[str] = {
+    "custom_tracking_url",
+    "warmup_enabled",
+    "total_warmup_per_day",
+    "daily_rampup",
+    "reply_rate_percentage",
+    "bcc",
+    "different_reply_to_address",
+}
+
+
+def _normalise_bulk_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Translate a single CSV row (either schema) into MailboxCreate kwargs."""
+    clean: dict[str, Any] = {}
+    for raw_key, raw_val in row.items():
+        if raw_key is None:
+            continue
+        key = str(raw_key).strip().lower()
+        if not key or key in _IGNORED_COLUMNS:
+            continue
+        if isinstance(raw_val, str):
+            raw_val = raw_val.strip()
+        target = _MAILFORGE_ALIASES.get(key, key)
+        clean[target] = raw_val
+
+    # Mailforge re-uses `password` for both SMTP + IMAP if imap_password is blank.
+    if not clean.get("imap_password") and clean.get("smtp_password"):
+        clean["imap_password"] = clean["smtp_password"]
+    # ...and the same user_name for IMAP if imap_user_name is blank.
+    if not clean.get("imap_username") and clean.get("smtp_username"):
+        clean["imap_username"] = clean["smtp_username"]
+
+    # Derive domain from email when missing (Mailforge CSVs don't export it).
+    if not clean.get("domain"):
+        email = str(clean.get("email_address") or "")
+        if "@" in email:
+            clean["domain"] = email.split("@", 1)[1].lower()
+
+    # Normalise TLS/SSL flags based on ports if the CSV doesn't specify them.
+    try:
+        smtp_port = int(clean.get("smtp_port") or 587)
+    except (TypeError, ValueError):
+        smtp_port = 587
+    try:
+        imap_port = int(clean.get("imap_port") or 993)
+    except (TypeError, ValueError):
+        imap_port = 993
+    clean.setdefault("smtp_port", smtp_port)
+    clean.setdefault("imap_port", imap_port)
+    if "smtp_use_tls" not in clean:
+        clean["smtp_use_tls"] = smtp_port in (587, 2525)
+    if "smtp_use_ssl" not in clean:
+        clean["smtp_use_ssl"] = smtp_port == 465
+    if "imap_use_ssl" not in clean:
+        clean["imap_use_ssl"] = imap_port == 993
+    for b in ("smtp_use_tls", "smtp_use_ssl", "imap_use_ssl"):
+        val = clean.get(b)
+        if isinstance(val, str):
+            clean[b] = val.lower() in ("true", "1", "yes", "y", "t")
+
+    # Integer coercion for the numeric columns.
+    for int_field in ("smtp_port", "imap_port", "daily_cap"):
+        v = clean.get(int_field)
+        if isinstance(v, str) and v:
+            try:
+                clean[int_field] = int(v)
+            except ValueError:
+                clean.pop(int_field, None)
+    if clean.get("daily_cap") in (None, 0, ""):
+        clean["daily_cap"] = 40
+
+    clean.setdefault("provider", "mailforge")
+    return clean
 
 
 def _ensure_crypto() -> None:
@@ -214,30 +305,30 @@ def bulk_import(payload: BulkImportPayload, uid: str = Depends(require_ceo)) -> 
       imap_host,imap_port,imap_username,imap_password,imap_use_ssl,
       daily_cap,vertical,notes
     """
-    _ensure_crypto()
+    if not payload.dry_run:
+        _ensure_crypto()
     rows_to_create: list[dict[str, Any]] = []
     if payload.rows:
-        rows_to_create.extend(r.model_dump() for r in payload.rows)
+        rows_to_create.extend(_normalise_bulk_row(r.model_dump()) for r in payload.rows)
     if payload.csv_text:
         reader = csv.DictReader(io.StringIO(payload.csv_text))
         for row in reader:
-            clean = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items() if k}
-            for bool_field in ("smtp_use_tls", "smtp_use_ssl", "imap_use_ssl"):
-                if bool_field in clean:
-                    clean[bool_field] = str(clean[bool_field]).lower() in ("true", "1", "yes", "y")
-            for int_field in ("smtp_port", "imap_port", "daily_cap"):
-                if clean.get(int_field):
-                    try:
-                        clean[int_field] = int(clean[int_field])
-                    except ValueError:
-                        pass
-            rows_to_create.append(clean)
+            rows_to_create.append(_normalise_bulk_row(row))
+
+    if payload.dry_run:
+        preview = []
+        for row in rows_to_create:
+            row = dict(row)
+            for secret in ("smtp_password", "imap_password"):
+                if row.get(secret):
+                    row[secret] = "***"
+            preview.append(row)
+        return {"ok": True, "dry_run": True, "preview": preview, "count": len(preview)}
 
     created: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     for row in rows_to_create:
         try:
-            row.setdefault("provider", "smtp")
             created.append(mailbox_registry.create_mailbox(row, created_by=uid))
         except Exception as exc:
             errors.append({"email": row.get("email_address"), "error": str(exc)[:400]})
