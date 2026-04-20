@@ -104,7 +104,16 @@ export function ProspectCard({
           >
             {prospect.source}
           </span>
-          <span>Score {prospect.hawk_score}</span>
+          {prospect.stage === "scanning" ? (
+            <span className="inline-flex items-center gap-1 text-amber-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+              Scanning…
+            </span>
+          ) : prospect.hawk_score > 0 ? (
+            <span>Score {prospect.hawk_score}</span>
+          ) : (
+            <span className="text-slate-600">Unscanned</span>
+          )}
           <span>{new Date(prospect.last_activity_at).toLocaleDateString()}</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-500">

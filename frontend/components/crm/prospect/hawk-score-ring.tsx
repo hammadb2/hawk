@@ -14,17 +14,37 @@ export function HawkScoreRing({
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const pct = Math.min(100, Math.max(0, score)) / 100;
+  const hasScore = typeof score === "number" && score > 0;
+  const clamped = Math.min(100, Math.max(0, score || 0));
+  const pct = clamped / 100;
   const offset = c * (1 - pct);
-  const color = score < 40 ? "#f87171" : score < 70 ? "#fbbf24" : "#34d399";
+  const color = !hasScore
+    ? "#64748b" // slate-500 muted ring for unscanned (score null/0)
+    : clamped < 40
+      ? "#f87171"
+      : clamped < 70
+        ? "#fbbf24"
+        : "#34d399";
   return (
     <div
       className={cn("relative shrink-0", className)}
       style={{ width: size, height: size }}
-      title={`HAWK score ${score}/100 — red under 40, amber 40–70, green above 70`}
+      title={
+        hasScore
+          ? `HAWK score ${clamped}/100 — red under 40, amber 40–70, green above 70`
+          : "Not scanned yet"
+      }
     >
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-slate-800" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          className="text-slate-700/60"
+        />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -34,11 +54,13 @@ export function HawkScoreRing({
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
-          strokeDashoffset={offset}
+          strokeDashoffset={hasScore ? offset : c}
           className="transition-[stroke-dashoffset] duration-500"
         />
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-900">{score}</div>
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-semibold text-white">
+        {hasScore ? clamped : "—"}
+      </div>
     </div>
   );
 }
