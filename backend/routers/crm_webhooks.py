@@ -235,7 +235,7 @@ def _create_prospect_from_reply(
         "company_name": company,
         "industry": industry,
         "stage": stage,
-        "source": "aria_nightly",
+        "source": "inbound",
         "assigned_rep_id": assigned_rep_id,
         "hawk_score": hawk_score,
         "last_activity_at": datetime.now(timezone.utc).isoformat(),

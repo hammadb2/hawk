@@ -316,6 +316,15 @@ def nightly_pipeline_run(
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+# Legacy alias — external schedulers (cron-job.org) may still target the
+# old Charlotte path. Keeps them working while teams migrate URLs.
+@router.post("/charlotte-run", include_in_schema=False)
+def nightly_pipeline_run_legacy(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
+
+
 @router.post("/morning-dispatch")
 def morning_dispatch_run(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
