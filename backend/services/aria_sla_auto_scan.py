@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -110,12 +111,16 @@ def _find_candidates(limit: int) -> list[dict[str, Any]]:
 
 
 def _claim_prospect(prospect_id: str, job_id: str) -> bool:
-    """Write active_scan_job_id + scan_started_at. Returns True if claimed."""
+    """Claim a prospect for scanning by atomically writing active_scan_job_id.
+
+    Uses ``Prefer: return=representation`` so PostgREST returns the affected
+    rows; if the length is 0, another worker already claimed it.
+    """
     now = datetime.now(timezone.utc).isoformat()
     try:
         r = httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",
-            headers=_sb_headers(),
+            headers=_sb_headers(prefer="return=representation"),
             params={
                 "id": f"eq.{prospect_id}",
                 "active_scan_job_id": "is.null",  # only claim if no existing job
@@ -128,10 +133,30 @@ def _claim_prospect(prospect_id: str, job_id: str) -> bool:
             },
             timeout=15.0,
         )
-        return r.status_code < 400
+        if r.status_code >= 400:
+            return False
+        try:
+            body = r.json() or []
+        except Exception:
+            body = []
+        return len(body) > 0
     except Exception as exc:
         logger.warning("SLA claim error prospect=%s: %s", prospect_id, exc)
         return False
+
+
+def _update_job_id(prospect_id: str, job_id: str) -> None:
+    """Replace the placeholder claim token with the real scanner job_id."""
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={"id": f"eq.{prospect_id}"},
+            json={"active_scan_job_id": job_id},
+            timeout=15.0,
+        )
+    except Exception as exc:
+        logger.warning("SLA update-job-id error prospect=%s: %s", prospect_id, exc)
 
 
 def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
@@ -154,7 +179,7 @@ def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
         httpx.post(
             f"{SUPABASE_URL}/rest/v1/suppressions",
             headers=_sb_headers(prefer="return=minimal,resolution=merge-duplicates"),
-            json={"domain": domain, "reason": "manual"},
+            json={"domain": domain, "reason": reason[:500]},
             timeout=15.0,
         )
     except Exception as exc:
@@ -244,6 +269,13 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
     if not domain:
         return {"prospect_id": prospect_id, "skipped": "no_domain"}
 
+    # Claim first (atomically, with a local placeholder UUID) so we don't burn
+    # scanner credits on prospects another worker is already handling.
+    placeholder = str(uuid.uuid4())
+    if not _claim_prospect(prospect_id, placeholder):
+        logger.info("SLA skip prospect=%s: already claimed", prospect_id)
+        return {"prospect_id": prospect_id, "skipped": "already_claimed"}
+
     try:
         job_id = enqueue_async_scan(
             domain,
@@ -256,9 +288,7 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
         _release_on_failure(prospect_id, f"enqueue: {exc}")
         return {"prospect_id": prospect_id, "error": f"enqueue: {exc}"}
 
-    if not _claim_prospect(prospect_id, job_id):
-        logger.info("SLA skip prospect=%s: already claimed", prospect_id)
-        return {"prospect_id": prospect_id, "skipped": "already_claimed"}
+    _update_job_id(prospect_id, job_id)
 
     try:
         result = poll_scan_job(job_id, timeout_sec=360.0, interval_sec=5.0)
@@ -268,7 +298,7 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
 
     score = _write_scan_result(prospect_id, result)
     if score is not None and score >= SLA_SCORE_DROP_THRESHOLD:
-        _soft_drop(prospect_id, domain, reason=f"hawk_score={score}>=threshold")
+        _soft_drop(prospect_id, domain, reason=f"sla_auto_score_gate:hawk_score={score}>=threshold")
         return {"prospect_id": prospect_id, "domain": domain, "score": score, "outcome": "soft_dropped"}
     return {"prospect_id": prospect_id, "domain": domain, "score": score, "outcome": "scanned"}
 
