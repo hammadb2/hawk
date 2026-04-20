@@ -15,6 +15,7 @@ declare
     'aria_lead_inventory',
     'aria_pipeline_runs',
     'aria_messages',
+    'aria_conversations',
     'crm_prospect_scans',
     'scans',
     'findings',
