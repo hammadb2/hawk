@@ -214,8 +214,19 @@ def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
         logger.warning("SLA soft-drop suppression error prospect=%s: %s", prospect_id, exc)
 
 
-def _write_scan_result(prospect_id: str, result: dict[str, Any]) -> int | None:
-    """Persist scan result (hawk_score, vulnerability_found). Returns score."""
+def _write_scan_result(
+    prospect_id: str,
+    result: dict[str, Any],
+    *,
+    job_id: str | None = None,
+) -> int | None:
+    """Persist scan result (hawk_score, vulnerability_found). Returns score.
+
+    Also inserts a row into ``crm_prospect_scans`` with the full scanner payload
+    so the prospect detail panel's "Scan results" tab surfaces the same data the
+    manual Scan button produces. Without this row the card's score badge would
+    show a number while the detail panel still said "No scans yet".
+    """
     score = result.get("score")
     try:
         score_int: int | None = int(score) if score is not None else None
@@ -293,6 +304,45 @@ def _write_scan_result(prospect_id: str, result: dict[str, Any]) -> int | None:
     except Exception as exc:
         logger.warning("SLA scan result patch error prospect=%s: %s", prospect_id, exc)
 
+    # Persist a crm_prospect_scans row so the prospect detail "Scan results"
+    # tab has the full interpreted + attack-path payload to render. Idempotent
+    # via external_job_id when available.
+    try:
+        raw_layers = result.get("raw_layers") or {}
+        interpreted = result.get("interpreted_findings") or []
+        if not interpreted and isinstance(raw_layers, dict):
+            interpreted = raw_layers.get("interpreted_findings") or []
+        attack_paths = result.get("attack_paths") or []
+        if not attack_paths and isinstance(raw_layers, dict):
+            attack_paths = raw_layers.get("attack_paths") or []
+        breach_cost = result.get("breach_cost_estimate") or {}
+        industry = result.get("industry")
+
+        scan_row: dict[str, Any] = {
+            "prospect_id": prospect_id,
+            "hawk_score": score_int if score_int is not None else 0,
+            "grade": result.get("grade"),
+            "findings": {"source": "hawk_scanner_v2_async_sla", "findings": findings},
+            "status": "complete",
+            "scan_version": result.get("scan_version") or "2.0",
+            "industry": industry,
+            "raw_layers": raw_layers if isinstance(raw_layers, dict) else {},
+            "interpreted_findings": interpreted,
+            "breach_cost_estimate": breach_cost if isinstance(breach_cost, dict) else {},
+            "attack_paths": attack_paths if isinstance(attack_paths, list) else [],
+        }
+        if job_id:
+            scan_row["external_job_id"] = job_id
+
+        httpx.post(
+            f"{SUPABASE_URL}/rest/v1/crm_prospect_scans",
+            headers=_sb_headers(prefer="return=minimal,resolution=merge-duplicates"),
+            json=scan_row,
+            timeout=20.0,
+        )
+    except Exception as exc:
+        logger.warning("SLA scan result crm_prospect_scans insert error prospect=%s: %s", prospect_id, exc)
+
     return score_int
 
 
@@ -357,7 +407,7 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
         _release_on_failure(prospect_id, f"poll: {exc}")
         return {"prospect_id": prospect_id, "error": f"poll: {exc}"}
 
-    score = _write_scan_result(prospect_id, result)
+    score = _write_scan_result(prospect_id, result, job_id=job_id)
     if score is not None and score >= SLA_SCORE_DROP_THRESHOLD:
         _soft_drop(prospect_id, domain, reason=f"sla_auto_score_gate:hawk_score={score}>=threshold")
         return {"prospect_id": prospect_id, "domain": domain, "score": score, "outcome": "soft_dropped"}

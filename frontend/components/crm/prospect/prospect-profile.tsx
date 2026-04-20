@@ -904,11 +904,13 @@ export function ProspectProfile({
           )}
           {emailEvents.length === 0 && (
             <p className="text-slate-500">
-              No email events yet. POST to the API webhook (see{" "}
-              <Link href="/crm/charlotte" className="text-emerald-400 hover:underline">
-                Charlotte
+              No email events yet. ARIA will draft and dispatch the first-touch
+              email via Smartlead once this prospect is enriched — see{" "}
+              <Link href="/crm/ai" className="text-emerald-400 hover:underline">
+                ARIA
               </Link>
-              ) or connect Smartlead with <code className="text-slate-500">X-CRM-Webhook-Secret</code>.
+              {" "}for status, or connect Smartlead directly with{" "}
+              <code className="text-slate-500">X-CRM-Webhook-Secret</code>.
             </p>
           )}
           {emailEvents.map((ev) => {
