@@ -6,7 +6,7 @@ import { CRM_API_BASE_URL } from "@/lib/crm/api-url";
 import { createClient } from "@/lib/supabase/client";
 import { crmPageSubtitle, crmPageTitle, crmSurfaceCard } from "@/lib/crm/crm-surface";
 
-type CharlotteRun = {
+type PipelineRun = {
   id?: string;
   created_at?: string;
   leads_pulled?: number;
@@ -28,7 +28,9 @@ type ScannerHealth = {
 
 type HealthData = {
   ok: boolean;
-  charlotte_last_run: CharlotteRun | null;
+  pipeline_last_run: PipelineRun | null;
+  /** Legacy key kept for wire-compat with older backends. */
+  charlotte_last_run?: PipelineRun | null;
   replies_unhandled: number;
   scanner_health_last: ScannerHealth | null;
 };
@@ -98,7 +100,7 @@ export default function CrmHealthPage() {
     };
   }, [supabase]);
 
-  const charlotte = data?.charlotte_last_run;
+  const pipeline = data?.pipeline_last_run ?? data?.charlotte_last_run ?? null;
   const scanner = data?.scanner_health_last;
   const repliesUnhandled = data?.replies_unhandled ?? 0;
 
@@ -113,7 +115,7 @@ export default function CrmHealthPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className={crmPageTitle}>System Health</h1>
-        <p className={crmPageSubtitle}>Live status of Charlotte, scanner infrastructure, and reply queue.</p>
+        <p className={crmPageSubtitle}>Live status of the ARIA pipeline, scanner infrastructure, and reply queue.</p>
       </div>
 
       {err && <p className="text-sm text-rose-400">{err}</p>}
@@ -124,15 +126,14 @@ export default function CrmHealthPage() {
         </div>
       ) : data ? (
         <div className="space-y-6">
-          {/* Summary cards */}
           <div className="grid gap-4 sm:grid-cols-3">
             <div className={`${crmSurfaceCard} p-4`}>
               <div className="flex items-center justify-between">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Charlotte</div>
-                <StatusBadge status={charlotte?.status} />
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">ARIA pipeline</div>
+                <StatusBadge status={pipeline?.status} />
               </div>
               <div className="mt-2 text-sm text-slate-400">
-                Last run: {timeAgo(charlotte?.created_at)}
+                Last run: {timeAgo(pipeline?.created_at)}
               </div>
             </div>
 
@@ -147,62 +148,60 @@ export default function CrmHealthPage() {
             </div>
 
             <div className={`${crmSurfaceCard} p-4`}>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Reply Queue</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Reply queue</div>
               <div className={`mt-2 text-2xl font-semibold ${replyColor}`}>{repliesUnhandled}</div>
               <div className="text-xs text-slate-500">unhandled replies</div>
             </div>
           </div>
 
-          {/* Charlotte detail */}
           <div className={`${crmSurfaceCard} p-5`}>
-            <h2 className="text-sm font-semibold text-white">Charlotte — Last Run Details</h2>
-            {charlotte ? (
+            <h2 className="text-sm font-semibold text-white">ARIA pipeline — last run details</h2>
+            {pipeline ? (
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">
                   <dt className="text-slate-400">Status</dt>
-                  <dd><StatusBadge status={charlotte.status} /></dd>
+                  <dd><StatusBadge status={pipeline.status} /></dd>
                 </div>
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">
                   <dt className="text-slate-400">Run time</dt>
                   <dd className="text-slate-200">
-                    {charlotte.created_at ? new Date(charlotte.created_at).toLocaleString() : "—"}
+                    {pipeline.created_at ? new Date(pipeline.created_at).toLocaleString() : "—"}
                   </dd>
                 </div>
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">
                   <dt className="text-slate-400">Leads pulled</dt>
-                  <dd className="font-medium text-white">{charlotte.leads_pulled ?? "—"}</dd>
+                  <dd className="font-medium text-white">{pipeline.leads_pulled ?? "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">
                   <dt className="text-slate-400">Emails written</dt>
-                  <dd className="font-medium text-white">{charlotte.emails_written ?? "—"}</dd>
+                  <dd className="font-medium text-white">{pipeline.emails_written ?? "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">
                   <dt className="text-slate-400">Emails uploaded</dt>
-                  <dd className="font-medium text-white">{charlotte.emails_uploaded ?? "—"}</dd>
+                  <dd className="font-medium text-white">{pipeline.emails_uploaded ?? "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">
                   <dt className="text-slate-400">Duration</dt>
                   <dd className="text-slate-200">
-                    {charlotte.duration_seconds != null ? `${charlotte.duration_seconds}s` : "—"}
+                    {pipeline.duration_seconds != null ? `${pipeline.duration_seconds}s` : "—"}
                   </dd>
                 </div>
-                {charlotte.error_summary && (
+                {pipeline.error_summary && (
                   <div className="col-span-2">
                     <dt className="text-slate-400">Error</dt>
                     <dd className="mt-1 rounded border border-rose-800/50 bg-rose-950/30 p-2 text-xs text-rose-300">
-                      {charlotte.error_summary}
+                      {pipeline.error_summary}
                     </dd>
                   </div>
                 )}
               </dl>
             ) : (
-              <p className="mt-3 text-sm text-slate-400">No Charlotte runs recorded yet.</p>
+              <p className="mt-3 text-sm text-slate-400">No ARIA pipeline runs recorded yet.</p>
             )}
           </div>
 
-          {/* Scanner detail */}
           <div className={`${crmSurfaceCard} p-5`}>
-            <h2 className="text-sm font-semibold text-white">Scanner Infrastructure</h2>
+            <h2 className="text-sm font-semibold text-white">Scanner infrastructure</h2>
             {scanner ? (
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div className="flex justify-between border-b border-[#1e1e2e]/80 pb-2">

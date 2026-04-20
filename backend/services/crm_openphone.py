@@ -126,7 +126,7 @@ def format_hot_lead_message(
     ind = industry or "—"
     return (
         "🦅 HAWK Alert — Hot Lead\n"
-        f"{company} replied to Charlotte.\n"
+        f"{company} replied to ARIA.\n"
         f"Domain: {domain}\n"
         f"HAWK Score: {hawk_score}\n"
         f"Industry: {ind}\n"
@@ -134,7 +134,7 @@ def format_hot_lead_message(
     )
 
 
-def format_charlotte_reply_rep_message(
+def format_aria_reply_rep_message(
     *,
     company: str,
     first_name: str | None,
@@ -143,15 +143,20 @@ def format_charlotte_reply_rep_message(
     fn = (first_name or "").strip() or "Someone"
     base = crm_base_url.rstrip("/")
     return (
-        f"New Charlotte reply. {company}. {fn} replied to your email. "
+        f"New ARIA reply. {company}. {fn} replied to your email. "
         f"Login: {base}/crm"
     )
 
 
-def format_charlotte_reply_ceo_message(
+def format_aria_reply_ceo_message(
     *,
     company: str,
     score: int | str,
     rep_name: str,
 ) -> str:
-    return f"Charlotte reply. {company} scored {score}/100. Assigned to {rep_name}."
+    return f"ARIA reply. {company} scored {score}/100. Assigned to {rep_name}."
+
+
+# Legacy aliases kept so older imports keep working.
+format_charlotte_reply_rep_message = format_aria_reply_rep_message
+format_charlotte_reply_ceo_message = format_aria_reply_ceo_message

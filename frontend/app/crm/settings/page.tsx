@@ -1,272 +1,203 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
+import { useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { createClient } from "@/lib/supabase/client";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
-import { CeoHealthSection } from "@/components/crm/settings/ceo-health-section";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 import { crmPageSubtitle, crmPageTitle, crmSurfaceCard } from "@/lib/crm/crm-surface";
+import { SettingsTabs, type TabId, TABS } from "@/components/crm/settings/settings-tabs";
+import { GeneralSection } from "@/components/crm/settings/sections/general-section";
+import { OutreachSection } from "@/components/crm/settings/sections/outreach-section";
+import { CampaignsSection } from "@/components/crm/settings/sections/campaigns-section";
+import { DiscoverySection } from "@/components/crm/settings/sections/discovery-section";
+import { ScannerSection } from "@/components/crm/settings/sections/scanner-section";
+import { TeamSection } from "@/components/crm/settings/sections/team-section";
+import { NotificationsSection } from "@/components/crm/settings/sections/notifications-section";
+import { IntegrationsSection } from "@/components/crm/settings/sections/integrations-section";
+import { DangerZoneSection } from "@/components/crm/settings/sections/danger-section";
 
-type CrmConfig = {
-  id?: string;
-  commission_rate: number;
-  monthly_close_target: number;
-  aging_days_warning: number;
-  aging_days_critical: number;
-  guarantee_days: number;
-  auto_assign_enabled: boolean;
-  charlotte_enabled: boolean;
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-const DEFAULTS: CrmConfig = {
-  commission_rate: 0.3,
-  monthly_close_target: 10,
-  aging_days_warning: 3,
-  aging_days_critical: 7,
-  guarantee_days: 90,
-  auto_assign_enabled: true,
-  charlotte_enabled: true,
-};
+export type SettingsMap = Record<string, string>;
 
 export default function CrmSettingsPage() {
-  const supabase = useMemo(() => createClient(), []);
   const { profile } = useCrmAuth();
-  const [config, setConfig] = useState<CrmConfig>(DEFAULTS);
+  const supabase = useMemo(() => createClient(), []);
+  const [settings, setSettings] = useState<SettingsMap>({});
+  const [dirty, setDirty] = useState<SettingsMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("general");
+
+  const authHeader = useCallback(async (): Promise<string | null> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return session?.access_token ? `Bearer ${session.access_token}` : null;
+  }, [supabase]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("crm_settings")
-      .select("*")
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      setConfig(DEFAULTS);
-    } else if (data) {
-      setConfig(data as CrmConfig);
+    try {
+      const token = await authHeader();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      const res = await fetch(`${API_URL}/api/crm/settings`, {
+        headers: { Authorization: token },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(`Failed to load settings: ${body.detail ?? res.status}`);
+        setLoading(false);
+        return;
+      }
+      const body = (await res.json()) as { settings: SettingsMap };
+      setSettings(body.settings ?? {});
+      setDirty({});
+    } catch (e) {
+      toast.error(`Failed to load settings: ${(e as Error).message}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [supabase]);
+  }, [authHeader]);
 
   useLiveEffect(() => {
     if (profile?.role === "ceo") void load();
     else setLoading(false);
   }, [profile?.role, load]);
 
-  async function save() {
-    setSaving(true);
-    const payload = {
-      commission_rate: config.commission_rate,
-      monthly_close_target: config.monthly_close_target,
-      aging_days_warning: config.aging_days_warning,
-      aging_days_critical: config.aging_days_critical,
-      guarantee_days: config.guarantee_days,
-      auto_assign_enabled: config.auto_assign_enabled,
-      charlotte_enabled: config.charlotte_enabled,
-    };
-    if (config.id) {
-      const { error } = await supabase.from("crm_settings").update(payload).eq("id", config.id);
-      if (error) toast.error(error.message);
-      else toast.success("Settings saved");
-    } else {
-      const { error } = await supabase.from("crm_settings").insert(payload);
-      if (error) toast.error(error.message);
-      else {
-        toast.success("Settings saved");
-        await load();
-      }
-    }
-    setSaving(false);
-  }
+  const setField = useCallback((key: string, value: string) => {
+    setDirty((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
-  function updateField<K extends keyof CrmConfig>(key: K, value: CrmConfig[K]) {
-    setConfig((prev) => ({ ...prev, [key]: value }));
-  }
+  const value = useCallback(
+    (key: string, fallback = "") => dirty[key] ?? settings[key] ?? fallback,
+    [dirty, settings],
+  );
+
+  const hasDirty = Object.keys(dirty).length > 0;
+
+  const save = useCallback(async () => {
+    if (!hasDirty) return;
+    setSaving(true);
+    try {
+      const token = await authHeader();
+      if (!token) throw new Error("Not signed in");
+      const res = await fetch(`${API_URL}/api/crm/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: token },
+        body: JSON.stringify({ updates: dirty }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail ?? `HTTP ${res.status}`);
+      }
+      setSettings((prev) => ({ ...prev, ...dirty }));
+      setDirty({});
+      toast.success("Settings saved");
+    } catch (e) {
+      toast.error(`Save failed: ${(e as Error).message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [authHeader, dirty, hasDirty]);
+
+  const resetToDefaults = useCallback(async () => {
+    if (!window.confirm("Reset every setting to its default value? This cannot be undone.")) return;
+    setSaving(true);
+    try {
+      const token = await authHeader();
+      if (!token) throw new Error("Not signed in");
+      const res = await fetch(`${API_URL}/api/crm/settings/reset`, {
+        method: "POST",
+        headers: { Authorization: token },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail ?? `HTTP ${res.status}`);
+      }
+      toast.success("Settings reset to defaults");
+      await load();
+    } catch (e) {
+      toast.error(`Reset failed: ${(e as Error).message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [authHeader, load]);
 
   if (profile?.role !== "ceo") {
     return (
-      <div className="mx-auto max-w-2xl space-y-8">
+      <div className="mx-auto max-w-3xl space-y-6">
         <div>
-          <h1 className={crmPageTitle}>CRM settings</h1>
+          <h1 className={crmPageTitle}>Settings</h1>
           <p className={crmPageSubtitle}>Only the CEO can modify CRM settings.</p>
         </div>
-        <section className={`${crmSurfaceCard} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Integrations</h2>
-          <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-slate-400">
-            <li>
-              <Link href="/crm/charlotte" className="text-emerald-400 hover:underline">
-                Charlotte & email webhooks
-              </Link>{" "}
-              — outbound engagement events into prospect profiles.
-            </li>
-          </ul>
-        </section>
+        <div className={`${crmSurfaceCard} p-5 text-sm text-slate-400`}>
+          Contact your CEO if you need a setting changed.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <div>
-        <h1 className={crmPageTitle}>CRM settings</h1>
-        <p className={crmPageSubtitle}>Configure CRM behavior. Changes take effect immediately.</p>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className={crmPageTitle}>Settings</h1>
+          <p className={crmPageSubtitle}>
+            System-wide configuration. Changes apply immediately — no deploy required.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasDirty && (
+            <span className="text-xs text-amber-400">
+              {Object.keys(dirty).length} unsaved change{Object.keys(dirty).length === 1 ? "" : "s"}
+            </span>
+          )}
+          <button
+            onClick={() => setDirty({})}
+            disabled={!hasDirty || saving}
+            className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-xs text-slate-300 hover:bg-[#14141f] disabled:opacity-40"
+          >
+            Discard
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={!hasDirty || saving}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <SettingsTabs active={activeTab} onChange={setActiveTab} tabs={TABS} />
+
+        <div className="space-y-6">
+          {loading ? (
+            <div className={`${crmSurfaceCard} p-12 text-center text-sm text-slate-400`}>Loading…</div>
+          ) : (
+            <>
+              {activeTab === "general" && <GeneralSection value={value} onChange={setField} />}
+              {activeTab === "outreach" && <OutreachSection value={value} onChange={setField} />}
+              {activeTab === "campaigns" && <CampaignsSection value={value} onChange={setField} />}
+              {activeTab === "discovery" && <DiscoverySection value={value} onChange={setField} />}
+              {activeTab === "scanner" && <ScannerSection value={value} onChange={setField} />}
+              {activeTab === "team" && <TeamSection value={value} onChange={setField} />}
+              {activeTab === "notifications" && <NotificationsSection value={value} onChange={setField} />}
+              {activeTab === "integrations" && <IntegrationsSection value={value} />}
+              {activeTab === "danger" && (
+                <DangerZoneSection onReset={() => void resetToDefaults()} disabled={saving} />
+              )}
+            </>
+          )}
+        </div>
       </div>
-
-      {loading ? (
-        <div className="py-12 text-center text-slate-400">Loading…</div>
-      ) : (
-        <>
-          <section className={`${crmSurfaceCard} space-y-4 p-5`}>
-            <h2 className="text-sm font-semibold text-white">Commission & targets</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label className="text-xs text-slate-400">Commission rate (%)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  className="border-[#1e1e2e] bg-[#0d0d14] text-white"
-                  value={config.commission_rate}
-                  onChange={(e) => updateField("commission_rate", parseFloat(e.target.value) || 0)}
-                />
-                <p className="mt-1 text-[10px] text-slate-500">Decimal (0.3 = 30%)</p>
-              </div>
-              <div>
-                <Label className="text-xs text-slate-400">Monthly close target (per rep)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  className="border-[#1e1e2e] bg-[#0d0d14] text-white"
-                  value={config.monthly_close_target}
-                  onChange={(e) => updateField("monthly_close_target", parseInt(e.target.value) || 1)}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className={`${crmSurfaceCard} space-y-4 p-5`}>
-            <h2 className="text-sm font-semibold text-white">Pipeline aging</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label className="text-xs text-slate-400">Warning after (days)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  className="border-[#1e1e2e] bg-[#0d0d14] text-white"
-                  value={config.aging_days_warning}
-                  onChange={(e) => updateField("aging_days_warning", parseInt(e.target.value) || 1)}
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-slate-400">Critical after (days)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  className="border-[#1e1e2e] bg-[#0d0d14] text-white"
-                  value={config.aging_days_critical}
-                  onChange={(e) => updateField("aging_days_critical", parseInt(e.target.value) || 1)}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className={`${crmSurfaceCard} space-y-4 p-5`}>
-            <h2 className="text-sm font-semibold text-white">Guarantee & automation</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label className="text-xs text-slate-400">Guarantee period (days)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  className="border-[#1e1e2e] bg-[#0d0d14] text-white"
-                  value={config.guarantee_days}
-                  onChange={(e) => updateField("guarantee_days", parseInt(e.target.value) || 1)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-[#1e1e2e] bg-[#0d0d14] text-emerald-500"
-                  checked={config.auto_assign_enabled}
-                  onChange={(e) => updateField("auto_assign_enabled", e.target.checked)}
-                />
-                <span className="text-sm text-slate-300">Auto-assign new prospects (round-robin)</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-[#1e1e2e] bg-[#0d0d14] text-emerald-500"
-                  checked={config.charlotte_enabled}
-                  onChange={(e) => updateField("charlotte_enabled", e.target.checked)}
-                />
-                <span className="text-sm text-slate-300">Charlotte AI outbound enabled</span>
-              </label>
-            </div>
-          </section>
-
-          <div className="flex justify-end">
-            <Button className="bg-emerald-600" onClick={() => void save()} disabled={saving}>
-              {saving ? "Saving…" : "Save settings"}
-            </Button>
-          </div>
-        </>
-      )}
-
-      <section className={`${crmSurfaceCard} p-5`}>
-        <h2 className="text-sm font-semibold text-white">Integrations</h2>
-        <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-slate-400">
-          <li>
-            <Link href="/crm/charlotte" className="text-emerald-400 hover:underline">
-              Charlotte & email webhooks
-            </Link>{" "}
-            — outbound engagement events into prospect profiles.
-          </li>
-          <li>
-            Backend route <code className="text-slate-500">POST /api/crm/webhooks/email-events</code> with{" "}
-            <code className="text-slate-500">X-CRM-Webhook-Secret</code> (see <code className="text-slate-500">backend/.env.example</code>).
-          </li>
-          <li>
-            Prospect scans: <code className="text-slate-500">NEXT_PUBLIC_API_URL</code> +{" "}
-            <code className="text-slate-500">/api/crm/run-scan</code> (Next.js) calls your FastAPI scanner.
-          </li>
-        </ul>
-      </section>
-
-      <section className={`${crmSurfaceCard} p-5`}>
-        <h2 className="text-sm font-semibold text-white">Environment checklist</h2>
-        <p className="mt-2 text-xs text-slate-400">Set these in Vercel / hosting (frontend) and API host (backend). Values are never shown here.</p>
-        <ul className="mt-3 space-y-1 font-mono text-xs text-slate-400">
-          <li>NEXT_PUBLIC_SUPABASE_URL</li>
-          <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
-          <li>NEXT_PUBLIC_SITE_URL (canonical origin — magic links, auth callbacks)</li>
-          <li>NEXT_PUBLIC_API_URL</li>
-          <li>SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (API)</li>
-          <li>SUPABASE_JWT_SECRET (API — invite / verify-payment)</li>
-          <li>CRM_PUBLIC_BASE_URL, OPENPHONE_API_KEY, OPENPHONE_FROM_NUMBER, CRM_CEO_PHONE_E164, VA_PHONE_NUMBER (API)</li>
-          <li>CRM_EMAIL_WEBHOOK_SECRET (API)</li>
-          <li>HAWK_CRM_CRON_SECRET, HAWK_CRON_SECRET, or CRON_SECRET (Railway alias — aging cron)</li>
-        </ul>
-      </section>
-
-      <CeoHealthSection />
-
-      <section className={`${crmSurfaceCard} p-5`}>
-        <h2 className="text-sm font-semibold text-white">Database</h2>
-        <p className="mt-2 text-sm text-slate-400">
-          Apply SQL migrations under <code className="text-slate-500">supabase/migrations/</code> in timestamp order in the Supabase project
-          that backs this CRM.
-        </p>
-      </section>
     </div>
   );
 }

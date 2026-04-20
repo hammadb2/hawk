@@ -100,7 +100,7 @@ export const authApi = {
 export const scansApi = {
   start: (body: { domain: string }, token: string) =>
     request<{ scan_id: string; domain: string; status: string; score?: number; grade?: string }>("/api/scan", { method: "POST", body: JSON.stringify(body), token }),
-  /** Public scan (no auth). Default backend depth is `full`; pass `fast` for a quicker Charlotte-tier pass. */
+  /** Public scan (no auth). Default backend depth is `full`; pass `fast` for a lighter / quicker pass. */
   startPublic: (body: { domain: string; scan_depth?: "fast" | "full" }) =>
     request<PublicScanResult>("/api/scan/public", { method: "POST", body: JSON.stringify(body) }),
   get: (scanId: string, token: string) =>

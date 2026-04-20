@@ -54,7 +54,11 @@ from models import User, Scan, Domain, Report
 from schemas import ScanEnqueueRequest, ScanStartRequest, ScanResponse, ScanListItem
 from services.scanner import enqueue_async_scan, get_async_job, run_scan
 from services.scanner_trust import scanner_trust_level
-from services.charlotte import critical_finding_alert, weekly_digest_email, monthly_report_ready_email
+from services.transactional_email import (
+    critical_finding_alert,
+    monthly_report_ready_email,
+    weekly_digest_email,
+)
 from config import PLAN_DOMAINS
 
 router = APIRouter(tags=["scans"])
