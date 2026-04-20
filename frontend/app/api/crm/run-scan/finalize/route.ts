@@ -178,11 +178,12 @@ export async function POST(request: Request) {
   const scoreBefore = typeof prospect.hawk_score === "number" ? prospect.hawk_score : null;
 
   const nowIso = new Date().toISOString();
-  // Only advance stage/pipeline_status from "new" → "scanned". If the
-  // prospect has already moved further down the funnel (loom_sent, replied,
-  // call_booked, proposal_sent, closed_won, lost) we leave them where they
-  // are and only refresh the scan-related fields.
-  const shouldAdvanceStage = prospect.stage === "new" || prospect.stage == null;
+  // Only advance stage/pipeline_status from "new" or "scanning" → "scanned".
+  // If the prospect has already moved further down the funnel (sent_email,
+  // replied, call_booked, closed_won, lost) we leave them where they are and
+  // only refresh the scan-related fields.
+  const shouldAdvanceStage =
+    prospect.stage === "new" || prospect.stage === "scanning" || prospect.stage == null;
   const prospectUpdate: Record<string, unknown> = {
     hawk_score: score,
     last_activity_at: nowIso,

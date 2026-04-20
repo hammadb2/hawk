@@ -6,11 +6,11 @@ export type ProfileRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | 
 
 export type ProspectStage =
   | "new"
+  | "scanning"
   | "scanned"
-  | "loom_sent"
+  | "sent_email"
   | "replied"
   | "call_booked"
-  | "proposal_sent"
   | "closed_won"
   | "lost";
 
@@ -225,11 +225,11 @@ export type ProspectFileRow = {
 
 export const STAGE_ORDER: ProspectStage[] = [
   "new",
+  "scanning",
   "scanned",
-  "loom_sent",
+  "sent_email",
   "replied",
   "call_booked",
-  "proposal_sent",
   "closed_won",
   "lost",
 ];
@@ -239,11 +239,11 @@ export const STAGE_META: Record<
   { label: string; color: string; columnBg: string }
 > = {
   new: { label: "New", color: "#9090A8", columnBg: "rgba(144,144,168,0.12)" },
+  scanning: { label: "Scanning", color: "#22D3EE", columnBg: "rgba(34,211,238,0.12)" },
   scanned: { label: "Scanned", color: "#60A5FA", columnBg: "rgba(96,165,250,0.12)" },
-  loom_sent: { label: "Loom Sent", color: "#9B7FFF", columnBg: "rgba(155,127,255,0.12)" },
+  sent_email: { label: "Sent Email", color: "#9B7FFF", columnBg: "rgba(155,127,255,0.12)" },
   replied: { label: "Replied", color: "#2DD4BF", columnBg: "rgba(45,212,191,0.12)" },
   call_booked: { label: "Call Booked", color: "#FBBF24", columnBg: "rgba(251,191,36,0.12)" },
-  proposal_sent: { label: "Proposal Sent", color: "#FB923C", columnBg: "rgba(251,146,60,0.12)" },
   closed_won: { label: "Closed Won", color: "#00C48C", columnBg: "rgba(0,196,140,0.12)" },
   lost: { label: "Lost", color: "#FF4757", columnBg: "rgba(255,71,87,0.12)" },
 };

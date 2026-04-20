@@ -76,8 +76,8 @@ create table if not exists public.prospects (
   city text,
   stage text not null default 'new'
     check (stage in (
-      'new', 'scanned', 'loom_sent', 'replied', 'call_booked',
-      'proposal_sent', 'closed_won', 'lost'
+      'new', 'scanning', 'scanned', 'sent_email', 'replied', 'call_booked',
+      'closed_won', 'lost'
     )),
   assigned_rep_id uuid references public.profiles (id),
   hawk_score int not null default 0 check (hawk_score >= 0 and hawk_score <= 100),
