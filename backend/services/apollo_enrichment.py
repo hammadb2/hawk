@@ -293,14 +293,25 @@ async def _apollo_people_search(
     per_page: int = 10,
     page: int = 1,
     client: httpx.AsyncClient | None = None,
+    status_filter: list[str] | None = None,
+    titles_override: list[str] | None = None,
+    diagnostics: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Execute one ``mixed_people/search`` call. Returns raw `people` list."""
+    """Execute one ``mixed_people/search`` call. Returns raw ``people`` list.
+
+    ``has_email: true`` was historically part of the body; Apollo now rejects
+    the flag on several plan tiers and silently returns zero results with no
+    error, which is exactly the failure mode we've been hitting. It's gone.
+    ``status_filter`` + ``titles_override`` let callers progressively relax the
+    query when the strict pass returns nothing.
+    """
     body: dict[str, Any] = {
         "page": page,
         "per_page": min(100, max(1, per_page)),
-        "person_titles": VERTICAL_TITLES.get(vertical, VERTICAL_TITLES["dental"]),
-        "contact_email_status": ["verified", "likely to engage"],
-        "has_email": True,
+        "person_titles": titles_override
+        or VERTICAL_TITLES.get(vertical, VERTICAL_TITLES["dental"]),
+        "contact_email_status": status_filter
+        or ["verified", "likely to engage"],
     }
     if domain:
         body["q_organization_domains"] = domain
@@ -317,6 +328,18 @@ async def _apollo_people_search(
             json=body,
             timeout=45.0,
         )
+        if diagnostics is not None:
+            diagnostics.setdefault("search_calls", []).append(
+                {
+                    "domain": domain,
+                    "vertical": vertical,
+                    "city": city,
+                    "province": province,
+                    "status_filter": body["contact_email_status"],
+                    "http_status": r.status_code,
+                    "body_snippet": r.text[:300] if r.status_code >= 400 else "",
+                }
+            )
         if r.status_code >= 400:
             logger.warning(
                 "Apollo people/search HTTP %s domain=%s body=%s",
@@ -325,13 +348,157 @@ async def _apollo_people_search(
             return []
         _increment_credits(1)
         data = r.json() or {}
-        return list(data.get("people") or data.get("contacts") or [])
+        people = list(data.get("people") or data.get("contacts") or [])
+        if diagnostics is not None:
+            diagnostics["search_calls"][-1]["people_count"] = len(people)
+            # Distribution of email_status values so we can tell whether the
+            # filter bucket is actually the bottleneck.
+            statuses: dict[str, int] = {}
+            for p in people:
+                if isinstance(p, dict):
+                    s = str(p.get("email_status") or "").strip().lower() or "—"
+                    statuses[s] = statuses.get(s, 0) + 1
+            diagnostics["search_calls"][-1]["email_statuses"] = statuses
+        return people
     except Exception as exc:
         logger.warning("Apollo people/search error domain=%s: %s", domain, exc)
+        if diagnostics is not None:
+            diagnostics.setdefault("search_calls", []).append(
+                {"domain": domain, "error": str(exc)[:300]}
+            )
         return []
     finally:
         if own_client and client is not None:
             await client.aclose()
+
+
+# Progressive relaxation ladder. Each pass is tried in order until one
+# produces a verified contact (or we run out of credits). Keeps the default
+# verified-only gate for the common case while still recovering domains
+# Apollo has indexed at lower confidence.
+_STATUS_LADDER: list[list[str]] = [
+    ["verified"],
+    ["verified", "likely to engage"],
+    ["verified", "likely to engage", "guessed"],
+]
+
+
+async def enrich_single_domain_verbose(
+    *,
+    domain: str,
+    vertical: str,
+    company_name: str = "",
+    city: str | None = None,
+    province: str | None = None,
+) -> dict[str, Any]:
+    """Apollo enrichment with full diagnostics.
+
+    Always returns a dict shaped as::
+
+        {
+            "found": bool,
+            "reason": "…",         # when found=False
+            "contact": {...},      # when found=True, matches the legacy shape
+            "diagnostics": {...},  # per-call HTTP status + people counts + statuses
+        }
+
+    The diagnostic payload is what the ``/api/crm/cron/apollo-diagnose``
+    endpoint surfaces. ``enrich_single_domain`` wraps this function for
+    backwards compatibility.
+    """
+    diag: dict[str, Any] = {"search_calls": []}
+
+    if not _configured():
+        return {"found": False, "reason": "apollo_not_configured", "diagnostics": diag}
+    norm_domain = _normalize_domain(domain)
+    if not norm_domain:
+        return {"found": False, "reason": "empty_domain", "diagnostics": diag}
+    if credits_remaining_today() <= 0:
+        logger.warning(
+            "Apollo daily credit cap reached — skipping enrichment for %s", norm_domain
+        )
+        return {"found": False, "reason": "daily_credit_cap_reached", "diagnostics": diag}
+
+    people: list[dict[str, Any]] = []
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        # Pass 1 → 3: domain-anchored search, progressively relaxed email-status
+        # filter. Stop the moment we get a hit.
+        for status_filter in _STATUS_LADDER:
+            if credits_remaining_today() <= 0:
+                break
+            people = await _apollo_people_search(
+                domain=norm_domain,
+                vertical=vertical,
+                client=client,
+                per_page=10,
+                status_filter=status_filter,
+                diagnostics=diag,
+            )
+            if people:
+                break
+
+        # Pass 4: geo + company-name fallback for businesses Apollo hasn't
+        # indexed by domain.
+        if not people and company_name and city and credits_remaining_today() > 0:
+            people = await _apollo_people_search(
+                vertical=vertical,
+                city=city,
+                province=province,
+                client=client,
+                per_page=25,
+                status_filter=_STATUS_LADDER[-1],
+                diagnostics=diag,
+            )
+
+        if people:
+            await _apollo_bulk_match_unlock(people, client=client)
+
+    if not people:
+        return {"found": False, "reason": "no_people_returned", "diagnostics": diag}
+
+    person = _select_person(people)
+    if not person:
+        # Count how many had locked emails so the reason is actionable.
+        locked = sum(
+            1 for p in people
+            if isinstance(p, dict)
+            and "email_not_unlocked" in str(
+                p.get("email") or p.get("primary_email") or ""
+            ).lower()
+        )
+        diag["people_returned"] = len(people)
+        diag["people_locked_email"] = locked
+        return {
+            "found": False,
+            "reason": "no_verified_contact_after_unlock",
+            "diagnostics": diag,
+        }
+
+    email = str(person.get("email") or person.get("primary_email") or "").strip().lower()
+    if not email or "@" not in email:
+        return {
+            "found": False,
+            "reason": "person_selected_but_email_missing",
+            "diagnostics": diag,
+        }
+
+    contact = {
+        "email": email,
+        "first_name": str(person.get("first_name") or "").strip(),
+        "last_name": str(person.get("last_name") or "").strip(),
+        "title": str(person.get("title") or "").strip(),
+        "phone": str(
+            person.get("phone")
+            or person.get("sanitized_phone")
+            or person.get("mobile_phone")
+            or ""
+        ).strip(),
+        "linkedin_url": str(person.get("linkedin_url") or "").strip(),
+        "apollo_person_id": str(person.get("id") or "").strip(),
+        "source": "apollo",
+    }
+    diag["people_returned"] = len(people)
+    return {"found": True, "contact": contact, "diagnostics": diag}
 
 
 async def enrich_single_domain(
@@ -358,58 +525,24 @@ async def enrich_single_domain(
 
     ``None`` when no verified contact is found or Apollo is not configured.
     Soft budget guard: if today's credit counter has already hit the cap this
-    function returns ``None`` rather than making another call.
+    function returns ``None`` rather than making another call. Backed by
+    :func:`enrich_single_domain_verbose` for the diagnostics.
     """
-    if not _configured():
-        return None
-    domain = _normalize_domain(domain)
-    if not domain:
-        return None
-    if credits_remaining_today() <= 0:
-        logger.warning("Apollo daily credit cap reached — skipping enrichment for %s", domain)
-        return None
-
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        people = await _apollo_people_search(
-            domain=domain, vertical=vertical, client=client, per_page=10,
+    res = await enrich_single_domain_verbose(
+        domain=domain,
+        vertical=vertical,
+        company_name=company_name,
+        city=city,
+        province=province,
+    )
+    if not res.get("found"):
+        logger.info(
+            "Apollo enrich blank domain=%s reason=%s",
+            domain,
+            res.get("reason"),
         )
-        # If the domain match returned nothing, fall back to company-name + vertical
-        # titles in the geography (for businesses Apollo hasn't indexed by
-        # domain). Still gated by the daily credit cap above.
-        if not people and company_name and city:
-            people = await _apollo_people_search(
-                vertical=vertical, city=city, province=province, client=client,
-                per_page=25,
-            )
-        # ``mixed_people/search`` returns records with the email field locked
-        # (empty or ``email_not_unlocked@…``). Unlock them via bulk_match before
-        # selecting, otherwise every prospect soft-drops for "no contact".
-        if people:
-            await _apollo_bulk_match_unlock(people, client=client)
-
-    person = _select_person(people)
-    if not person:
         return None
-
-    email = str(person.get("email") or person.get("primary_email") or "").strip().lower()
-    if not email or "@" not in email:
-        return None
-
-    return {
-        "email": email,
-        "first_name": str(person.get("first_name") or "").strip(),
-        "last_name": str(person.get("last_name") or "").strip(),
-        "title": str(person.get("title") or "").strip(),
-        "phone": str(
-            person.get("phone")
-            or person.get("sanitized_phone")
-            or person.get("mobile_phone")
-            or ""
-        ).strip(),
-        "linkedin_url": str(person.get("linkedin_url") or "").strip(),
-        "apollo_person_id": str(person.get("id") or "").strip(),
-        "source": "apollo",
-    }
+    return res.get("contact") or None
 
 
 def enrich_single_domain_sync(

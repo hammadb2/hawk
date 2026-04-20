@@ -353,6 +353,206 @@ def post_scan_backfill(
     return {"ok": True, "processed": len(prospects), "outcomes": outcomes}
 
 
+@router.post("/apollo-diagnose")
+def apollo_diagnose(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    domain: str | None = None,
+    prospect_id: str | None = None,
+    vertical: str | None = None,
+) -> dict:
+    """Hit Apollo end-to-end for a single domain and return raw telemetry.
+
+    Use when prospects are stuck at ``pipeline_status=scanned`` with empty
+    ``contact_email`` and you need to see *why* — API key rejection, plan-tier
+    rejection of a filter, zero matches, or Apollo's email-unlock gate failing.
+    Pass either ``domain`` (anonymous lookup) or ``prospect_id`` (enriches with
+    the stored vertical/city/province for a real apples-to-apples test against
+    what the post-scan pipeline would have tried).
+    """
+    _require_secret(x_cron_secret)
+    import asyncio
+
+    from services.apollo_enrichment import (
+        _configured as apollo_configured,
+        credits_remaining_today,
+        enrich_single_domain_verbose,
+    )
+
+    target_domain = (domain or "").strip()
+    target_vertical = (vertical or "").strip() or "dental"
+    target_company = ""
+    target_city: str | None = None
+    target_province: str | None = None
+
+    if prospect_id:
+        if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+            raise HTTPException(status_code=503, detail="Supabase not configured")
+        headers = {
+            "apikey": SUPABASE_SERVICE_ROLE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        }
+        try:
+            r = httpx.get(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers=headers,
+                params={
+                    "select": "domain,vertical,industry,company_name,city,province,contact_email",
+                    "id": f"eq.{prospect_id}",
+                    "limit": "1",
+                },
+                timeout=15.0,
+            )
+            r.raise_for_status()
+            rows = r.json() or []
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Supabase fetch failed: {exc}") from exc
+        if not rows:
+            raise HTTPException(status_code=404, detail="prospect not found")
+        row = rows[0]
+        target_domain = target_domain or str(row.get("domain") or "").strip()
+        target_vertical = (
+            (row.get("vertical") or row.get("industry") or target_vertical).strip() or "dental"
+        )
+        target_company = str(row.get("company_name") or "").strip()
+        target_city = (row.get("city") or None)
+        target_province = (row.get("province") or None)
+
+    if not target_domain:
+        raise HTTPException(status_code=400, detail="domain or prospect_id required")
+
+    return {
+        "ok": True,
+        "apollo_configured": apollo_configured(),
+        "credits_remaining_today": credits_remaining_today(),
+        "domain": target_domain,
+        "vertical": target_vertical,
+        "company_name": target_company,
+        "city": target_city,
+        "province": target_province,
+        "result": asyncio.run(
+            enrich_single_domain_verbose(
+                domain=target_domain,
+                vertical=target_vertical,
+                company_name=target_company,
+                city=target_city,
+                province=target_province,
+            )
+        ),
+    }
+
+
+@router.post("/apollo-bulk-enrich")
+def apollo_bulk_enrich(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    limit: int = 500,
+    concurrency: int = 8,
+) -> dict:
+    """Apollo-only enrichment sweep over every ``pipeline_status=scanned`` prospect
+    with no ``contact_email``.
+
+    Differs from ``/post-scan-backfill`` which runs the *full* post-scan pipeline
+    (Apollo → ZB → ARIA draft → ``pipeline_status=ready``): this one stops at
+    Apollo + writes the resolved contact fields so you can verify Apollo is
+    finding people before letting the drafter + dispatcher loose on them.
+    Every prospect either gets a contact written or a soft-drop with a
+    ``last_soft_drop_reason`` recorded so you know exactly why Apollo blanked.
+    """
+    _require_secret(x_cron_secret)
+    from concurrent.futures import ThreadPoolExecutor
+
+    from services.apollo_enrichment import enrich_single_domain_sync
+
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=headers,
+            params={
+                "select": "id,domain,vertical,industry,company_name,city,province",
+                "pipeline_status": "eq.scanned",
+                "contact_email": "is.null",
+                "domain": "not.is.null",
+                "stage": "in.(new,scanning,scanned)",
+                "order": "scanned_at.asc.nullslast",
+                "limit": str(max(1, min(limit, 2000))),
+            },
+            timeout=30.0,
+        )
+        r.raise_for_status()
+        prospects = r.json() or []
+    except Exception as exc:
+        logger.exception("apollo-bulk-enrich query failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not prospects:
+        return {"ok": True, "processed": 0, "outcomes": {}}
+
+    outcomes: dict[str, int] = {}
+
+    def _one(p: dict) -> str:
+        pid = p.get("id")
+        try:
+            contact = enrich_single_domain_sync(
+                domain=str(p.get("domain") or ""),
+                vertical=str(p.get("vertical") or p.get("industry") or "dental"),
+                company_name=str(p.get("company_name") or ""),
+                city=p.get("city"),
+                province=p.get("province"),
+            )
+        except Exception as exc:
+            logger.warning("apollo-bulk-enrich prospect=%s error: %s", pid, exc)
+            return "error"
+        if not contact or not contact.get("email"):
+            logger.info(
+                "apollo-bulk-enrich blank prospect=%s domain=%s vertical=%s",
+                pid,
+                p.get("domain"),
+                p.get("vertical") or p.get("industry"),
+            )
+            return "blank"
+        try:
+            patch = {
+                "contact_email": contact["email"],
+                "contact_name": " ".join(
+                    x for x in (contact.get("first_name"), contact.get("last_name")) if x
+                ).strip()
+                or None,
+                "contact_title": contact.get("title") or None,
+                "contact_phone": contact.get("phone") or None,
+                "contact_linkedin_url": contact.get("linkedin_url") or None,
+                "email_finder": contact.get("source") or "apollo",
+                "last_activity_at": datetime.now(timezone.utc).isoformat(),
+            }
+            resp = httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers=headers,
+                params={
+                    "id": f"eq.{pid}",
+                    "stage": "in.(new,scanning,scanned)",
+                },
+                json=patch,
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            logger.warning("apollo-bulk-enrich patch prospect=%s failed: %s", pid, exc)
+            return "patch_failed"
+        return "enriched"
+
+    with ThreadPoolExecutor(max_workers=max(1, min(concurrency, 16))) as pool:
+        for outcome in pool.map(_one, prospects):
+            outcomes[outcome] = outcomes.get(outcome, 0) + 1
+
+    return {"ok": True, "processed": len(prospects), "outcomes": outcomes}
+
+
 @router.post("/pipeline-doctor")
 def pipeline_doctor_trigger(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
