@@ -31,11 +31,31 @@ export async function POST(request: Request) {
 
   const { data: prospect, error: pe } = await supabase
     .from("prospects")
-    .select("id, domain, industry")
+    .select("id, domain, industry, active_scan_job_id, scan_started_at")
     .eq("id", prospectId)
     .single();
   if (pe || !prospect) {
     return NextResponse.json({ error: "Prospect not found" }, { status: 404 });
+  }
+
+  // Block if another scan (manual or SLA auto) is already in flight and fresh.
+  // Stale jobs (> 20 min, beyond the frontend poll timeout) are treated as
+  // dead and silently replaced. The backend watchdog releases stuck SLA jobs
+  // after SLA_SCAN_WATCHDOG_MIN (default 15 min), so this is consistent.
+  if (prospect.active_scan_job_id) {
+    const startedAt = prospect.scan_started_at ? Date.parse(prospect.scan_started_at) : 0;
+    const ageMs = Date.now() - startedAt;
+    const STALE_MS = 20 * 60 * 1000;
+    if (startedAt && ageMs < STALE_MS) {
+      return NextResponse.json(
+        {
+          error: "Scan already in progress",
+          job_id: prospect.active_scan_job_id,
+          started_at: prospect.scan_started_at,
+        },
+        { status: 409 },
+      );
+    }
   }
 
   const domain = String(prospect.domain).trim();

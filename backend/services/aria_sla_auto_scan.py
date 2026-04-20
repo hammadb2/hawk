@@ -232,10 +232,16 @@ def _write_scan_result(prospect_id: str, result: dict[str, Any]) -> int | None:
     # Split into two PATCHes: the first unconditionally refreshes scan-state
     # fields (score, findings, timing), the second advances stage only if the
     # prospect hasn't been manually progressed past `new` during the poll window.
+    # Default these to None so a successful retry after a prior failure (which
+    # may have written "[SCAN FAILED] …" into vulnerability_found via
+    # _release_on_failure) clears the stale message. They're overwritten below
+    # if the current scan produced findings.
     scan_patch: dict[str, Any] = {
         "active_scan_job_id": None,
         "scan_started_at": None,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "vulnerability_found": None,
+        "vulnerability_type": None,
     }
     if score_int is not None:
         scan_patch["hawk_score"] = max(0, min(100, score_int))
