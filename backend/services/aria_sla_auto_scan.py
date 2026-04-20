@@ -435,20 +435,75 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _find_stuck_post_scan(limit: int) -> list[dict[str, Any]]:
+    """Find prospects that finished scanning but never got enriched.
+
+    These are prospects whose manual finalize route fired-and-forgot the
+    post-scan trigger but the HTTP call failed (backend down, network
+    blip), leaving the prospect at stage=scanned with pipeline_status=scanned
+    and no contact_email. The normal SLA `_find_candidates` filter misses
+    them (it requires stage in (new,scanning) AND scanned_at is null), so we
+    add a dedicated sweep here keyed on scanned_at.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "select": "id,domain",
+                "stage": "eq.scanned",
+                "pipeline_status": "eq.scanned",
+                "contact_email": "is.null",
+                "scanned_at": f"lt.{cutoff}",
+                "order": "scanned_at.asc",
+                "limit": str(limit),
+            },
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        logger.warning("SLA stuck-post-scan query failed: %s", exc)
+        return []
+
+
+def _run_post_scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
+    """Swallow exceptions so one stuck prospect can't break the batch."""
+    try:
+        from services.aria_post_scan_pipeline import run_post_scan_sync
+
+        return run_post_scan_sync(prospect["id"])
+    except Exception as exc:
+        logger.warning(
+            "SLA stuck-post-scan prospect=%s failed: %s", prospect.get("id"), exc
+        )
+        return {"ok": False, "prospect_id": prospect.get("id"), "error": str(exc)[:200]}
+
+
 def run_sla_auto_scan() -> dict[str, Any]:
     """Public entrypoint used by the APScheduler job."""
     if not _configured():
         return {"ok": False, "reason": "supabase not configured"}
 
     released = _watchdog_release_stuck_jobs()
-    candidates = _find_candidates(SLA_SCAN_BATCH)
-    if not candidates:
-        return {"ok": True, "released": released, "scanned": 0, "soft_dropped": 0, "errors": 0}
 
+    # Sweep stuck post-scan prospects (manual finalize fire-and-forget that
+    # never landed). Run this first so a queue of stuck leads gets unblocked
+    # on the same 2-minute tick as fresh scans.
+    stuck = _find_stuck_post_scan(SLA_SCAN_BATCH)
+    stuck_results: list[dict[str, Any]] = []
+    if stuck:
+        with ThreadPoolExecutor(max_workers=SLA_SCAN_CONCURRENCY) as pool:
+            for res in pool.map(_run_post_scan_one, stuck):
+                stuck_results.append(res)
+
+    candidates = _find_candidates(SLA_SCAN_BATCH)
     results: list[dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=SLA_SCAN_CONCURRENCY) as pool:
-        for res in pool.map(_scan_one, candidates):
-            results.append(res)
+    if candidates:
+        with ThreadPoolExecutor(max_workers=SLA_SCAN_CONCURRENCY) as pool:
+            for res in pool.map(_scan_one, candidates):
+                results.append(res)
 
     scanned = sum(1 for r in results if r.get("outcome") == "scanned")
     dropped = sum(1 for r in results if r.get("outcome") == "soft_dropped")
@@ -460,5 +515,7 @@ def run_sla_auto_scan() -> dict[str, Any]:
         "scanned": scanned,
         "soft_dropped": dropped,
         "errors": errors,
+        "stuck_post_scan": len(stuck),
+        "stuck_results": stuck_results[:25],
         "results": results[:50],
     }

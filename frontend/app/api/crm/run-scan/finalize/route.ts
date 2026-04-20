@@ -221,7 +221,9 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "X-Cron-Secret": cronSecret },
     }).catch(() => {
-      /* best-effort — the SLA auto-scan will pick it up on the next sweep */
+      /* best-effort — the SLA auto-scan's _find_stuck_post_scan sweep (every
+         ~2 min) picks up any prospect still at stage=scanned with a null
+         contact_email older than 3 min and runs the same pipeline. */
     });
   }
 
