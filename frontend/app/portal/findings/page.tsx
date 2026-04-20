@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -82,7 +83,7 @@ export default function PortalFindingsPage() {
     setLoading(false);
   }, [supabase]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     void load();
   }, [load]);
 
