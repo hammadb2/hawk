@@ -57,7 +57,7 @@ class HomepageLeadBody(BaseModel):
 
 
 def _enqueue_full_scan_background(domain: str) -> None:
-    """Queue deep scan for ops / Charlotte pipeline (non-blocking)."""
+    """Queue deep scan for ops / ARIA pipeline (non-blocking)."""
     try:
         enqueue_async_scan(domain, None, None, scan_depth="full")
     except Exception:

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 PORT = os.environ.get("PORT", "8000").strip() or "8000"
 
-# Charlotte / email pipeline: alert if no events for this long during business hours (MST)
+# ARIA outbound pipeline: alert if no events for this long during business hours (MST)
 EMAIL_FRESH_WARN_HOURS = int(os.environ.get("MONITOR_EMAIL_FRESH_WARN_HOURS", "2"))
 EMAIL_FRESH_FAIL_HOURS = int(os.environ.get("MONITOR_EMAIL_FRESH_FAIL_HOURS", "48"))
 
@@ -72,13 +72,21 @@ def _insert_log(
         return None
 
 
+_LEGACY_SERVICE_NAMES: dict[str, tuple[str, ...]] = {
+    # New name -> historical names to fall back on when the rename rolls out
+    # so consecutive-failure CEO alerts don't lose their memory for one cycle.
+    "aria_email": ("charlotte_email",),
+}
+
+
 def _fetch_previous_log(service: str) -> dict[str, Any] | None:
+    candidates = (service, *_LEGACY_SERVICE_NAMES.get(service, ()))
     try:
         r = httpx.get(
             f"{SUPABASE_URL.rstrip('/')}/rest/v1/system_health_log",
             headers=_sb_headers_read(),
             params={
-                "service": f"eq.{service}",
+                "service": f"in.({','.join(candidates)})",
                 "select": "id,status,alert_sent,checked_at",
                 "order": "checked_at.desc",
                 "limit": "1",
@@ -192,7 +200,7 @@ def check_stripe() -> tuple[str, int, dict[str, Any]]:
         return "failed", ms, {"error": str(e)[:400]}
 
 
-def check_charlotte_email_freshness() -> tuple[str, int, dict[str, Any]]:
+def check_aria_email_freshness() -> tuple[str, int, dict[str, Any]]:
     """Last prospect_email_events row age — stale pipeline during business hours is degraded."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         return "failed", 0, {"error": "supabase not configured"}
@@ -233,7 +241,7 @@ def run_health_monitor() -> dict[str, Any]:
         ("supabase", check_supabase_rest),
         ("smartlead", check_smartlead),
         ("stripe", check_stripe),
-        ("charlotte_email", check_charlotte_email_freshness),
+        ("aria_email", check_aria_email_freshness),
     ]
     results: list[dict[str, Any]] = []
     for name, fn in checks:

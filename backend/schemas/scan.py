@@ -10,7 +10,7 @@ class ScanStartRequest(BaseModel):
     full_result: bool = False
     scan_depth: str | None = Field(
         default=None,
-        description="fast (Charlotte-tier, quicker) or full (all layers). Omitted on /api/scan/public defaults to full.",
+        description="fast (lighter / quicker) or full (all layers). Omitted on /api/scan/public defaults to full.",
     )
     remediation_acknowledged: bool = Field(
         default=False,
@@ -22,7 +22,7 @@ class ScanEnqueueRequest(BaseModel):
     domain: str = Field(..., min_length=1)
     industry: str | None = None
     company_name: str | None = None
-    scan_depth: str = Field(default="full", description="full | fast (Charlotte tier)")
+    scan_depth: str = Field(default="full", description="full | fast (lighter pass)")
 
 
 class ScanListItem(BaseModel):

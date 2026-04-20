@@ -142,7 +142,7 @@ export function FilterPanel({
           <div>
             <Label className="text-slate-300">Source</Label>
             <div className="mt-2 flex flex-wrap gap-2">
-              {(["charlotte", "manual", "inbound"] as ProspectSource[]).map((s) => {
+              {(["aria_nightly", "aria_chat", "manual", "inbound", "homepage_scanner"] as ProspectSource[]).map((s) => {
                 const selected = filters.sources.includes(s);
                 return (
                   <button

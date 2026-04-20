@@ -154,9 +154,9 @@ def va_action(body: VaActionBody, uid: str = Depends(require_supabase_uid)):
     return {"ok": True, "crm_url": f"{base}/crm/prospects/{body.prospect_id}"}
 
 
-@router.get("/charlotte-runs")
-def list_charlotte_runs(uid: str = Depends(require_supabase_uid)):
-    """Recent Charlotte automation runs with stats."""
+@router.get("/pipeline-runs")
+def list_pipeline_runs(uid: str = Depends(require_supabase_uid)):
+    """Recent ARIA pipeline / legacy automation runs with stats."""
     _require_va_dashboard(uid)
     if not SUPABASE_URL:
         raise HTTPException(status_code=503, detail="Supabase not configured")
@@ -172,6 +172,13 @@ def list_charlotte_runs(uid: str = Depends(require_supabase_uid)):
     )
     r.raise_for_status()
     return {"ok": True, "runs": r.json() or []}
+
+
+# Legacy alias — old /crm/charlotte page polled this path; kept so in-flight
+# clients don't 404 but not referenced from any page in the repo.
+@router.get("/charlotte-runs", include_in_schema=False)
+def list_pipeline_runs_legacy(uid: str = Depends(require_supabase_uid)):
+    return list_pipeline_runs(uid)
 
 
 @router.get("/health-dashboard")
@@ -213,6 +220,9 @@ def health_dashboard(uid: str = Depends(require_supabase_uid)):
 
     return {
         "ok": True,
+        "pipeline_last_run": last_run,
+        # Legacy key kept so the old /crm/health client build renders until
+        # every deployed frontend picks up the new `pipeline_last_run` name.
         "charlotte_last_run": last_run,
         "replies_unhandled": pending_n,
         "scanner_health_last": last_scan_health,
@@ -256,13 +266,21 @@ def cron_va_reply_escalation(
     return run_va_reply_escalation()
 
 
-@cron_routes.post("/charlotte-quality-check")
-def cron_charlotte_quality(
+@cron_routes.post("/pipeline-quality-check")
+def cron_pipeline_quality(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
-    """Charlotte email QA metrics; alert CEO if out of range."""
+    """ARIA outbound QA metrics; alert CEO if out of range."""
     _require_cron_secret(x_cron_secret)
     return run_charlotte_quality_check()
+
+
+# Legacy cron alias — external scheduler may still hit the old path.
+@cron_routes.post("/charlotte-quality-check", include_in_schema=False)
+def cron_pipeline_quality_legacy(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    return cron_pipeline_quality(x_cron_secret)
 
 
 @cron_routes.post("/onboarding-sequences")

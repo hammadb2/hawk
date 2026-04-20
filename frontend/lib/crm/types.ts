@@ -15,12 +15,13 @@ export type ProspectStage =
   | "lost";
 
 export type ProspectSource =
-  | "charlotte"
+  | "aria_nightly"
+  | "aria_chat"
   | "manual"
   | "inbound"
   | "homepage_scanner"
-  | "aria_nightly"
-  | "aria_chat";
+  /** Legacy value kept so historical rows don't widen to `string`. */
+  | "charlotte";
 
 /** ARIA outbound automation stages (CRM `prospects.pipeline_status`). */
 export type ProspectPipelineStatus =

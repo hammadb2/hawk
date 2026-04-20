@@ -38,6 +38,7 @@ from routers import (
     crm_payment,
     crm_portal_api,
     crm_scale,
+    crm_settings as crm_settings_router,
     crm_webhooks,
     guardian,
     monitor,
@@ -148,6 +149,7 @@ app.include_router(portal_phase2.router)
 app.include_router(portal_self_serve.router)
 app.include_router(crm_scale.router)
 app.include_router(crm_dashboard.router)
+app.include_router(crm_settings_router.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
 app.include_router(crm_onboarding.router)

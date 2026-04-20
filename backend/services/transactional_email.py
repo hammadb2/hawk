@@ -1,20 +1,43 @@
-"""Trigger Charlotte (Revenue-Ops) for transactional emails."""
+"""Transactional email helpers (welcome, password reset, critical findings, digests).
+
+These are app-triggered one-off emails (not campaign sends). The project doesn't
+ship an SMTP sender by default, so every helper here no-ops cleanly and returns
+False if no delivery backend is wired up.
+
+To actually deliver mail, set ``TRANSACTIONAL_EMAIL_WEBHOOK_URL`` (and optionally
+``TRANSACTIONAL_EMAIL_API_KEY``) in the environment — the payload is POSTed as
+``{"task": "send_email", "to": ..., "subject": ..., "body": ...}`` so any simple
+relay (Resend proxy, Postmark webhook shim, a Cloudflare Worker, etc.) can accept
+it without us hard-coding a provider.
+"""
+
 from __future__ import annotations
+
+import os
 
 import httpx
 
-from config import BASE_URL, CHARLOTTE_URL, CHARLOTTE_API_KEY
+from config import BASE_URL
+
+_WEBHOOK_URL = os.environ.get("TRANSACTIONAL_EMAIL_WEBHOOK_URL", "").strip()
+_WEBHOOK_KEY = os.environ.get("TRANSACTIONAL_EMAIL_API_KEY", "").strip()
 
 
 def send_email(to: str, subject: str, body: str) -> bool:
-    """POST to Charlotte agent. Returns True if sent, False on error (non-blocking)."""
-    if not CHARLOTTE_URL or not CHARLOTTE_API_KEY:
+    """POST to a transactional-email relay if configured; otherwise return False.
+
+    Intentionally silent on failure — callers treat delivery as best-effort.
+    """
+    if not _WEBHOOK_URL:
         return False
+    headers = {"Content-Type": "application/json"}
+    if _WEBHOOK_KEY:
+        headers["X-API-Key"] = _WEBHOOK_KEY
     try:
         with httpx.Client(timeout=10) as client:
             r = client.post(
-                CHARLOTTE_URL,
-                headers={"X-API-Key": CHARLOTTE_API_KEY, "Content-Type": "application/json"},
+                _WEBHOOK_URL,
+                headers=headers,
                 json={"task": "send_email", "to": to, "subject": subject, "body": body},
             )
             return r.is_success
@@ -49,13 +72,18 @@ def critical_finding_alert(
     titles: list[str] | None = None,
 ) -> bool:
     subject = f"HAWK: {critical_count} critical finding(s) for {domain}"
-    lines = [f"We found {critical_count} critical finding(s) on {domain}.", "", "View details:", f"{BASE_URL}/dashboard/findings?scan={scan_id}", ""]
+    lines = [
+        f"We found {critical_count} critical finding(s) on {domain}.",
+        "",
+        "View details:",
+        f"{BASE_URL}/dashboard/findings?scan={scan_id}",
+        "",
+    ]
     if titles:
         lines.append("Findings:")
         for t in titles[:10]:
             lines.append(f"  • {t}")
-    body = "\n".join(lines)
-    return send_email(to, subject, body)
+    return send_email(to, subject, "\n".join(lines))
 
 
 def weekly_digest_email(

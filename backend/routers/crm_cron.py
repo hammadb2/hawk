@@ -1,4 +1,4 @@
-"""CRM scheduled jobs — aging reminders, onboarding, Shield, Charlotte, Phase 4 crons (Vercel/Railway + X-Cron-Secret)."""
+"""CRM scheduled jobs — aging reminders, onboarding, Shield, ARIA pipeline, Phase 4 crons (Vercel/Railway + X-Cron-Secret)."""
 
 from __future__ import annotations
 
@@ -280,19 +280,6 @@ def rolling_dispatch_trigger(
     return run_rolling_dispatch()
 
 
-@router.post("/charlotte-run")
-def charlotte_daily_run(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    """
-    DEPRECATED — Charlotte automation replaced by nightly-pipeline.
-    This endpoint now redirects to the nightly pipeline for backward compatibility.
-    Use POST /api/crm/cron/nightly-pipeline instead.
-    """
-    _require_secret(x_cron_secret)
-    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
-
-
 @router.post("/nightly-pipeline")
 def nightly_pipeline_run(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
@@ -304,7 +291,7 @@ def nightly_pipeline_run(
     Batched OpenAI (20 per call) → CASL footer + timezone scheduling →
     Store in aria_lead_inventory as 'ready'.
 
-    Replaces the old Charlotte daily run.
+    Replaces the legacy nightly agent run.
     Target: complete within 90 minutes for 3,000 leads.
     """
     _require_secret(x_cron_secret)
@@ -327,6 +314,15 @@ def nightly_pipeline_run(
         except Exception:
             pass
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+# Legacy alias — external schedulers (cron-job.org) may still target the
+# old Charlotte path. Keeps them working while teams migrate URLs.
+@router.post("/charlotte-run", include_in_schema=False)
+def nightly_pipeline_run_legacy(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
 
 
 @router.post("/morning-dispatch")
@@ -712,4 +708,4 @@ def aria_competitive_brief_cron(
     except Exception as e:
         logger.exception("aria competitive brief cron failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
-# scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
+# scanner-health, va-reply-escalation, pipeline quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
