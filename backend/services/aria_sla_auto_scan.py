@@ -67,6 +67,10 @@ def _watchdog_release_stuck_jobs() -> int:
             params={
                 "active_scan_job_id": "not.is.null",
                 "scan_started_at": f"lt.{cutoff}",
+                # Only release SLA-auto scans. Manual scans can legitimately
+                # run up to ~20 min on the frontend poll loop; they clear
+                # themselves via the finalize route.
+                "scan_trigger": "eq.sla_auto",
             },
             json={"active_scan_job_id": None, "scan_started_at": None},
             timeout=20.0,

@@ -9,11 +9,28 @@
 -- This migration adds the state columns used by both flows. Idempotent.
 
 alter table public.prospects
-  add column if not exists active_scan_job_id uuid,
+  add column if not exists active_scan_job_id text,
   add column if not exists scan_started_at timestamptz,
   add column if not exists scan_last_polled_at timestamptz,
   add column if not exists scan_trigger text,          -- 'manual' | 'sla_auto' | 'nightly'
   add column if not exists scanned_at timestamptz;
+
+-- If a prior draft of this migration created active_scan_job_id as uuid
+-- (scanner job ids are opaque strings, not guaranteed UUID), coerce it to text
+-- so PostgREST writes from the SLA job + /api/crm/run-scan never fail.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'prospects'
+      and column_name = 'active_scan_job_id'
+      and data_type = 'uuid'
+  ) then
+    execute 'alter table public.prospects alter column active_scan_job_id type text using active_scan_job_id::text';
+  end if;
+end$$;
 
 comment on column public.prospects.active_scan_job_id is
   'Job id returned by hawk-scanner-v2 /v1/scan/async while a scan is in flight. Cleared on completion, failure, or timeout. Drives the persistent scanning-state UI.';
