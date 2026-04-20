@@ -36,6 +36,12 @@ SLA_SCAN_AGE_MIN = int(os.environ.get("SLA_SCAN_AGE_MIN", "10"))
 SLA_SCAN_WATCHDOG_MIN = int(os.environ.get("SLA_SCAN_WATCHDOG_MIN", "15"))
 SLA_SCAN_BATCH = int(os.environ.get("SLA_SCAN_BATCH", "10"))
 SLA_SCAN_CONCURRENCY = int(os.environ.get("SLA_SCAN_CONCURRENCY", "3"))
+# Stuck-post-scan sweep is cheap (Apollo + OpenAI per prospect, no Apify)
+# compared with fresh scans, so it runs on a bigger batch/concurrency budget
+# to chew through backlogs like the 800-prospect incident without waiting a
+# couple of hours for the 10-per-tick SLA budget.
+SLA_STUCK_BATCH = int(os.environ.get("SLA_STUCK_BATCH", "75"))
+SLA_STUCK_CONCURRENCY = int(os.environ.get("SLA_STUCK_CONCURRENCY", "8"))
 SLA_SCORE_DROP_THRESHOLD = int(os.environ.get("SLA_SCORE_DROP_THRESHOLD", "85"))
 
 
@@ -436,14 +442,24 @@ def _scan_one(prospect: dict[str, Any]) -> dict[str, Any]:
 
 
 def _find_stuck_post_scan(limit: int) -> list[dict[str, Any]]:
-    """Find prospects that finished scanning but never got enriched.
+    """Find prospects that finished scanning but never got fully enriched.
 
     These are prospects whose manual finalize route fired-and-forgot the
     post-scan trigger but the HTTP call failed (backend down, network
-    blip), leaving the prospect at stage=scanned with pipeline_status=scanned
-    and no contact_email. The normal SLA `_find_candidates` filter misses
-    them (it requires stage in (new,scanning) AND scanned_at is null), so we
-    add a dedicated sweep here keyed on scanned_at.
+    blip), leaving the prospect at ``stage=scanned, pipeline_status=scanned``
+    without the full (contact_email + email_subject + smartlead_campaign_id)
+    triple needed for the rolling dispatcher. The normal SLA
+    ``_find_candidates`` filter misses them (it requires stage in
+    (new,scanning) AND scanned_at is null), so we add a dedicated sweep here
+    keyed on scanned_at.
+
+    We deliberately do **not** gate on ``contact_email IS NULL`` any more:
+    some prospects already had a contact_email copied in from older nightly
+    Apollo enrichment but still lack ``email_subject`` or
+    ``smartlead_campaign_id``, so the rolling dispatcher's
+    ``pipeline_status=eq.ready`` filter skips them forever. The post-scan
+    pipeline is idempotent (it short-circuits at the top when the full
+    triple is already present), so broadening the filter is safe.
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
     try:
@@ -451,11 +467,15 @@ def _find_stuck_post_scan(limit: int) -> list[dict[str, Any]]:
             f"{SUPABASE_URL}/rest/v1/prospects",
             headers=_sb_headers(),
             params={
-                "select": "id,domain",
+                "select": "id,domain,contact_email,email_subject,smartlead_campaign_id",
                 "stage": "eq.scanned",
                 "pipeline_status": "eq.scanned",
-                "contact_email": "is.null",
                 "scanned_at": f"lt.{cutoff}",
+                "or": (
+                    "(contact_email.is.null,"
+                    "email_subject.is.null,"
+                    "smartlead_campaign_id.is.null)"
+                ),
                 "order": "scanned_at.asc",
                 "limit": str(limit),
             },
@@ -491,10 +511,10 @@ def run_sla_auto_scan() -> dict[str, Any]:
     # Sweep stuck post-scan prospects (manual finalize fire-and-forget that
     # never landed). Run this first so a queue of stuck leads gets unblocked
     # on the same 2-minute tick as fresh scans.
-    stuck = _find_stuck_post_scan(SLA_SCAN_BATCH)
+    stuck = _find_stuck_post_scan(SLA_STUCK_BATCH)
     stuck_results: list[dict[str, Any]] = []
     if stuck:
-        with ThreadPoolExecutor(max_workers=SLA_SCAN_CONCURRENCY) as pool:
+        with ThreadPoolExecutor(max_workers=SLA_STUCK_CONCURRENCY) as pool:
             for res in pool.map(_run_post_scan_one, stuck):
                 stuck_results.append(res)
 

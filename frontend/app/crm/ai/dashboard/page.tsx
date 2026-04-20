@@ -40,6 +40,29 @@ interface DashboardData {
   };
 }
 
+interface PipelineBucket {
+  bucket: string;
+  stuck: number;
+  severity: "info" | "warn" | "critical" | string;
+  diagnosis?: string | null;
+  threshold_minutes?: number;
+  remaining?: number;
+  cap?: number;
+  sample_domains?: string[];
+}
+
+interface PipelineHealth {
+  ok?: boolean;
+  started_at?: string;
+  finished_at?: string;
+  summary?: string;
+  total_stuck?: number;
+  critical_buckets?: string[];
+  buckets?: PipelineBucket[];
+  applied_fixes?: Record<string, Record<string, unknown>>;
+  __persisted_at?: string;
+}
+
 function KPICard({ label, value, sub, color = "emerald" }: { label: string; value: string | number; sub?: string; color?: string }) {
   const colorMap: Record<string, string> = {
     emerald: "border-emerald-500/30",
@@ -53,6 +76,95 @@ function KPICard({ label, value, sub, color = "emerald" }: { label: string; valu
       <p className="text-xs font-medium text-slate-400">{label}</p>
       <p className="mt-1 text-2xl font-bold text-white">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+    </div>
+  );
+}
+
+function PipelineDoctorCard({
+  health,
+  running,
+  onRun,
+}: {
+  health: PipelineHealth | null;
+  running: boolean;
+  onRun: () => void;
+}) {
+  const severityColor: Record<string, string> = {
+    critical: "text-rose-400 bg-rose-500/10 border-rose-500/30",
+    warn: "text-amber-300 bg-amber-500/10 border-amber-500/30",
+    info: "text-slate-400 bg-slate-500/10 border-slate-500/20",
+  };
+  const buckets = health?.buckets ?? [];
+  const stuckBuckets = buckets.filter((b) => (b.stuck ?? 0) > 0);
+  const healthy = (health?.total_stuck ?? 0) === 0 && buckets.length > 0;
+  const applied = health?.applied_fixes ?? {};
+  const ageLabel = health?.finished_at
+    ? new Date(health.finished_at).toLocaleString()
+    : health?.__persisted_at
+      ? new Date(health.__persisted_at).toLocaleString()
+      : null;
+
+  return (
+    <div className={`p-5 ${crmSurfaceCard}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white">ARIA Pipeline Doctor</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {health
+              ? `${health.summary ?? ""}${ageLabel ? ` · last run ${ageLabel}` : ""}`
+              : "No snapshot yet — scheduler runs every 15 min"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={running}
+          className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-950/60 disabled:opacity-50"
+        >
+          {running ? "Diagnosing…" : "Run now"}
+        </button>
+      </div>
+
+      {healthy && (
+        <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-950/20 p-3 text-xs text-emerald-200">
+          Pipeline healthy — every stage flushing on schedule.
+        </div>
+      )}
+
+      {stuckBuckets.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {stuckBuckets.map((b) => {
+            const fix = applied[b.bucket];
+            return (
+              <div
+                key={b.bucket}
+                className={`rounded-lg border p-3 text-xs ${severityColor[b.severity] ?? severityColor.info}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">
+                    {b.bucket.replace(/_/g, " ")} · {b.stuck} stuck
+                  </span>
+                  <span className="uppercase tracking-wider text-[10px] opacity-80">
+                    {b.severity}
+                  </span>
+                </div>
+                {b.diagnosis && (
+                  <p className="mt-1 whitespace-pre-wrap text-slate-200/80">{b.diagnosis}</p>
+                )}
+                {fix && (
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Auto-fix: {fix.applied ? "applied" : "skipped"}
+                    {fix.reason ? ` — ${String(fix.reason)}` : ""}
+                    {fix.processed !== undefined ? ` · processed ${String(fix.processed)}` : ""}
+                    {fix.released !== undefined ? ` · released ${String(fix.released)}` : ""}
+                    {fix.new_cap !== undefined ? ` · cap → ${String(fix.new_cap)}` : ""}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -98,6 +210,8 @@ export default function CEODashboardPage() {
   const { profile, session } = useCrmAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [narration, setNarration] = useState("");
+  const [pipelineHealth, setPipelineHealth] = useState<PipelineHealth | null>(null);
+  const [doctorRunning, setDoctorRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -115,6 +229,7 @@ export default function CEODashboardPage() {
         if (resp.dashboard) {
           setData(resp.dashboard);
           setNarration(resp.narration || "");
+          setPipelineHealth((resp.pipeline_health as PipelineHealth) || null);
         }
       } else {
         setError("Failed to load dashboard");
@@ -124,6 +239,29 @@ export default function CEODashboardPage() {
     }
     setLoading(false);
   }, [session?.access_token]);
+
+  const runPipelineDoctor = useCallback(async () => {
+    if (!session?.access_token || doctorRunning) return;
+    setDoctorRunning(true);
+    try {
+      const r = await fetch(`${CRM_API_BASE_URL}/api/crm/ai/pipeline-doctor/run`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ auto_fix: true, sms_on_critical: false }),
+      });
+      if (r.ok) {
+        const resp = (await r.json()) as PipelineHealth;
+        setPipelineHealth(resp);
+      }
+    } catch {
+      /* non-blocking — the scheduler will refresh on the next tick */
+    } finally {
+      setDoctorRunning(false);
+    }
+  }, [session?.access_token, doctorRunning]);
 
   useEffect(() => {
     void fetchDashboard();
@@ -225,6 +363,13 @@ export default function CEODashboardPage() {
               <span>Conversion rate: {data.pipeline.conversion_rate}%</span>
             </div>
           </div>
+
+          {/* ARIA Pipeline Doctor */}
+          <PipelineDoctorCard
+            health={pipelineHealth}
+            running={doctorRunning}
+            onRun={runPipelineDoctor}
+          />
 
           {/* Plan Breakdown + Outbound */}
           <div className="grid gap-4 md:grid-cols-2">

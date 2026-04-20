@@ -280,6 +280,98 @@ def rolling_dispatch_trigger(
     return run_rolling_dispatch()
 
 
+@router.post("/post-scan-backfill")
+def post_scan_backfill(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    limit: int = 500,
+    concurrency: int = 10,
+):
+    """One-shot backfill of stuck post-scan prospects.
+
+    Finds every prospect at ``stage=scanned, pipeline_status=scanned`` that
+    is missing any of ``contact_email`` / ``email_subject`` /
+    ``smartlead_campaign_id`` and runs the idempotent post-scan pipeline
+    (Apollo enrich → ARIA draft → pipeline_status=ready). Use when a backlog
+    needs to be cleared faster than the SLA sweep's per-tick budget.
+
+    Safe to re-run — the pipeline short-circuits when a prospect is already
+    fully enriched.
+    """
+    _require_secret(x_cron_secret)
+    from concurrent.futures import ThreadPoolExecutor
+
+    from services.aria_post_scan_pipeline import run_post_scan_sync
+
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+    }
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=headers,
+            params={
+                "select": "id",
+                "stage": "eq.scanned",
+                "pipeline_status": "eq.scanned",
+                "or": (
+                    "(contact_email.is.null,"
+                    "email_subject.is.null,"
+                    "smartlead_campaign_id.is.null)"
+                ),
+                "order": "scanned_at.asc",
+                "limit": str(max(1, min(limit, 2000))),
+            },
+            timeout=30.0,
+        )
+        r.raise_for_status()
+        prospects = r.json() or []
+    except Exception as exc:
+        logger.exception("post-scan-backfill query failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not prospects:
+        return {"ok": True, "processed": 0, "outcomes": {}}
+
+    outcomes: dict[str, int] = {}
+
+    def _one(p: dict) -> dict:
+        try:
+            return run_post_scan_sync(p["id"]) or {"ok": False, "outcome": "empty"}
+        except Exception as exc:
+            logger.warning("post-scan-backfill prospect=%s failed: %s", p.get("id"), exc)
+            return {"ok": False, "outcome": "error", "error": str(exc)[:200]}
+
+    with ThreadPoolExecutor(max_workers=max(1, min(concurrency, 20))) as pool:
+        for res in pool.map(_one, prospects):
+            key = str(res.get("outcome") or "unknown")
+            outcomes[key] = outcomes.get(key, 0) + 1
+
+    return {"ok": True, "processed": len(prospects), "outcomes": outcomes}
+
+
+@router.post("/pipeline-doctor")
+def pipeline_doctor_trigger(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    auto_fix: bool = True,
+    sms_on_critical: bool = False,
+):
+    """Manual trigger for the ARIA Pipeline Doctor.
+
+    Runs the same diagnoser + auto-fixer the scheduler fires every 15 min.
+    Defaults to ``sms_on_critical=false`` so manual/ad-hoc invocations don't
+    page the CEO; set ``?sms_on_critical=true`` to mirror the scheduler's
+    escalation behaviour.
+    """
+    _require_secret(x_cron_secret)
+    from services.aria_pipeline_doctor import run_pipeline_doctor
+
+    return run_pipeline_doctor(auto_fix=auto_fix, sms_on_critical=sms_on_critical)
+
+
 @router.post("/nightly-pipeline")
 def nightly_pipeline_run(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),

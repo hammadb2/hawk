@@ -320,6 +320,37 @@ FUNCTION_DEFINITIONS = [
         "description": "Get the God Mode CEO dashboard with all KPIs: revenue, pipeline, activity, client health, and team metrics with AI narration.",
         "parameters": {"type": "object", "properties": {}},
     },
+    # ── ARIA Pipeline Doctor (outbound pipeline health + auto-fix) ────────
+    {
+        "name": "run_pipeline_doctor",
+        "description": (
+            "Diagnose the outbound pipeline end-to-end (new → scanning → scanned → "
+            "ready → contacted → dispatched), identify stuck buckets, and autonomously "
+            "apply safe escape hatches (trigger SLA auto-scan, release scanning "
+            "watchdog, backfill stuck post-scan, kick the rolling dispatcher, bump "
+            "Apollo credit cap). Use this whenever the CEO asks things like 'why are "
+            "emails stuck', 'how is the pipeline doing', or 'why aren't prospects "
+            "moving'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "auto_fix": {
+                    "type": "boolean",
+                    "description": "Apply idempotent auto-fixes (default true).",
+                },
+                "sms_on_critical": {
+                    "type": "boolean",
+                    "description": "Send the CEO an SMS for critical buckets (default false when invoked from chat).",
+                },
+            },
+        },
+    },
+    {
+        "name": "get_pipeline_doctor_snapshot",
+        "description": "Return the last ARIA Pipeline Doctor snapshot (stuck buckets + applied fixes + diagnosis) without running a fresh diagnosis.",
+        "parameters": {"type": "object", "properties": {}},
+    },
     # ── Phase 19: Onboarding trainer ──────────────────────────────────────
     {
         "name": "start_training_session",
@@ -381,6 +412,10 @@ def _filter_functions_for_role(permissions: dict[str, bool]) -> list[dict]:
             continue
         # Phase 15: CEO dashboard requires financials
         if name == "get_ceo_dashboard" and not permissions.get("financials"):
+            continue
+        # Pipeline Doctor requires prospect_data access (everyone who can see
+        # the pipeline can see pipeline health diagnostics).
+        if name in ("run_pipeline_doctor", "get_pipeline_doctor_snapshot") and not permissions.get("prospect_data"):
             continue
         # Phase 19: training available to all with AI access
         available.append(fn)
@@ -501,6 +536,19 @@ def _execute_function(
             data = get_dashboard_data()
             narration = generate_narration(data)
             return json.dumps({"dashboard": data, "narration": narration})
+        # ── ARIA Pipeline Doctor ─────────────────────────────────────
+        elif name == "run_pipeline_doctor":
+            from services.aria_pipeline_doctor import run_pipeline_doctor
+            return json.dumps(
+                run_pipeline_doctor(
+                    auto_fix=bool(args.get("auto_fix", True)),
+                    sms_on_critical=bool(args.get("sms_on_critical", False)),
+                )
+            )
+        elif name == "get_pipeline_doctor_snapshot":
+            from services.aria_pipeline_doctor import load_last_snapshot
+            snap = load_last_snapshot()
+            return json.dumps(snap or {"ok": False, "reason": "no snapshot yet"})
         # ── Phase 19: Training ───────────────────────────────────────
         elif name == "start_training_session":
             from services.aria_onboarding_trainer import start_training_session
@@ -876,13 +924,53 @@ def get_ceo_dashboard(uid: str = Depends(require_supabase_uid)):
         raise HTTPException(status_code=403, detail="CEO-only endpoint")
 
     from services.aria_ceo_dashboard import get_dashboard_data, generate_narration
+    from services.aria_pipeline_doctor import load_last_snapshot
 
     dashboard = get_dashboard_data()
     if "error" in dashboard:
         raise HTTPException(status_code=503, detail=dashboard["error"])
 
     narration = generate_narration(dashboard)
-    return {"dashboard": dashboard, "narration": narration}
+    pipeline_health = load_last_snapshot()
+    return {
+        "dashboard": dashboard,
+        "narration": narration,
+        "pipeline_health": pipeline_health,
+    }
+
+
+@router.get("/pipeline-doctor")
+def pipeline_doctor_snapshot(uid: str = Depends(require_supabase_uid)):
+    """Return the latest ARIA Pipeline Doctor snapshot without re-running diagnosis."""
+    _require_ai_access(uid)
+    from services.aria_pipeline_doctor import load_last_snapshot
+
+    snap = load_last_snapshot()
+    if not snap:
+        return {"ok": False, "reason": "no snapshot yet — scheduler runs every 15 min"}
+    return snap
+
+
+class PipelineDoctorRunBody(BaseModel):
+    auto_fix: bool = True
+    sms_on_critical: bool = False
+
+
+@router.post("/pipeline-doctor/run")
+def pipeline_doctor_run(
+    body: PipelineDoctorRunBody,
+    uid: str = Depends(require_supabase_uid),
+):
+    """Run the ARIA Pipeline Doctor on demand (diagnose + auto-fix)."""
+    prof = _require_ai_access(uid)
+    if prof.get("role") != "ceo":
+        raise HTTPException(status_code=403, detail="CEO-only endpoint")
+    from services.aria_pipeline_doctor import run_pipeline_doctor
+
+    return run_pipeline_doctor(
+        auto_fix=body.auto_fix,
+        sms_on_critical=body.sms_on_critical,
+    )
 
 
 class AnalyzeFileBody(BaseModel):

@@ -61,6 +61,7 @@ from services.crm_apscheduler_jobs import (
     run_morning_dispatch_job,
     run_nightly_pipeline_job,
     run_onboarding_drip_job,
+    run_pipeline_doctor_job,
     run_portal_milestones_job,
     run_rep_health_job,
     run_rolling_dispatch_job,
@@ -105,6 +106,10 @@ scheduler.add_job(run_aria_client_health_job, CronTrigger(minute="*/15", timezon
 scheduler.add_job(run_sla_auto_scan_job, CronTrigger(minute="*/2", timezone=MST))
 # Rolling email dispatcher — 9am through 4pm MST (8 ticks) toward 200/campaign/day (600/day).
 scheduler.add_job(run_rolling_dispatch_job, CronTrigger(hour="9-16", minute=5, timezone=MST))
+# ARIA Pipeline Doctor — every 15 min, diagnoses stuck buckets (new / scanning /
+# scanned / ready / apollo credits) and auto-applies idempotent escape hatches.
+# Escalates critical buckets via CEO SMS.
+scheduler.add_job(run_pipeline_doctor_job, CronTrigger(minute="*/15", timezone=MST))
 
 
 @asynccontextmanager
