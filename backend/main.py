@@ -61,6 +61,7 @@ from services.crm_apscheduler_jobs import (
     run_onboarding_drip_job,
     run_portal_milestones_job,
     run_rep_health_job,
+    run_rolling_dispatch_job,
     run_scheduled_ai_actions_job,
     run_shield_rescan_job,
     run_sla_auto_scan_job,
@@ -100,6 +101,8 @@ scheduler.add_job(run_scheduled_ai_actions_job, CronTrigger(minute="*/15", timez
 scheduler.add_job(run_aria_memory_job, CronTrigger(minute="*/15", timezone=MST))
 scheduler.add_job(run_aria_client_health_job, CronTrigger(minute="*/15", timezone=MST))
 scheduler.add_job(run_sla_auto_scan_job, CronTrigger(minute="*/2", timezone=MST))
+# Rolling email dispatcher — 9am through 4pm MST (8 ticks) toward 200/campaign/day (600/day).
+scheduler.add_job(run_rolling_dispatch_job, CronTrigger(hour="9-16", minute=5, timezone=MST))
 
 
 @asynccontextmanager
