@@ -296,6 +296,10 @@ export function ProspectProfile({
         return;
       }
 
+      // Mark as already-handled BEFORE polling so any concurrent load() (toggle
+      // hot, add note, stage change) that refreshes `p.active_scan_job_id`
+      // doesn't trip the resume useEffect into a second parallel poll loop.
+      scanResumeRef.current = jobId;
       setScanPhase("Queued…");
       await pollAndFinalize(jobId, p.id);
     } catch (e) {
