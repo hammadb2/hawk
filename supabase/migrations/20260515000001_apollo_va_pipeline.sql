@@ -169,24 +169,18 @@ create policy "va_outreach_log_insert"
 -- ---------------------------------------------------------------------------
 -- 4) crm_settings seed + cleanup
 -- ---------------------------------------------------------------------------
-insert into public.crm_settings(key, value, description)
+-- crm_settings has only (key, value, updated_at). Descriptions live in the
+-- DEFAULT_KEYS dict in backend/routers/crm_settings.py instead.
+insert into public.crm_settings(key, value)
 values
-  ('apollo_daily_credit_cap', '2500',
-   'Daily Apollo enrichment credit cap (soft budget guard).'),
-  ('apollo_credits_used_today', '0',
-   'Running count of Apollo credits consumed today (reset at UTC midnight).'),
-  ('apollo_credits_used_date', '',
-   'UTC date that `apollo_credits_used_today` applies to.'),
-  ('apollo_people_topup_enabled', 'true',
-   'If true, top discovery up to `discovery_daily_target` via Apollo people search.'),
-  ('discovery_daily_target', '2000',
-   'Target number of raw leads discovered per day (Google Places + Apollo combined).'),
-  ('google_places_max_per_search', '40',
-   'Max businesses returned per (vertical, city) Google Places query.'),
-  ('va_queue_enabled', 'true',
-   'If true, route prospects past the 600/day dispatcher cap into the VA queue.'),
-  ('va_daily_target_per_va', '60',
-   'Target manual outreach count per VA per day (used for Team tab pacing).')
+  ('apollo_daily_credit_cap', '2500'),
+  ('apollo_credits_used_today', '0'),
+  ('apollo_credits_used_date', ''),
+  ('apollo_people_topup_enabled', 'true'),
+  ('discovery_daily_target', '2000'),
+  ('google_places_max_per_search', '40'),
+  ('va_queue_enabled', 'true'),
+  ('va_daily_target_per_va', '60')
 on conflict (key) do nothing;
 
 -- Drop legacy Apify per-actor kill switches — actors 2/3/4 are gone.
