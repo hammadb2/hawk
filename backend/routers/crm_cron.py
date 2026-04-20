@@ -264,6 +264,22 @@ def post_scan_pipeline_trigger(
     return result
 
 
+@router.post("/rolling-dispatch")
+def rolling_dispatch_trigger(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Manual trigger for the rolling dispatcher.
+
+    Safe to call outside the scheduled 9am-4pm MST window — the service
+    computes remaining quota off the current hour, so a manual call after
+    hours will just dispatch the full day's remaining budget.
+    """
+    _require_secret(x_cron_secret)
+    from services.aria_rolling_dispatch import run_rolling_dispatch
+
+    return run_rolling_dispatch()
+
+
 @router.post("/charlotte-run")
 def charlotte_daily_run(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
