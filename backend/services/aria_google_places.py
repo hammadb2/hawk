@@ -77,7 +77,10 @@ def _map_place_to_lead(
     place: dict[str, Any], vertical: str, city: str
 ) -> dict[str, Any] | None:
     name_obj = place.get("displayName") or {}
-    name = (name_obj.get("text") if isinstance(name_obj, dict) else str(name_obj)).strip()
+    if isinstance(name_obj, dict):
+        name = (name_obj.get("text") or "").strip()
+    else:
+        name = str(name_obj).strip()
     if not name:
         return None
 
