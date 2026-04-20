@@ -109,7 +109,7 @@ export function ProspectCard({
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
               Scanning…
             </span>
-          ) : prospect.hawk_score > 0 ? (
+          ) : prospect.hawk_score > 0 || prospect.scanned_at ? (
             <span>Score {prospect.hawk_score}</span>
           ) : (
             <span className="text-slate-600">Unscanned</span>
