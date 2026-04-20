@@ -154,9 +154,12 @@ def _classify_vertical(prospect: dict[str, Any]) -> str:
         canon = canonical_vertical(raw)
         if canon in ("dental", "legal", "accounting"):
             return canon
+    # Deliberately exclude vulnerability_found — scan findings regularly contain
+    # words like "audit" / "law" / "legal hold" which would cross-classify a
+    # dental practice into the accounting or legal campaign.
     haystack = " ".join(
         str(prospect.get(k) or "").lower()
-        for k in ("company_name", "domain", "vulnerability_found")
+        for k in ("company_name", "domain")
     )
     for hints, bucket in (
         (_DENTAL_HINTS, "dental"),
@@ -412,7 +415,26 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
     }
     if campaign_id:
         patch["smartlead_campaign_id"] = campaign_id
-    _patch_prospect(prospect_id, patch)
+
+    # DB-level stage guard. The enrichment + ZeroBounce + OpenAI window can run
+    # for minutes; a rep may advance the prospect to sent_email / replied /
+    # call_booked during that time. Filtering on stage prevents the final PATCH
+    # from regressing pipeline_status back to "ready" on a lead that's already
+    # moved forward, matching the pattern used by _soft_drop above and
+    # _write_scan_result in aria_sla_auto_scan.
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "id": f"eq.{prospect_id}",
+                "stage": "in.(new,scanning,scanned)",
+            },
+            json=patch,
+            timeout=20.0,
+        )
+    except Exception as exc:
+        logger.warning("post-scan final patch prospect=%s failed: %s", prospect_id, exc)
 
     logger.info(
         "post-scan ready prospect=%s domain=%s vertical=%s source=%s zb=%s",
