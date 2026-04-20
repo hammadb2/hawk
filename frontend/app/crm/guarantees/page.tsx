@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
@@ -64,7 +65,7 @@ export default function GuaranteesPage() {
     setLoading(false);
   }, [supabase]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     if (authReady && session && profile) void load();
   }, [authReady, session, profile, load]);
 

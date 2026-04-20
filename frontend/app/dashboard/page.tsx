@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/components/providers/auth-provider";
 import { scansApi, domainsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 
 const GRADE_COLORS: Record<string, string> = {
   A: "text-green",
@@ -30,7 +31,7 @@ export default function DashboardOverviewPage() {
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     if (!token) return;
     Promise.all([
       scansApi.list(token).then((r) => {
