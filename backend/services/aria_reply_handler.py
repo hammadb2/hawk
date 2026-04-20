@@ -240,12 +240,35 @@ def process_reply_event(event: dict[str, Any]) -> dict[str, Any]:
     reply_id = _store_reply(row)
     _patch_prospect_on_smartlead_reply(prospect_email, sentiment)
 
+    # Hand off to the autonomous reply loop. This is where ARIA actually
+    # *sends* the response (for positive / question / objection), parses
+    # OOO return dates, schedules 48h follow-ups, and trips the human
+    # checkpoint for legal / custom-contract / >$5k deals.
+    auto_result: dict[str, Any] = {}
+    if reply_id:
+        try:
+            from services import aria_auto_reply
+
+            auto_result = aria_auto_reply.handle_reply(
+                reply_id=reply_id,
+                sentiment=sentiment,
+                prospect_email=prospect_email,
+                reply_subject=reply_subject,
+                reply_body=reply_body,
+                vulnerability=vulnerability,
+                company_name=company_name,
+            ) or {}
+        except Exception as exc:
+            logger.exception("auto_reply dispatch failed reply=%s", reply_id)
+            auto_result = {"status": "queued_for_va", "reason": f"dispatch_error: {exc!s}"[:200]}
+
     return {
         "ok": True,
         "reply_id": reply_id,
         "sentiment": sentiment,
         "confidence": classification["confidence"],
-        "status": status,
+        "status": auto_result.get("status") or status,
+        "auto_reply": auto_result,
     }
 
 

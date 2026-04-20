@@ -652,6 +652,69 @@ def _log_prospect_activity(*, prospect_id: str, type_: str, notes: str, metadata
         logger.exception("Cal webhook: activity log failed prospect=%s", prospect_id)
 
 
+def _send_confirmation_email(prospect: dict[str, Any], subject: str, html_body: str) -> None:
+    """Send the booking confirmation email through a Mailforge mailbox."""
+    from services.mailbox_registry import pick_next_for_vertical
+    from services.mailbox_smtp_sender import send_via_mailbox
+
+    to_email = (prospect.get("contact_email") or "").strip()
+    if not to_email:
+        return
+    mailbox = pick_next_for_vertical((prospect.get("vertical") or "").strip() or "unknown")
+    if not mailbox:
+        logger.warning("Cal confirm: no mailbox available for vertical=%s", prospect.get("vertical"))
+        return
+    to_name = " ".join(
+        p for p in (prospect.get("first_name"), prospect.get("last_name")) if p
+    ).strip() or to_email.split("@")[0]
+    text = re.sub(r"<[^>]+>", " ", html_body)
+    send_via_mailbox(
+        str(mailbox["id"]),
+        to_email=to_email,
+        to_name=to_name,
+        subject=subject,
+        body_text=text,
+        body_html=html_body,
+    )
+
+
+def _schedule_call_reminder(
+    *, prospect_id: str, start_iso: str | None, time_note: str, meeting_link: str
+) -> None:
+    """Schedule the plain 24-hour reminder email."""
+    if not start_iso:
+        return
+    try:
+        from services import aria_scheduled_actions
+
+        # Cal.com gives ISO 8601; it may or may not carry TZ info.
+        try:
+            call_time = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+        except ValueError:
+            logger.warning("Cal reminder: unparseable start_iso=%s", start_iso)
+            return
+        if call_time.tzinfo is None:
+            call_time = call_time.replace(tzinfo=timezone.utc)
+        from datetime import timedelta
+
+        due = call_time - timedelta(hours=24)
+        # If the call is <24h away, send reminder in 1 hour so they still get one.
+        if due <= datetime.now(timezone.utc):
+            due = datetime.now(timezone.utc) + timedelta(hours=1)
+        aria_scheduled_actions.schedule(
+            action_type="call_reminder_24hr",
+            due_at=due,
+            prospect_id=prospect_id,
+            payload={
+                "start_time": start_iso,
+                "when_label": time_note,
+                "meeting_link": meeting_link,
+            },
+        )
+    except Exception:
+        logger.exception("Cal webhook: schedule reminder failed prospect=%s", prospect_id)
+
+
 def _send_rep_sms_if_configured(*, rep_id: str | None, message: str) -> None:
     if not rep_id or not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         return
@@ -750,6 +813,81 @@ async def cal_com_webhook(
             f"CRM: {base}/crm/prospects/{pid}"
         )
         _send_rep_sms_if_configured(rep_id=prospect.get("assigned_rep_id"), message=rep_msg)
+
+        # Closer briefing — rich SMS with top-3 vulns + Hawk Score so Kevin
+        # + the assigned rep walk into the call prepared.
+        try:
+            from services import aria_settings
+            from services.aria_closer_briefing import (
+                fetch_briefing,
+                render_confirmation_email,
+                render_sms,
+            )
+
+            briefing = fetch_briefing(pid)
+            closer_sms = render_sms(briefing, attendee_name, time_note)
+            try:
+                send_ceo_sms(closer_sms)
+            except Exception:
+                logger.exception("Cal briefing CEO SMS failed prospect=%s", pid)
+            kevin = (
+                os.environ.get("KEVIN_SMS_NUMBER", "").strip()
+                or str(aria_settings.get_setting("kevin_sms_number", "") or "").strip()
+            )
+            if kevin:
+                try:
+                    send_sms(kevin, closer_sms)
+                except Exception:
+                    logger.exception("Cal briefing Kevin SMS failed prospect=%s", pid)
+
+            # Prospect confirmation email — sent via a mailbox so threading
+            # with the original outbound stays clean.
+            booking_link = payload.get("bookerUrl") or payload.get("reschedule_url") or ""
+            subject, html = render_confirmation_email(briefing, time_note, booking_link or None)
+            try:
+                _send_confirmation_email(prospect, subject, html)
+            except Exception:
+                logger.exception("Cal confirmation email failed prospect=%s", pid)
+
+            # Closer CRM task — surface in the assigned rep's activity feed.
+            rep_id = prospect.get("assigned_rep_id")
+            _log_prospect_activity(
+                prospect_id=pid,
+                type_="closer_brief",
+                notes=(
+                    f"Call at {time_note}. Hawk Score: {briefing.get('hawk_score')}. "
+                    f"Top vulns: {', '.join(briefing.get('top_vulns') or []) or '—'}"
+                )[:2000],
+                metadata={
+                    "start_time": start_iso,
+                    "attendee_email": attendee_email,
+                    "assigned_rep_id": rep_id,
+                    "top_vulns": briefing.get("top_vulns") or [],
+                    "hawk_score": briefing.get("hawk_score"),
+                },
+            )
+
+            # 24-hour pre-call reminder.
+            _schedule_call_reminder(
+                prospect_id=pid,
+                start_iso=start_iso,
+                time_note=time_note,
+                meeting_link=str(payload.get("meetingUrl") or payload.get("meeting_link") or ""),
+            )
+
+            # Cancel any pending no-book follow-ups / nurture drips — they've booked.
+            try:
+                from services import aria_scheduled_actions
+
+                aria_scheduled_actions.cancel_pending(
+                    pid,
+                    action_types=["follow_up_48hr", "nurture_weekly", "snooze_90d"],
+                )
+            except Exception:
+                logger.exception("Cal webhook: cancel_pending failed prospect=%s", pid)
+        except Exception:
+            logger.exception("Cal webhook: closer-briefing pipeline failed prospect=%s", pid)
+
         return {"ok": True, "matched": True, "prospect_id": pid, "trigger": trigger}
 
     if trigger == "BOOKING_CANCELLED":

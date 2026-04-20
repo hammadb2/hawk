@@ -241,7 +241,8 @@ def _poll_single_mailbox(mailbox_id: str) -> dict[str, Any]:
                 continue
             reply_from = parseaddr(msg.get("From", ""))[1]
             reply_subject = msg.get("Subject", "") or ""
-            body_snippet = _extract_body_snippet(msg)[:2000]
+            body_full = _extract_body_snippet(msg)
+            body_snippet = body_full[:2000]
             _mark_prospect_replied(
                 str(prospect["id"]),
                 reply_from=reply_from,
@@ -249,6 +250,26 @@ def _poll_single_mailbox(mailbox_id: str) -> dict[str, Any]:
                 reply_body_snippet=body_snippet,
                 mailbox_id=mailbox_id,
             )
+            # Hand off to the autonomous reply loop: classification +
+            # knowledge-base grounded draft + mailbox SMTP send + nurture
+            # scheduling. Best-effort; failures don't abort the poll.
+            try:
+                from services import aria_reply_handler
+
+                event = {
+                    "event_type": "reply",
+                    "lead": {"email": reply_from, "id": ""},
+                    "email": {"subject": reply_subject, "body": body_full, "text_body": body_full},
+                    "campaign_id": "",
+                    "source": "imap_poller",
+                    "mailbox_id": mailbox_id,
+                }
+                aria_reply_handler.process_reply_event(event)
+            except Exception:
+                logger.exception(
+                    "reply-poll auto-reply dispatch failed prospect=%s",
+                    prospect.get("id"),
+                )
             replies += 1
     except Exception as exc:
         err = f"IMAP poll error: {exc.__class__.__name__}: {exc}"
