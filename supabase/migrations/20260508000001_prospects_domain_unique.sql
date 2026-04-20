@@ -126,22 +126,35 @@ begin
   end if;
 end $$;
 
--- prospect_email_events.prospect_id — ON DELETE CASCADE. Also has a
--- partial unique index on (prospect_id, external_id) so we must drop any
--- loser rows whose external_id already exists on the keeper before
--- reparenting, otherwise the UPDATE trips the unique index.
+-- prospect_email_events.prospect_id — ON DELETE CASCADE. Has a partial
+-- unique index on (prospect_id, external_id). Before reparenting onto the
+-- keeper, dedupe so at most one row per (target_prospect_id, external_id)
+-- survives — covering both keeper-vs-loser AND loser-vs-loser collisions.
 do $$
 begin
   if to_regclass('public.prospect_email_events') is not null then
     execute $sql$
+      with target as (
+        select e.id,
+               e.external_id,
+               coalesce(m.keeper_id, e.prospect_id) as target_prospect_id
+          from public.prospect_email_events e
+          left join _prospect_dedup_map m on m.loser_id = e.prospect_id
+         where e.external_id is not null
+           and length(trim(e.external_id)) > 0
+      ),
+      ranked as (
+        select id,
+               row_number() over (
+                 partition by target_prospect_id, external_id
+                 order by id
+               ) as rn
+          from target
+      )
       delete from public.prospect_email_events e
-       using _prospect_dedup_map m,
-             public.prospect_email_events k
-       where e.prospect_id = m.loser_id
-         and k.prospect_id = m.keeper_id
-         and e.external_id is not null
-         and length(trim(e.external_id)) > 0
-         and k.external_id = e.external_id;
+       using ranked r
+       where e.id = r.id
+         and r.rn > 1;
     $sql$;
     execute $sql$
       update public.prospect_email_events e
