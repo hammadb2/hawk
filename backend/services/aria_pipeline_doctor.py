@@ -415,6 +415,208 @@ def _fix_noop() -> dict[str, Any]:
     return {"applied": False, "reason": "no autonomous fix; review manually"}
 
 
+# ── Mailbox health diagnosers / fixes (native-SMTP dispatcher) ───────────────
+
+
+def _count_ready_prospects() -> int:
+    if not SUPABASE_URL:
+        return 0
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers={**_sb_headers(), "Prefer": "count=exact"},
+            params={"select": "id", "pipeline_status": "eq.ready", "limit": "1"},
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        cr = r.headers.get("content-range", "")
+        return int(cr.split("/", 1)[1]) if "/" in cr else 0
+    except Exception:
+        return 0
+
+
+def _diagnose_no_active_mailboxes() -> dict[str, Any]:
+    """No active mailboxes at all → 100% of ready prospects are blocked."""
+    try:
+        from services import mailbox_registry
+
+        active = mailbox_registry.list_mailboxes(status="active")
+    except Exception as exc:
+        return {
+            "bucket": "no_active_mailboxes",
+            "stuck": 0,
+            "severity": "info",
+            "diagnosis": f"mailbox registry unreachable: {exc}",
+            "recommendation": "check MAILBOX_ENCRYPTION_KEY + crm_mailboxes table",
+        }
+    if active:
+        return {
+            "bucket": "no_active_mailboxes",
+            "stuck": 0,
+            "severity": "ok",
+            "diagnosis": f"{len(active)} active mailbox(es) ready to send",
+        }
+    ready = _count_ready_prospects()
+    severity = "critical" if ready else "warn"
+    return {
+        "bucket": "no_active_mailboxes",
+        "stuck": ready,
+        "severity": severity,
+        "diagnosis": (
+            f"{ready} prospects at pipeline_status=ready but no crm_mailboxes.status=active rows. "
+            "Rolling dispatcher cannot send anything."
+        ),
+        "recommendation": "add or reactivate a mailbox at /crm/settings/mailboxes",
+    }
+
+
+def _diagnose_mailbox_caps_exhausted() -> dict[str, Any]:
+    """All active mailboxes have sent_today >= daily_cap."""
+    try:
+        from services import mailbox_registry
+
+        active = mailbox_registry.list_mailboxes(status="active")
+    except Exception as exc:
+        return {
+            "bucket": "mailbox_caps_exhausted",
+            "stuck": 0,
+            "severity": "info",
+            "diagnosis": f"mailbox registry unreachable: {exc}",
+        }
+    if not active:
+        return {
+            "bucket": "mailbox_caps_exhausted",
+            "stuck": 0,
+            "severity": "ok",
+            "diagnosis": "no active mailboxes (covered by no_active_mailboxes bucket)",
+        }
+    today = datetime.now(timezone.utc).date().isoformat()
+    remaining = 0
+    for mbx in active:
+        cap = int(mbx.get("daily_cap") or 0)
+        date = str(mbx.get("sent_today_date") or "")
+        sent = int(mbx.get("sent_today") or 0) if date == today else 0
+        remaining += max(0, cap - sent)
+    if remaining > 0:
+        return {
+            "bucket": "mailbox_caps_exhausted",
+            "stuck": 0,
+            "severity": "ok",
+            "diagnosis": f"{remaining} sends remaining today across {len(active)} mailbox(es)",
+        }
+    ready = _count_ready_prospects()
+    severity = "warn" if ready < 50 else "critical"
+    return {
+        "bucket": "mailbox_caps_exhausted",
+        "stuck": ready,
+        "severity": severity,
+        "diagnosis": (
+            f"all {len(active)} active mailboxes at/over daily_cap; "
+            f"{ready} prospects waiting — rolls over at midnight MST"
+        ),
+        "recommendation": "raise daily_cap on mailboxes or add more inboxes via /crm/settings/mailboxes",
+    }
+
+
+def _diagnose_mailbox_high_bounce() -> dict[str, Any]:
+    """Any active mailbox whose 7-day bounce_rate exceeds the threshold."""
+    try:
+        from services import mailbox_registry
+
+        all_mbx = mailbox_registry.list_mailboxes()
+    except Exception as exc:
+        return {
+            "bucket": "mailbox_high_bounce",
+            "stuck": 0,
+            "severity": "info",
+            "diagnosis": f"mailbox registry unreachable: {exc}",
+        }
+    threshold_rows = _fetch(
+        "crm_settings",
+        {"key": "eq.mailbox_bounce_rate_threshold", "select": "value", "limit": "1"},
+    )
+    try:
+        threshold = float((threshold_rows[0] or {}).get("value") or 0.05) if threshold_rows else 0.05
+    except (ValueError, TypeError):
+        threshold = 0.05
+
+    hot: list[dict[str, Any]] = []
+    for mbx in all_mbx:
+        if str(mbx.get("status")) != "active":
+            continue
+        try:
+            rate = float(mbx.get("bounce_rate_7d") or 0)
+        except (ValueError, TypeError):
+            rate = 0.0
+        if rate >= threshold:
+            hot.append(
+                {
+                    "id": str(mbx.get("id")),
+                    "email_address": mbx.get("email_address"),
+                    "bounce_rate_7d": rate,
+                    "bounce_count_7d": int(mbx.get("bounce_count_7d") or 0),
+                    "sent_count_7d": int(mbx.get("sent_count_7d") or 0),
+                }
+            )
+
+    if not hot:
+        return {
+            "bucket": "mailbox_high_bounce",
+            "stuck": 0,
+            "severity": "ok",
+            "diagnosis": f"no active mailbox is over {int(threshold * 100)}% bounce rate",
+        }
+    return {
+        "bucket": "mailbox_high_bounce",
+        "stuck": len(hot),
+        "severity": "critical",
+        "diagnosis": (
+            f"{len(hot)} mailbox(es) above {int(threshold * 100)}% 7-day bounce rate — "
+            "deliverability risk, auto-pausing"
+        ),
+        "recommendation": "investigate warmup / content / domain reputation before reactivating",
+        "mailboxes": hot,
+    }
+
+
+def _fix_mailbox_high_bounce() -> dict[str, Any]:
+    """Auto-pause every mailbox currently over the bounce-rate threshold."""
+    try:
+        from services import mailbox_registry
+    except Exception as exc:
+        return {"applied": False, "error": f"mailbox registry unavailable: {exc}"}
+
+    threshold_rows = _fetch(
+        "crm_settings",
+        {"key": "eq.mailbox_bounce_rate_threshold", "select": "value", "limit": "1"},
+    )
+    try:
+        threshold = float((threshold_rows[0] or {}).get("value") or 0.05) if threshold_rows else 0.05
+    except (ValueError, TypeError):
+        threshold = 0.05
+
+    paused: list[str] = []
+    errors: list[str] = []
+    for mbx in mailbox_registry.list_mailboxes(status="active"):
+        try:
+            rate = float(mbx.get("bounce_rate_7d") or 0)
+        except (ValueError, TypeError):
+            rate = 0.0
+        if rate < threshold:
+            continue
+        try:
+            mailbox_registry.update_mailbox(str(mbx["id"]), {"status": "paused"})
+            paused.append(str(mbx.get("email_address") or mbx["id"]))
+        except Exception as exc:
+            errors.append(f"{mbx.get('email_address')}: {exc}")
+    return {
+        "applied": bool(paused),
+        "paused": paused,
+        "errors": errors,
+        "threshold": threshold,
+    }
+
+
 FIXES: dict[str, Callable[[], dict[str, Any]]] = {
     "new_backlog": _fix_new_backlog,
     "scanning_orphans": _fix_scanning_orphans,
@@ -422,6 +624,9 @@ FIXES: dict[str, Callable[[], dict[str, Any]]] = {
     "ready_backlog": _fix_ready_backlog,
     "apollo_credits": _fix_apollo_credits,
     "legacy_zerobounce_softdrops": _fix_noop,
+    "no_active_mailboxes": _fix_noop,
+    "mailbox_caps_exhausted": _fix_noop,
+    "mailbox_high_bounce": _fix_mailbox_high_bounce,
 }
 
 
@@ -473,6 +678,9 @@ DIAGNOSERS: list[Callable[[], dict[str, Any]]] = [
     _diagnose_ready_backlog,
     _diagnose_apollo_credits,
     _diagnose_recent_zb_softdrops,
+    _diagnose_no_active_mailboxes,
+    _diagnose_mailbox_caps_exhausted,
+    _diagnose_mailbox_high_bounce,
 ]
 
 

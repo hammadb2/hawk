@@ -34,6 +34,7 @@ from routers import (
     crm_dashboard,
     crm_enterprise,
     crm_invite,
+    crm_mailboxes,
     crm_onboarding,
     crm_va,
     crm_payment,
@@ -58,6 +59,8 @@ from services.crm_apscheduler_jobs import (
     run_inbox_health_job,
     run_monday_briefing_job,
     run_monthly_reports_job,
+    run_mailbox_daily_reset_job,
+    run_mailbox_imap_poller_job,
     run_morning_dispatch_job,
     run_nightly_pipeline_job,
     run_onboarding_drip_job,
@@ -110,6 +113,10 @@ scheduler.add_job(run_rolling_dispatch_job, CronTrigger(hour="9-16", minute=5, t
 # scanned / ready / apollo credits) and auto-applies idempotent escape hatches.
 # Escalates critical buckets via CEO SMS.
 scheduler.add_job(run_pipeline_doctor_job, CronTrigger(minute="*/15", timezone=MST))
+# Mailbox-native dispatcher: poll IMAP inboxes for replies every 5 min and reset
+# per-mailbox daily send counters at midnight MST.
+scheduler.add_job(run_mailbox_imap_poller_job, CronTrigger(minute="*/5", timezone=MST))
+scheduler.add_job(run_mailbox_daily_reset_job, CronTrigger(hour=0, minute=0, timezone=MST))
 
 
 @asynccontextmanager
@@ -158,6 +165,7 @@ app.include_router(crm_dashboard.router)
 app.include_router(crm_settings_router.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
+app.include_router(crm_mailboxes.router)
 app.include_router(crm_onboarding.router)
 app.include_router(crm_va.router)
 app.include_router(crm_ai_command.router)

@@ -125,6 +125,13 @@ RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "HAWK Security <noreply@
 # Optional override; defaults to RESEND_FROM_EMAIL when empty
 RESEND_GUARANTEE_FROM = os.environ.get("RESEND_GUARANTEE_FROM", "").strip() or RESEND_FROM_EMAIL
 
+# Mailbox-native cold-outbound dispatcher (replaces Smartlead).
+# Fernet key (urlsafe base64, 32 bytes) used to encrypt per-mailbox SMTP/IMAP
+# passwords at rest. MUST be set in production; the backend will refuse to
+# decrypt stored credentials without it. Generate with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+MAILBOX_ENCRYPTION_KEY = os.environ.get("MAILBOX_ENCRYPTION_KEY", "").strip()
+
 # Cron (scheduled scans) — set to a secret; cron calls with X-Cron-Secret
 # Railway often uses CRON_SECRET; we accept that as an alias for HAWK_CRON_SECRET.
 CRON_SECRET = (

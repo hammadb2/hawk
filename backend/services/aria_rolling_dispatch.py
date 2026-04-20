@@ -2,19 +2,20 @@
 
 Runs every hour 9am-4pm MST (8 ticks), each tick dispatches the per-vertical
 catch-up quota so the 600/day target is spread across business hours rather
-than blasted at 6:30am. Primary source is `prospects` rows where
-`pipeline_status=ready` (set by `aria_post_scan_pipeline`), ordered by
-`hawk_score desc` so higher-signal leads go out first.
+than blasted at 6:30am. Primary source is ``prospects`` rows where
+``pipeline_status=ready`` (set by ``aria_post_scan_pipeline``), ordered by
+``hawk_score desc`` so higher-signal leads go out first.
 
-Design notes:
-- Quota is computed by COUNTING prospects with `dispatched_at >= today` per
-  vertical, so no separate counter table is needed and the count can't drift.
-- Each tick: remaining = DAILY_CAP - sent_today; per_tick = remaining /
-  remaining_ticks (ceil). Clamped to DAILY_CAP to avoid over-sends if a tick
-  is skipped.
-- Smartlead bulk upload reuses the helpers in `aria_morning_dispatch`.
-- DB-level stage guard on the final PATCH (same pattern as post-scan + SLA)
-  prevents regressing a prospect that a rep already advanced.
+v2 (Mailforge / native-SMTP) — Smartlead removed:
+- Each send goes out via one of the rows in ``crm_mailboxes`` (round-robin by
+  remaining daily capacity). Smartlead bulk upload is gone.
+- Per-mailbox daily caps ``crm_mailboxes.daily_cap`` enforce the real inbox
+  sending limits; the per-vertical 200/day quota is a coarser ceiling on top.
+- Each prospect stores ``sent_via_mailbox_id`` + ``sent_message_id`` so the
+  IMAP reply poller can thread replies back to the originating prospect.
+- ``smartlead_campaign_id`` is no longer required to dispatch a prospect —
+  the old gate blocked 800+ ready prospects indefinitely whenever the
+  per-vertical campaign id wasn't seeded in ``crm_settings``.
 """
 
 from __future__ import annotations
@@ -29,8 +30,10 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from config import SMARTLEAD_API_KEY, SUPABASE_URL
+from config import SUPABASE_URL
+from services import mailbox_registry
 from services.crm_bool_setting import fetch_crm_bool
+from services.mailbox_smtp_sender import send_via_mailbox
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +95,13 @@ def _count_sent_today(vertical: str) -> int:
 
 
 def _fetch_ready_prospects(vertical: str, limit: int) -> list[dict[str, Any]]:
+    """Fetch ready-to-send prospects. Note: smartlead_campaign_id filter removed."""
     if not SUPABASE_URL or limit <= 0:
         return []
     params = {
         "select": (
             "id,domain,company_name,contact_email,contact_name,contact_title,"
-            "email_subject,email_body,smartlead_campaign_id,hawk_score,"
+            "email_subject,email_body,hawk_score,"
             "vulnerability_found,city,province,industry,stage,pipeline_status"
         ),
         "pipeline_status": "eq.ready",
@@ -106,7 +110,6 @@ def _fetch_ready_prospects(vertical: str, limit: int) -> list[dict[str, Any]]:
         "contact_email": "not.is.null",
         "email_subject": "not.is.null",
         "email_body": "not.is.null",
-        "smartlead_campaign_id": "not.is.null",
         "order": "hawk_score.desc.nullslast,last_activity_at.asc",
         "limit": str(limit),
     }
@@ -124,60 +127,55 @@ def _fetch_ready_prospects(vertical: str, limit: int) -> list[dict[str, Any]]:
         return []
 
 
-def _to_morning_dispatch_lead(prospect: dict[str, Any]) -> dict[str, Any]:
-    """Adapt a prospect row to the dict shape `_bulk_upload_to_smartlead` expects."""
-    return {
-        "id": prospect["id"],
-        "contact_email": prospect.get("contact_email", ""),
-        "contact_name": prospect.get("contact_name") or "",
-        "business_name": prospect.get("company_name") or "",
-        "domain": prospect.get("domain") or "",
-        "vertical": prospect.get("industry") or "",
-        "city": prospect.get("city") or "",
-        "province": prospect.get("province") or "",
-        "hawk_score": prospect.get("hawk_score"),
-        "vulnerability_found": prospect.get("vulnerability_found") or "",
-        "email_subject": prospect.get("email_subject") or "",
-        "email_body": prospect.get("email_body") or "",
-    }
+def _contact_display_name(prospect: dict[str, Any]) -> str:
+    name = (prospect.get("contact_name") or "").strip()
+    if name:
+        return name
+    return (prospect.get("company_name") or "").strip()
 
 
-def _mark_prospects_dispatched(prospect_ids: list[str], campaign_id: str) -> int:
-    """Flip prospects to stage=sent_email + pipeline_status=dispatched with stage guard."""
-    if not prospect_ids or not SUPABASE_URL:
-        return 0
+def _mark_prospect_dispatched(
+    prospect_id: str,
+    *,
+    mailbox_id: str,
+    message_id: str,
+) -> bool:
+    """Flip a single prospect to stage=sent_email + record the mailbox + message id.
+
+    Stage-guarded PATCH so we never regress a row a rep already advanced.
+    """
+    if not SUPABASE_URL:
+        return False
     now_iso = datetime.now(timezone.utc).isoformat()
-    patch = {
+    message_id_clean = message_id.strip("<> ").strip()
+    domain = message_id_clean.split("@", 1)[1] if "@" in message_id_clean else None
+    patch: dict[str, Any] = {
         "stage": "sent_email",
         "pipeline_status": "dispatched",
         "dispatched_at": now_iso,
-        "smartlead_campaign_id": campaign_id or None,
         "last_activity_at": now_iso,
+        "sent_via_mailbox_id": mailbox_id,
+        "sent_message_id": message_id_clean,
     }
-    updated = 0
-    # Chunk to keep PostgREST `in.()` predicates reasonable.
-    for i in range(0, len(prospect_ids), 50):
-        chunk = prospect_ids[i : i + 50]
-        try:
-            r = httpx.patch(
-                f"{SUPABASE_URL}/rest/v1/prospects",
-                headers=_sb_headers(),
-                params={
-                    "id": f"in.({','.join(chunk)})",
-                    "stage": "in.(new,scanning,scanned)",
-                    "pipeline_status": "eq.ready",
-                },
-                json=patch,
-                timeout=20.0,
-            )
-            r.raise_for_status()
-            try:
-                updated += len(r.json() or [])
-            except Exception:
-                updated += len(chunk)
-        except Exception as exc:
-            logger.warning("rolling-dispatch mark-dispatched chunk failed: %s", exc)
-    return updated
+    if domain:
+        patch["sent_message_id_domain"] = domain
+    try:
+        r = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "id": f"eq.{prospect_id}",
+                "stage": "in.(new,scanning,scanned)",
+                "pipeline_status": "eq.ready",
+            },
+            json=patch,
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        return bool(r.json() or [])
+    except Exception as exc:
+        logger.warning("rolling-dispatch mark-dispatched %s failed: %s", prospect_id, exc)
+        return False
 
 
 def _quota_for_tick(vertical: str) -> tuple[int, int, int]:
@@ -191,6 +189,43 @@ def _quota_for_tick(vertical: str) -> tuple[int, int, int]:
     return sent, remaining, min(per_tick, remaining)
 
 
+def _dispatch_prospect(prospect: dict[str, Any], vertical: str) -> dict[str, Any]:
+    """Pick a mailbox + send + mark. Returns an outcome dict for the per-vertical stats."""
+    mailbox = mailbox_registry.pick_next_for_vertical(vertical)
+    if not mailbox:
+        return {"ok": False, "reason": "no_active_mailbox"}
+
+    mailbox_id = str(mailbox["id"])
+    result = send_via_mailbox(
+        mailbox_id,
+        to_email=str(prospect.get("contact_email") or ""),
+        to_name=_contact_display_name(prospect),
+        subject=str(prospect.get("email_subject") or ""),
+        body_text=str(prospect.get("email_body") or ""),
+        reply_to=None,
+    )
+    if not result.ok or not result.message_id:
+        return {
+            "ok": False,
+            "mailbox_id": mailbox_id,
+            "error": result.error or "unknown send error",
+            "was_bounce": result.was_bounce,
+            "was_auth_failure": result.was_auth_failure,
+        }
+
+    marked = _mark_prospect_dispatched(
+        str(prospect["id"]),
+        mailbox_id=mailbox_id,
+        message_id=result.message_id,
+    )
+    return {
+        "ok": True,
+        "mailbox_id": mailbox_id,
+        "message_id": result.message_id,
+        "marked": marked,
+    }
+
+
 def run_rolling_dispatch() -> dict[str, Any]:
     """Public entrypoint. Safe to invoke manually outside tick hours."""
     start = datetime.now(timezone.utc)
@@ -202,19 +237,27 @@ def run_rolling_dispatch() -> dict[str, Any]:
     }
     if not SUPABASE_URL or not SERVICE_KEY:
         return {**stats, "ok": False, "reason": "supabase not configured"}
-    if not SMARTLEAD_API_KEY:
-        return {**stats, "ok": False, "reason": "smartlead api key not configured"}
 
-    # Respect the global kill switch that morning-dispatch already honors.
-    from services.aria_morning_dispatch import (
-        _bulk_upload_to_smartlead,
-        _ensure_campaign_sequence,
-        _get_setting,
-    )
+    # Global kill switch + mailbox-dispatch feature flag.
+    from services.aria_morning_dispatch import _get_setting
 
     enabled = _get_setting("pipeline_dispatch_enabled", "true")
     if enabled.lower() not in ("true", "1", "yes"):
         return {**stats, "ok": False, "skipped": True, "reason": "pipeline_dispatch_enabled is false"}
+    mbx_on = _get_setting("mailbox_dispatch_enabled", "true")
+    if mbx_on.lower() not in ("true", "1", "yes"):
+        return {**stats, "ok": False, "skipped": True, "reason": "mailbox_dispatch_enabled is false"}
+
+    # Pre-flight: do we have any active mailboxes at all? If not, bail clean.
+    active_mailboxes = mailbox_registry.list_mailboxes(status="active")
+    if not active_mailboxes:
+        return {
+            **stats,
+            "ok": False,
+            "skipped": True,
+            "reason": "no_active_mailboxes",
+            "fix": "add mailboxes at /crm/settings/mailboxes",
+        }
 
     for vertical in VERTICALS:
         sent_today, remaining_today, quota = _quota_for_tick(vertical)
@@ -223,7 +266,7 @@ def run_rolling_dispatch() -> dict[str, Any]:
                 "sent_today": sent_today,
                 "remaining_today": remaining_today,
                 "quota": 0,
-                "uploaded": 0,
+                "sent": 0,
             }
             continue
 
@@ -233,51 +276,50 @@ def run_rolling_dispatch() -> dict[str, Any]:
                 "sent_today": sent_today,
                 "remaining_today": remaining_today,
                 "quota": quota,
-                "uploaded": 0,
+                "sent": 0,
                 "reason": "no ready prospects",
             }
             continue
 
-        # Split by campaign_id — each prospect already has its vertical's campaign
-        # resolved in aria_post_scan_pipeline, but we still group defensively in
-        # case settings changed mid-day and different prospects have different ids.
-        by_campaign: dict[str, list[dict[str, Any]]] = {}
-        for p in prospects:
-            cid = str(p.get("smartlead_campaign_id") or "")
-            if cid:
-                by_campaign.setdefault(cid, []).append(p)
-
-        v_uploaded_total = 0
-        v_breakdown: list[dict[str, Any]] = []
-        for campaign_id, group in by_campaign.items():
-            leads = [_to_morning_dispatch_lead(p) for p in group]
-            _ensure_campaign_sequence(campaign_id, leads)
-            uploaded = _bulk_upload_to_smartlead(campaign_id, leads)
-            uploaded_ids = [str(lead["id"]) for lead in uploaded if lead.get("id")]
-            # Only flip the stage + counter for leads Smartlead actually accepted.
-            marked = _mark_prospects_dispatched(uploaded_ids, campaign_id)
-            v_uploaded_total += marked
-            v_breakdown.append(
-                {
-                    "campaign_id": campaign_id,
-                    "attempted": len(leads),
-                    "uploaded": len(uploaded),
-                    "marked": marked,
-                }
-            )
+        sent = 0
+        failed = 0
+        bounced = 0
+        auth_failed = 0
+        capacity_exhausted = False
+        error_samples: list[str] = []
+        for prospect in prospects:
+            outcome = _dispatch_prospect(prospect, vertical)
+            if outcome.get("ok"):
+                sent += 1
+                continue
+            failed += 1
+            if outcome.get("reason") == "no_active_mailbox":
+                capacity_exhausted = True
+                # Stop the per-vertical tick early — we'll retry these prospects
+                # next tick once a mailbox rolls over or becomes available.
+                break
+            if outcome.get("was_bounce"):
+                bounced += 1
+            if outcome.get("was_auth_failure"):
+                auth_failed += 1
+            err = str(outcome.get("error") or "")
+            if err and len(error_samples) < 3:
+                error_samples.append(err[:200])
 
         stats["by_vertical"][vertical] = {
-            "sent_today": sent_today,
-            "remaining_today": remaining_today,
+            "sent_today": sent_today + sent,
+            "remaining_today": max(0, remaining_today - sent),
             "quota": quota,
-            "uploaded": v_uploaded_total,
-            "campaigns": v_breakdown,
+            "sent": sent,
+            "failed": failed,
+            "bounced": bounced,
+            "auth_failed": auth_failed,
+            "capacity_exhausted": capacity_exhausted,
+            "errors_sample": error_samples,
         }
-        stats["dispatched_total"] += v_uploaded_total
+        stats["dispatched_total"] += sent
 
-    # Route prospects past the automated-dispatch cap into the VA queue so the
-    # manual-outreach team can pick them up. We only do this after all ticks
-    # are done for the day (last tick at 4pm MST).
+    # Route overflow to VA queue after the last tick of the day (4pm MST).
     current_hour = datetime.now(MST).hour
     if current_hour >= DISPATCH_TICK_HOURS[-1]:
         va_routed = _route_overflow_to_va_queue()
@@ -289,11 +331,11 @@ def run_rolling_dispatch() -> dict[str, Any]:
 
 
 def _route_overflow_to_va_queue() -> dict[str, int]:
-    """Move `ready` prospects past the daily automated-dispatch cap into the
+    """Move ``ready`` prospects past the daily automated-dispatch cap into the
     VA queue so manual outreach can pick them up.
 
     Called at the end of the final dispatch tick of the day. Safe to call
-    repeatedly — it only targets `pipeline_status=ready` rows.
+    repeatedly — it only targets ``pipeline_status=ready`` rows.
     """
     out: dict[str, int] = {}
     if not fetch_crm_bool("va_queue_enabled", default=True):
@@ -301,8 +343,6 @@ def _route_overflow_to_va_queue() -> dict[str, int]:
     if not SUPABASE_URL or not SERVICE_KEY:
         return out
 
-    # Per-vertical excess = ready_count - remaining_today (already dispatched
-    # via the tick loop). Anything left above today's cap flips to va_queue.
     for vertical in VERTICALS:
         try:
             r = httpx.get(
@@ -327,8 +367,6 @@ def _route_overflow_to_va_queue() -> dict[str, int]:
             out[vertical] = 0
             continue
 
-        # Flip the lot — the 200/vertical quota already consumed what it
-        # needed earlier in the day.
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
             r = httpx.patch(

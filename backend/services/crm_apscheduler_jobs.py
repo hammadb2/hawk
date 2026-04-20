@@ -263,3 +263,29 @@ async def run_pipeline_doctor_job() -> None:
         )
     except Exception:
         logger.exception("scheduler job run_pipeline_doctor_job failed")
+
+
+async def run_mailbox_imap_poller_job() -> None:
+    """Every 5 min: poll active mailboxes' IMAP inboxes and flip replied prospects."""
+    try:
+        from services.mailbox_imap_poller import run_imap_reply_poll
+
+        result = await asyncio.to_thread(run_imap_reply_poll)
+        logger.info(
+            "scheduler job run_mailbox_imap_poller_job ok: replies=%s mailboxes=%s",
+            result.get("replies_detected"),
+            result.get("mailboxes_polled"),
+        )
+    except Exception:
+        logger.exception("scheduler job run_mailbox_imap_poller_job failed")
+
+
+async def run_mailbox_daily_reset_job() -> None:
+    """Midnight MST: reset per-mailbox sent_today counters (stale-date rollover)."""
+    try:
+        from services import mailbox_registry
+
+        result = await asyncio.to_thread(mailbox_registry.reset_daily_counters)
+        logger.info("scheduler job run_mailbox_daily_reset_job ok: reset=%s", result)
+    except Exception:
+        logger.exception("scheduler job run_mailbox_daily_reset_job failed")
