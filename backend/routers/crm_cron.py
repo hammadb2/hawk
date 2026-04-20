@@ -182,7 +182,7 @@ def run_stale_pipeline_cron_internal() -> dict:
         timeout=45.0,
     )
     r.raise_for_status()
-    stale_stages = {"call_booked", "proposal_sent"}
+    stale_stages = {"call_booked"}
     rows = [x for x in (r.json() or []) if x.get("stage") in stale_stages]
     base = CRM_PUBLIC_BASE_URL.rstrip("/")
     sent = 0

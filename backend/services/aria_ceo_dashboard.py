@@ -82,7 +82,7 @@ def get_dashboard_data() -> dict[str, Any]:
 
     # Pipeline metrics
     prospect_stages = {}
-    for stage in ["new", "scanned", "loom_sent", "replied", "call_booked", "proposal_sent", "closed_won", "lost"]:
+    for stage in ["new", "scanned", "sent_email", "replied", "call_booked", "closed_won", "lost"]:
         prospect_stages[stage] = _count_rows("prospects", {"stage": f"eq.{stage}"})
 
     total_prospects = sum(prospect_stages.values())

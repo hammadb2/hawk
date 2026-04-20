@@ -167,8 +167,8 @@ def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
     """Mark prospect stage=lost + pipeline_status=suppressed, insert suppressions row.
 
     Only applies the stage change if the prospect is still at ``new`` or
-    ``scanned`` — we never regress a rep-advanced prospect (loom_sent,
-    replied, call_booked, proposal_sent, closed_won).
+    ``scanned`` — we never regress a rep-advanced prospect (sent_email,
+    replied, call_booked, closed_won).
     """
     try:
         httpx.patch(
