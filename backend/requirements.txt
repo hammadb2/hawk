@@ -21,3 +21,7 @@ python-dotenv>=1.0.0
 apscheduler>=3.10.0
 sentry-sdk[fastapi]>=2.0.0
 python-whois>=0.9.4
+# Mailbox-native cold-outbound dispatcher (replaces Smartlead).
+aiosmtplib>=3.0.1
+cryptography>=42.0.0
+

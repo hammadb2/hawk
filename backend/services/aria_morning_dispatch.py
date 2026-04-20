@@ -1,9 +1,14 @@
 """
-ARIA Morning Dispatch — loads 'ready' leads from aria_lead_inventory into Smartlead campaigns.
+ARIA Morning Dispatch — legacy Smartlead bulk-upload entrypoint.
 
-Runs at 6:30am MST via POST /api/crm/cron/morning-dispatch.
-Assigns leads to vertical-specific campaigns, bulk uploads to Smartlead with time zone scheduling.
-Target: complete within 5 minutes.
+Deprecated after migration to the mailbox-native SMTP dispatcher (see
+``aria_rolling_dispatch``). ``run_morning_dispatch`` is kept as a thin
+delegator that invokes the rolling dispatcher so any existing scheduler or
+cron hook that still calls it won't break and still drives real sends.
+
+The Smartlead helpers (``_bulk_upload_to_smartlead``, ``_ensure_campaign``,
+``_ensure_campaign_sequence``) remain importable for the ``aria_prospect_pipeline``
+sync hook but are no longer on the outbound hot path.
 """
 
 from __future__ import annotations
@@ -257,88 +262,17 @@ def _ensure_campaign_sequence(
 # ── Morning Dispatch Orchestrator ───────────────────────────────────────
 
 def run_morning_dispatch() -> dict[str, Any]:
+    """Deprecated — delegates to the mailbox-native rolling dispatcher.
+
+    The old 6:30am Smartlead bulk-upload is gone; instead we simply run one
+    rolling-dispatch tick so the day gets started early. Kept under the same
+    name so existing scheduler + cron hooks keep working.
     """
-    Execute the morning dispatch:
-    1. Pull 'ready' leads from aria_lead_inventory ordered by score
-    2. Group by vertical
-    3. Ensure campaigns exist for each vertical
-    4. Bulk upload to Smartlead with scheduled send times
-    5. Mark as 'dispatched'
+    from services.aria_rolling_dispatch import run_rolling_dispatch
 
-    Target: complete within 5 minutes.
-    """
-    from services.aria_lead_inventory import get_ready_leads, mark_leads_dispatched
-
-    start_time = datetime.now(timezone.utc)
-    stats: dict[str, Any] = {
-        "ok": True,
-        "dispatched_total": 0,
-        "by_vertical": {},
-        "duration_seconds": 0,
-    }
-
-    # Check if dispatch is enabled
-    enabled = _get_setting("pipeline_dispatch_enabled", "true")
-    if enabled.lower() not in ("true", "1", "yes"):
-        return {**stats, "ok": False, "skipped": True, "reason": "pipeline_dispatch_enabled is false"}
-
-    daily_limit = int(_get_setting("daily_send_limit", "600"))
-
-    try:
-        # Pull all ready leads
-        leads = get_ready_leads(limit=daily_limit)
-        if not leads:
-            return {**stats, "message": "No leads ready for dispatch"}
-
-        # Group by vertical
-        by_vertical: dict[str, list[dict[str, Any]]] = {}
-        for lead in leads:
-            v = lead.get("vertical", "dental")
-            by_vertical.setdefault(v, []).append(lead)
-
-        for vertical, v_leads in by_vertical.items():
-            campaign_id = _ensure_campaign(vertical)
-            if not campaign_id:
-                logger.error("No campaign for vertical=%s — skipping %d leads", vertical, len(v_leads))
-                stats["by_vertical"][vertical] = {"error": "no_campaign", "count": len(v_leads)}
-                continue
-
-            # Ensure campaign has a sequence template
-            _ensure_campaign_sequence(campaign_id, v_leads)
-
-            # Bulk upload
-            uploaded_leads = _bulk_upload_to_smartlead(campaign_id, v_leads)
-
-            # Mark only actually-uploaded leads as dispatched
-            lead_ids = [lead["id"] for lead in uploaded_leads if lead.get("id")]
-            dispatched = mark_leads_dispatched(lead_ids, campaign_id)
-
-            try:
-                from services.aria_prospect_pipeline import sync_prospect_smartlead_morning
-
-                for inv_lead in uploaded_leads:
-                    sync_prospect_smartlead_morning(inv_lead.get("domain", ""), str(campaign_id))
-            except Exception as exc:
-                logger.debug("Prospect Smartlead sync skipped: %s", exc)
-
-            stats["by_vertical"][vertical] = {
-                "campaign_id": campaign_id,
-                "uploaded": len(uploaded_leads),
-                "dispatched": dispatched,
-            }
-            stats["dispatched_total"] += dispatched
-
-    except Exception as exc:
-        logger.exception("Morning dispatch failed: %s", exc)
-        stats["ok"] = False
-        stats["error"] = str(exc)[:1000]
-
-    stats["duration_seconds"] = int((datetime.now(timezone.utc) - start_time).total_seconds())
-    logger.info("Morning dispatch complete: %s", json.dumps(stats))
-
-    # Send CEO SMS
+    stats = run_rolling_dispatch()
+    stats["delegated_from"] = "morning_dispatch"
     _send_dispatch_summary_sms(stats)
-
     return stats
 
 
@@ -349,8 +283,12 @@ def _send_dispatch_summary_sms(stats: dict[str, Any]) -> None:
 
         total = stats.get("dispatched_total", 0)
         by_vert = stats.get("by_vertical", {})
-        parts = [f"{v}: {d.get('dispatched', 0)}" for v, d in by_vert.items() if isinstance(d, dict)]
-        msg = f"ARIA dispatch complete. {total} leads loaded.\n" + ", ".join(parts)
+        parts = [
+            f"{v}: {d.get('sent', d.get('dispatched', 0))}"
+            for v, d in by_vert.items()
+            if isinstance(d, dict)
+        ]
+        msg = f"ARIA dispatch complete. {total} emails sent.\n" + ", ".join(parts)
         send_ceo_sms(msg)
     except Exception:
         logger.exception("Dispatch summary SMS failed")
