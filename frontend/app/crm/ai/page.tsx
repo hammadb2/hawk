@@ -311,39 +311,52 @@ export default function AiCommandCenterPage() {
   }
 
   return (
-    <div className="flex max-h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden bg-crmBg lg:flex-row lg:items-stretch lg:overflow-hidden">
-      <aside className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r border-crmBorder bg-crmSurface lg:flex lg:h-full lg:max-h-full">
-        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder px-4 py-3">
-          <h2 className="text-sm font-semibold text-white">Conversations</h2>
+    <div className="flex h-full max-h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-crmBorder bg-crmBg shadow-xl shadow-black/20 lg:flex-row lg:items-stretch">
+      <aside className="hidden min-h-0 w-72 shrink-0 flex-col overflow-hidden border-b border-crmBorder bg-crmSurface lg:flex lg:h-full lg:max-h-full lg:border-b-0 lg:border-r">
+        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder px-4 py-4">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Conversations</h2>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {conversations.length} total
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => void createConversation()}
-            className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-emerald-500"
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow shadow-emerald-900/30 transition hover:bg-emerald-500"
           >
-            + New
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2">
           {loadingConvs ? (
-            <div className="flex justify-center py-4">
+            <div className="flex justify-center py-6">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
             </div>
           ) : conversations.length === 0 ? (
-            <p className="px-2 py-4 text-center text-xs text-slate-500">No conversations yet.</p>
+            <div className="px-3 py-8 text-center">
+              <p className="text-xs text-slate-500">No conversations yet.</p>
+              <p className="mt-1 text-[11px] text-slate-600">Click “New” to start chatting with ARIA.</p>
+            </div>
           ) : (
             conversations.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => selectConversation(c.id)}
-                className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                className={`group w-full rounded-xl px-3 py-2.5 text-left text-sm transition ${
                   activeConvId === c.id
-                    ? "border border-emerald-500/30 bg-emerald-500/15 font-medium text-emerald-400"
-                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    ? "border border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-300 shadow-sm shadow-emerald-900/10"
+                    : "border border-transparent text-slate-400 hover:border-crmBorder hover:bg-white/5 hover:text-slate-100"
                 }`}
               >
                 <p className="truncate">{c.title}</p>
-                <p className="text-xs text-slate-500">{new Date(c.updated_at).toLocaleDateString()}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {new Date(c.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </p>
               </button>
             ))
           )}
@@ -351,14 +364,32 @@ export default function AiCommandCenterPage() {
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-h-0 lg:h-full">
-        <div className="flex shrink-0 items-center justify-between border-b border-crmBorder bg-crmSurface px-4 py-3">
-          <div>
-            <h1 className="text-sm font-semibold text-white">ARIA</h1>
-            <p className="text-xs text-slate-500">
-              {profile?.role === "ceo"
-                ? "Full access — all commands available"
-                : `${profile?.role_type || profile?.role || ""} access`}
-            </p>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-crmBorder bg-gradient-to-r from-crmSurface via-crmSurface to-crmSurface2 px-5 py-3.5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30">
+              <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-semibold text-white">ARIA</h1>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/30">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                  Online
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                {profile?.role === "ceo"
+                  ? "Full access — all commands available"
+                  : `${profile?.role_type || profile?.role || ""} access`}
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -371,9 +402,9 @@ export default function AiCommandCenterPage() {
 
         <div
           ref={messagesScrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-crmBg px-4 py-6"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-crmBg px-4 py-6 sm:px-6"
         >
-          <div className="mx-auto max-w-3xl space-y-4">
+          <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-4">
             {/* Unread briefing banner */}
             {visibleBriefings.map((briefing) => (
               <div key={briefing.id} className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
@@ -402,23 +433,25 @@ export default function AiCommandCenterPage() {
               </div>
             ))}
             {messages.length === 0 && (
-              <div className="py-12 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 ring-2 ring-emerald-500/30">
-                  <svg className="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
+                <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/25 to-emerald-600/10 ring-1 ring-emerald-500/40">
+                  <svg className="h-10 w-10 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={1.5}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                     />
                   </svg>
                 </div>
-                <h2 className="text-lg font-semibold text-white">ARIA</h2>
-                <p className="mt-1 text-xs font-medium text-emerald-400">Automated Revenue & Intelligence Assistant</p>
-                <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+                <h2 className="text-xl font-semibold tracking-tight text-white">Meet ARIA</h2>
+                <p className="mt-1 text-xs font-medium uppercase tracking-wider text-emerald-400">
+                  Automated Revenue & Intelligence Assistant
+                </p>
+                <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-slate-400">
                   Your chief of staff. I run pipelines, pull reports, analyze data, generate documents, and monitor the business 24/7.
                 </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-2">
+                <div className="mt-7 grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
                   {[
                     "Show pipeline funnel chart",
                     "Compare revenue this week vs last",
@@ -432,25 +465,48 @@ export default function AiCommandCenterPage() {
                       onClick={() => {
                         setInput(suggestion);
                       }}
-                      className="rounded-lg border border-crmBorder bg-crmSurface px-3 py-2 text-xs text-slate-300 transition hover:border-emerald-500/40 hover:text-emerald-400"
+                      className="group flex items-center justify-between rounded-xl border border-crmBorder bg-crmSurface px-4 py-3 text-left text-sm text-slate-300 transition hover:-translate-y-0.5 hover:border-emerald-500/40 hover:bg-crmSurface2 hover:text-white hover:shadow-lg hover:shadow-emerald-900/10"
                     >
-                      {suggestion}
+                      <span>{suggestion}</span>
+                      <svg
+                        className="h-4 w-4 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-emerald-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </button>
                   ))}
                 </div>
               </div>
             )}
             {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                key={i}
+                className={`flex items-start gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {msg.role !== "user" && (
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.8}
+                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                )}
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                     msg.role === "user"
-                      ? "border border-emerald-500/25 bg-emerald-950/50 text-slate-100"
-                      : "border border-crmBorder border-l-4 border-l-emerald-500 bg-crmSurface text-slate-200"
+                      ? "rounded-tr-md bg-emerald-600/90 text-white shadow-emerald-900/20"
+                      : "rounded-tl-md border border-crmBorder bg-crmSurface text-slate-200 shadow-black/20"
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <div className="mb-1 flex items-center gap-1">
+                    <div className="mb-1 flex items-center gap-1.5">
                       <p className="text-xs font-semibold text-emerald-400">ARIA</p>
                       {session?.access_token && msg.content && (
                         <VoiceOutput text={msg.content} accessToken={session.access_token} />
@@ -498,13 +554,23 @@ export default function AiCommandCenterPage() {
               </div>
             ))}
             {sending && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl border border-crmBorder border-l-4 border-l-emerald-500 bg-crmSurface px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
+                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <div className="rounded-2xl rounded-tl-md border border-crmBorder bg-crmSurface px-4 py-3 shadow-sm shadow-black/20">
                   <p className="mb-1 text-xs font-semibold text-emerald-400">ARIA</p>
                   <div className="flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "150ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "300ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400/60" style={{ animationDelay: "0ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400/60" style={{ animationDelay: "150ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400/60" style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -525,60 +591,68 @@ export default function AiCommandCenterPage() {
           </div>
         )}
 
-        <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-4">
-          <div className="mx-auto flex max-w-3xl gap-2">
-            {session?.access_token && (
-              <VoiceInput
-                accessToken={session.access_token}
-                onTranscription={(text) => setInput(text)}
-                disabled={sending}
+        <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-4 sm:px-6">
+          <div className="mx-auto max-w-3xl">
+            <div className="flex items-center gap-2 rounded-2xl border border-crmBorder bg-crmSurface2 px-2 py-2 shadow-inner shadow-black/20 transition focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/30">
+              {session?.access_token && (
+                <VoiceInput
+                  accessToken={session.access_token}
+                  onTranscription={(text) => setInput(text)}
+                  disabled={sending}
+                />
+              )}
+              {session?.access_token && (
+                <FileUpload
+                  accessToken={session.access_token}
+                  onAnalysis={(result) => {
+                    setMessages((prev) => [
+                      ...prev,
+                      { role: "user", content: `Analyze file: ${result.filename}` },
+                      { role: "assistant", content: result.analysis },
+                    ]);
+                  }}
+                  disabled={sending}
+                />
+              )}
+              {canRunPipeline && (
+                <button
+                  type="button"
+                  onClick={() => setShowPipelineTrigger(!showPipelineTrigger)}
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+                    showPipelineTrigger
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                      : "border-transparent text-slate-400 hover:bg-white/5 hover:text-emerald-400"
+                  }`}
+                  title="Run outbound pipeline"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </button>
+              )}
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
+                placeholder="Ask ARIA anything…"
+                className="flex-1 bg-transparent px-2 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
               />
-            )}
-            {session?.access_token && (
-              <FileUpload
-                accessToken={session.access_token}
-                onAnalysis={(result) => {
-                  setMessages((prev) => [
-                    ...prev,
-                    { role: "user", content: `Analyze file: ${result.filename}` },
-                    { role: "assistant", content: result.analysis },
-                  ]);
-                }}
-                disabled={sending}
-              />
-            )}
-            {canRunPipeline && (
               <button
                 type="button"
-                onClick={() => setShowPipelineTrigger(!showPipelineTrigger)}
-                className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
-                  showPipelineTrigger
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
-                    : "border-crmBorder bg-crmSurface2 text-slate-400 hover:border-emerald-500/40 hover:text-emerald-400"
-                }`}
-                title="Run outbound pipeline"
+                onClick={() => void sendMessage()}
+                disabled={sending || !input.trim()}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow shadow-emerald-900/30 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <span>Send</span>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m0 0l-6-6m6 6l-6 6" />
                 </svg>
               </button>
-            )}
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
-              placeholder="Ask ARIA anything..."
-              className="flex-1 rounded-xl border border-crmBorder bg-crmSurface2 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
-            />
-            <button
-              type="button"
-              onClick={() => void sendMessage()}
-              disabled={sending || !input.trim()}
-              className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-            >
-              Send
-            </button>
+            </div>
+            <p className="mt-2 text-center text-[11px] text-slate-500">
+              Press <kbd className="rounded border border-crmBorder bg-crmSurface2 px-1 font-mono text-[10px] text-slate-400">Enter</kbd> to send. ARIA can make mistakes — review actions before confirming.
+            </p>
           </div>
         </div>
       </div>
