@@ -24,7 +24,14 @@ type Listener = (n: number) => void;
 let signalCounter = 0;
 const listeners = new Set<Listener>();
 
+/** Collapse rapid-fire emits (e.g. focus + visibilitychange both firing on tab return) into one. */
+const EMIT_DEBOUNCE_MS = 200;
+let lastEmitAt = 0;
+
 function emit() {
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  if (now - lastEmitAt < EMIT_DEBOUNCE_MS) return;
+  lastEmitAt = now;
   signalCounter += 1;
   listeners.forEach((fn) => {
     try {
