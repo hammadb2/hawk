@@ -14,7 +14,6 @@ Actors 2-4 run in async batches of 50 for leads still missing emails.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import re
@@ -31,11 +30,9 @@ APIFY_BASE = "https://api.apify.com/v2"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
-# Actor IDs
+# Actor IDs — only Actor 1 (Google Maps) is still used. Actors 2/3/4 have
+# been retired in favour of Apollo contact enrichment (cheaper + verified).
 ACTOR_GOOGLE_MAPS = "compass/crawler-google-places"
-ACTOR_LINKEDIN = "dev_fusion/linkedin-profile-scraper"
-ACTOR_LEADS_FINDER = "code_crafter/leads-finder"
-ACTOR_WEBSITE_CRAWLER = "vdrmota/contact-info-scraper"
 
 
 def _actor_path(actor_id: str) -> str:
@@ -219,19 +216,9 @@ def _extract_place_website(item: dict[str, Any]) -> str:
 # Major cities for scoring bonus
 MAJOR_CITIES = {"toronto", "vancouver", "calgary", "edmonton", "ottawa"}
 
-# Decision-maker titles for LinkedIn / Leads Finder
-DECISION_MAKER_TITLES = [
-    "owner", "principal", "managing partner", "practice manager",
-    "dentist", "lawyer", "accountant", "CPA", "director",
-]
-
-# Preferred email prefixes for website crawl (Actor 4)
-PREFERRED_EMAIL_PREFIXES = ["owner", "info", "contact", "hello", "admin"]
-
-# Polling config
+# Polling config (Actor 1 Google Maps only)
 APIFY_POLL_INTERVAL = 10  # seconds
 APIFY_MAX_WAIT = 900  # 15 minutes max per actor run
-BATCH_SIZE = 50  # parallel batch size for actors 2-4
 
 # Concurrency + memory tuning to stay inside an Apify plan's memory budget.
 # On the FREE plan the total memory across all concurrent actor runs is 8192MB
@@ -599,273 +586,58 @@ async def run_actor1_google_maps(
     return deduped
 
 
-# ── Actor 2: Mass LinkedIn Profile Scraper with Email ─────────────────────
+
+# ── Apollo contact enrichment (replaces Apify actors 2/3/4) ──────────────
 
 
-async def _run_linkedin_batch(
-    client: httpx.AsyncClient,
-    sem: asyncio.Semaphore,
-    leads_batch: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Run Actor 2 for a batch of up to 50 leads. Returns domain→contact mapping."""
-    async with sem:
-        # Build search queries from company name + domain
-        search_queries = []
-        for lead in leads_batch:
-            company = lead.get("business_name", "")
-            domain = lead.get("domain", "")
-            search_queries.append(f"{company} {domain}")
-
-        run_input = {
-            "searchQueries": search_queries,
-            "titleFilter": DECISION_MAKER_TITLES,
-            "maxResults": len(leads_batch),
-        }
-
-        items = await _run_actor_and_get_results(client, ACTOR_LINKEDIN, run_input, max_wait=APIFY_MAX_WAIT)
-
-        # Map results back to domains
-        results: dict[str, dict[str, Any]] = {}
-        for item in items:
-            email = (item.get("email") or "").lower().strip()
-            first_name = (item.get("firstName") or item.get("first_name") or "").strip()
-            last_name = (item.get("lastName") or item.get("last_name") or "").strip()
-            title = (item.get("title") or item.get("headline") or "").strip()
-            linkedin_url = (item.get("linkedInUrl") or item.get("profileUrl") or item.get("url") or "").strip()
-            company_name = (item.get("companyName") or item.get("company") or "").strip()
-
-            # Try to match back to a lead by company name
-            for lead in leads_batch:
-                lead_company = (lead.get("business_name") or "").lower()
-                if lead_company and company_name and lead_company in company_name.lower():
-                    domain = lead["domain"]
-                    if domain not in results:
-                        results[domain] = {
-                            "email": email,
-                            "first_name": first_name,
-                            "last_name": last_name,
-                            "title": title,
-                            "linkedin_url": linkedin_url,
-                            "source": "linkedin",
-                        }
-                    break
-
-        return results
-
-
-async def run_actor2_linkedin(
+async def apollo_enrich_leads(
     leads: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Run Actor 2 for leads missing emails. Returns domain→contact mapping."""
-    if not os.environ.get("APIFY_API_KEY", "").strip():
-        return {}
+    """Enrich discovery leads with verified decision-maker contacts via Apollo.
 
-    needs_email = [ld for ld in leads if not ld.get("emails_from_website")]
+    For every lead that doesn't already have an email from Actor 1, resolve a
+    decision-maker (owner / managing partner / principal dentist / etc.) with
+    a verified email, first/last name, title, phone, and LinkedIn URL via a
+    single ``mixed_people/search`` call per domain. Concurrency-bounded so we
+    don't flatten Apollo's rate limit.
 
-    if not needs_email:
-        logger.info("Actor 2 skipped — all leads already have emails from websites")
-        return {}
-
-    logger.info("Actor 2: finding decision makers for %d leads via LinkedIn", len(needs_email))
-
-    sem = asyncio.Semaphore(APIFY_BATCH_CONCURRENCY)  # stays under plan memory budget
-    all_results: dict[str, dict[str, Any]] = {}
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        batches = [needs_email[i:i + BATCH_SIZE] for i in range(0, len(needs_email), BATCH_SIZE)]
-        tasks = [_run_linkedin_batch(client, sem, batch) for batch in batches]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("LinkedIn batch failed: %s", result)
-                continue
-            all_results.update(result)
-
-    logger.info("Actor 2 complete: found contacts for %d/%d leads", len(all_results), len(needs_email))
-    return all_results
-
-
-# ── Actor 3: Leads Finder (database fallback) ────────────────────────────
-
-
-async def run_actor3_leads_finder(
-    leads: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Run Actor 3 for leads still missing emails. Returns domain→contact mapping."""
-    if not os.environ.get("APIFY_API_KEY", "").strip():
-        return {}
+    Returns ``{domain: contact_dict}`` where contact_dict matches the shape
+    the previous actor 2/3/4 wrappers produced (``email``, ``first_name``,
+    ``last_name``, ``title``, ``linkedin_url``, ``source``).
+    """
+    from services.apollo_enrichment import enrich_single_domain
 
     needs_email = [ld for ld in leads if not ld.get("_email_found")]
-
     if not needs_email:
-        logger.info("Actor 3 skipped — all leads already have emails")
         return {}
 
-    # Group by vertical for more targeted searches
-    by_vertical: dict[str, list[dict[str, Any]]] = {}
-    for ld in needs_email:
-        v = ld.get("vertical", "dental")
-        by_vertical.setdefault(v, []).append(ld)
+    sem = asyncio.Semaphore(max(1, APIFY_BATCH_CONCURRENCY))
 
-    logger.info("Actor 3: searching contact database for %d leads across %d verticals",
-                len(needs_email), len(by_vertical))
+    async def _enrich(lead: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+        async with sem:
+            try:
+                hit = await enrich_single_domain(
+                    domain=lead.get("domain") or "",
+                    vertical=lead.get("vertical") or "dental",
+                    company_name=lead.get("business_name") or lead.get("company_name") or "",
+                    city=lead.get("city") or None,
+                    province=lead.get("province") or None,
+                )
+                return (lead.get("domain") or "").strip().lower(), hit
+            except Exception as exc:
+                logger.warning(
+                    "apollo enrich_single_domain domain=%s failed: %s",
+                    lead.get("domain"), exc,
+                )
+                return (lead.get("domain") or "").strip().lower(), None
 
-    all_results: dict[str, dict[str, Any]] = {}
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        for vertical, v_leads in by_vertical.items():
-            run_input = {
-                "job_title": " OR ".join(DECISION_MAKER_TITLES),
-                "location": "Canada",
-                "industry": vertical,
-                "number_of_leads": min(len(v_leads) * 2, 1000),  # fetch extra to improve match rate
-            }
-
-            items = await _run_actor_and_get_results(client, ACTOR_LEADS_FINDER, run_input, max_wait=APIFY_MAX_WAIT)
-
-            # Build domain index from results
-            for item in items:
-                email = (item.get("email") or "").lower().strip()
-                if not email or "@" not in email:
-                    continue
-                item_domain = _normalize_domain(item.get("website") or item.get("domain") or "")
-                # Also try extracting domain from email
-                if not item_domain and email:
-                    item_domain = email.split("@")[-1]
-
-                if not item_domain:
-                    continue
-
-                first_name = (item.get("first_name") or item.get("firstName") or "").strip()
-                last_name = (item.get("last_name") or item.get("lastName") or "").strip()
-                title = (item.get("title") or item.get("job_title") or "").strip()
-                linkedin_url = (item.get("linkedin_url") or item.get("linkedinUrl") or "").strip()
-
-                # Match against our leads
-                for ld in v_leads:
-                    if ld["domain"] == item_domain and ld["domain"] not in all_results:
-                        all_results[ld["domain"]] = {
-                            "email": email,
-                            "first_name": first_name,
-                            "last_name": last_name,
-                            "title": title,
-                            "linkedin_url": linkedin_url,
-                            "source": "leads_finder",
-                        }
-                        break
-
-    logger.info("Actor 3 complete: found contacts for %d/%d leads", len(all_results), len(needs_email))
-    return all_results
-
-
-# ── Actor 4: Website Email Crawler (last resort) ─────────────────────────
-
-
-async def _run_website_crawl_batch(
-    client: httpx.AsyncClient,
-    sem: asyncio.Semaphore,
-    leads_batch: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Run Actor 4 for a batch of leads. Returns domain→contact mapping."""
-    async with sem:
-        start_urls = [{"url": f"https://{ld['domain']}"} for ld in leads_batch]
-
-        run_input = {
-            "startUrls": start_urls,
-            "maxDepth": 2,
-            "maxPagesPerCrawl": 10,
-        }
-
-        items = await _run_actor_and_get_results(client, ACTOR_WEBSITE_CRAWLER, run_input, max_wait=APIFY_MAX_WAIT)
-
-        results: dict[str, dict[str, Any]] = {}
-        for item in items:
-            emails_found: list[str] = []
-
-            # Website / contact scrapers return emails in various formats
-            for field in ("emails", "emailAddresses", "email", "contactEmails", "foundEmails"):
-                val = item.get(field)
-                if isinstance(val, str) and "@" in val:
-                    emails_found.append(val.lower().strip())
-                elif isinstance(val, list):
-                    for e in val:
-                        if isinstance(e, str) and "@" in e:
-                            emails_found.append(e.lower().strip())
-
-            if not emails_found:
-                continue
-
-            # Determine which domain this result belongs to
-            page_url = item.get("url") or item.get("pageUrl") or ""
-            crawl_domain = _normalize_domain(page_url)
-            if not crawl_domain:
-                continue
-
-            # Find matching lead
-            matched_domain = None
-            for ld in leads_batch:
-                if ld["domain"] == crawl_domain or crawl_domain.endswith("." + ld["domain"]):
-                    matched_domain = ld["domain"]
-                    break
-
-            if not matched_domain or matched_domain in results:
-                continue
-
-            # Pick best email: prefer those with preferred prefixes
-            best_email = emails_found[0]
-            for prefix in PREFERRED_EMAIL_PREFIXES:
-                for em in emails_found:
-                    if em.split("@")[0] == prefix:
-                        best_email = em
-                        break
-                else:
-                    continue
-                break
-
-            results[matched_domain] = {
-                "email": best_email,
-                "first_name": "",
-                "last_name": "",
-                "title": "",
-                "linkedin_url": "",
-                "source": "website_crawl",
-            }
-
-        return results
-
-
-async def run_actor4_website_crawl(
-    leads: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Run Actor 4 for leads still missing emails. Returns domain→contact mapping."""
-    if not os.environ.get("APIFY_API_KEY", "").strip():
-        return {}
-
-    needs_email = [ld for ld in leads if not ld.get("_email_found")]
-
-    if not needs_email:
-        logger.info("Actor 4 skipped — all leads already have emails")
-        return {}
-
-    logger.info("Actor 4: crawling %d websites for email addresses", len(needs_email))
-
-    sem = asyncio.Semaphore(APIFY_BATCH_CONCURRENCY)  # stays under plan memory budget
-    all_results: dict[str, dict[str, Any]] = {}
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        batches = [needs_email[i:i + BATCH_SIZE] for i in range(0, len(needs_email), BATCH_SIZE)]
-        tasks = [_run_website_crawl_batch(client, sem, batch) for batch in batches]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning("Website crawl batch failed: %s", result)
-                continue
-            all_results.update(result)
-
-    logger.info("Actor 4 complete: found emails for %d/%d leads", len(all_results), len(needs_email))
-    return all_results
+    results = await asyncio.gather(*[_enrich(ld) for ld in needs_email])
+    out: dict[str, dict[str, Any]] = {}
+    for domain, hit in results:
+        if domain and hit and hit.get("email"):
+            out[domain] = hit
+    logger.info("Apollo enrichment: found contacts for %d/%d leads", len(out), len(needs_email))
+    return out
 
 
 # ── Deduplication & Suppression ───────────────────────────────────────────
@@ -909,194 +681,67 @@ async def deduplicate_leads(leads: list[dict[str, Any]]) -> list[dict[str, Any]]
     return leads
 
 
-# ── Email merge and priority logic ────────────────────────────────────────
+
+# ── Email merge (Actor 1 website email + Apollo fallback) ────────────────
 
 
 def _merge_emails(
     leads: list[dict[str, Any]],
     actor1_emails: dict[str, list[str]],
-    actor2_results: dict[str, dict[str, Any]],
-    actor3_results: dict[str, dict[str, Any]],
-    actor4_results: dict[str, dict[str, Any]],
+    apollo_results: dict[str, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Merge email results from all 4 actors using priority order.
+    """Merge emails from Actor 1 (website-exposed) + Apollo (decision-maker).
 
-    Priority:
-    1. Actor 1 website email (found on their site, highest confidence)
-    2. Actor 2 LinkedIn email (verified decision maker)
-    3. Actor 3 Leads Finder email (database verified)
-    4. Actor 4 crawled email (scraped from website)
+    Priority order:
+    1. Actor 1 website email (already on the public website, highest trust)
+    2. Apollo decision-maker email (verified in Apollo's contact DB)
 
     Returns (leads_with_email, leads_without_email).
     """
     with_email: list[dict[str, Any]] = []
     without_email: list[dict[str, Any]] = []
-
     for lead in leads:
-        domain = lead["domain"]
+        domain = (lead.get("domain") or "").lower()
         email = ""
         contact_name = ""
         contact_title = ""
+        phone = ""
+        linkedin_url = ""
         email_finder = ""
 
-        # Priority 1: Actor 1 website emails
-        a1_emails = actor1_emails.get(domain, [])
-        if a1_emails:
-            email = a1_emails[0]
+        a1 = actor1_emails.get(domain) or []
+        if a1:
+            email = a1[0]
             email_finder = "google_maps_website"
 
-        # Priority 2: Actor 2 LinkedIn
         if not email:
-            a2 = actor2_results.get(domain)
-            if a2 and a2.get("email"):
-                email = a2["email"]
-                contact_name = f"{a2.get('first_name', '')} {a2.get('last_name', '')}".strip()
-                contact_title = a2.get("title", "")
-                email_finder = "linkedin"
-
-        # Priority 3: Actor 3 Leads Finder
-        if not email:
-            a3 = actor3_results.get(domain)
-            if a3 and a3.get("email"):
-                email = a3["email"]
-                contact_name = f"{a3.get('first_name', '')} {a3.get('last_name', '')}".strip()
-                contact_title = a3.get("title", "")
-                email_finder = "leads_finder"
-
-        # Priority 4: Actor 4 Website Crawl
-        if not email:
-            a4 = actor4_results.get(domain)
-            if a4 and a4.get("email"):
-                email = a4["email"]
-                email_finder = "website_crawl"
+            ap = apollo_results.get(domain)
+            if ap and ap.get("email"):
+                email = str(ap["email"]).lower().strip()
+                contact_name = " ".join(
+                    p for p in [ap.get("first_name", ""), ap.get("last_name", "")] if p
+                ).strip()
+                contact_title = str(ap.get("title") or "").strip()
+                phone = str(ap.get("phone") or "").strip()
+                linkedin_url = str(ap.get("linkedin_url") or "").strip()
+                email_finder = "apollo"
 
         if email and "@" in email:
-            lead["contact_email"] = email.lower().strip()
+            lead["contact_email"] = email
             lead["contact_name"] = contact_name or lead.get("contact_name") or ""
             lead["contact_title"] = contact_title or lead.get("contact_title") or ""
+            lead["contact_phone"] = phone or lead.get("contact_phone") or ""
+            lead["contact_linkedin_url"] = linkedin_url or lead.get("contact_linkedin_url") or ""
             lead["email_finder"] = email_finder
             with_email.append(lead)
         elif lead.get("contact_email") and "@" in lead["contact_email"]:
-            # Preserve pre-existing email (e.g. from Apollo fallback)
             with_email.append(lead)
         else:
             lead["status"] = "suppressed"
             without_email.append(lead)
 
-    logger.info("Email merge: %d with email, %d suppressed (no email)", len(with_email), len(without_email))
+    logger.info("Email merge: %d with email, %d suppressed", len(with_email), len(without_email))
     return with_email, without_email
-
-
-# ── Apollo last-resort fallback ───────────────────────────────────────────
-
-
-async def _apollo_last_resort(
-    leads: list[dict[str, Any]],
-    vertical: str,
-    location: str,
-) -> list[dict[str, Any]]:
-    """Absolute last resort: Apollo search if all 4 Apify actors returned zero results.
-
-    This should almost never happen.
-    """
-    if not APOLLO_API_KEY:
-        return []
-
-    logger.warning("All 4 Apify actors returned zero — trying Apollo last resort for %s/%s", vertical, location)
-
-    try:
-        titles = {
-            "dental": [
-                "dentist", "owner", "clinic owner", "principal", "dental director",
-                "practice manager", "managing dentist",
-            ],
-            "legal": ["lawyer", "managing partner", "owner", "principal", "partner"],
-            "accounting": ["CPA", "accountant", "owner", "principal", "partner"],
-        }
-        loc_strings = _apollo_location_strings(location)
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            results: list[dict[str, Any]] = []
-            seen_email: set[str] = set()
-
-            for page in (1, 2):
-                body: dict[str, Any] = {
-                    "page": page,
-                    "per_page": 50,
-                    "person_titles": titles.get(vertical, titles["dental"]),
-                    "person_locations": loc_strings,
-                    "organization_num_employees_ranges": ["1,50"],
-                    "contact_email_status": ["verified", "unverified"],
-                    "has_email": True,
-                    "q_organization_keyword_tags": _apollo_organization_keyword_tags(vertical),
-                }
-                r = await client.post(
-                    "https://api.apollo.io/api/v1/mixed_people/search",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Cache-Control": "no-cache",
-                        "X-Api-Key": APOLLO_API_KEY,
-                    },
-                    json=body,
-                    timeout=45.0,
-                )
-                if r.status_code >= 400:
-                    logger.warning("Apollo last resort HTTP %s: %s", r.status_code, r.text[:400])
-                    break
-
-                data = r.json()
-                people = data.get("people") or data.get("contacts") or []
-                for p in people:
-                    if not isinstance(p, dict):
-                        continue
-                    email = (p.get("email") or p.get("primary_email") or "").strip()
-                    if not email or "@" not in email:
-                        continue
-                    el = email.lower()
-                    if el in seen_email:
-                        continue
-                    org = p.get("organization") or {}
-                    if isinstance(org, str):
-                        org = {}
-                    website = (
-                        org.get("website_url")
-                        or org.get("primary_domain")
-                        or p.get("organization_website_url")
-                        or ""
-                    )
-                    domain = _normalize_domain(str(website)) if website else ""
-                    if not domain:
-                        domain = _normalize_domain(email.split("@")[-1])
-                    if not domain:
-                        continue
-                    seen_email.add(el)
-                    results.append({
-                        "business_name": (org.get("name") or "").strip(),
-                        "domain": domain,
-                        "contact_email": el,
-                        "contact_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-                        "contact_title": (p.get("title") or "").strip(),
-                        "email_finder": "apollo_fallback",
-                        "vertical": vertical,
-                        "city": location,
-                        "province": "",
-                        "lead_score": 1,
-                        "status": "pending",
-                    })
-
-                pagination = data.get("pagination") or {}
-                total_pages = int(pagination.get("total_pages") or 1)
-                if page >= total_pages or not people:
-                    break
-
-            logger.info("Apollo last resort: found %d leads for %s/%s", len(results), vertical, location)
-            return results
-
-    except Exception as exc:
-        logger.warning("Apollo last resort failed: %s", exc)
-        return []
-
-
-# ── Main orchestrator ─────────────────────────────────────────────────────
 
 
 async def run_full_discovery(
@@ -1105,23 +750,13 @@ async def run_full_discovery(
     pipeline_run_id: str | None = None,
     prospect_source: str = "aria_nightly",
 ) -> list[dict[str, Any]]:
-    """Run the full 4-actor discovery pipeline.
+    """Run full discovery: Google Places / Actor 1 + Apollo contact enrichment.
 
-    Flow:
-    1. Actor 1 (Google Maps) — all city x vertical combinations in parallel
-    2. Deduplicate against inventory + prospects + suppressions
-    3. Actor 2 (LinkedIn) — for leads without email
-    4. Actor 3 (Leads Finder) — for leads still without email
-    5. Actor 4 (Website Crawler) — last resort for remaining leads
-    6. Merge emails using priority order
-    7. Return leads with emails (suppressed leads also returned for inventory storage)
-
-    Args:
-        cities: Optional list of cities to scrape. Defaults to CITIES constant (18 Canadian cities).
-        pipeline_run_id: Optional ARIA chat pipeline run UUID for CRM linkage.
-        prospect_source: `aria_nightly` (default) or `aria_chat` for `prospects.source`.
-
-    Returns all leads with lead_score, contact_email, email_finder set.
+    Apify actors 2/3/4 have been retired in favour of Apollo's
+    ``mixed_people/search`` which is both cheaper and produces verified
+    decision-maker contacts (email, name, title, phone, LinkedIn) in a single
+    call. The hybrid ``apollo_people_topup`` path also tops the discovery
+    queue up to the daily target when Google Places volume is low.
     """
     google_places_key = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
     apify_key = os.environ.get("APIFY_API_KEY", "").strip()
@@ -1131,10 +766,8 @@ async def run_full_discovery(
         )
         return []
 
-    # Step 1: Discovery (Google Places preferred, Apify Google Maps fallback).
-    # Google Places (New) Pro SKU is covered by the $200/month Maps Platform
-    # free credit for the nightly volume here, so it's ~free vs Apify's
-    # per-place cost. Actor 2/3/4 Apify enrichment still runs on the results.
+    # Step 1: Discovery. Google Places is preferred (cheap / rate-limit
+    # friendly); Actor 1 Google Maps is only used if Places is unset.
     if google_places_key:
         from services.aria_google_places import discover_leads as _discover_google_places
 
@@ -1146,29 +779,31 @@ async def run_full_discovery(
             all_leads = await run_actor1_google_maps(cities=cities)
     else:
         all_leads = await run_actor1_google_maps(cities=cities)
-    if not all_leads:
-        logger.warning("Actor 1 returned zero leads — checking Apollo last resort")
-        # Try Apollo as absolute last resort for each vertical
-        for v in VERTICALS:
-            for c in CITIES[:5]:  # Just top 5 cities
-                fallback = await _apollo_last_resort([], v, c)
-                all_leads.extend(fallback)
-        if not all_leads:
-            return []
 
-    # Capture Actor 1 emails before dedup (keyed by domain)
+    # Step 2: Optional hybrid top-up via Apollo so the discovery volume hits
+    # the daily target regardless of Google Places yield.
+    all_leads = await _apollo_topup_if_needed(all_leads, cities=cities)
+
+    if not all_leads:
+        logger.warning("Discovery returned zero leads after Apollo top-up — stopping")
+        return []
+
+    # Capture Actor 1 / Places website emails before dedup (keyed by domain).
     actor1_emails: dict[str, list[str]] = {}
     for lead in all_leads:
         if lead.get("emails_from_website"):
             actor1_emails[lead["domain"]] = lead["emails_from_website"]
 
-    # Step 2: Deduplicate
+    # Step 3: Dedup against inventory + prospects + suppressions
     all_leads = await deduplicate_leads(all_leads)
     if not all_leads:
         logger.info("All leads already in inventory/CRM after dedup")
         return []
 
-    from services.aria_prospect_pipeline import bulk_upsert_discovered_prospects, sync_prospects_after_email_merge
+    from services.aria_prospect_pipeline import (
+        bulk_upsert_discovered_prospects,
+        sync_prospects_after_email_merge,
+    )
 
     bulk_upsert_discovered_prospects(
         all_leads,
@@ -1176,41 +811,86 @@ async def run_full_discovery(
         source=prospect_source,
     )
 
-    # Mark which leads have emails from Actor 1
     for lead in all_leads:
         if actor1_emails.get(lead["domain"]):
             lead["_email_found"] = True
 
-    # Step 3: Actor 2 — LinkedIn
-    actor2_results = await run_actor2_linkedin(all_leads)
-    for lead in all_leads:
-        if not lead.get("_email_found") and lead["domain"] in actor2_results and actor2_results[lead["domain"]].get("email"):
-            lead["_email_found"] = True
+    # Step 4: Apollo contact enrichment for every lead without a website email
+    apollo_results = await apollo_enrich_leads(all_leads)
 
-    # Step 4: Actor 3 — Leads Finder
-    actor3_results = await run_actor3_leads_finder(all_leads)
-    for lead in all_leads:
-        if not lead.get("_email_found") and lead["domain"] in actor3_results and actor3_results[lead["domain"]].get("email"):
-            lead["_email_found"] = True
-
-    # Step 5: Actor 4 — Website Crawler
-    actor4_results = await run_actor4_website_crawl(all_leads)
-
-    # Step 6: Merge emails
-    with_email, without_email = _merge_emails(
-        all_leads, actor1_emails, actor2_results, actor3_results, actor4_results,
-    )
-
-    # Clean up internal markers
+    # Step 5: Merge + sync
+    with_email, without_email = _merge_emails(all_leads, actor1_emails, apollo_results)
     for ld in with_email + without_email:
         ld.pop("_email_found", None)
         ld.pop("emails_from_website", None)
-
     sync_prospects_after_email_merge(with_email, without_email)
 
-    # Return both — caller decides what to do with suppressed leads
-    logger.info("Full discovery complete: %d with email, %d suppressed", len(with_email), len(without_email))
+    logger.info(
+        "Full discovery complete: %d with email, %d suppressed",
+        len(with_email), len(without_email),
+    )
     return with_email + without_email
+
+
+async def _apollo_topup_if_needed(
+    leads: list[dict[str, Any]],
+    cities: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Top the discovery queue up with Apollo people-search when volume is low.
+
+    The daily discovery target is configurable via
+    ``crm_settings.discovery_daily_target`` (default 2000). If Google Places /
+    Actor 1 returned fewer contacts than that, Apollo fills the remainder with
+    verified decision-makers across the same verticals and cities.
+    """
+    try:
+        target = _fetch_discovery_daily_target()
+    except Exception:
+        target = 2000
+    shortfall = max(0, target - len(leads))
+    if shortfall <= 0 or not APOLLO_API_KEY:
+        return leads
+
+    from services.apollo_enrichment import apollo_people_topup
+
+    cities_list = cities or CITIES
+    per_vertical = max(1, shortfall // max(1, len(VERTICALS)))
+    topups: list[dict[str, Any]] = []
+    for vertical in VERTICALS:
+        locations = [f"{c}, Canada" for c in cities_list]
+        chunk = await apollo_people_topup(
+            vertical=vertical, locations=locations, batch_size=per_vertical,
+        )
+        topups.extend(chunk)
+        if len(leads) + len(topups) >= target:
+            break
+
+    if topups:
+        logger.info(
+            "Apollo top-up: +%d leads to reach target=%d (had %d)",
+            len(topups), target, len(leads),
+        )
+    return leads + topups
+
+
+def _fetch_discovery_daily_target() -> int:
+    """Read the configured daily discovery target from crm_settings."""
+    if not SUPABASE_URL or not SERVICE_KEY:
+        return 2000
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/crm_settings",
+            headers=_sb_headers(),
+            params={"key": "eq.discovery_daily_target", "select": "value", "limit": "1"},
+            timeout=10.0,
+        )
+        r.raise_for_status()
+        rows = r.json() or []
+        if rows:
+            return max(100, int(str(rows[0].get("value") or "2000")))
+    except Exception as exc:
+        logger.warning("discovery_daily_target lookup failed: %s", exc)
+    return 2000
 
 
 async def run_ondemand_discovery(
@@ -1221,21 +901,20 @@ async def run_ondemand_discovery(
     pipeline_run_id: str | None = None,
     prospect_source: str = "aria_chat",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Run discovery for a single vertical + city (on-demand pipeline).
+    """Run discovery for a single vertical + city with Apollo enrichment.
 
-    Same 4-actor flow but scoped to one combination.
-
-    Returns ``(leads, meta)`` where ``meta`` helps explain empty results (missing keys,
-    zero Google Maps rows, dedupe-only loss, or enrichment produced no emails).
+    Returns ``(leads, meta)`` where ``meta`` explains empty results.
     """
     vertical = canonical_vertical(vertical)
     city = normalize_city_for_discovery(city)
     apify_on = bool(os.environ.get("APIFY_API_KEY", "").strip())
+    places_on = bool(os.environ.get("GOOGLE_PLACES_API_KEY", "").strip())
     meta: dict[str, Any] = {
         "vertical": vertical,
         "city": city,
         "apify_configured": apify_on,
         "apollo_configured": bool(APOLLO_API_KEY),
+        "google_places_configured": places_on,
         "gmaps_raw_count": 0,
         "after_batch_trim": 0,
         "after_dedup": 0,
@@ -1243,59 +922,54 @@ async def run_ondemand_discovery(
         "without_email": 0,
     }
 
-    if not apify_on:
-        logger.warning("APIFY_API_KEY not configured for on-demand discovery")
-        # Try Apollo as absolute last resort
-        fallback = await _apollo_last_resort([], vertical, city)
-        out = await deduplicate_leads(fallback) if fallback else []
-        if out:
-            from services.aria_prospect_pipeline import bulk_upsert_enriched_prospects
+    # Step 1: Discovery (Google Places / Actor 1 for this single combo)
+    if places_on:
+        from services.aria_google_places import discover_leads as _discover_google_places
 
-            bulk_upsert_enriched_prospects(
-                out,
-                pipeline_run_id=pipeline_run_id,
-                source=prospect_source,
-            )
-        meta["path"] = "apollo_only_no_apify"
-        return out, meta
-
-    # Actor 1: single city + vertical
-    sem = asyncio.Semaphore(10)
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        leads = await _run_google_maps_single(client, sem, vertical, city)
+        leads = await _discover_google_places(cities=[city], verticals=[vertical])
+    elif apify_on:
+        sem = asyncio.Semaphore(APIFY_GMAPS_CONCURRENCY)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            leads = await _run_google_maps_single(client, sem, vertical, city)
+    else:
+        leads = []
 
     meta["gmaps_raw_count"] = len(leads)
 
+    if not leads and APOLLO_API_KEY:
+        from services.apollo_enrichment import apollo_people_topup
+
+        leads = await apollo_people_topup(
+            vertical=vertical,
+            locations=[f"{city}, Canada"],
+            batch_size=batch_size,
+        )
+        meta["path"] = "apollo_only"
+        if not leads:
+            return [], meta
+
     if not leads:
-        # Apollo last resort
-        fallback = await _apollo_last_resort([], vertical, city)
-        out = await deduplicate_leads(fallback) if fallback else []
-        if out:
-            from services.aria_prospect_pipeline import bulk_upsert_enriched_prospects
+        meta["path"] = "empty_no_discovery"
+        return [], meta
 
-            bulk_upsert_enriched_prospects(
-                out,
-                pipeline_run_id=pipeline_run_id,
-                source=prospect_source,
-            )
-        meta["path"] = "apollo_after_empty_gmaps"
-        return out, meta
-
-    # Score and sort, take top batch_size
+    # Score + trim
     for lead in leads:
-        lead["lead_score"] = score_lead(lead)
+        lead["lead_score"] = lead.get("lead_score") or score_lead(lead)
     leads.sort(key=lambda x: x.get("lead_score", 0), reverse=True)
     leads = leads[:batch_size]
     meta["after_batch_trim"] = len(leads)
 
-    # Deduplicate
+    # Dedup
     leads = await deduplicate_leads(leads)
     meta["after_dedup"] = len(leads)
     if not leads:
         meta["path"] = "dedup_removed_all"
         return [], meta
 
-    from services.aria_prospect_pipeline import bulk_upsert_discovered_prospects, sync_prospects_after_email_merge
+    from services.aria_prospect_pipeline import (
+        bulk_upsert_discovered_prospects,
+        sync_prospects_after_email_merge,
+    )
 
     bulk_upsert_discovered_prospects(
         leads,
@@ -1303,35 +977,17 @@ async def run_ondemand_discovery(
         source=prospect_source,
     )
 
-    # Capture Actor 1 emails
     actor1_emails: dict[str, list[str]] = {}
     for lead in leads:
         if lead.get("emails_from_website"):
             actor1_emails[lead["domain"]] = lead["emails_from_website"]
-        if actor1_emails.get(lead["domain"]):
+        if actor1_emails.get(lead["domain"]) or lead.get("contact_email"):
             lead["_email_found"] = True
 
-    # Actor 2: LinkedIn for leads missing email
-    actor2_results = await run_actor2_linkedin(leads)
-    for lead in leads:
-        if not lead.get("_email_found") and lead["domain"] in actor2_results and actor2_results[lead["domain"]].get("email"):
-            lead["_email_found"] = True
+    apollo_results = await apollo_enrich_leads(leads)
 
-    # Actor 3: Leads Finder
-    actor3_results = await run_actor3_leads_finder(leads)
-    for lead in leads:
-        if not lead.get("_email_found") and lead["domain"] in actor3_results and actor3_results[lead["domain"]].get("email"):
-            lead["_email_found"] = True
+    with_email, without_email = _merge_emails(leads, actor1_emails, apollo_results)
 
-    # Actor 4: Website Crawler
-    actor4_results = await run_actor4_website_crawl(leads)
-
-    # Merge
-    with_email, without_email = _merge_emails(
-        leads, actor1_emails, actor2_results, actor3_results, actor4_results,
-    )
-
-    # Clean up
     for ld in with_email + without_email:
         ld.pop("_email_found", None)
         ld.pop("emails_from_website", None)
@@ -1340,8 +996,9 @@ async def run_ondemand_discovery(
 
     meta["with_email"] = len(with_email)
     meta["without_email"] = len(without_email)
-    meta["path"] = "apify_full"
+    meta["path"] = meta.get("path") or ("places_apollo" if places_on else "apify_apollo")
     return with_email + without_email, meta
+
 
 
 def format_discovery_empty_message(meta: dict[str, Any]) -> str:

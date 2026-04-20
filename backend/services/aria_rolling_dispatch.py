@@ -274,6 +274,81 @@ def run_rolling_dispatch() -> dict[str, Any]:
         }
         stats["dispatched_total"] += v_uploaded_total
 
+    # Route prospects past the automated-dispatch cap into the VA queue so the
+    # manual-outreach team can pick them up. We only do this after all ticks
+    # are done for the day (last tick at 4pm MST).
+    current_hour = datetime.now(MST).hour
+    if current_hour >= DISPATCH_TICK_HOURS[-1]:
+        va_routed = _route_overflow_to_va_queue()
+        stats["va_queue_routed"] = va_routed
+
     stats["duration_seconds"] = int((datetime.now(timezone.utc) - start).total_seconds())
     logger.info("rolling-dispatch complete: %s", json.dumps(stats))
     return stats
+
+
+def _route_overflow_to_va_queue() -> dict[str, int]:
+    """Move `ready` prospects past the daily automated-dispatch cap into the
+    VA queue so manual outreach can pick them up.
+
+    Called at the end of the final dispatch tick of the day. Safe to call
+    repeatedly — it only targets `pipeline_status=ready` rows.
+    """
+    out: dict[str, int] = {}
+    if not SUPABASE_URL or not SERVICE_KEY:
+        return out
+
+    # Per-vertical excess = ready_count - remaining_today (already dispatched
+    # via the tick loop). Anything left above today's cap flips to va_queue.
+    for vertical in VERTICALS:
+        try:
+            r = httpx.get(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers={**_sb_headers(), "Prefer": "count=exact"},
+                params={
+                    "select": "id",
+                    "pipeline_status": "eq.ready",
+                    "industry": f"eq.{vertical}",
+                    "limit": "1",
+                },
+                timeout=15.0,
+            )
+            r.raise_for_status()
+            cr = r.headers.get("content-range", "")
+            ready_count = int(cr.split("/", 1)[1]) if "/" in cr else 0
+        except Exception as exc:
+            logger.warning("va-overflow count vertical=%s failed: %s", vertical, exc)
+            continue
+
+        if ready_count == 0:
+            out[vertical] = 0
+            continue
+
+        # Flip the lot — the 200/vertical quota already consumed what it
+        # needed earlier in the day.
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            r = httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers=_sb_headers(),
+                params={
+                    "pipeline_status": "eq.ready",
+                    "industry": f"eq.{vertical}",
+                    "stage": "in.(new,scanning,scanned)",
+                },
+                json={
+                    "pipeline_status": "va_queue",
+                    "last_activity_at": now_iso,
+                },
+                timeout=30.0,
+            )
+            r.raise_for_status()
+            try:
+                routed = len(r.json() or [])
+            except Exception:
+                routed = 0
+            out[vertical] = routed
+            logger.info("va-overflow routed vertical=%s count=%d", vertical, routed)
+        except Exception as exc:
+            logger.warning("va-overflow route vertical=%s failed: %s", vertical, exc)
+    return out

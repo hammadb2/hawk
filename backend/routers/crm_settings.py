@@ -81,11 +81,15 @@ DEFAULT_KEYS: dict[str, str] = {
         '"Winnipeg","Halifax","Quebec City","Saskatoon","Regina","Victoria",'
         '"Kelowna","London","Hamilton","Waterloo","Mississauga","Brampton"]'
     ),
-    "google_places_max_per_search": "10",
+    "google_places_max_per_search": "40",
     "discovery_verticals_enabled": '["dental","legal","accounting"]',
-    "apify_enable_leadsfinder": "true",
-    "apify_enable_linkedin": "true",
-    "apify_enable_website_crawler": "false",
+    "discovery_daily_target": "2000",
+    # Apollo enrichment (replaces Apify actors 2/3/4)
+    "apollo_people_topup_enabled": "true",
+    "apollo_daily_credit_cap": "2500",
+    # VA manual-outreach queue
+    "va_queue_enabled": "true",
+    "va_daily_target_per_va": "60",
     # Smartlead campaigns
     "smartlead_campaign_id_dental": "",
     "smartlead_campaign_id_legal": "",
