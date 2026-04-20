@@ -245,6 +245,25 @@ def monthly_reports_pdf(
     return run_monthly_client_reports()
 
 
+@router.post("/post-scan-pipeline/{prospect_id}")
+def post_scan_pipeline_trigger(
+    prospect_id: str,
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Manual-scan finalize hook.
+
+    Runs the single-prospect post-scan pipeline (Apify enrichment → ZeroBounce
+    → ARIA personalized draft). Called by the Next.js finalize route after a
+    manual "Run scan" completes so those prospects get the same auto-enrich
+    treatment the SLA auto-scan already applies.
+    """
+    _require_secret(x_cron_secret)
+    from services.aria_post_scan_pipeline import run_post_scan_sync
+
+    result = run_post_scan_sync(prospect_id)
+    return result
+
+
 @router.post("/charlotte-run")
 def charlotte_daily_run(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),

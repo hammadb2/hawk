@@ -207,6 +207,26 @@ export async function POST(request: Request) {
     metadata: { score_before: scoreBefore, score_after: score, grade: r.grade },
   });
 
+  // Kick off the post-scan pipeline (Apify enrichment → ZeroBounce → ARIA
+  // personalized draft) so manual scans get the same auto-enrich treatment
+  // the SLA auto-scan already applies. Fire-and-forget so the finalize
+  // response isn't blocked on Apify / OpenAI latency.
+  const cronSecret =
+    process.env.HAWK_CRM_CRON_SECRET ||
+    process.env.HAWK_CRON_SECRET ||
+    process.env.CRON_SECRET ||
+    "";
+  if (cronSecret) {
+    void fetch(`${base}/api/crm/cron/post-scan-pipeline/${encodeURIComponent(prospectId)}`, {
+      method: "POST",
+      headers: { "X-Cron-Secret": cronSecret },
+    }).catch(() => {
+      /* best-effort — the SLA auto-scan's _find_stuck_post_scan sweep (every
+         ~2 min) picks up any prospect still at stage=scanned with a null
+         contact_email older than 3 min and runs the same pipeline. */
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     scan_id: inserted?.id,
