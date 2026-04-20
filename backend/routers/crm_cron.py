@@ -530,7 +530,7 @@ def apollo_bulk_enrich(
                 "email_finder": contact.get("source") or "apollo",
                 "last_activity_at": datetime.now(timezone.utc).isoformat(),
             }
-            httpx.patch(
+            resp = httpx.patch(
                 f"{SUPABASE_URL}/rest/v1/prospects",
                 headers=headers,
                 params={
@@ -540,6 +540,7 @@ def apollo_bulk_enrich(
                 json=patch,
                 timeout=15.0,
             )
+            resp.raise_for_status()
         except Exception as exc:
             logger.warning("apollo-bulk-enrich patch prospect=%s failed: %s", pid, exc)
             return "patch_failed"
