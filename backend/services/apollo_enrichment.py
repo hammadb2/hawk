@@ -193,7 +193,7 @@ def _select_person(people: list[dict[str, Any]]) -> dict[str, Any] | None:
         if not isinstance(p, dict):
             continue
         email = (p.get("email") or p.get("primary_email") or "").strip()
-        if not email or "@" not in email:
+        if not email or "@" not in email or "email_not_unlocked" in email.lower():
             continue
         status = str(p.get("email_status") or "").lower()
         score = 0
@@ -210,6 +210,78 @@ def _select_person(people: list[dict[str, Any]]) -> dict[str, Any] | None:
         return None
     scored.sort(key=lambda x: x[0], reverse=True)
     return scored[0][1]
+
+
+async def _apollo_bulk_match_unlock(
+    people: list[dict[str, Any]],
+    *,
+    client: httpx.AsyncClient,
+) -> None:
+    """Reveal obfuscated emails on ``people`` rows in place via ``people/bulk_match``.
+
+    Apollo's ``mixed_people/search`` endpoint returns person records but keeps
+    the actual ``email`` field locked (empty or ``email_not_unlocked@…``) until
+    a separate unlock call is made. Without this step the post-scan pipeline
+    can never produce a usable contact and soft-drops every prospect.
+
+    Mutates each person dict so ``person["email"]`` (and ``primary_email``)
+    holds the revealed address when Apollo has it. Chunks at 10 ids per call
+    to match Apollo's bulk_match limit; each chunk counts as ``len(chunk)``
+    credits in our daily counter.
+    """
+    need = [
+        p for p in people
+        if isinstance(p, dict)
+        and p.get("id")
+        and (
+            not (p.get("email") or p.get("primary_email"))
+            or "email_not_unlocked" in str(p.get("email") or p.get("primary_email") or "").lower()
+        )
+    ]
+    for i in range(0, len(need), 10):
+        if credits_remaining_today() <= 0:
+            logger.warning("Apollo daily credit cap reached — stopping email unlock sweep")
+            return
+        chunk = need[i : i + 10]
+        ids = [str(p["id"]) for p in chunk]
+        payload = {
+            "reveal_personal_emails": True,
+            "details": [{"id": pid} for pid in ids],
+        }
+        try:
+            r = await client.post(
+                f"{APOLLO_BASE}/people/bulk_match",
+                headers=_apollo_headers(),
+                json=payload,
+                timeout=45.0,
+            )
+        except Exception as exc:
+            logger.warning("Apollo bulk_match error ids=%d: %s", len(ids), exc)
+            continue
+        if r.status_code >= 400:
+            logger.warning(
+                "Apollo bulk_match HTTP %s ids=%d body=%s",
+                r.status_code, len(ids), r.text[:300],
+            )
+            continue
+        _increment_credits(len(chunk))
+        try:
+            data = r.json() or {}
+        except Exception:
+            continue
+        matches = data.get("matches") or data.get("people") or []
+        by_id: dict[str, dict[str, Any]] = {}
+        for m in matches:
+            if isinstance(m, dict) and m.get("id"):
+                by_id[str(m["id"])] = m
+        for p in chunk:
+            pid = str(p.get("id") or "")
+            m = by_id.get(pid)
+            if not m:
+                continue
+            em = str(m.get("email") or m.get("primary_email") or "").strip()
+            if em and "@" in em and "email_not_unlocked" not in em.lower():
+                p["email"] = em
 
 
 async def _apollo_people_search(
@@ -309,6 +381,11 @@ async def enrich_single_domain(
                 vertical=vertical, city=city, province=province, client=client,
                 per_page=25,
             )
+        # ``mixed_people/search`` returns records with the email field locked
+        # (empty or ``email_not_unlocked@…``). Unlock them via bulk_match before
+        # selecting, otherwise every prospect soft-drops for "no contact".
+        if people:
+            await _apollo_bulk_match_unlock(people, client=client)
 
     person = _select_person(people)
     if not person:
@@ -397,11 +474,18 @@ async def apollo_people_topup(
                 )
                 if not people:
                     break
+                # Reveal emails before filtering — search alone returns them locked.
+                await _apollo_bulk_match_unlock(people, client=client)
                 for p in people:
                     if not isinstance(p, dict):
                         continue
                     email = (p.get("email") or p.get("primary_email") or "").strip().lower()
-                    if not email or "@" not in email or email in seen_email:
+                    if (
+                        not email
+                        or "@" not in email
+                        or "email_not_unlocked" in email
+                        or email in seen_email
+                    ):
                         continue
                     org = p.get("organization") or {}
                     if isinstance(org, str):
