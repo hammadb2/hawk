@@ -126,10 +126,23 @@ begin
   end if;
 end $$;
 
--- prospect_email_events.prospect_id — ON DELETE CASCADE.
+-- prospect_email_events.prospect_id — ON DELETE CASCADE. Also has a
+-- partial unique index on (prospect_id, external_id) so we must drop any
+-- loser rows whose external_id already exists on the keeper before
+-- reparenting, otherwise the UPDATE trips the unique index.
 do $$
 begin
   if to_regclass('public.prospect_email_events') is not null then
+    execute $sql$
+      delete from public.prospect_email_events e
+       using _prospect_dedup_map m,
+             public.prospect_email_events k
+       where e.prospect_id = m.loser_id
+         and k.prospect_id = m.keeper_id
+         and e.external_id is not null
+         and length(trim(e.external_id)) > 0
+         and k.external_id = e.external_id;
+    $sql$;
     execute $sql$
       update public.prospect_email_events e
          set prospect_id = m.keeper_id
