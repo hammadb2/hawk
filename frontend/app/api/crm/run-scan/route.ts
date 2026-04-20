@@ -67,5 +67,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No job_id from API" }, { status: 502 });
   }
 
+  // Persist scanning state so the UI survives a page reload mid-scan.
+  const now = new Date().toISOString();
+  await supabase
+    .from("prospects")
+    .update({
+      active_scan_job_id: j.job_id,
+      scan_started_at: now,
+      scan_last_polled_at: now,
+      scan_trigger: "manual",
+    })
+    .eq("id", prospectId);
+
   return NextResponse.json({ job_id: j.job_id, prospect_id: prospectId });
 }

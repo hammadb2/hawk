@@ -173,9 +173,20 @@ export async function POST(request: Request) {
 
   const scoreBefore = typeof prospect.hawk_score === "number" ? prospect.hawk_score : null;
 
+  const nowIso = new Date().toISOString();
   await supabase
     .from("prospects")
-    .update({ hawk_score: score, last_activity_at: new Date().toISOString() })
+    .update({
+      hawk_score: score,
+      last_activity_at: nowIso,
+      scanned_at: nowIso,
+      active_scan_job_id: null,
+      scan_started_at: null,
+      scan_last_polled_at: null,
+      scan_trigger: null,
+      stage: "scanned",
+      pipeline_status: "scanned",
+    })
     .eq("id", prospectId);
 
   await supabase.from("activities").insert({

@@ -63,6 +63,7 @@ from services.crm_apscheduler_jobs import (
     run_rep_health_job,
     run_scheduled_ai_actions_job,
     run_shield_rescan_job,
+    run_sla_auto_scan_job,
     run_stale_pipeline_job,
     run_weekly_threat_job,
 )
@@ -98,6 +99,7 @@ scheduler.add_job(run_competitive_brief_job, CronTrigger(day_of_week="mon", hour
 scheduler.add_job(run_scheduled_ai_actions_job, CronTrigger(minute="*/15", timezone=MST))
 scheduler.add_job(run_aria_memory_job, CronTrigger(minute="*/15", timezone=MST))
 scheduler.add_job(run_aria_client_health_job, CronTrigger(minute="*/15", timezone=MST))
+scheduler.add_job(run_sla_auto_scan_job, CronTrigger(minute="*/2", timezone=MST))
 
 
 @asynccontextmanager
