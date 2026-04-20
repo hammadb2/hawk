@@ -76,7 +76,7 @@ create table if not exists public.prospects (
   city text,
   stage text not null default 'new'
     check (stage in (
-      'new', 'scanned', 'sent_email', 'replied', 'call_booked',
+      'new', 'scanning', 'scanned', 'sent_email', 'replied', 'call_booked',
       'closed_won', 'lost'
     )),
   assigned_rep_id uuid references public.profiles (id),

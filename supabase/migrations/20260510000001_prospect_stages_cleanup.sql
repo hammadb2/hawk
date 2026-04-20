@@ -1,13 +1,16 @@
 -- =============================================================================
--- Stage cleanup: replace `loom_sent` with `sent_email`, drop `proposal_sent`.
+-- Stage cleanup: replace `loom_sent` with `sent_email`, drop `proposal_sent`,
+-- and add a new `scanning` stage between `new` and `scanned` for in-flight
+-- scans (so the pipeline board reflects real-time scanner activity).
 --
 -- New canonical stage order:
---   new -> scanned -> sent_email -> replied -> call_booked -> closed_won
+--   new -> scanning -> scanned -> sent_email -> replied -> call_booked -> closed_won
 -- Terminal: lost.
 --
 -- Existing row migration:
 --   loom_sent     -> sent_email   (same pre-reply funnel position; rename)
 --   proposal_sent -> call_booked  (drop proposal step; fall back to previous)
+-- `scanning` has no prior rows (new stage).
 --
 -- Idempotent: safe to re-run. Does not touch rows already on the new values.
 -- =============================================================================
@@ -32,6 +35,7 @@ alter table public.prospects
   add constraint prospects_stage_check
   check (stage in (
     'new',
+    'scanning',
     'scanned',
     'sent_email',
     'replied',

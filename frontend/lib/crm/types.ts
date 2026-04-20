@@ -6,6 +6,7 @@ export type ProfileRoleType = "ceo" | "closer" | "va_outreach" | "va_manager" | 
 
 export type ProspectStage =
   | "new"
+  | "scanning"
   | "scanned"
   | "sent_email"
   | "replied"
@@ -224,6 +225,7 @@ export type ProspectFileRow = {
 
 export const STAGE_ORDER: ProspectStage[] = [
   "new",
+  "scanning",
   "scanned",
   "sent_email",
   "replied",
@@ -237,6 +239,7 @@ export const STAGE_META: Record<
   { label: string; color: string; columnBg: string }
 > = {
   new: { label: "New", color: "#9090A8", columnBg: "rgba(144,144,168,0.12)" },
+  scanning: { label: "Scanning", color: "#22D3EE", columnBg: "rgba(34,211,238,0.12)" },
   scanned: { label: "Scanned", color: "#60A5FA", columnBg: "rgba(96,165,250,0.12)" },
   sent_email: { label: "Sent Email", color: "#9B7FFF", columnBg: "rgba(155,127,255,0.12)" },
   replied: { label: "Replied", color: "#2DD4BF", columnBg: "rgba(45,212,191,0.12)" },

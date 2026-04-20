@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
   const { data: prospect, error: pe } = await supabase
     .from("prospects")
-    .select("id, domain, industry, active_scan_job_id, scan_started_at")
+    .select("id, domain, industry, stage, active_scan_job_id, scan_started_at")
     .eq("id", prospectId)
     .single();
   if (pe || !prospect) {
@@ -87,17 +87,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No job_id from API" }, { status: 502 });
   }
 
-  // Persist scanning state so the UI survives a page reload mid-scan.
+  // Persist scanning state so the UI survives a page reload mid-scan. Also
+  // advance stage=new -> stage=scanning so the pipeline board reflects the
+  // in-flight scan. Never regress stage if a rep has already moved the
+  // prospect past `new` (sent_email, replied, etc.); just refresh scan state.
   const now = new Date().toISOString();
-  await supabase
-    .from("prospects")
-    .update({
-      active_scan_job_id: j.job_id,
-      scan_started_at: now,
-      scan_last_polled_at: now,
-      scan_trigger: "manual",
-    })
-    .eq("id", prospectId);
+  const scanUpdate: Record<string, unknown> = {
+    active_scan_job_id: j.job_id,
+    scan_started_at: now,
+    scan_last_polled_at: now,
+    scan_trigger: "manual",
+  };
+  if (prospect.stage === "new" || prospect.stage == null) {
+    scanUpdate.stage = "scanning";
+  }
+  await supabase.from("prospects").update(scanUpdate).eq("id", prospectId);
 
   return NextResponse.json({ job_id: j.job_id, prospect_id: prospectId });
 }

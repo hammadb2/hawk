@@ -55,7 +55,9 @@ def _configured() -> bool:
 def _watchdog_release_stuck_jobs() -> int:
     """Clear active_scan_job_id on prospects whose scan started > watchdog ago.
 
-    Returns number of rows released.
+    Also reverts ``stage`` from ``scanning`` back to ``new`` so the candidate
+    query picks the prospect up again on the next tick. Returns number of
+    rows released.
     """
     if not _configured():
         return 0
@@ -71,8 +73,15 @@ def _watchdog_release_stuck_jobs() -> int:
                 # run up to ~20 min on the frontend poll loop; they clear
                 # themselves via the finalize route.
                 "scan_trigger": "eq.sla_auto",
+                # Only revert rows still at stage=scanning. If a rep manually
+                # advanced the prospect during the scan, leave their stage.
+                "stage": "eq.scanning",
             },
-            json={"active_scan_job_id": None, "scan_started_at": None},
+            json={
+                "active_scan_job_id": None,
+                "scan_started_at": None,
+                "stage": "new",
+            },
             timeout=20.0,
         )
         if r.status_code >= 400:
@@ -117,8 +126,11 @@ def _find_candidates(limit: int) -> list[dict[str, Any]]:
 def _claim_prospect(prospect_id: str, job_id: str) -> bool:
     """Claim a prospect for scanning by atomically writing active_scan_job_id.
 
-    Uses ``Prefer: return=representation`` so PostgREST returns the affected
-    rows; if the length is 0, another worker already claimed it.
+    Also transitions ``stage`` from ``new`` to ``scanning`` so the pipeline
+    board reflects the in-flight scan in real time. Uses
+    ``Prefer: return=representation`` so PostgREST returns the affected rows;
+    if the length is 0, another worker already claimed it (or a rep advanced
+    the stage past ``new`` in the last second).
     """
     now = datetime.now(timezone.utc).isoformat()
     try:
@@ -128,12 +140,14 @@ def _claim_prospect(prospect_id: str, job_id: str) -> bool:
             params={
                 "id": f"eq.{prospect_id}",
                 "active_scan_job_id": "is.null",  # only claim if no existing job
+                "stage": "eq.new",  # SLA auto-scan only claims stage=new rows
             },
             json={
                 "active_scan_job_id": job_id,
                 "scan_started_at": now,
                 "scan_last_polled_at": now,
                 "scan_trigger": "sla_auto",
+                "stage": "scanning",
             },
             timeout=15.0,
         )
@@ -166,9 +180,9 @@ def _update_job_id(prospect_id: str, job_id: str) -> None:
 def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
     """Mark prospect stage=lost + pipeline_status=suppressed, insert suppressions row.
 
-    Only applies the stage change if the prospect is still at ``new`` or
-    ``scanned`` — we never regress a rep-advanced prospect (sent_email,
-    replied, call_booked, closed_won).
+    Only applies the stage change if the prospect is still at ``new``,
+    ``scanning``, or ``scanned`` — we never regress a rep-advanced prospect
+    (sent_email, replied, call_booked, closed_won).
     """
     try:
         httpx.patch(
@@ -176,7 +190,7 @@ def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
             headers=_sb_headers(),
             params={
                 "id": f"eq.{prospect_id}",
-                "stage": "in.(new,scanned)",
+                "stage": "in.(new,scanning,scanned)",
             },
             json={
                 "stage": "lost",
@@ -266,7 +280,10 @@ def _write_scan_result(prospect_id: str, result: dict[str, Any]) -> int | None:
             headers=_sb_headers(),
             params={
                 "id": f"eq.{prospect_id}",
-                "stage": "eq.new",  # only advance from `new`; never regress later stages
+                # Only advance from `new` (never scanned) or `scanning` (the
+                # claim-time transition); never regress later stages if a rep
+                # manually advanced the prospect during the scan.
+                "stage": "in.(new,scanning)",
             },
             json={"stage": "scanned", "pipeline_status": "scanned"},
             timeout=15.0,
@@ -278,6 +295,25 @@ def _write_scan_result(prospect_id: str, result: dict[str, Any]) -> int | None:
 
 
 def _release_on_failure(prospect_id: str, error: str) -> None:
+    """Release the scan lock on failure and revert stage=scanning -> new.
+
+    The stage revert lets the SLA candidate query pick the prospect up again
+    on the next tick (bounded retry). Only reverts if still at ``scanning``
+    so a rep who manually advanced the prospect mid-scan isn't regressed.
+    """
+    try:
+        httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "id": f"eq.{prospect_id}",
+                "stage": "eq.scanning",
+            },
+            json={"stage": "new"},
+            timeout=15.0,
+        )
+    except Exception as exc:
+        logger.warning("SLA release-on-failure stage revert error prospect=%s: %s", prospect_id, exc)
     try:
         httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",

@@ -61,7 +61,8 @@ function StageBar({ stages }: { stages: Record<string, number> }) {
   const total = Object.values(stages).reduce((a, b) => a + b, 0) || 1;
   const colors: Record<string, string> = {
     new: "bg-blue-400",
-    scanned: "bg-cyan-400",
+    scanning: "bg-cyan-300",
+    scanned: "bg-cyan-500",
     sent_email: "bg-indigo-400",
     replied: "bg-yellow-400",
     call_booked: "bg-emerald-400",
