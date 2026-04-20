@@ -193,7 +193,7 @@ def _select_person(people: list[dict[str, Any]]) -> dict[str, Any] | None:
         if not isinstance(p, dict):
             continue
         email = (p.get("email") or p.get("primary_email") or "").strip()
-        if not email or "@" not in email:
+        if not email or "@" not in email or "email_not_unlocked" in email.lower():
             continue
         status = str(p.get("email_status") or "").lower()
         score = 0
@@ -235,7 +235,7 @@ async def _apollo_bulk_match_unlock(
         and p.get("id")
         and (
             not (p.get("email") or p.get("primary_email"))
-            or "email_not_unlocked" in str(p.get("email") or "").lower()
+            or "email_not_unlocked" in str(p.get("email") or p.get("primary_email") or "").lower()
         )
     ]
     for i in range(0, len(need), 10):
@@ -480,7 +480,12 @@ async def apollo_people_topup(
                     if not isinstance(p, dict):
                         continue
                     email = (p.get("email") or p.get("primary_email") or "").strip().lower()
-                    if not email or "@" not in email or email in seen_email:
+                    if (
+                        not email
+                        or "@" not in email
+                        or "email_not_unlocked" in email
+                        or email in seen_email
+                    ):
                         continue
                     org = p.get("organization") or {}
                     if isinstance(org, str):
