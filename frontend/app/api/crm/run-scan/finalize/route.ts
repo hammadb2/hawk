@@ -136,7 +136,11 @@ export async function POST(request: Request) {
   const attackPathsPersisted = resolveAttackPaths(r);
   const score = typeof r.score === "number" ? r.score : 0;
 
-  const { data: prospect, error: pe } = await supabase.from("prospects").select("id, hawk_score, industry").eq("id", prospectId).single();
+  const { data: prospect, error: pe } = await supabase
+    .from("prospects")
+    .select("id, hawk_score, industry, stage")
+    .eq("id", prospectId)
+    .single();
   if (pe || !prospect) {
     return NextResponse.json({ error: "Prospect not found" }, { status: 404 });
   }
@@ -173,10 +177,27 @@ export async function POST(request: Request) {
 
   const scoreBefore = typeof prospect.hawk_score === "number" ? prospect.hawk_score : null;
 
-  await supabase
-    .from("prospects")
-    .update({ hawk_score: score, last_activity_at: new Date().toISOString() })
-    .eq("id", prospectId);
+  const nowIso = new Date().toISOString();
+  // Only advance stage/pipeline_status from "new" or "scanning" → "scanned".
+  // If the prospect has already moved further down the funnel (sent_email,
+  // replied, call_booked, closed_won, lost) we leave them where they are and
+  // only refresh the scan-related fields.
+  const shouldAdvanceStage =
+    prospect.stage === "new" || prospect.stage === "scanning" || prospect.stage == null;
+  const prospectUpdate: Record<string, unknown> = {
+    hawk_score: score,
+    last_activity_at: nowIso,
+    scanned_at: nowIso,
+    active_scan_job_id: null,
+    scan_started_at: null,
+    scan_last_polled_at: null,
+    scan_trigger: null,
+  };
+  if (shouldAdvanceStage) {
+    prospectUpdate.stage = "scanned";
+    prospectUpdate.pipeline_status = "scanned";
+  }
+  await supabase.from("prospects").update(prospectUpdate).eq("id", prospectId);
 
   await supabase.from("activities").insert({
     prospect_id: prospectId,
@@ -185,6 +206,26 @@ export async function POST(request: Request) {
     notes: null,
     metadata: { score_before: scoreBefore, score_after: score, grade: r.grade },
   });
+
+  // Kick off the post-scan pipeline (Apify enrichment → ZeroBounce → ARIA
+  // personalized draft) so manual scans get the same auto-enrich treatment
+  // the SLA auto-scan already applies. Fire-and-forget so the finalize
+  // response isn't blocked on Apify / OpenAI latency.
+  const cronSecret =
+    process.env.HAWK_CRM_CRON_SECRET ||
+    process.env.HAWK_CRON_SECRET ||
+    process.env.CRON_SECRET ||
+    "";
+  if (cronSecret) {
+    void fetch(`${base}/api/crm/cron/post-scan-pipeline/${encodeURIComponent(prospectId)}`, {
+      method: "POST",
+      headers: { "X-Cron-Secret": cronSecret },
+    }).catch(() => {
+      /* best-effort — the SLA auto-scan's _find_stuck_post_scan sweep (every
+         ~2 min) picks up any prospect still at stage=scanned with a null
+         contact_email older than 3 min and runs the same pipeline. */
+    });
+  }
 
   return NextResponse.json({
     ok: true,

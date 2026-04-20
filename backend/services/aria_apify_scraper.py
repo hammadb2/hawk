@@ -37,6 +37,16 @@ ACTOR_LINKEDIN = "dev_fusion/linkedin-profile-scraper"
 ACTOR_LEADS_FINDER = "code_crafter/leads-finder"
 ACTOR_WEBSITE_CRAWLER = "vdrmota/contact-info-scraper"
 
+
+def _actor_path(actor_id: str) -> str:
+    """Normalize an Apify actor identifier for use in a REST URL path.
+
+    The REST API identifies actors as ``{username}~{actorName}`` in URL paths.
+    A plain ``{username}/{actorName}`` results in a 404 because Apify interprets
+    the slash as a path separator.
+    """
+    return actor_id.replace("/", "~")
+
 # 18 Canadian cities
 CITIES: list[str] = [
     "Toronto", "Vancouver", "Calgary", "Edmonton", "Ottawa", "Montreal",
@@ -223,6 +233,36 @@ APIFY_POLL_INTERVAL = 10  # seconds
 APIFY_MAX_WAIT = 900  # 15 minutes max per actor run
 BATCH_SIZE = 50  # parallel batch size for actors 2-4
 
+# Concurrency + memory tuning to stay inside an Apify plan's memory budget.
+# On the FREE plan the total memory across all concurrent actor runs is 8192MB
+# and each run defaults to 4096MB, so only 2 can execute at once. Anything over
+# that returns HTTP 402 ``actor-memory-limit-exceeded`` and the run silently
+# drops. These knobs let the nightly pipeline serialize itself cleanly on free
+# and fan out wider on paid plans without code changes.
+def _int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return default
+
+
+def _optional_int_env(name: str) -> int | None:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+    try:
+        return max(128, int(raw))
+    except ValueError:
+        return None
+
+
+APIFY_GMAPS_CONCURRENCY = _int_env("APIFY_GMAPS_CONCURRENCY", 2)
+APIFY_BATCH_CONCURRENCY = _int_env("APIFY_BATCH_CONCURRENCY", 2)
+APIFY_ACTOR_MEMORY_MB = _optional_int_env("APIFY_ACTOR_MEMORY_MB")
+
 
 def _sb_headers() -> dict[str, str]:
     return {
@@ -288,12 +328,15 @@ async def _start_actor_run(
     run_input: dict[str, Any],
 ) -> str | None:
     """Start an Apify actor run. Returns the run ID or None on failure."""
-    url = f"{APIFY_BASE}/acts/{actor_id}/runs"
+    url = f"{APIFY_BASE}/acts/{_actor_path(actor_id)}/runs"
+    params: dict[str, Any] = {"token": os.environ.get("APIFY_API_KEY", "").strip()}
+    if APIFY_ACTOR_MEMORY_MB:
+        params["memory"] = APIFY_ACTOR_MEMORY_MB
     try:
         r = await client.post(
             url,
             json=run_input,
-            params={"token": os.environ.get("APIFY_API_KEY", "").strip()},
+            params=params,
             timeout=60.0,
         )
         if r.status_code >= 400:
@@ -314,7 +357,7 @@ async def _poll_actor_run(
     max_wait: int = APIFY_MAX_WAIT,
 ) -> dict[str, Any] | None:
     """Poll an Apify actor run until it completes. Returns run data or None."""
-    url = f"{APIFY_BASE}/acts/{actor_id}/runs/{run_id}"
+    url = f"{APIFY_BASE}/acts/{_actor_path(actor_id)}/runs/{run_id}"
     elapsed = 0
     while elapsed < max_wait:
         await asyncio.sleep(APIFY_POLL_INTERVAL)
@@ -523,8 +566,10 @@ async def run_actor1_google_maps(
     cities = cities or CITIES
     verticals = verticals or VERTICALS
 
-    # All combinations run in parallel (54 tasks)
-    sem = asyncio.Semaphore(60)  # generous concurrency — Apify handles rate limiting
+    # Concurrency is capped to APIFY_GMAPS_CONCURRENCY (default 2) so the
+    # pipeline stays inside Apify's total memory budget on FREE plans. Raise
+    # this via env after upgrading to a paid plan.
+    sem = asyncio.Semaphore(APIFY_GMAPS_CONCURRENCY)
     all_leads: list[dict[str, Any]] = []
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -623,7 +668,7 @@ async def run_actor2_linkedin(
 
     logger.info("Actor 2: finding decision makers for %d leads via LinkedIn", len(needs_email))
 
-    sem = asyncio.Semaphore(5)  # 5 concurrent batches of 50 = 250 simultaneous
+    sem = asyncio.Semaphore(APIFY_BATCH_CONCURRENCY)  # stays under plan memory budget
     all_results: dict[str, dict[str, Any]] = {}
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -805,7 +850,7 @@ async def run_actor4_website_crawl(
 
     logger.info("Actor 4: crawling %d websites for email addresses", len(needs_email))
 
-    sem = asyncio.Semaphore(5)  # 5 concurrent batches of 50
+    sem = asyncio.Semaphore(APIFY_BATCH_CONCURRENCY)  # stays under plan memory budget
     all_results: dict[str, dict[str, Any]] = {}
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -1078,12 +1123,29 @@ async def run_full_discovery(
 
     Returns all leads with lead_score, contact_email, email_finder set.
     """
-    if not os.environ.get("APIFY_API_KEY", "").strip():
-        logger.error("APIFY_API_KEY not configured — cannot run discovery")
+    google_places_key = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
+    apify_key = os.environ.get("APIFY_API_KEY", "").strip()
+    if not google_places_key and not apify_key:
+        logger.error(
+            "Neither GOOGLE_PLACES_API_KEY nor APIFY_API_KEY configured — cannot run discovery"
+        )
         return []
 
-    # Step 1: Actor 1 — Google Maps
-    all_leads = await run_actor1_google_maps(cities=cities)
+    # Step 1: Discovery (Google Places preferred, Apify Google Maps fallback).
+    # Google Places (New) Pro SKU is covered by the $200/month Maps Platform
+    # free credit for the nightly volume here, so it's ~free vs Apify's
+    # per-place cost. Actor 2/3/4 Apify enrichment still runs on the results.
+    if google_places_key:
+        from services.aria_google_places import discover_leads as _discover_google_places
+
+        all_leads = await _discover_google_places(cities=cities)
+        if not all_leads and apify_key:
+            logger.warning(
+                "Google Places returned 0 leads — falling back to Apify Actor 1 Google Maps"
+            )
+            all_leads = await run_actor1_google_maps(cities=cities)
+    else:
+        all_leads = await run_actor1_google_maps(cities=cities)
     if not all_leads:
         logger.warning("Actor 1 returned zero leads — checking Apollo last resort")
         # Try Apollo as absolute last resort for each vertical

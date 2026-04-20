@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { LiveRefreshBeacon } from "@/components/live-refresh-beacon";
+import { LiveRealtimeBridge } from "@/components/live-realtime-bridge";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -72,7 +74,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <LiveRefreshBeacon />
+          <LiveRealtimeBridge />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

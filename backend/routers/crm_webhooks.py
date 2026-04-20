@@ -1,4 +1,4 @@
-"""CRM inbound webhooks — email engagement events (Smartlead / Charlotte / custom) into Supabase."""
+"""CRM inbound webhooks — email engagement events (Smartlead / ARIA / custom) into Supabase."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from config import CRM_PUBLIC_BASE_URL
 from services.crm_openphone import (
-    format_charlotte_reply_ceo_message,
-    format_charlotte_reply_rep_message,
+    format_aria_reply_ceo_message,
+    format_aria_reply_rep_message,
     send_ceo_sms,
     send_sms,
 )
@@ -35,7 +35,7 @@ CAL_WEBHOOK_SECRET = os.environ.get("CAL_WEBHOOK_SECRET", "").strip()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
-# Charlotte / CEO alert — must be set via CRM_CEO_PHONE_E164 env var
+# CEO alert — must be set via CRM_CEO_PHONE_E164 env var
 CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip()
 VA_PHONE_NUMBER = os.environ.get("VA_PHONE_NUMBER", "").strip()
 
@@ -80,12 +80,12 @@ class EmailEventIn(BaseModel):
     clicked_at: Optional[datetime] = None
     replied_at: Optional[datetime] = None
     sequence_step: Optional[int] = None
-    source: str = Field(default="smartlead", description="smartlead | charlotte | webhook | manual")
+    source: str = Field(default="smartlead", description="smartlead | aria | webhook | manual")
     external_id: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     event_type: Optional[str] = Field(
         default=None,
-        description="Optional: email_replied | email_opened (Charlotte / Smartlead)",
+        description="Optional: email_replied | email_opened (ARIA / Smartlead)",
     )
     company_name: Optional[str] = None
     industry: Optional[str] = None
@@ -218,7 +218,7 @@ def _fetch_prospect_by_contact_email(email: str) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
-def _create_prospect_charlotte(
+def _create_prospect_from_reply(
     *,
     nd: str,
     stage: str,
@@ -235,7 +235,7 @@ def _create_prospect_charlotte(
         "company_name": company,
         "industry": industry,
         "stage": stage,
-        "source": "charlotte",
+        "source": "inbound",
         "assigned_rep_id": assigned_rep_id,
         "hawk_score": hawk_score,
         "last_activity_at": datetime.now(timezone.utc).isoformat(),
@@ -329,7 +329,7 @@ def _resolve_prospect_or_create(body: EmailEventIn) -> tuple[str, bool]:
     first = body.first_name or md.get("first_name")
     contact_name = str(first).strip() if first else None
 
-    pr = _create_prospect_charlotte(
+    pr = _create_prospect_from_reply(
         nd=nd,
         stage=stage,
         assigned_rep_id=rep_id,
@@ -342,7 +342,7 @@ def _resolve_prospect_or_create(body: EmailEventIn) -> tuple[str, bool]:
     return str(pr["id"]), True
 
 
-def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn, sentiment: str | None) -> None:
+def _notify_aria_reply(*, prospect_id: str, body: EmailEventIn, sentiment: str | None) -> None:
     """WhatsApp rep + CEO; timeline activity (reply events)."""
     prospect = _get_prospect_row(prospect_id)
     if not prospect:
@@ -372,25 +372,25 @@ def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn, sentiment: 
 
     if rep_wa:
         try:
-            msg = format_charlotte_reply_rep_message(
+            msg = format_aria_reply_rep_message(
                 company=str(company),
                 first_name=str(first) if first else None,
                 crm_base_url=base,
             )
             send_sms(rep_wa, msg)
         except Exception:
-            logger.exception("SMS Charlotte rep alert failed prospect=%s", prospect_id)
+            logger.exception("SMS ARIA rep alert failed prospect=%s", prospect_id)
 
     if CRM_CEO_PHONE_E164:
         try:
-            ceo_msg = format_charlotte_reply_ceo_message(
+            ceo_msg = format_aria_reply_ceo_message(
                 company=str(company),
                 score=score,
                 rep_name=rep_name,
             )
             send_sms(CRM_CEO_PHONE_E164, ceo_msg)
         except Exception:
-            logger.exception("SMS Charlotte CEO alert failed")
+            logger.exception("SMS ARIA CEO alert failed")
 
     if VA_PHONE_NUMBER:
         try:
@@ -425,8 +425,8 @@ def _notify_charlotte_reply(*, prospect_id: str, body: EmailEventIn, sentiment: 
             headers=_sb_headers(),
             json={
                 "prospect_id": prospect_id,
-                "type": "charlotte_reply",
-                "notes": "Charlotte reply received",
+                "type": "aria_reply",
+                "notes": "ARIA reply received",
                 "metadata": {
                     "source": body.source,
                     "external_id": body.external_id,
@@ -494,7 +494,7 @@ def ingest_email_event(
 
     **Match prospect:** `prospect_id`, or `domain`, or derive domain from `contact_email`.
 
-    **Charlotte / Smartlead reply:** if no prospect exists, creates one (round-robin closer),
+    **ARIA / Smartlead reply:** if no prospect exists, creates one (round-robin closer),
     then WhatsApp rep + CEO and logs timeline activity.
     """
     _require_webhook_secret(x_crm_webhook_secret)
@@ -551,7 +551,7 @@ def ingest_email_event(
         md_sent = body.metadata or {}
         raw_sent = (body.sentiment or (md_sent.get("sentiment") if isinstance(md_sent.get("sentiment"), str) else "") or "").strip().lower()
         reply_sentiment = raw_sent or None
-        _notify_charlotte_reply(prospect_id=pid, body=body, sentiment=reply_sentiment)
+        _notify_aria_reply(prospect_id=pid, body=body, sentiment=reply_sentiment)
         # Run ARIA classification in a background thread to avoid blocking the webhook response
         import threading
         threading.Thread(
@@ -593,7 +593,7 @@ def smartlead_webhook(
     Smartlead inbound webhook — handles reply, bounce, and spam complaint events.
 
     Configure in Smartlead dashboard (Settings > Webhooks):
-    URL: POST https://intelligent-rejoicing-production.up.railway.app/api/crm/webhooks/smartlead?secret=<CRM_SMARTLEAD_WEBHOOK_SECRET>
+    URL: POST https://hawk-production.up.railway.app/api/crm/webhooks/smartlead?secret=<CRM_SMARTLEAD_WEBHOOK_SECRET>
     Events: reply received, email bounced, spam complaint.
 
     Auth via query parameter because Smartlead webhooks do not support custom headers.
@@ -652,6 +652,7 @@ def _verify_cal_webhook_signature(raw_body: bytes, signature_header: str | None)
     if sig.lower().startswith("sha256="):
         sig = sig.split("=", 1)[-1].strip()
     mac = hmac.new(CAL_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256).digest()
+    # Cal.com: createHmac("sha256", secret).update(body).digest("hex") — see cal.com sendPayload.ts
     expected_b64 = base64.b64encode(mac).decode("ascii")
     expected_hex = mac.hex()
     return secrets.compare_digest(sig, expected_b64) or secrets.compare_digest(sig, expected_hex)

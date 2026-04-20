@@ -100,7 +100,7 @@ def run_scan(
 ) -> dict:
     """
     POST to scanner relay; returns scan response (score, grade, findings).
-    scan_depth: "full" (all layers) or "fast" (~Charlotte tier, quicker).
+    scan_depth: "full" (all layers) or "fast" (lighter / quicker pass).
     Raises httpx.HTTPStatusError on 4xx/5xx, httpx.ConnectError if relay unreachable.
     """
     depth = (scan_depth or "full").strip().lower()

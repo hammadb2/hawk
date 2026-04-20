@@ -23,7 +23,7 @@ _kpi_lock = threading.Lock()
 _kpi_cache: dict[str, tuple[float, dict[str, Any], tuple[str, str]]] = {}
 _KPI_TTL_SEC = 60.0
 
-_OPEN_STAGES = ("new", "scanned", "loom_sent", "replied", "call_booked", "proposal_sent")
+_OPEN_STAGES = ("new", "scanning", "scanned", "sent_email", "replied", "call_booked")
 
 
 def _user_rest_headers(authorization: str) -> dict[str, str]:

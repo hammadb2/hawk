@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
@@ -85,7 +86,7 @@ export default function EarningsPage() {
     setLoading(false);
   }, [session?.user?.id, supabase]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     if (authReady && session) void load();
   }, [authReady, session, load]);
 

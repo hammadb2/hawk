@@ -1,4 +1,4 @@
-"""Cron: escalate unhandled Charlotte replies past 30 minutes (CEO WhatsApp once)."""
+"""Cron: escalate unhandled ARIA replies past 30 minutes (CEO WhatsApp once)."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def run_va_reply_escalation() -> dict:
                 "Unhandled reply — "
                 f"{co} — "
                 "30 minutes with no action. "
-                "Check Charlotte replies dashboard.",
+                "Check ARIA replies dashboard.",
             )
             httpx.patch(
                 f"{SUPABASE_URL}/rest/v1/prospects",

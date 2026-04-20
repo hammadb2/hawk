@@ -59,7 +59,7 @@ STRIPE_PRICE_SHIELD_TEST = os.environ.get("STRIPE_PRICE_SHIELD_TEST", "").strip(
 # Shield onboarding — booking link in WhatsApp / email (Cal.com or similar)
 CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "https://cal.com").strip().rstrip("/")
 
-# OpenAI — portal AI, Charlotte emails, attacker simulation, Ask HAWK, scanner interpretation (when wired to API)
+# OpenAI — portal AI, ARIA email drafts, attacker simulation, Ask HAWK, scanner interpretation
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
 
@@ -68,10 +68,6 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_CHAT_MODEL = "deepseek-chat"
 DEEPSEEK_REASONER_MODEL = "deepseek-reasoner"
-
-# Charlotte (Revenue-Ops) for emails
-CHARLOTTE_URL = os.environ.get("CHARLOTTE_URL", "http://46.225.168.75:8001/agent/charlotte")
-CHARLOTTE_API_KEY = os.environ.get("CHARLOTTE_API_KEY", "")
 
 # Frontend / marketing site (Stripe redirects, email links — same host as Next.js when unified)
 DEFAULT_PUBLIC_SITE_URL = "https://securedbyhawk.com"

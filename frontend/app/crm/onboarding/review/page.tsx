@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
@@ -47,7 +48,7 @@ export default function OnboardingReviewPage() {
     setLoading(false);
   }, [session?.access_token, filter]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     void load();
   }, [load]);
 

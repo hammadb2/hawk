@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -63,7 +64,7 @@ export default function PortalEnterprisePage() {
     setLoading(false);
   }, [router, supabase]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     void load();
   }, [load]);
 

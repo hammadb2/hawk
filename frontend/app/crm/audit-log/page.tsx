@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
@@ -97,7 +98,7 @@ export default function AuditLogPage() {
     }
   }, [profile, supabase, typeFilter, page, activityTypes.length]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     if (authReady && session && profile) void load();
   }, [authReady, session, profile, load]);
 

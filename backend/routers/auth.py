@@ -25,7 +25,7 @@ from schemas import (
     ResetPasswordRequest,
 )
 from config import TRIAL_DAYS, BASE_URL
-from services.charlotte import welcome_email, password_reset_email
+from services.transactional_email import welcome_email, password_reset_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

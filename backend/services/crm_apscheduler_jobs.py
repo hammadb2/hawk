@@ -214,3 +214,31 @@ async def run_aria_client_health_job() -> None:
         logger.info("scheduler job run_aria_client_health_job ok: %s", result)
     except Exception:
         logger.exception("scheduler job run_aria_client_health_job failed")
+
+
+async def run_sla_auto_scan_job() -> None:
+    """Every 2 min: scan prospects stuck in stage=new for > 10 min (soft-drop if score>=85)."""
+    try:
+        from services.aria_sla_auto_scan import run_sla_auto_scan
+
+        result = await asyncio.to_thread(run_sla_auto_scan)
+        logger.info("scheduler job run_sla_auto_scan_job ok: %s", result)
+    except Exception:
+        logger.exception("scheduler job run_sla_auto_scan_job failed")
+
+
+async def run_rolling_dispatch_job() -> None:
+    """Hourly 9am-4pm MST: dispatch per-vertical slice toward 200/day/campaign (600/day total)."""
+    try:
+        from services.aria_rolling_dispatch import run_rolling_dispatch
+
+        result = await asyncio.to_thread(run_rolling_dispatch)
+        logger.info("scheduler job run_rolling_dispatch_job ok: %s", result)
+    except Exception as e:
+        logger.exception("scheduler job run_rolling_dispatch_job failed")
+        try:
+            from services.crm_openphone import send_ceo_sms
+
+            send_ceo_sms(f"ARIA rolling dispatch failed: {e!s}"[:1500])
+        except Exception:
+            pass

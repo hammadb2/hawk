@@ -94,11 +94,11 @@ See **backend/.env.example**. Main ones:
 - `DATABASE_URL` — SQLite or PostgreSQL
 - `HAWK_SCANNER_RELAY_URL` — Ghost relay (default 178.104.27.211:8002)
 - `STRIPE_*` — Billing
-- `OPENAI_API_KEY`, `OPENAI_MODEL` — Ask HAWK, portal AI, Charlotte, scanner interpretation (when API hosts those features)
-- `CHARLOTTE_*` — Transactional email (Revenue-Ops)
+- `OPENAI_API_KEY`, `OPENAI_MODEL` — Ask HAWK, portal AI, ARIA drafts, scanner interpretation (when API hosts those features)
+- `TRANSACTIONAL_EMAIL_WEBHOOK_URL`, `TRANSACTIONAL_EMAIL_API_KEY` — optional relay for welcome / password-reset / digest emails
 - `HAWK_CRON_SECRET` or `CRON_SECRET` — Cron endpoints (same header value)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRM_EMAIL_WEBHOOK_SECRET` — CRM webhooks (backend only)
-- `SMARTLEAD_API_KEY` — optional; Charlotte / Smartlead when enabled
+- `SMARTLEAD_API_KEY` — optional; ARIA / Smartlead dispatch when enabled
 
 ---
 
@@ -114,5 +114,5 @@ See **backend/.env.example**. Main ones:
 
 ## Auth
 
-- **Forgot password:** User requests reset → backend creates 1h token, Charlotte sends email with link to `/reset-password?token=...` → user sets new password via `POST /api/auth/reset-password`.
+- **Forgot password:** User requests reset → backend creates 1h token, transactional email relay (if configured) sends a link to `/reset-password?token=...` → user sets new password via `POST /api/auth/reset-password`.
 - **Dashboard/onboarding** are protected by middleware (cookie `hawk_auth`). Login/register set the cookie; logout clears it.

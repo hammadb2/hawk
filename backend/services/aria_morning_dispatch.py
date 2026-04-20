@@ -282,7 +282,7 @@ def run_morning_dispatch() -> dict[str, Any]:
     if enabled.lower() not in ("true", "1", "yes"):
         return {**stats, "ok": False, "skipped": True, "reason": "pipeline_dispatch_enabled is false"}
 
-    daily_limit = int(_get_setting("daily_send_limit", "3000"))
+    daily_limit = int(_get_setting("daily_send_limit", "600"))
 
     try:
         # Pull all ready leads

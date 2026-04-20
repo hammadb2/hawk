@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCrmAuth } from "@/components/crm/crm-auth-provider";
 import type {
@@ -187,6 +187,82 @@ export function ProspectProfile({
     });
   }
 
+  /** Clear persistent scanning state on this prospect row (e.g. after timeout). */
+  const clearScanState = useCallback(
+    async (prospectId: string) => {
+      await supabase
+        .from("prospects")
+        .update({
+          active_scan_job_id: null,
+          scan_started_at: null,
+          scan_last_polled_at: null,
+          scan_trigger: null,
+        })
+        .eq("id", prospectId);
+    },
+    [supabase],
+  );
+
+  /** Poll an already-enqueued scan job until complete, then finalize. Reusable
+   *  both for fresh scans and for resuming after a page reload. */
+  const pollAndFinalize = useCallback(
+    async (jobId: string, prospectId: string): Promise<void> => {
+      const maxPolls = 400; // ~20 min at 3s
+      for (let i = 0; i < maxPolls; i++) {
+        setScanPhase(`Scanning… (~${(i + 1) * 3}s)`);
+        await new Promise((r) => setTimeout(r, 3000));
+
+        const pollRes = await fetch(`/api/crm/scan-job/${encodeURIComponent(jobId)}`);
+        const pollRaw = await pollRes.text();
+        let poll: { status?: string; error?: string; detail?: string } = {};
+        try {
+          if (pollRaw) poll = JSON.parse(pollRaw) as typeof poll;
+        } catch {
+          toast.error("Invalid response while polling scan status");
+          await clearScanState(prospectId);
+          return;
+        }
+        if (!pollRes.ok) {
+          toast.error([poll.error, poll.detail].filter(Boolean).join(" — ") || "Poll failed");
+          await clearScanState(prospectId);
+          return;
+        }
+        if (poll.status === "failed") {
+          toast.error(typeof poll.error === "string" ? poll.error : "Scan job failed");
+          await clearScanState(prospectId);
+          return;
+        }
+        if (poll.status === "complete") {
+          setScanPhase("Saving results…");
+          const finRes = await fetch("/api/crm/run-scan/finalize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobId, prospectId }),
+          });
+          const finRaw = await finRes.text();
+          let fin: { error?: string; detail?: string; score?: number; duplicate?: boolean } = {};
+          try {
+            if (finRaw) fin = JSON.parse(finRaw) as typeof fin;
+          } catch {
+            /* ignore */
+          }
+          if (!finRes.ok) {
+            toast.error([fin.error, fin.detail].filter(Boolean).join(" — ") || "Could not save scan");
+            await clearScanState(prospectId);
+            return;
+          }
+          toast.success(fin.duplicate ? "Scan already saved" : `Scan complete — score ${fin.score ?? "—"}`);
+          await load();
+          onUpdated?.();
+          return;
+        }
+      }
+      toast.error("Scan timed out — worker may be busy. Try again or check Railway scanner worker.");
+      await clearScanState(prospectId);
+    },
+    [clearScanState, load, onUpdated],
+  );
+
   async function runScan() {
     if (!p) return;
     setScanning(true);
@@ -220,71 +296,53 @@ export function ProspectProfile({
         return;
       }
 
+      // Mark as already-handled BEFORE polling so any concurrent load() (toggle
+      // hot, add note, stage change) that refreshes `p.active_scan_job_id`
+      // doesn't trip the resume useEffect into a second parallel poll loop.
+      scanResumeRef.current = jobId;
       setScanPhase("Queued…");
-      const maxPolls = 400;
-      for (let i = 0; i < maxPolls; i++) {
-        await new Promise((r) => setTimeout(r, 3000));
-        setScanPhase(`Scanning… (~${(i + 1) * 3}s)`);
-
-        const pollRes = await fetch(`/api/crm/scan-job/${encodeURIComponent(jobId)}`);
-        const pollRaw = await pollRes.text();
-        let poll: {
-          status?: string;
-          error?: string;
-          result?: Record<string, unknown>;
-        } = {};
-        try {
-          if (pollRaw) poll = JSON.parse(pollRaw) as typeof poll;
-        } catch {
-          toast.error("Invalid response while polling scan status");
-          return;
-        }
-
-        if (!pollRes.ok) {
-          toast.error([poll.error, (poll as { detail?: string }).detail].filter(Boolean).join(" — ") || "Poll failed");
-          return;
-        }
-
-        if (poll.status === "failed") {
-          toast.error(typeof poll.error === "string" ? poll.error : "Scan job failed");
-          return;
-        }
-
-        if (poll.status === "complete") {
-          setScanPhase("Saving results…");
-          const finRes = await fetch("/api/crm/run-scan/finalize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jobId, prospectId: p.id }),
-          });
-          const finRaw = await finRes.text();
-          let fin: { error?: string; detail?: string; score?: number; duplicate?: boolean } = {};
-          try {
-            if (finRaw) fin = JSON.parse(finRaw) as typeof fin;
-          } catch {
-            /* ignore */
-          }
-          if (!finRes.ok) {
-            toast.error([fin.error, fin.detail].filter(Boolean).join(" — ") || "Could not save scan");
-            return;
-          }
-          toast.success(
-            fin.duplicate ? "Scan already saved" : `Scan complete — score ${fin.score ?? "—"}`,
-          );
-          await load();
-          onUpdated?.();
-          return;
-        }
-      }
-
-      toast.error("Scan timed out — worker may be busy. Try again or check Railway scanner worker.");
+      await pollAndFinalize(jobId, p.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Network error — could not reach scan service");
+      if (p) {
+        await clearScanState(p.id);
+      }
     } finally {
       setScanning(false);
       setScanPhase(null);
     }
   }
+
+  /** Resume an in-flight scan after a page reload. Fires once per prospect load. */
+  const scanResumeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!p) return;
+    const jobId = p.active_scan_job_id;
+    if (!jobId) return;
+    // Only resume once per job_id to avoid infinite re-polling on list refreshes.
+    if (scanResumeRef.current === jobId) return;
+
+    // Watchdog: if it's been stuck for > 20 min, assume worker crashed.
+    const startedMs = p.scan_started_at ? new Date(p.scan_started_at).getTime() : 0;
+    const ageSec = startedMs ? (Date.now() - startedMs) / 1000 : Number.POSITIVE_INFINITY;
+    if (ageSec > 20 * 60) {
+      void clearScanState(p.id).then(() => void load());
+      return;
+    }
+
+    scanResumeRef.current = jobId;
+    setScanning(true);
+    const elapsed = Math.max(0, Math.round(ageSec));
+    setScanPhase(`Resuming… (~${elapsed}s so far)`);
+    void (async () => {
+      try {
+        await pollAndFinalize(jobId, p.id);
+      } finally {
+        setScanning(false);
+        setScanPhase(null);
+      }
+    })();
+  }, [p, clearScanState, pollAndFinalize, load]);
 
   async function toggleHot() {
     if (!p) return;
@@ -607,20 +665,53 @@ export function ProspectProfile({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-1.5">
               <Button
                 size="sm"
                 className={cn(
-                  "bg-emerald-600 text-white hover:bg-emerald-500",
-                  scanning && "animate-pulse ring-2 ring-amber-400/70 ring-offset-2 ring-offset-crmSurface",
+                  "relative overflow-hidden transition-all",
+                  scanning
+                    ? "cursor-not-allowed bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-600/40 ring-2 ring-amber-300/60 ring-offset-2 ring-offset-crmSurface"
+                    : "bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-md hover:shadow-emerald-600/30",
                 )}
                 onClick={() => void runScan()}
                 disabled={scanning}
               >
-                {scanning ? "Scanning…" : "Run scan"}
+                {scanning && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  />
+                )}
+                <span className="relative flex items-center gap-2">
+                  {scanning ? (
+                    <>
+                      <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="4" />
+                        <path
+                          d="M22 12a10 10 0 0 1-10 10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      Scanning…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                      </svg>
+                      Run scan
+                    </>
+                  )}
+                </span>
               </Button>
               {scanning && scanPhase && (
-                <span className="max-w-[200px] text-right text-[10px] text-amber-200/90">{scanPhase}</span>
+                <span className="max-w-[220px] rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-right text-[10px] font-medium text-amber-200/90">
+                  {scanPhase}
+                </span>
               )}
             </div>
             <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-slate-200" onClick={() => setLogOpen(true)}>
@@ -813,11 +904,13 @@ export function ProspectProfile({
           )}
           {emailEvents.length === 0 && (
             <p className="text-slate-500">
-              No email events yet. POST to the API webhook (see{" "}
-              <Link href="/crm/charlotte" className="text-emerald-400 hover:underline">
-                Charlotte
+              No email events yet. ARIA will draft and dispatch the first-touch
+              email via Smartlead once this prospect is enriched — see{" "}
+              <Link href="/crm/ai" className="text-emerald-400 hover:underline">
+                ARIA
               </Link>
-              ) or connect Smartlead with <code className="text-slate-500">X-CRM-Webhook-Secret</code>.
+              {" "}for status, or connect Smartlead directly with{" "}
+              <code className="text-slate-500">X-CRM-Webhook-Secret</code>.
             </p>
           )}
           {emailEvents.map((ev) => {

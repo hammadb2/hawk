@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLiveEffect } from "@/lib/hooks/use-refresh-signal";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
@@ -203,7 +204,7 @@ function PortalHomeContent() {
     setLoading(false);
   }, [router, supabase, searchParams]);
 
-  useEffect(() => {
+  useLiveEffect(() => {
     void load();
   }, [load]);
 

@@ -29,8 +29,9 @@ async function fetchProspectsList(filter: ProspectsListFilter): Promise<Prospect
 
 export function useProspectsList(pipelineFilter: ProspectsListFilter) {
   return useSWR(prospectsSwrKey(pipelineFilter), () => fetchProspectsList(pipelineFilter), {
-    revalidateOnFocus: false,
-    dedupingInterval: 30000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    dedupingInterval: 15000,
   });
 }
 
@@ -52,7 +53,7 @@ export function useClients() {
       if (error) throw error;
       return (data as CrmClientRow[]) ?? [];
     },
-    { revalidateOnFocus: false, dedupingInterval: 30000 }
+    { revalidateOnFocus: true, revalidateOnReconnect: true, dedupingInterval: 15000 }
   );
 }
 
@@ -67,7 +68,7 @@ export function useProfiles() {
       if (error) throw error;
       return (data as Pick<Profile, "id" | "full_name" | "email" | "role" | "health_score">[]) ?? [];
     },
-    { revalidateOnFocus: false, dedupingInterval: 60000 }
+    { revalidateOnFocus: true, revalidateOnReconnect: true, dedupingInterval: 30000 }
   );
 }
 
@@ -97,7 +98,7 @@ export function useTeamDirectory() {
       }
       return { rows: list, tlNames };
     },
-    { revalidateOnFocus: false, dedupingInterval: 30000 }
+    { revalidateOnFocus: true, revalidateOnReconnect: true, dedupingInterval: 15000 }
   );
 }
 
@@ -122,7 +123,7 @@ export function useHotLeads(enabled: boolean) {
       if (error) throw error;
       return (data as Prospect[]) ?? [];
     },
-    { revalidateOnFocus: false, dedupingInterval: 30000 }
+    { revalidateOnFocus: true, revalidateOnReconnect: true, dedupingInterval: 15000 }
   );
 }
 

@@ -1,4 +1,4 @@
-"""CRM scheduled jobs — aging reminders, onboarding, Shield, Charlotte, Phase 4 crons (Vercel/Railway + X-Cron-Secret)."""
+"""CRM scheduled jobs — aging reminders, onboarding, Shield, ARIA pipeline, Phase 4 crons (Vercel/Railway + X-Cron-Secret)."""
 
 from __future__ import annotations
 
@@ -182,7 +182,7 @@ def run_stale_pipeline_cron_internal() -> dict:
         timeout=45.0,
     )
     r.raise_for_status()
-    stale_stages = {"call_booked", "proposal_sent"}
+    stale_stages = {"call_booked"}
     rows = [x for x in (r.json() or []) if x.get("stage") in stale_stages]
     base = CRM_PUBLIC_BASE_URL.rstrip("/")
     sent = 0
@@ -245,17 +245,39 @@ def monthly_reports_pdf(
     return run_monthly_client_reports()
 
 
-@router.post("/charlotte-run")
-def charlotte_daily_run(
+@router.post("/post-scan-pipeline/{prospect_id}")
+def post_scan_pipeline_trigger(
+    prospect_id: str,
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
 ):
-    """
-    DEPRECATED — Charlotte automation replaced by nightly-pipeline.
-    This endpoint now redirects to the nightly pipeline for backward compatibility.
-    Use POST /api/crm/cron/nightly-pipeline instead.
+    """Manual-scan finalize hook.
+
+    Runs the single-prospect post-scan pipeline (Apify enrichment → ZeroBounce
+    → ARIA personalized draft). Called by the Next.js finalize route after a
+    manual "Run scan" completes so those prospects get the same auto-enrich
+    treatment the SLA auto-scan already applies.
     """
     _require_secret(x_cron_secret)
-    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
+    from services.aria_post_scan_pipeline import run_post_scan_sync
+
+    result = run_post_scan_sync(prospect_id)
+    return result
+
+
+@router.post("/rolling-dispatch")
+def rolling_dispatch_trigger(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Manual trigger for the rolling dispatcher.
+
+    Safe to call outside the scheduled 9am-4pm MST window — the service
+    computes remaining quota off the current hour, so a manual call after
+    hours will just dispatch the full day's remaining budget.
+    """
+    _require_secret(x_cron_secret)
+    from services.aria_rolling_dispatch import run_rolling_dispatch
+
+    return run_rolling_dispatch()
 
 
 @router.post("/nightly-pipeline")
@@ -269,7 +291,7 @@ def nightly_pipeline_run(
     Batched OpenAI (20 per call) → CASL footer + timezone scheduling →
     Store in aria_lead_inventory as 'ready'.
 
-    Replaces the old Charlotte daily run.
+    Replaces the legacy nightly agent run.
     Target: complete within 90 minutes for 3,000 leads.
     """
     _require_secret(x_cron_secret)
@@ -292,6 +314,15 @@ def nightly_pipeline_run(
         except Exception:
             pass
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+# Legacy alias — external schedulers (cron-job.org) may still target the
+# old Charlotte path. Keeps them working while teams migrate URLs.
+@router.post("/charlotte-run", include_in_schema=False)
+def nightly_pipeline_run_legacy(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
 
 
 @router.post("/morning-dispatch")
@@ -677,4 +708,4 @@ def aria_competitive_brief_cron(
     except Exception as e:
         logger.exception("aria competitive brief cron failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
-# scanner-health, va-reply-escalation, charlotte-quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
+# scanner-health, va-reply-escalation, pipeline quality-check live in routers/crm_scale.cron_routes (mounted in main.py).

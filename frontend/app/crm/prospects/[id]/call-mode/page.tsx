@@ -217,7 +217,11 @@ export default function CallModePage() {
             <section className={`space-y-4 p-6 ${crmSurfaceCard}`}>
               <h2 className="text-lg font-medium text-white">Loaded scan</h2>
               <div className="flex flex-col items-center justify-center gap-2 py-4">
-                <HawkScoreRing score={scan?.hawk_score ?? p?.hawk_score ?? 0} size={120} />
+                <HawkScoreRing
+                  score={scan?.hawk_score ?? p?.hawk_score ?? 0}
+                  size={120}
+                  showEmptyState={!scan}
+                />
                 <span className="text-sm text-slate-400">Grade {(scan?.grade as string) || "—"}</span>
               </div>
               <ul className="space-y-2 text-sm text-slate-300">

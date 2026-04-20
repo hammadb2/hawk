@@ -601,7 +601,7 @@ def _fn_generate_document(args: dict[str, Any]) -> str:
 
 
 def _fn_get_pipeline_summary(headers: dict[str, str]) -> str:
-    stages = ["new", "scanned", "loom_sent", "replied", "call_booked", "proposal_sent", "closed_won", "lost"]
+    stages = ["new", "scanning", "scanned", "sent_email", "replied", "call_booked", "closed_won", "lost"]
     result: dict[str, Any] = {"stages": {}, "total": 0}
 
     for stage in stages:
