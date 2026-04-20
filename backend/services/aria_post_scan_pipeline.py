@@ -5,9 +5,8 @@ Runs immediately after a prospect's scan completes (SLA auto-scan or manual
 
 1. Skip if stage past `scanned` (rep/ARIA already moved it) or already dispatched.
 2. Skip if already has a verified contact + email_subject (idempotent re-runs).
-3. Run Apify enrichment (actor 2 LinkedIn → actor 3 Leads Finder → actor 4
-   Website Crawl, in that priority order) for this one domain. If none of
-   them surface a contact email, soft-drop the prospect.
+3. Enrich contact via Apollo.io (domain → decision-maker lookup with verified
+   email + phone + LinkedIn URL). If Apollo returns nothing, soft-drop.
 4. ZeroBounce verify the email. `valid` or `catch-all` proceeds; anything else
    soft-drops.
 5. Classify the vertical (uses industry / business_name / canonical_vertical)
@@ -17,9 +16,10 @@ Runs immediately after a prospect's scan completes (SLA auto-scan or manual
    fallback stay consistent with the rest of the stack). Greet the contact
    by first name whenever available.
 7. Persist ``contact_email``, ``contact_name``, ``contact_title``,
-   ``email_finder``, ``zero_bounce_result``, ``email_subject``, ``email_body``,
+   ``contact_phone``, ``contact_linkedin_url``, ``email_finder``,
+   ``zero_bounce_result``, ``email_subject``, ``email_body``,
    ``smartlead_campaign_id`` and flip ``pipeline_status=ready`` so the 600/day
-   dispatcher (PR C) can pick the prospect up.
+   dispatcher can pick the prospect up.
 
 Soft-drop path: ``stage=lost``, ``pipeline_status=suppressed``, plus a
 ``suppressions`` row keyed by domain so the nightly discovery never re-queues
@@ -37,12 +37,8 @@ from typing import Any
 import httpx
 
 from config import SMARTLEAD_API_KEY, SUPABASE_URL
-from services.aria_apify_scraper import (
-    canonical_vertical,
-    run_actor2_linkedin,
-    run_actor3_leads_finder,
-    run_actor4_website_crawl,
-)
+from services.apollo_enrichment import enrich_single_domain
+from services.aria_apify_scraper import canonical_vertical
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +71,10 @@ def _fetch_prospect(prospect_id: str) -> dict[str, Any] | None:
             params={
                 "id": f"eq.{prospect_id}",
                 "select": (
-                    "id,domain,company_name,industry,stage,pipeline_status,hawk_score,"
-                    "contact_name,contact_email,contact_title,email_finder,email_subject,"
-                    "email_body,vulnerability_found,smartlead_campaign_id,dispatched_at"
+                    "id,domain,company_name,industry,city,province,stage,pipeline_status,hawk_score,"
+                    "contact_name,contact_email,contact_title,contact_phone,contact_linkedin_url,"
+                    "email_finder,email_subject,email_body,vulnerability_found,"
+                    "smartlead_campaign_id,dispatched_at"
                 ),
                 "limit": "1",
             },
@@ -200,78 +197,31 @@ def _resolve_campaign_id(vertical: str) -> str:
     return os.environ.get("SMARTLEAD_CAMPAIGN_ID", "").strip()
 
 
-# ── Apify single-prospect enrichment ─────────────────────────────────────
-
-
-def _build_enrichment_lead(prospect: dict[str, Any], vertical: str) -> dict[str, Any]:
-    """Shape the prospect row so the shared Apify actor wrappers accept it."""
-    return {
-        "id": prospect["id"],
-        "domain": (prospect.get("domain") or "").strip().lower(),
-        "company_name": prospect.get("company_name") or "",
-        "vertical": vertical,
-        "industry": prospect.get("industry") or vertical,
-    }
+# ── Apollo single-prospect enrichment ────────────────────────────────────
 
 
 async def _enrich_single(prospect: dict[str, Any], vertical: str) -> dict[str, Any] | None:
-    """Run actors 2→3→4 in fall-through order. Returns first hit or None."""
-    lead = _build_enrichment_lead(prospect, vertical)
-    domain = lead["domain"]
+    """Enrich the prospect's decision-maker contact via Apollo.io.
+
+    Replaces the Apify actor 2→3→4 fall-through. Apollo returns verified
+    email, first/last name, title, phone, and LinkedIn URL in a single call,
+    which is both cheaper and faster. Returns ``None`` when no verified
+    contact is found so the caller can soft-drop.
+    """
+    domain = (prospect.get("domain") or "").strip().lower()
     if not domain:
         return None
-    leads = [lead]
-
-    # Actor 2: LinkedIn decision-maker lookup.
     try:
-        a2 = await run_actor2_linkedin(leads)
+        return await enrich_single_domain(
+            domain=domain,
+            vertical=vertical,
+            company_name=prospect.get("company_name") or "",
+            city=prospect.get("city") or None,
+            province=prospect.get("province") or None,
+        )
     except Exception as exc:
-        logger.warning("post-scan actor2 prospect=%s failed: %s", prospect["id"], exc)
-        a2 = {}
-    hit = a2.get(domain) if isinstance(a2, dict) else None
-    if hit and hit.get("email") and "@" in str(hit["email"]):
-        return {
-            "email": str(hit["email"]).lower().strip(),
-            "first_name": str(hit.get("first_name") or "").strip(),
-            "last_name": str(hit.get("last_name") or "").strip(),
-            "title": str(hit.get("title") or "").strip(),
-            "source": "linkedin",
-        }
-
-    # Actor 3: Leads Finder (mark lead as still email-less for the actor's filter).
-    lead["_email_found"] = False
-    try:
-        a3 = await run_actor3_leads_finder(leads)
-    except Exception as exc:
-        logger.warning("post-scan actor3 prospect=%s failed: %s", prospect["id"], exc)
-        a3 = {}
-    hit = a3.get(domain) if isinstance(a3, dict) else None
-    if hit and hit.get("email") and "@" in str(hit["email"]):
-        return {
-            "email": str(hit["email"]).lower().strip(),
-            "first_name": str(hit.get("first_name") or "").strip(),
-            "last_name": str(hit.get("last_name") or "").strip(),
-            "title": str(hit.get("title") or "").strip(),
-            "source": "leads_finder",
-        }
-
-    # Actor 4: Website crawl (last resort).
-    try:
-        a4 = await run_actor4_website_crawl(leads)
-    except Exception as exc:
-        logger.warning("post-scan actor4 prospect=%s failed: %s", prospect["id"], exc)
-        a4 = {}
-    hit = a4.get(domain) if isinstance(a4, dict) else None
-    if hit and hit.get("email") and "@" in str(hit["email"]):
-        return {
-            "email": str(hit["email"]).lower().strip(),
-            "first_name": "",
-            "last_name": "",
-            "title": "",
-            "source": "website_crawl",
-        }
-
-    return None
+        logger.warning("post-scan apollo enrichment prospect=%s failed: %s", prospect.get("id"), exc)
+        return None
 
 
 # ── ZeroBounce single-email gate ─────────────────────────────────────────
@@ -405,6 +355,8 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
         "contact_email": email,
         "contact_name": contact_name or None,
         "contact_title": enrichment.get("title") or None,
+        "contact_phone": enrichment.get("phone") or None,
+        "contact_linkedin_url": enrichment.get("linkedin_url") or None,
         "email_finder": enrichment.get("source") or None,
         "zero_bounce_result": zb_status,
         "email_subject": email_draft.get("subject", "")[:998],

@@ -35,6 +35,7 @@ from routers import (
     crm_enterprise,
     crm_invite,
     crm_onboarding,
+    crm_va,
     crm_payment,
     crm_portal_api,
     crm_scale,
@@ -153,6 +154,7 @@ app.include_router(crm_settings_router.router)
 app.include_router(crm_scale.cron_routes)
 app.include_router(crm_invite.router)
 app.include_router(crm_onboarding.router)
+app.include_router(crm_va.router)
 app.include_router(crm_ai_command.router)
 app.include_router(aria_pipeline.router)
 app.include_router(aria_voice.router)

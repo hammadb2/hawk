@@ -19,11 +19,11 @@ export function DiscoverySection({ value, onChange }: { value: ValueGetter; onCh
             placeholder="Toronto, Vancouver, Calgary, …"
           />
         </Field>
-        <Field label="Max results per search" hint="Google Places cap per city+vertical. Default 10.">
+        <Field label="Max results per search" hint="Google Places cap per city+vertical. Default 40.">
           <TextInput
             type="number"
             min={1}
-            max={20}
+            max={60}
             value={value("google_places_max_per_search")}
             onChange={(v) => onChange("google_places_max_per_search", v)}
           />
@@ -35,30 +35,60 @@ export function DiscoverySection({ value, onChange }: { value: ValueGetter; onCh
             placeholder="dental, legal, accounting"
           />
         </Field>
+        <Field label="Daily target" hint="Total leads/day across Google Places + Apollo topup. Default 2000.">
+          <TextInput
+            type="number"
+            min={100}
+            max={10000}
+            value={value("discovery_daily_target")}
+            onChange={(v) => onChange("discovery_daily_target", v)}
+          />
+        </Field>
       </SettingsCard>
 
       <SettingsCard
-        title="Apify enrichment actors"
-        description="Which contact-enrichment actors to run after a scan. Each adds cost — off = skipped."
+        title="Apollo enrichment"
+        description="Apify actors 2/3/4 have been retired. Apollo mixed_people/search resolves verified decision-maker contacts per domain."
       >
         <Toggle
-          label="Leads Finder"
-          description="Actor 2 — pulls decision-maker contact from domain."
-          value={value("apify_enable_leadsfinder")}
-          onChange={(v) => onChange("apify_enable_leadsfinder", v)}
+          label="Apollo people topup"
+          description="If Google Places returns fewer than the daily target, top up with Apollo people search."
+          value={value("apollo_people_topup_enabled")}
+          onChange={(v) => onChange("apollo_people_topup_enabled", v)}
         />
+        <Field
+          label="Daily credit cap"
+          hint="Soft budget guard — enrichment stops for the day once hit."
+        >
+          <TextInput
+            type="number"
+            min={0}
+            max={50000}
+            value={value("apollo_daily_credit_cap")}
+            onChange={(v) => onChange("apollo_daily_credit_cap", v)}
+          />
+        </Field>
+      </SettingsCard>
+
+      <SettingsCard
+        title="VA manual-outreach queue"
+        description="Prospects past the 600/day automated dispatcher cap are routed to /crm/va for manual outreach."
+      >
         <Toggle
-          label="LinkedIn company scraper"
-          description="Actor 3 — LinkedIn owner/executive lookup."
-          value={value("apify_enable_linkedin")}
-          onChange={(v) => onChange("apify_enable_linkedin", v)}
+          label="VA queue enabled"
+          description="If off, overflow prospects stay in 'ready' rather than being routed to va_queue."
+          value={value("va_queue_enabled")}
+          onChange={(v) => onChange("va_queue_enabled", v)}
         />
-        <Toggle
-          label="Website crawler"
-          description="Actor 4 — generic fallback contact scrape. Slow, expensive."
-          value={value("apify_enable_website_crawler")}
-          onChange={(v) => onChange("apify_enable_website_crawler", v)}
-        />
+        <Field label="Daily target per VA" hint="Used on the /crm/va Team tab to show pacing.">
+          <TextInput
+            type="number"
+            min={1}
+            max={500}
+            value={value("va_daily_target_per_va")}
+            onChange={(v) => onChange("va_daily_target_per_va", v)}
+          />
+        </Field>
       </SettingsCard>
     </>
   );
