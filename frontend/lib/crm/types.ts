@@ -94,6 +94,12 @@ export type Prospect = {
   province?: string | null;
   reply_received_at?: string | null;
   call_booked_at?: string | null;
+  /** Persistent scanner state — survives page reloads */
+  active_scan_job_id?: string | null;
+  scan_started_at?: string | null;
+  scan_last_polled_at?: string | null;
+  scan_trigger?: string | null;
+  scanned_at?: string | null;
 };
 
 export type CrmActivityRow = {

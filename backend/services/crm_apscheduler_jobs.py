@@ -214,3 +214,14 @@ async def run_aria_client_health_job() -> None:
         logger.info("scheduler job run_aria_client_health_job ok: %s", result)
     except Exception:
         logger.exception("scheduler job run_aria_client_health_job failed")
+
+
+async def run_sla_auto_scan_job() -> None:
+    """Every 2 min: scan prospects stuck in stage=new for > 10 min (soft-drop if score>=85)."""
+    try:
+        from services.aria_sla_auto_scan import run_sla_auto_scan
+
+        result = await asyncio.to_thread(run_sla_auto_scan)
+        logger.info("scheduler job run_sla_auto_scan_job ok: %s", result)
+    except Exception:
+        logger.exception("scheduler job run_sla_auto_scan_job failed")
