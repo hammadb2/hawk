@@ -118,6 +118,19 @@ MONITOR_API_BASE_URL = os.environ.get("MONITOR_API_BASE_URL", "").strip().rstrip
 # CEO SMS (OpenPhone) — E.164, e.g. +15551234567
 CRM_CEO_PHONE_E164 = os.environ.get("CRM_CEO_PHONE_E164", "").strip()
 
+# Closer (Kevin) SMS number for booking alerts — E.164. Falls back to the
+# ``kevin_sms_number`` row in ``crm_settings`` when this env var is empty so
+# the CEO can rotate it from the UI without a redeploy.
+KEVIN_SMS_NUMBER = os.environ.get("KEVIN_SMS_NUMBER", "").strip()
+
+# Auto-reply kill switch (env var override for crm_settings.autonomous_reply_enabled).
+# Leave empty to defer to the DB setting; set to "false" to force-disable.
+ARIA_AUTONOMOUS_REPLY_ENABLED = os.environ.get("ARIA_AUTONOMOUS_REPLY_ENABLED", "").strip()
+
+# Human-checkpoint threshold — any deal at or above this monthly-recurring
+# value bypasses auto-send and routes to the VA queue + SMS alert.
+ARIA_HUMAN_CHECKPOINT_USD = int(os.environ.get("ARIA_HUMAN_CHECKPOINT_USD", "5000") or "5000")
+
 # Client portal — welcome / drip (Phase 2B)
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 # Client-facing mail — verify securedbyhawk.com in Resend; Railway: RESEND_FROM_EMAIL=noreply@securedbyhawk.com

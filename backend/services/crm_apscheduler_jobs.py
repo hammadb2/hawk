@@ -289,3 +289,24 @@ async def run_mailbox_daily_reset_job() -> None:
         logger.info("scheduler job run_mailbox_daily_reset_job ok: reset=%s", result)
     except Exception:
         logger.exception("scheduler job run_mailbox_daily_reset_job failed")
+
+
+async def run_aria_scheduled_actions_job() -> None:
+    """Every 5 min: drain the aria_scheduled_actions queue.
+
+    Fires 48hr follow-ups, 24hr call reminders, weekly nurture drips, OOO
+    return follow-ups, and 90-day snooze re-engagements — whatever is due.
+    Handlers are registered once at app startup by ``aria_nurture.register_handlers``.
+    """
+    try:
+        from services import aria_scheduled_actions
+
+        result = await asyncio.to_thread(aria_scheduled_actions.run_due_actions)
+        logger.info(
+            "scheduler job run_aria_scheduled_actions_job ok: claimed=%s done=%s failed=%s",
+            result.get("claimed"),
+            result.get("done"),
+            result.get("failed"),
+        )
+    except Exception:
+        logger.exception("scheduler job run_aria_scheduled_actions_job failed")

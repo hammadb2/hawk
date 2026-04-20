@@ -61,6 +61,7 @@ from services.crm_apscheduler_jobs import (
     run_monthly_reports_job,
     run_mailbox_daily_reset_job,
     run_mailbox_imap_poller_job,
+    run_aria_scheduled_actions_job,
     run_morning_dispatch_job,
     run_nightly_pipeline_job,
     run_onboarding_drip_job,
@@ -117,10 +118,25 @@ scheduler.add_job(run_pipeline_doctor_job, CronTrigger(minute="*/15", timezone=M
 # per-mailbox daily send counters at midnight MST.
 scheduler.add_job(run_mailbox_imap_poller_job, CronTrigger(minute="*/5", timezone=MST))
 scheduler.add_job(run_mailbox_daily_reset_job, CronTrigger(hour=0, minute=0, timezone=MST))
+# Autonomous reply loop: drain the aria_scheduled_actions queue every 5 min.
+# Handles 48hr follow-ups, 24hr call reminders, weekly nurture drips, OOO
+# return follow-ups, and 90-day snoozes.
+scheduler.add_job(run_aria_scheduled_actions_job, CronTrigger(minute="*/5", timezone=MST))
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Register autonomous-reply scheduled-action handlers before the
+    # scheduler starts, so the very first tick has handlers available.
+    try:
+        from services import aria_nurture
+
+        aria_nurture.register_handlers()
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Failed to register ARIA nurture handlers")
+
     scheduler.start()
     yield
     scheduler.shutdown(wait=False)
