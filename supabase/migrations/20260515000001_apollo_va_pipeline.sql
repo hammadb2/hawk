@@ -133,8 +133,12 @@ create table if not exists public.va_outreach_log (
 create index if not exists idx_va_outreach_log_assignment
   on public.va_outreach_log (assignment_id);
 
+-- Composite index for per-VA daily rollups. We index on raw logged_at (not
+-- its ::date cast) because casting timestamptz → date depends on session tz
+-- and Postgres rejects non-IMMUTABLE expressions in index definitions.
+-- Range queries (logged_at >= :start and < :end) still use this index.
 create index if not exists idx_va_outreach_log_va_day
-  on public.va_outreach_log (va_id, (logged_at::date));
+  on public.va_outreach_log (va_id, logged_at);
 
 alter table public.va_outreach_log enable row level security;
 
