@@ -1,4 +1,4 @@
-"""Post-scan pipeline: auto-enrich + ZeroBounce verify + ARIA personalized draft.
+"""Post-scan pipeline: auto-enrich + ARIA personalized draft.
 
 Runs immediately after a prospect's scan completes (SLA auto-scan or manual
 "Run scan" finalize). For a single prospect:
@@ -6,20 +6,27 @@ Runs immediately after a prospect's scan completes (SLA auto-scan or manual
 1. Skip if stage past `scanned` (rep/ARIA already moved it) or already dispatched.
 2. Skip if already has a verified contact + email_subject (idempotent re-runs).
 3. Enrich contact via Apollo.io (domain → decision-maker lookup with verified
-   email + phone + LinkedIn URL). If Apollo returns nothing, soft-drop.
-4. ZeroBounce verify the email. `valid` or `catch-all` proceeds; anything else
-   soft-drops.
-5. Classify the vertical (uses industry / business_name / canonical_vertical)
+   email + phone + LinkedIn URL, filtered to ``verified``/``likely to engage``
+   statuses only). If Apollo returns nothing, soft-drop.
+4. Classify the vertical (uses industry / business_name / canonical_vertical)
    to pick the correct Smartlead campaign id from crm_settings.
-6. Generate a personalized first-touch email via ARIA (reuses
+5. Generate a personalized first-touch email via ARIA (reuses
    ``aria_pipeline._generate_email_for_lead`` so prompt / tone / PIPEDA
    fallback stay consistent with the rest of the stack). Greet the contact
    by first name whenever available.
-7. Persist ``contact_email``, ``contact_name``, ``contact_title``,
+6. Persist ``contact_email``, ``contact_name``, ``contact_title``,
    ``contact_phone``, ``contact_linkedin_url``, ``email_finder``,
-   ``zero_bounce_result``, ``email_subject``, ``email_body``,
-   ``smartlead_campaign_id`` and flip ``pipeline_status=ready`` so the 600/day
-   dispatcher can pick the prospect up.
+   ``email_subject``, ``email_body``, ``smartlead_campaign_id`` and flip
+   ``pipeline_status=ready`` so the 600/day dispatcher can pick the prospect up.
+
+ZeroBounce is intentionally **disabled** on the verify step — Apollo already
+returns only ``verified`` / ``likely to engage`` email statuses (see
+``VERTICAL_TITLES`` filter in :mod:`services.apollo_enrichment`) and the
+extra ZB hop was soft-dropping too many catch-all domains that do actually
+receive mail. The column ``zero_bounce_result`` is still written with
+``'skipped'`` so historical analytics queries keep working. The kill switch
+lives in ``crm_settings.zerobounce_post_scan_enabled`` — flip to ``true`` to
+re-enable without a redeploy.
 
 Soft-drop path: ``stage=lost``, ``pipeline_status=suppressed``, plus a
 ``suppressions`` row keyed by domain so the nightly discovery never re-queues
@@ -39,6 +46,7 @@ import httpx
 from config import SMARTLEAD_API_KEY, SUPABASE_URL
 from services.apollo_enrichment import enrich_single_domain
 from services.aria_apify_scraper import canonical_vertical
+from services.crm_bool_setting import fetch_crm_bool
 
 logger = logging.getLogger(__name__)
 
@@ -228,9 +236,20 @@ async def _enrich_single(prospect: dict[str, Any], vertical: str) -> dict[str, A
 
 
 def _zerobounce_verify(email: str) -> tuple[str, dict[str, Any]]:
-    """Return (status, raw_result). `status='unknown'` when disabled/error."""
+    """Return (status, raw_result). Gated by ``zerobounce_post_scan_enabled``.
+
+    The post-scan pipeline treats ZeroBounce as an optional tripwire: Apollo's
+    own ``contact_email_status`` filter (``verified``/``likely to engage``) is
+    already the verified-contact gate. When the CRM toggle is off (current
+    default) we short-circuit with ``status='skipped'`` so the prospect
+    proceeds to draft + dispatch without a second verification hop. Flip
+    ``crm_settings.zerobounce_post_scan_enabled=true`` to re-enable without
+    a redeploy.
+    """
+    if not fetch_crm_bool("zerobounce_post_scan_enabled", default=False):
+        return "skipped", {"skipped": "zerobounce_post_scan_enabled=false"}
     if not ZEROBOUNCE_API_KEY:
-        return "unknown", {"skipped": "ZEROBOUNCE_API_KEY not configured"}
+        return "skipped", {"skipped": "ZEROBOUNCE_API_KEY not configured"}
     try:
         r = httpx.get(
             ZEROBOUNCE_VALIDATE,
@@ -310,8 +329,10 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
 
     email = str(enrichment["email"]).strip().lower()
     zb_status, zb_raw = _zerobounce_verify(email)
-    if zb_status not in ("valid", "catch-all", "unknown"):
-        # `invalid`, `spamtrap`, `abuse`, `do_not_mail`, `disposable`, etc. → drop.
+    # Apollo's verified-status filter is the gate; ZB is an opt-in tripwire
+    # only. When ZB *is* enabled, treat `skipped`, `valid`, `catch-all`, or
+    # `unknown` as proceed; every other explicit negative still soft-drops.
+    if zb_status not in ("skipped", "valid", "catch-all", "unknown"):
         _soft_drop(
             prospect_id,
             domain,

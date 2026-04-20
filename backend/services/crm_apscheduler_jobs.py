@@ -242,3 +242,24 @@ async def run_rolling_dispatch_job() -> None:
             send_ceo_sms(f"ARIA rolling dispatch failed: {e!s}"[:1500])
         except Exception:
             pass
+
+
+async def run_pipeline_doctor_job() -> None:
+    """Every 15 min: diagnose stuck outbound buckets + auto-apply escape hatches.
+
+    Runs the ARIA Pipeline Doctor autonomously. Each bucket with stuck work
+    gets its idempotent fix called (trigger SLA, release scanning watchdog,
+    backfill post-scan, kick rolling dispatch, bump Apollo cap). Any
+    ``critical`` bucket escalates via CEO SMS.
+    """
+    try:
+        from services.aria_pipeline_doctor import run_pipeline_doctor
+
+        result = await asyncio.to_thread(run_pipeline_doctor, auto_fix=True, sms_on_critical=True)
+        logger.info(
+            "scheduler job run_pipeline_doctor_job ok: total_stuck=%s critical=%s",
+            result.get("total_stuck"),
+            result.get("critical_buckets"),
+        )
+    except Exception:
+        logger.exception("scheduler job run_pipeline_doctor_job failed")
