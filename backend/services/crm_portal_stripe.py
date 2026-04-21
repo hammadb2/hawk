@@ -679,7 +679,10 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> tuple[bool, str]:
                 to_email=email,
                 first_name=fn,
                 domain=domain or "your domain",
-                cal_url=CAL_COM_BOOKING_URL,
+                # Inline fallback — CAL_COM_BOOKING_URL defaults to "" in config so
+                # the Day-0 welcome email button would otherwise render as href=""
+                # when the env var is unset in prod.
+                cal_url=CAL_COM_BOOKING_URL or "https://cal.com/hawksecurity/15min",
             )
         except Exception:
             logger.exception("Shield Day 0 welcome email failed")
@@ -687,7 +690,10 @@ def provision_portal_from_checkout(event: dict[str, Any]) -> tuple[bool, str]:
         wa_client = (
             "Welcome to HAWK Shield. Your breach response guarantee is now active. "
             "Your 90 day path to HAWK Certified starts today. "
-            f"Book your onboarding call: {CAL_COM_BOOKING_URL} "
+            # Same inline fallback as the welcome email above — WhatsApp text would
+            # otherwise read "Book your onboarding call:  Login: ..." with nothing
+            # clickable.
+            f"Book your onboarding call: {CAL_COM_BOOKING_URL or 'https://cal.com/hawksecurity/15min'} "
             f"Login: {portal_url.replace('https://', '')}"
         )
         phone = (prospect.get("phone") if prospect else None) or ""

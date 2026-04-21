@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
+
+def _booking_url() -> str:
+    """CAL_COM_BOOKING_URL defaults to "" in config so every callsite must guard
+    its own fallback — otherwise the Shield onboarding email buttons render as
+    ``href=""`` and the SMS text reads "Book here: " with nothing to click."""
+    return (CAL_COM_BOOKING_URL or "https://cal.com/hawksecurity/15min").rstrip("/")
+
 SEVERITY_ORDER = ("critical", "high", "medium", "warning", "low", "info", "ok")
 
 
@@ -290,7 +297,7 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                         to_email=email,
                         first_name=first,
                         domain=domain_s or "your domain",
-                        cal_url=CAL_COM_BOOKING_URL,
+                        cal_url=_booking_url(),
                         top_findings=tops,
                     )
                     if not c.get("onboarding_call_booked_at") and phone:
@@ -298,7 +305,7 @@ def run_shield_onboarding_sequences() -> dict[str, Any]:
                             phone,
                             f"Hi {first} your onboarding call with HAWK is not booked yet. "
                             "This is where we walk you through your findings and fix plan. "
-                            f"Book here: {CAL_COM_BOOKING_URL}",
+                            f"Book here: {_booking_url()}",
                         )
                     httpx.patch(
                         f"{SUPABASE_URL}/rest/v1/clients",
