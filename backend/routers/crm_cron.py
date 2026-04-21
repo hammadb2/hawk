@@ -478,15 +478,23 @@ def apollo_bulk_enrich(
                 "select": "id,domain,vertical,industry,company_name,city,province",
                 "pipeline_status": "eq.scanned",
                 "contact_email": "is.null",
-                "domain": "not.is.null",
-                "stage": "in.(new,scanning,scanned)",
-                "order": "scanned_at.asc.nullslast",
+                "order": "scanned_at.desc",
                 "limit": str(max(1, min(limit, 2000))),
             },
             timeout=30.0,
         )
-        r.raise_for_status()
-        prospects = r.json() or []
+        if r.status_code >= 400:
+            logger.warning(
+                "apollo-bulk-enrich query HTTP %s body=%s",
+                r.status_code, r.text[:400],
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"supabase {r.status_code}: {r.text[:300]}",
+            )
+        prospects = [p for p in (r.json() or []) if p.get("domain")]
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("apollo-bulk-enrich query failed")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
