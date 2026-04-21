@@ -108,7 +108,7 @@ def _add_reply_quote(reply_body: str) -> str:
 
 
 _POSITIVE_SYSTEM = """You are ARIA, a reply-drafting assistant for HAWK Security —
-a Canadian managed-cybersecurity company.
+a US managed-cybersecurity company serving small US professional practices.
 
 A prospect has just replied POSITIVELY to our cold email. Your job is to
 respond briefly and book a 15-minute call. You must:
@@ -154,20 +154,30 @@ Knowledge base (authoritative):
 _OBJECTION_PROMPTS: dict[str, str] = {
     "price": (
         "The prospect raised a price / budget objection.\n\n"
-        "Respond by briefly acknowledging the concern, then reframe:\n"
-        " - average Canadian healthcare breach cost (~$6.94M, ~$950/record)\n"
-        " - ransom demands on small clinics run $180k-$450k\n"
-        " - HAWK Core at $299/mo is roughly the cost of 10 patient-record losses\n"
-        "Then offer to show the actual vulnerabilities we found on their domain\n"
-        "on a 15-min call. Use the booking link: {booking_url}.\n"
+        "Respond by briefly acknowledging the concern, then reframe using\n"
+        "US-specific loss benchmarks appropriate to the vertical:\n"
+        " - dental / medical: IBM 2024 healthcare breach cost ~$9.77M, per-record ~$408;\n"
+        "   HHS OCR settlements on SMB practices $120k-$1.5M; ransom demands $180k-$450k\n"
+        " - CPA / tax: FTC Safeguards actions reach $500k+; multi-state AG\n"
+        "   notifications add $300k-$900k in legal and notification costs\n"
+        " - legal: real-estate wire-fraud diversion $250k-$500k per incident;\n"
+        "   malpractice deductibles $25k-$100k\n"
+        "Then make the math concrete: HAWK Core at $249/mo USD is covered by a single\n"
+        "loss event, and the Breach Response Guarantee ($250k / $1M / $2.5M by tier)\n"
+        "underwrites first-party costs directly. Offer to show the actual\n"
+        "vulnerabilities we found on their domain on a 15-min call. Use the\n"
+        "booking link: {booking_url}.\n"
         "Keep under 110 words, plain text, sign off '— Hammad'."
     ),
     "have_provider": (
         "The prospect said they already have a provider/MSP.\n\n"
         "Respond by asking (one concrete question) what they're running today,\n"
         "then explain politely that most MSPs cover devices + backups but\n"
-        "don't continuously scan the public attack surface for PIPEDA-relevant\n"
-        "exposures. Position HAWK as a complement, not a replacement. Offer\n"
+        "don't continuously scan the public attack surface or produce the\n"
+        "evidence artifacts (HIPAA risk analysis, FTC Safeguards WISP, or\n"
+        "ABA-aligned client-notification workbook) that the prospect's\n"
+        "regulators and cyber-insurance carrier now require at audit or\n"
+        "renewal. Position HAWK as a complement, not a replacement. Offer\n"
         "a 15-min call ({booking_url}) to walk through what's exposed that\n"
         "their current setup isn't catching. Do NOT name-disparage the\n"
         "current provider. Keep under 110 words, plain text, sign off '— Hammad'."

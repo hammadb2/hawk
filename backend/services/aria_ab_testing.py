@@ -188,7 +188,7 @@ def generate_variants(
                 {
                     "role": "system",
                     "content": (
-                        "You are a cold email optimization expert for Hawk Security, a Canadian cybersecurity company "
+                        "You are a cold email optimization expert for Hawk Security, a US cybersecurity company "
                         "targeting dental clinics, law firms, and accounting practices. "
                         "Generate an A/B test variant. Return JSON: "
                         "{\"variant_subject\": \"...\", \"variant_body\": \"...\", \"hypothesis\": \"...\"}"

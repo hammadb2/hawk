@@ -697,7 +697,7 @@ def step_hawk_scan(run_id: str, leads: list[dict[str, Any]]) -> list[dict[str, A
 
 # ── Step 5: OpenAI Personalized Email Generation ─────────────────────────
 
-EMAIL_SYSTEM_PROMPT = """You are ARIA, the outbound email writer for Hawk Security — a Canadian cybersecurity company.
+EMAIL_SYSTEM_PROMPT = """You are ARIA, the outbound email writer for Hawk Security — a US cybersecurity company serving small US professional practices.
 
 Write a cold outreach email that is SHORT (under 100 words), direct, and personalized.
 
@@ -714,12 +714,61 @@ Rules:
 - No greeting like "Dear" or "Hello"
 - Use the contact's first name only
 - Reference their exact domain
-- If no vulnerability was found, use a PIPEDA compliance angle instead
+- If no vulnerability was found, use the US regulatory angle that matches the prospect's vertical:
+    * dental / medical → HIPAA Security Rule + OCR breach notification (60-day rule, up to $2.1M/yr in civil monetary penalties)
+    * accounting / CPA / tax → FTC Safeguards Rule + 30-day breach notification to the FTC (effective May 2024)
+    * legal / law firm → ABA Formal Opinion 24-514 duty to notify clients of material data incidents (Model Rules 1.1, 1.4, 1.6)
+- Never reference Canada, PIPEDA, CASL, or any Canadian-only regulation — this is a US market
 - Keep it under 100 words total
 - Sound human, not robotic
 
 Return ONLY valid JSON: {"subject": "...", "body": "..."}
 """
+
+
+# Vertical → (regulatory_angle, fallback_email_body_fragment)
+_US_REGULATORY_ANGLE: dict[str, tuple[str, str]] = {
+    "dental": (
+        "HIPAA Security Rule compliance angle — OCR now requires breach notification within 60 days and civil penalties reach $2.1M per year",
+        "Under the HIPAA Security Rule, US dental practices must protect PHI with MFA, encryption, and continuous monitoring. OCR breach enforcement is at record highs (Westend Dental paid $350K in Dec 2024).",
+    ),
+    "medical": (
+        "HIPAA Security Rule compliance angle — OCR now requires breach notification within 60 days and civil penalties reach $2.1M per year",
+        "Under the HIPAA Security Rule, US medical practices must protect PHI with MFA, encryption, and continuous monitoring. OCR breach enforcement is at record highs.",
+    ),
+    "accounting": (
+        "FTC Safeguards Rule compliance angle — the May 2024 amendment requires 30-day breach notification and a written information security program (WISP)",
+        "Under the amended FTC Safeguards Rule, US CPA and tax firms must maintain a written information security program (WISP), continuous external monitoring, and notify the FTC within 30 days of any breach affecting 500+ consumers.",
+    ),
+    "cpa": (
+        "FTC Safeguards Rule compliance angle — the May 2024 amendment requires 30-day breach notification and a written information security program (WISP)",
+        "Under the amended FTC Safeguards Rule, US CPA and tax firms must maintain a written information security program (WISP), continuous external monitoring, and notify the FTC within 30 days of any breach affecting 500+ consumers.",
+    ),
+    "tax": (
+        "FTC Safeguards Rule compliance angle — the May 2024 amendment requires 30-day breach notification and a written information security program (WISP)",
+        "Under the amended FTC Safeguards Rule, US tax preparers must maintain a written information security program (WISP), continuous external monitoring, and notify the FTC within 30 days of any breach affecting 500+ consumers.",
+    ),
+    "legal": (
+        "ABA Formal Opinion 24-514 angle — lawyers have a duty under Model Rules 1.1, 1.4, and 1.6 to notify clients of material data incidents",
+        "ABA Formal Opinion 24-514 confirms that US law firms have an ethical duty to notify clients of any material data incident affecting representation. Client-trust accounts and matter portals are the highest-value targets for wire-fraud diversion.",
+    ),
+    "law": (
+        "ABA Formal Opinion 24-514 angle — lawyers have a duty under Model Rules 1.1, 1.4, and 1.6 to notify clients of material data incidents",
+        "ABA Formal Opinion 24-514 confirms that US law firms have an ethical duty to notify clients of any material data incident affecting representation.",
+    ),
+}
+
+
+def _regulatory_angle_for(vertical: str | None) -> tuple[str, str]:
+    """Return (prompt_angle, fallback_body_fragment) for the given vertical."""
+    v = (vertical or "").strip().lower()
+    if v in _US_REGULATORY_ANGLE:
+        return _US_REGULATORY_ANGLE[v]
+    # Generic US fallback for unknown verticals
+    return (
+        "general US small-business cybersecurity posture angle — every US state has its own data-breach notification law and cyber-insurance carriers now require MFA + EDR + WISP at renewal",
+        "Every US state has its own data-breach notification law and cyber-insurance carriers now require MFA, EDR, and a written information security program at renewal.",
+    )
 
 
 async def _generate_email_for_lead(lead: dict[str, Any]) -> dict[str, str]:
@@ -738,11 +787,12 @@ async def _generate_email_for_lead(lead: dict[str, Any]) -> dict[str, str]:
 - Vulnerability found: {vulnerability}
 - Booking link: {booking_url}"""
     else:
+        prompt_angle, _ = _regulatory_angle_for(lead.get("vertical"))
         user_msg = f"""Generate a cold email for:
 - First name: {first_name}
 - Company: {company}
 - Domain: {domain}
-- No specific vulnerability found. Use PIPEDA compliance angle for Canadian {lead.get('vertical', 'business')} practices.
+- No specific vulnerability found. Use this angle: {prompt_angle}.
 - Booking link: {booking_url}"""
 
     try:
@@ -768,9 +818,10 @@ async def _generate_email_for_lead(lead: dict[str, Any]) -> dict[str, str]:
                 "subject": f"Found an open issue on {domain}",
                 "body": f"{first_name},\n\nWe ran a security scan on {domain} and found: {vulnerability[:150]}.\n\nThis means an attacker could potentially exploit this to gain access to your systems or data.\n\nWe found additional issues as well. I would love to walk you through what we found in 15 minutes.\n\n{booking_url}",
             }
+        _, fallback_fragment = _regulatory_angle_for(lead.get("vertical"))
         return {
             "subject": f"Quick security question about {domain}",
-            "body": f"{first_name},\n\nUnder PIPEDA, Canadian {lead.get('vertical', 'business')} practices are required to protect client data. We ran a quick check on {domain} and wanted to share what we found.\n\nWould you have 15 minutes this week?\n\n{booking_url}",
+            "body": f"{first_name},\n\n{fallback_fragment} We ran a quick check on {domain} and wanted to share what we found.\n\nWould you have 15 minutes this week?\n\n{booking_url}",
         }
 
 
@@ -827,9 +878,10 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
                     "body": f"{first_name},\n\nWe scanned {domain} and found: {vuln[:100]}.\n\nThis could allow attackers to access your systems.\n\nCan we walk you through it in 15 minutes?\n\n{booking_url}",
                 }
             else:
+                _, fallback_fragment = _regulatory_angle_for(lead.get("vertical"))
                 email = {
                     "subject": f"Quick security question about {domain}",
-                    "body": f"{first_name},\n\nUnder PIPEDA, Canadian practices must protect client data. We checked {domain} and have findings to share.\n\n15 minutes this week?\n\n{booking_url}",
+                    "body": f"{first_name},\n\n{fallback_fragment} We checked {domain} and have findings to share.\n\n15 minutes this week?\n\n{booking_url}",
                 }
             _update_lead(lead["id"], {
                 "email_subject": email["subject"],

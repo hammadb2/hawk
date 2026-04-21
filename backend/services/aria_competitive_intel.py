@@ -38,9 +38,9 @@ def research_competitors(query: str | None = None) -> dict[str, Any]:
         return {"error": "OpenAI API key not configured"}
 
     default_query = (
-        "Canadian cybersecurity companies targeting SMBs (dental clinics, law firms, accounting practices). "
+        "US cybersecurity companies targeting small professional-practice SMBs (dental clinics, law firms, accounting / CPA firms). "
         "What are the main competitors, their pricing, and key differentiators? "
-        "Focus on managed security services, vulnerability scanning, and compliance (PIPEDA)."
+        "Focus on managed security services, vulnerability scanning, and US compliance (HIPAA Security Rule, FTC Safeguards Rule, ABA Formal Opinion 24-514)."
     )
 
     try:
@@ -55,10 +55,11 @@ def research_competitors(query: str | None = None) -> dict[str, Any]:
                 {
                     "role": "system",
                     "content": (
-                        "You are a competitive intelligence analyst for Hawk Security, a Canadian cybersecurity company. "
-                        "Hawk targets dental clinics, law firms, and accounting practices with three tiers: "
-                        "Starter ($199/mo), Shield ($997/mo), Enterprise ($2,500/mo). "
-                        "Key differentiators: HAWK Certified badge, financial guarantee, PIPEDA compliance focus. "
+                        "You are a competitive intelligence analyst for Hawk Security, a US cybersecurity company. "
+                        "Hawk targets US dental clinics, law firms, and accounting / CPA practices with three tiers (USD): "
+                        "HAWK Core ($249/mo), HAWK Guard ($449/mo), HAWK Sentinel ($799/mo). "
+                        "Key differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), "
+                        "US compliance artifacts (HIPAA / FTC Safeguards WISP / ABA Opinion 24-514 workbook). "
                         "Analyze the competitive landscape and provide actionable intelligence. "
                         "Return JSON: {\"competitors\": [{\"name\": \"...\", \"url\": \"...\", \"pricing\": \"...\", "
                         "\"strengths\": [\"...\"], \"weaknesses\": [\"...\"]}], "
@@ -110,8 +111,8 @@ def analyze_competitor_pricing(vertical: str = "dental") -> dict[str, Any]:
                 {
                     "role": "user",
                     "content": (
-                        f"Analyze cybersecurity pricing for {vertical} practices in Canada. "
-                        f"Hawk offers Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo. "
+                        f"Analyze cybersecurity pricing for US {vertical} practices. "
+                        f"Hawk offers (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo. "
                         f"How does this compare to competitors?"
                     ),
                 },

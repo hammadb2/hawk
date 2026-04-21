@@ -111,7 +111,7 @@ def detect_patterns() -> list[dict[str, Any]]:
                 {
                     "role": "system",
                     "content": (
-                        "You are a business intelligence analyst for Hawk Security, a Canadian cybersecurity company. "
+                        "You are a business intelligence analyst for Hawk Security, a US cybersecurity company serving small US professional practices (dental, legal, accounting / CPA). "
                         "Analyze the CRM data and identify actionable business patterns. "
                         "Return valid JSON only: {\"patterns\": [{\"type\": \"...\", \"title\": \"...\", "
                         "\"description\": \"...\", \"confidence\": 0.0-1.0, \"action\": \"...\"}]}. "

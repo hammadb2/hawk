@@ -151,8 +151,8 @@ Here are the live metrics:
 {metrics_json}
 
 HAWK SECURITY CONTEXT:
-- Canadian cybersecurity company targeting dental clinics, law firms, and accounting practices
-- Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo
+- US cybersecurity company targeting dental clinics, law firms, and accounting / CPA practices
+- Three products (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo
 - Target: 24 booked sales calls per day from cold email outreach
 - VA team runs the outbound pipeline
 
@@ -207,15 +207,15 @@ def generate_competitive_brief() -> str:
 Today is {today_str}.
 
 HAWK SECURITY CONTEXT:
-- Canadian cybersecurity company targeting dental clinics, law firms, and accounting practices
-- Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo
+- US cybersecurity company targeting dental clinics, law firms, and accounting / CPA practices
+- Three products (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo
 - Competitors include generic MSPs, larger cybersecurity firms, and DIY security tools
-- Key differentiators: HAWK Certified badge, financial guarantee, PIPEDA compliance focus
+- Key differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), vertical-specific compliance artifacts (HIPAA / FTC Safeguards WISP / ABA Opinion 24-514 workbook)
 
 Write a brief covering:
-1. Notable cybersecurity threats affecting Canadian SMBs this week
+1. Notable cybersecurity threats affecting US SMBs this week
 2. Competitive landscape shifts (MSP market, SMB security adoption trends)
-3. Regulatory developments (PIPEDA, Bill C-26, provincial privacy laws)
+3. Regulatory developments (HHS OCR HIPAA enforcement, FTC Safeguards Rule actions, ABA Formal Opinion 24-514 and state bar follow-on opinions, state AG breach-notification actions)
 4. 1-2 strategic recommendations
 
 Keep it to 3-4 paragraphs. Be specific and actionable. Markdown format."""

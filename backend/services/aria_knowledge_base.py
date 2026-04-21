@@ -2,7 +2,7 @@
 
 The knowledge base is a single markdown file at ``backend/data/aria_knowledge_base.md``.
 It's the source of truth ARIA consults before drafting any outbound reply —
-pricing, PIPEDA, common findings, objection playbooks, FAQ.
+pricing, US regulatory angles (HIPAA / FTC Safeguards / ABA Op 24-514), common findings, objection playbooks, FAQ.
 
 Why not a vector store? At current scale (one file, <10k tokens) string
 matching + section slicing outperforms an embedding round-trip and is
@@ -78,7 +78,7 @@ def retrieve_snippets(question_text: str, max_sections: int = 4) -> list[str]:
 
     Uses a simple keyword-overlap score over section bodies — deterministic,
     cheap, and good enough for a one-file KB. If nothing scores above zero,
-    returns the top defaults (HAWK product + PIPEDA + common findings) so the
+    returns the top defaults (HAWK product + US regulatory context + common findings) so the
     LLM always has baseline context.
     """
     kb = _load()
@@ -115,7 +115,7 @@ def _default_snippets(sections: dict[str, str], n: int) -> list[str]:
         "what hawk security is plain english",
         "how the scanner works",
         "service tiers and pricing",
-        "pipeda context  why this matters in plain language",
+        "us regulatory context  why this matters in plain language",
         "common findings and what they mean",
     ]
     out: list[str] = []
