@@ -86,6 +86,9 @@ if os.environ.get("SENTRY_DSN"):
 
 
 MST = ZoneInfo("America/Edmonton")
+# Dispatch-critical jobs run on US Eastern Time so outbound email lands in
+# prospect business hours. Internal / rep-facing jobs stay on MST (Jamie's TZ).
+ET = ZoneInfo("America/New_York")
 scheduler = AsyncIOScheduler(timezone=MST)
 
 scheduler.add_job(run_nightly_pipeline_job, CronTrigger(hour=23, minute=0, timezone=MST))
@@ -108,16 +111,16 @@ scheduler.add_job(run_scheduled_ai_actions_job, CronTrigger(minute="*/15", timez
 scheduler.add_job(run_aria_memory_job, CronTrigger(minute="*/15", timezone=MST))
 scheduler.add_job(run_aria_client_health_job, CronTrigger(minute="*/15", timezone=MST))
 scheduler.add_job(run_sla_auto_scan_job, CronTrigger(minute="*/2", timezone=MST))
-# Rolling email dispatcher — 9am through 4pm MST (8 ticks) toward 200/campaign/day (600/day).
-scheduler.add_job(run_rolling_dispatch_job, CronTrigger(hour="9-16", minute=5, timezone=MST))
+# Rolling email dispatcher — 9am through 4pm ET (8 ticks) toward 200/campaign/day (600/day).
+scheduler.add_job(run_rolling_dispatch_job, CronTrigger(hour="9-16", minute=5, timezone=ET))
 # ARIA Pipeline Doctor — every 15 min, diagnoses stuck buckets (new / scanning /
 # scanned / ready / apollo credits) and auto-applies idempotent escape hatches.
 # Escalates critical buckets via CEO SMS.
 scheduler.add_job(run_pipeline_doctor_job, CronTrigger(minute="*/15", timezone=MST))
 # Mailbox-native dispatcher: poll IMAP inboxes for replies every 5 min and reset
-# per-mailbox daily send counters at midnight MST.
+# per-mailbox daily send counters at midnight ET (matches dispatcher day boundary).
 scheduler.add_job(run_mailbox_imap_poller_job, CronTrigger(minute="*/5", timezone=MST))
-scheduler.add_job(run_mailbox_daily_reset_job, CronTrigger(hour=0, minute=0, timezone=MST))
+scheduler.add_job(run_mailbox_daily_reset_job, CronTrigger(hour=0, minute=0, timezone=ET))
 # Autonomous reply loop: drain the aria_scheduled_actions queue every 5 min.
 # Handles 48hr follow-ups, 24hr call reminders, weekly nurture drips, OOO
 # return follow-ups, and 90-day snoozes.

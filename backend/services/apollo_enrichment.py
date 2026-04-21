@@ -174,18 +174,23 @@ def _normalize_domain(raw: str) -> str:
     return d
 
 
-def _location_strings(city: str | None, province: str | None) -> list[str]:
-    """Build Apollo person_locations strings (city + province/state + country)."""
+def _location_strings(city: str | None, region: str | None) -> list[str]:
+    """Build Apollo ``person_locations`` strings for US metros.
+
+    ``region`` is the US state (full name or 2-letter abbreviation). The
+    ``province`` parameter name is preserved by callers historically — we
+    accept it under ``region`` now but keep behaviour backward-compatible.
+    """
     out: list[str] = []
     city = (city or "").strip()
-    province = (province or "").strip()
-    if city and province:
-        out.append(f"{city}, {province}, Canada")
+    region = (region or "").strip()
+    if city and region:
+        out.append(f"{city}, {region}, USA")
     if city:
-        out.append(f"{city}, Canada")
-    if province:
-        out.append(f"{province}, Canada")
-    return out or ["Canada"]
+        out.append(f"{city}, USA")
+    if region:
+        out.append(f"{region}, USA")
+    return out or ["United States"]
 
 
 def _select_person(people: list[dict[str, Any]]) -> dict[str, Any] | None:
