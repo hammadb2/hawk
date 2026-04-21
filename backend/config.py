@@ -56,8 +56,13 @@ STRIPE_WEBHOOK_SECRET_TEST = os.environ.get("STRIPE_WEBHOOK_SECRET_TEST", "").st
 STRIPE_PRICE_STARTER_TEST = os.environ.get("STRIPE_PRICE_STARTER_TEST", "").strip()
 STRIPE_PRICE_SHIELD_TEST = os.environ.get("STRIPE_PRICE_SHIELD_TEST", "").strip()
 
-# Shield onboarding — booking link in WhatsApp / email (Cal.com or similar)
-CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "https://cal.com").strip().rstrip("/")
+# Booking link used in every outbound + reply email (Cal.com or similar). Leave
+# empty by default so downstream ``CAL_COM_BOOKING_URL or "<fallback>"`` guards
+# actually hit their fallback; a prior default of ``"https://cal.com"`` was
+# non-empty-truthy which silently shadowed every callsite's real fallback URL
+# and caused reply emails to go out with a bare "https://cal.com" CTA when the
+# env var wasn't set in prod.
+CAL_COM_BOOKING_URL = os.environ.get("CAL_COM_BOOKING_URL", "").strip().rstrip("/")
 
 # OpenAI — portal AI, ARIA email drafts, attacker simulation, Ask HAWK, scanner interpretation
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()

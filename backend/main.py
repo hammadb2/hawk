@@ -117,9 +117,13 @@ scheduler.add_job(run_rolling_dispatch_job, CronTrigger(hour="9-16", minute=5, t
 # scanned / ready / apollo credits) and auto-applies idempotent escape hatches.
 # Escalates critical buckets via CEO SMS.
 scheduler.add_job(run_pipeline_doctor_job, CronTrigger(minute="*/15", timezone=MST))
-# Mailbox-native dispatcher: poll IMAP inboxes for replies every 5 min and reset
+# Mailbox-native dispatcher: poll IMAP inboxes for replies every 2 min and reset
 # per-mailbox daily send counters at midnight ET (matches dispatcher day boundary).
-scheduler.add_job(run_mailbox_imap_poller_job, CronTrigger(minute="*/5", timezone=MST))
+# Interval is driven by the ≤5-minute autonomous-reply SLA we promise US
+# prospects: detection + classify + draft + SMTP send must complete within
+# 5 min end-to-end. At */5 the worst-case detection latency alone consumed the
+# entire budget; */2 keeps median ≈1 min and worst case ≤2 min + send time.
+scheduler.add_job(run_mailbox_imap_poller_job, CronTrigger(minute="*/2", timezone=MST))
 scheduler.add_job(run_mailbox_daily_reset_job, CronTrigger(hour=0, minute=0, timezone=ET))
 # Autonomous reply loop: drain the aria_scheduled_actions queue every 5 min.
 # Handles 48hr follow-ups, 24hr call reminders, weekly nurture drips, OOO

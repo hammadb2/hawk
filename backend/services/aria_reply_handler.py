@@ -53,20 +53,27 @@ Return ONLY valid JSON:
 {"sentiment": "category", "confidence": 0.95, "reasoning": "one sentence explanation"}
 """
 
-RESPONSE_SYSTEM_PROMPT = """You are ARIA, drafting a reply for Hawk Security's outbound team.
+RESPONSE_SYSTEM_PROMPT = """You are ARIA, drafting a reply for HAWK Security, a US managed-
+cybersecurity service for small US professional practices (dental, legal, CPA).
+
+This prompt is only used as a last-resort fallback when the knowledge-base-grounded
+drafter in ``aria_auto_reply`` can't run. The primary drafter owns tone, length,
+and compliance framing; this fallback keeps the VA-queue preview reasonable.
 
 Rules:
-1. Match the tone of the prospect's message
-2. Keep it under 80 words
-3. No "Great question" or "Thanks for getting back to me"
-4. Be direct and specific
-5. For positive replies: suggest a 15-minute call with booking link
-6. For objections: acknowledge the concern, offer one concrete value prop
-7. For questions: answer directly, offer to elaborate on a call
-8. Never be pushy or salesy
-9. Sign off as "— Hawk Security Team"
+1. Match the tone of the prospect's message.
+2. Keep it under 80 words.
+3. No "Great question" / "Thanks for getting back to me" / "I hope this finds you well".
+4. Be direct and specific.
+5. For positive replies: propose a 15-minute call and include the booking link verbatim.
+6. For objections: acknowledge the concern, offer one concrete value prop (Breach
+   Response Guarantee by tier, or the HIPAA / FTC Safeguards / ABA Opinion 2024-3
+   artifacts we produce). Never name-disparage their existing provider.
+7. For questions: answer directly, offer to elaborate on a call.
+8. Never be pushy or salesy. No bold claims.
+9. Sign off as "— Hammad".
 
-Booking link: {booking_url}
+Booking link (must appear verbatim in positive / objection replies): {booking_url}
 
 Return ONLY the email reply body text (no JSON, no subject line).
 """
@@ -200,14 +207,15 @@ def process_reply_event(event: dict[str, Any]) -> dict[str, Any]:
         company_name = inventory_lead.get("business_name")
         inventory_lead_id = inventory_lead.get("id")
 
-    # Draft response (skip for auto-handled)
-    draft = draft_response(
-        reply_body=reply_body,
-        sentiment=sentiment,
-        prospect_name=prospect_name,
-        company_name=company_name,
-        vulnerability=vulnerability,
-    )
+    # We deliberately do NOT run ``draft_response`` here anymore. The KB-grounded
+    # drafter in ``aria_auto_reply.handle_reply`` owns the real send, and the
+    # generic draft we used to produce here was always thrown away by that path
+    # — so it was a ~1-2s latency tax + duplicate OpenAI spend on every reply
+    # that bit into the ≤5-minute autonomous-reply SLA without any benefit to
+    # the recipient. ``draft_response`` is still exported for VA-queue paths
+    # that want a cheap preview when auto-reply is disabled; the VA console
+    # calls it on-demand when it needs one.
+    draft = {"subject": "", "body": ""}
 
     # Determine initial status
     status = "classified"
