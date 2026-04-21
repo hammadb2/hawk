@@ -48,7 +48,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -120,7 +120,10 @@ def _patch_prospect(prospect_id: str, payload: dict[str, Any]) -> None:
         logger.warning("post-scan patch prospect=%s failed: %s", prospect_id, exc)
 
 
-def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> bool:
+VaRouteResult = Literal["routed", "kill_switch_off", "guard_filtered", "error"]
+
+
+def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> VaRouteResult:
     """Move an Apollo-miss prospect into ``pipeline_status=va_queue``.
 
     Stage stays ``scanned`` — the scan finding is still valid; only the
@@ -129,16 +132,24 @@ def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> bool:
     regardless of whether ``contact_email`` is populated, so a human can
     LinkedIn / phone / website-scrape the contact and dispatch manually.
 
-    Returns ``True`` if the prospect was routed, ``False`` otherwise (kill
-    switch off, prospect stage advanced past ``scanned``, or HTTP error).
-    Stage guard matches the one in ``_soft_drop`` and the final ready patch.
+    Returns one of:
+      * ``routed`` — prospect flipped to ``pipeline_status=va_queue``.
+      * ``kill_switch_off`` — ``apollo_miss_to_va_queue_enabled`` is false;
+        caller should fall back to the legacy soft-drop behaviour.
+      * ``guard_filtered`` — the stage / pipeline_status guard filtered the
+        prospect out. Typically means the bulk re-route cron (or a rep)
+        already moved it off ``pipeline_status=scanned``; caller MUST NOT
+        soft-drop it (that would suppress an already-routed lead).
+      * ``error`` — HTTP / network / Supabase failure. Caller MUST NOT
+        soft-drop (we don't know the row's real state).
     """
     if not fetch_crm_bool("apollo_miss_to_va_queue_enabled", default=True):
-        return False
+        return "kill_switch_off"
     try:
         # Prefer=return=representation so PostgREST responds with the actual
         # updated rows — a 204 / empty list means the stage+status guard
         # filtered the prospect out (e.g. a rep advanced it past `scanned`
+        # or the bulk re-route cron already flipped it to va_queue
         # mid-Apollo) and we must not report a successful route.
         r = httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",
@@ -161,18 +172,18 @@ def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> bool:
                 "post-scan va-route no-op prospect=%s reason=%s (stage/status guard)",
                 prospect_id, reason,
             )
-            return False
+            return "guard_filtered"
     except Exception as exc:
         logger.warning(
             "post-scan va-route patch prospect=%s reason=%s: %s",
             prospect_id, reason, exc,
         )
-        return False
+        return "error"
     logger.info(
         "post-scan routed-to-va-queue prospect=%s domain=%s reason=%s",
         prospect_id, domain, reason,
     )
-    return True
+    return "routed"
 
 
 def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
@@ -387,17 +398,38 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
         # long-tail (small dental / tax / law shops Apollo doesn't index).
         # Route to VA queue for manual sourcing instead of soft-dropping so
         # the lead is still reachable.
-        routed = _route_to_va_queue(
+        route_result = _route_to_va_queue(
             prospect_id, domain, reason="post_scan:no_contact_after_enrichment",
         )
-        if routed:
+        if route_result == "routed":
             return {
                 "ok": True,
                 "prospect_id": prospect_id,
                 "domain": domain,
                 "outcome": "routed_to_va_queue",
             }
-        # Kill switch off or stage advanced — fall back to the old behaviour.
+        if route_result == "guard_filtered":
+            # The stage/pipeline_status guard rejected the update — typically
+            # means the bulk re-route cron (or a rep) already moved this
+            # prospect off `pipeline_status=scanned`. Do NOT soft-drop; that
+            # would overwrite va_queue with suppressed and permanently kill
+            # an already-routed lead.
+            return {
+                "ok": True,
+                "prospect_id": prospect_id,
+                "domain": domain,
+                "outcome": "already_routed_or_advanced",
+            }
+        if route_result == "error":
+            # Network / Supabase error — we don't know the row's real state,
+            # so leave it alone. The 15-min Pipeline Doctor will retry.
+            return {
+                "ok": False,
+                "prospect_id": prospect_id,
+                "domain": domain,
+                "outcome": "va_route_error",
+            }
+        # route_result == "kill_switch_off" → fall back to legacy soft-drop.
         _soft_drop(prospect_id, domain, reason="post_scan:no_contact_after_enrichment")
         return {
             "ok": True,
