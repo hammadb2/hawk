@@ -538,13 +538,17 @@ def apollo_bulk_enrich(
                 "email_finder": contact.get("source") or "apollo",
                 "last_activity_at": datetime.now(timezone.utc).isoformat(),
             }
+            # No stage guard on the PATCH: the SELECT already narrowed to
+            # contact_email IS NULL, so we're only writing contact fields to
+            # prospects that genuinely need enrichment — safe at any stage.
+            # Guarding here would silently drop updates for prospects that
+            # somehow have pipeline_status=scanned but stage advanced (e.g.
+            # via patch_prospect_by_domain which has no stage guard), and we
+            # would re-fetch + re-Apollo them every run, burning credits.
             resp = httpx.patch(
                 f"{SUPABASE_URL}/rest/v1/prospects",
                 headers=headers,
-                params={
-                    "id": f"eq.{pid}",
-                    "stage": "in.(new,scanning,scanned)",
-                },
+                params={"id": f"eq.{pid}"},
                 json=patch,
                 timeout=15.0,
             )
