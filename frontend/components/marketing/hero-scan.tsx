@@ -226,7 +226,7 @@ export function HeroScan() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-0">{nd}</p>
                   <p className="text-xs text-ink-200">
-                    HAWK score {result.score ?? "—"}. {result.issues_count ?? previewRows.length} findings surfaced.
+                    HAWK score {result.score ?? "n/a"}. {result.issues_count ?? result.findings_count ?? previewRows.length} findings surfaced.
                   </p>
                 </div>
               </div>
