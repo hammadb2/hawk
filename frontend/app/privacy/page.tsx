@@ -1,23 +1,26 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { MarketingShell } from "@/components/marketing/marketing-shell";
+import { PrivacyContent } from "@/components/marketing/privacy-content";
+
+export const metadata: Metadata = {
+  title: "Privacy policy. HAWK Security.",
+  description:
+    "How HAWK Security collects, stores, and uses business contact and domain scan data. Plain language. No surprises.",
+  openGraph: {
+    title: "Privacy policy. HAWK Security.",
+    description:
+      "How HAWK Security collects, stores, and uses business contact and domain scan data.",
+    url: "https://securedbyhawk.com/privacy",
+    siteName: "HAWK Security",
+    type: "website",
+  },
+  robots: { index: true, follow: true },
+};
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-background px-4 py-16 text-text-primary sm:px-6">
-      <div className="mx-auto max-w-2xl">
-        <Link href="/" className="text-sm text-[#00C48C] hover:underline">
-          ← Back to home
-        </Link>
-        <h1 className="mt-8 text-3xl font-extrabold">Privacy Policy</h1>
-        <p className="mt-6 text-text-secondary leading-relaxed">
-          HAWK Security (AKB Studios) processes business contact information and domain scan data to deliver security assessments
-          and services you request. For questions:{" "}
-          <a href="mailto:hello@securedbyhawk.com" className="text-[#00C48C] hover:underline">
-            hello@securedbyhawk.com
-          </a>
-          .
-        </p>
-        <p className="mt-4 text-sm text-text-dim">This page is a summary; full policy may be provided at contract.</p>
-      </div>
-    </div>
+    <MarketingShell ambient={false}>
+      <PrivacyContent />
+    </MarketingShell>
   );
 }

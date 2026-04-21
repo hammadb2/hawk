@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { HttpError, marketingApi } from "@/lib/api";
-import { portal } from "@/lib/portal-ui";
+import { MarketingShell } from "@/components/marketing/marketing-shell";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
 const VERTICALS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "", label: "Select your practice type" },
-  { value: "dental", label: "Dental / medical practice" },
+  { value: "dental", label: "Dental or medical practice" },
   { value: "legal", label: "Law firm" },
-  { value: "accounting", label: "Accounting / CPA / tax firm" },
+  { value: "accounting", label: "Accounting, CPA, or tax firm" },
   { value: "other", label: "Other US small business" },
 ];
 
@@ -28,7 +29,6 @@ function normalizeDomain(raw: string): string {
     }
   }
   if (d.startsWith("www.")) d = d.slice(4);
-  // strip anything after the first slash just in case (e.g. pasted URL)
   d = d.split("/")[0];
   return d;
 }
@@ -65,12 +65,6 @@ export function FreeScanLanding() {
       });
       setStatus("success");
     } catch (err) {
-      // Branch on HTTP status, not message text. The request layer used to
-      // throw a plain Error whose message was just the server's `detail`
-      // string — status 429/400 were never *in* the message, so the old
-      // `err.message.includes("429")` checks never matched and every error
-      // fell through to the generic server-side message. `HttpError.status`
-      // is the canonical signal.
       let msg: string;
       if (err instanceof HttpError) {
         if (err.status === 429) {
@@ -89,231 +83,203 @@ export function FreeScanLanding() {
   }
 
   return (
-    <div className={`${portal.pageBg} selection:bg-emerald-500/15`}>
-      <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2" title="HAWK Security">
-            <span className="flex items-center rounded-lg bg-slate-900 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 sm:px-2.5 sm:py-2">
-              <img
-                src="/hawk-logo.png"
-                alt="HAWK Security"
-                className="h-8 w-auto sm:h-9"
-                width={168}
-                height={56}
-              />
-            </span>
-          </Link>
-          <Link
-            href="/"
-            className="text-sm font-medium text-slate-500 hover:text-emerald-600"
+    <MarketingShell>
+      <section className="relative px-6 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24">
+        <div className="mx-auto grid max-w-6xl items-start gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
-            ← Back to homepage
-          </Link>
-        </div>
-      </header>
+            <span className="text-eyebrow inline-flex items-center gap-2 text-signal">
+              <span className="h-1.5 w-1.5 rounded-full bg-signal" />
+              Free. US small businesses.
+            </span>
+            <h1 className="mt-5 text-display-lg text-balance text-ink-0">
+              See what ransomware crews see on your practice.{" "}
+              <span className="gradient-signal">Before they contact you.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-pretty text-lg leading-relaxed text-ink-100">
+              Enter your domain below. Within 24 hours we email you a plain English report with the
+              three highest priority external findings on your business. The same signals attackers harvest from DNS, mail, and TLS before they pick targets.
+            </p>
 
-      <main>
-        <section className="px-4 pt-16 pb-10 sm:px-6 sm:pt-24 sm:pb-16">
-          <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-            {/* Left: pitch */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
-                Free · US small businesses
-              </p>
-              <h1 className="mt-3 text-balance text-3xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
-                See what ransomware crews see on your practice.{" "}
-                <span className="text-emerald-600">Before they contact you.</span>
-              </h1>
-              <p className="mt-5 text-pretty text-lg leading-relaxed text-slate-600">
-                Enter your domain below. Within 24 hours we&apos;ll email you a plain English
-                report with the <strong className="text-slate-900">three highest priority external findings</strong>{" "}
-                on your business. The same signals attackers harvest from DNS, mail, and TLS before
-                they pick targets.
-              </p>
+            <ul className="mt-10 space-y-4">
+              <ScanBullet>No credit card. No sales call required to read the report.</ScanBullet>
+              <ScanBullet>
+                Plain English, not log dumps. Anything urgent gets flagged at the top.
+              </ScanBullet>
+              <ScanBullet>
+                Mapped to the US regulation that applies to your practice. HIPAA for dental. FTC
+                Safeguards Rule for CPA and tax. ABA 2024 cyber ethics for legal.
+              </ScanBullet>
+            </ul>
 
-              <ul className="mt-8 space-y-4 text-base leading-relaxed text-slate-700">
-                <FreeScanBullet>
-                  No credit card. No sales call required to read the report.
-                </FreeScanBullet>
-                <FreeScanBullet>
-                  Plain English, not log dumps. If something needs fixing urgently, we flag it at the top.
-                </FreeScanBullet>
-                <FreeScanBullet>
-                  Mapped to the US regulation that applies to your practice. HIPAA for dental. FTC
-                  Safeguards Rule for CPA and tax. ABA 2024 cyber ethics for legal.
-                </FreeScanBullet>
-              </ul>
+            <p className="mt-10 text-sm leading-relaxed text-ink-200">
+              Built by HAWK Security. Backed by a written{" "}
+              <Link
+                href="/guarantee-terms"
+                className="font-semibold text-signal transition-colors hover:text-signal-400"
+              >
+                Breach Response Guarantee
+              </Link>{" "}
+              up to $2.5M for paying clients.
+            </p>
+          </motion.div>
 
-              <p className="mt-8 text-sm leading-relaxed text-slate-500">
-                Built by HAWK Security. Backed by a written{" "}
-                <Link href="/guarantee-terms" className={portal.link}>
-                  Breach Response Guarantee
-                </Link>{" "}
-                up to $2.5M for paying clients.
-              </p>
-            </div>
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
+            className="relative"
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 rounded-[28px] bg-signal/10 blur-3xl"
+            />
+            <div className="relative rounded-2xl border border-white/5 bg-ink-900/70 p-6 backdrop-blur-xl sm:p-8">
+              {status === "success" ? (
+                <FreeScanSuccess domain={domain} email={email} />
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                  <div>
+                    <p className="text-eyebrow text-signal">Free scan request</p>
+                    <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink-0">
+                      Get your three finding report.
+                    </h2>
+                    <p className="mt-2 text-sm text-ink-200">Report arrives within 24 hours.</p>
+                  </div>
 
-            {/* Right: form */}
-            <div>
-              <div className={`${portal.card} p-6 sm:p-8`}>
-                {status === "success" ? (
-                  <FreeScanSuccess domain={domain} email={email} />
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-                    <div>
-                      <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                        Get your free three finding report
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Report arrives within 24 hours.
-                      </p>
-                    </div>
-
-                    <Field label="Your domain" required>
-                      <input
-                        type="text"
-                        inputMode="url"
-                        autoComplete="url"
-                        required
-                        placeholder="yourpractice.com"
-                        value={domainRaw}
-                        onChange={(e) => setDomainRaw(e.target.value)}
-                        className={inputClass}
-                      />
-                      {domainRaw && !DOMAIN_RE.test(domain) ? (
-                        <p className="mt-1 text-xs text-amber-600">
-                          Enter the domain without http or https. For example yourpractice.com
-                        </p>
-                      ) : null}
-                    </Field>
-
-                    <Field label="Work email" required>
-                      <input
-                        type="email"
-                        autoComplete="email"
-                        required
-                        placeholder="you@yourpractice.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className={inputClass}
-                      />
-                    </Field>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field label="Your name">
-                        <input
-                          type="text"
-                          autoComplete="name"
-                          placeholder="Jane Doe"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className={inputClass}
-                        />
-                      </Field>
-                      <Field label="Practice / firm">
-                        <input
-                          type="text"
-                          autoComplete="organization"
-                          placeholder="Doe Dental"
-                          value={company}
-                          onChange={(e) => setCompany(e.target.value)}
-                          className={inputClass}
-                        />
-                      </Field>
-                    </div>
-
-                    <Field label="Practice type">
-                      <select
-                        value={vertical}
-                        onChange={(e) => setVertical(e.target.value)}
-                        className={`${inputClass} appearance-none bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10 bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2020%2020%27%20fill%3D%27%2364748b%27%3E%3Cpath%20d%3D%27M5.23%207.21a.75.75%200%20011.06.02L10%2011.06l3.71-3.83a.75.75%200%20011.08%201.04l-4.25%204.39a.75.75%200%2001-1.08%200L5.21%208.27a.75.75%200%2001.02-1.06z%27%2F%3E%3C%2Fsvg%3E")]`}
-                      >
-                        {VERTICALS.map((v) => (
-                          <option key={v.value} value={v.value}>
-                            {v.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    {errorMsg ? (
-                      <p
-                        role="alert"
-                        className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                      >
-                        {errorMsg}
+                  <Field label="Your domain" required>
+                    <input
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
+                      required
+                      placeholder="yourpractice.com"
+                      value={domainRaw}
+                      onChange={(e) => setDomainRaw(e.target.value)}
+                      className={inputClass}
+                    />
+                    {domainRaw && !DOMAIN_RE.test(domain) ? (
+                      <p className="mt-1.5 text-xs text-signal-300">
+                        Enter the domain without http or https. For example yourpractice.com
                       </p>
                     ) : null}
+                  </Field>
 
-                    <button
-                      type="submit"
-                      disabled={!canSubmit}
-                      className={`w-full rounded-lg px-5 py-3 text-base font-semibold transition-colors ${
-                        canSubmit
-                          ? "bg-emerald-500 text-white shadow-sm hover:bg-emerald-600"
-                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                      }`}
+                  <Field label="Work email" required>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      required
+                      placeholder="you@yourpractice.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Your name">
+                      <input
+                        type="text"
+                        autoComplete="name"
+                        placeholder="Jane Doe"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className={inputClass}
+                      />
+                    </Field>
+                    <Field label="Practice or firm">
+                      <input
+                        type="text"
+                        autoComplete="organization"
+                        placeholder="Doe Dental"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        className={inputClass}
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Practice type">
+                    <select
+                      value={vertical}
+                      onChange={(e) => setVertical(e.target.value)}
+                      className={`${inputClass} appearance-none bg-[length:20px] bg-[right_12px_center] bg-no-repeat pr-10 bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2020%2020%27%20fill%3D%27%23a1a1aa%27%3E%3Cpath%20d%3D%27M5.23%207.21a.75.75%200%20011.06.02L10%2011.06l3.71-3.83a.75.75%200%20011.08%201.04l-4.25%204.39a.75.75%200%2001-1.08%200L5.21%208.27a.75.75%200%2001.02-1.06z%27%2F%3E%3C%2Fsvg%3E")]`}
                     >
-                      {status === "submitting"
-                        ? "Requesting scan…"
-                        : "Run my free scan"}
-                    </button>
+                      {VERTICALS.map((v) => (
+                        <option key={v.value} value={v.value} className="bg-ink-900 text-ink-0">
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
 
-                    <p className="text-center text-xs text-slate-400">
-                      We email you the report within 24 hours. You can unsubscribe at any time.
+                  {errorMsg ? (
+                    <p
+                      role="alert"
+                      className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-sm text-rose-200"
+                    >
+                      {errorMsg}
                     </p>
-                  </form>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
+                  ) : null}
 
-        <section className="border-t border-slate-200 bg-slate-50 px-4 py-12 sm:px-6 sm:py-16">
-          <div className="mx-auto max-w-5xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              What you&apos;ll get
+                  <button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="w-full rounded-full bg-signal px-5 py-3 text-base font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400 disabled:cursor-not-allowed disabled:bg-ink-700 disabled:text-ink-300 disabled:shadow-none"
+                  >
+                    {status === "submitting" ? "Requesting scan" : "Run my free scan"}
+                  </button>
+
+                  <p className="text-center text-xs text-ink-300">
+                    Report emailed within 24 hours. Unsubscribe any time.
+                  </p>
+                </form>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="relative border-t border-white/5 bg-ink-900/30 px-6 py-20 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center">
+            <span className="text-eyebrow inline-flex items-center gap-2 text-signal">
+              <span className="h-1.5 w-1.5 rounded-full bg-signal" />
+              What you get
+            </span>
+            <h2 className="mx-auto mt-4 max-w-2xl font-display text-3xl font-extrabold tracking-tightest text-ink-0 sm:text-4xl">
+              Three steps. Twenty four hours. Plain English.
             </h2>
-            <div className="mt-10 grid gap-6 sm:grid-cols-3">
-              <HowItWorksCard
-                step="1"
-                title="You submit"
-                body="Domain plus your work email. That is it. No credit card. No sales form dance."
-              />
-              <HowItWorksCard
-                step="2"
-                title="We scan"
-                body="Real external attack surface scan on your domain. DNS, mail, TLS, exposed services, auth posture."
-              />
-              <HowItWorksCard
-                step="3"
-                title="You get the report"
-                body="Plain English summary of the three highest priority findings, mapped to the US regulation that applies to your practice."
-              />
-            </div>
           </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-slate-200 px-4 py-8 sm:px-6">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-xs text-slate-400 sm:flex-row">
-          <span>© HAWK Security · securedbyhawk.com</span>
-          <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-emerald-600">
-              Privacy
-            </Link>
-            <Link href="/guarantee-terms" className="hover:text-emerald-600">
-              Guarantee terms
-            </Link>
+          <div className="mt-14 grid gap-6 sm:grid-cols-3">
+            <HowCard
+              step="01"
+              title="You submit"
+              body="Domain and work email. That is it. No credit card. No sales form dance."
+            />
+            <HowCard
+              step="02"
+              title="We scan"
+              body="Real external attack surface scan on your domain. DNS, mail, TLS, exposed services, auth posture."
+            />
+            <HowCard
+              step="03"
+              title="You get the report"
+              body="Plain English summary of the three highest priority findings, mapped to the US regulation for your practice."
+            />
           </div>
         </div>
-      </footer>
-    </div>
+      </section>
+    </MarketingShell>
   );
 }
 
 const inputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20";
+  "block w-full rounded-lg border border-white/10 bg-ink-900/80 px-3 py-2.5 text-sm text-ink-0 placeholder:text-ink-300 transition-colors focus:border-signal/60 focus:outline-none focus:ring-2 focus:ring-signal/30";
 
 function Field({
   label,
@@ -326,32 +292,29 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.14em] text-ink-200">
         {label}
-        {required ? <span className="ml-1 text-emerald-600">*</span> : null}
+        {required ? <span className="ml-1 text-signal">*</span> : null}
       </span>
       {children}
     </label>
   );
 }
 
-function FreeScanBullet({ children }: { children: React.ReactNode }) {
+function ScanBullet({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex gap-3">
+    <li className="flex items-start gap-3 text-base leading-relaxed text-ink-100">
       <span
         aria-hidden
-        className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"
+        className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-signal/15 ring-1 ring-signal/40"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="h-3 w-3"
-        >
+        <svg viewBox="0 0 20 20" fill="none" className="h-3 w-3">
           <path
-            fillRule="evenodd"
-            d="M16.704 5.292a1 1 0 010 1.416l-8 8a1 1 0 01-1.416 0l-4-4A1 1 0 014.704 9.29L8 12.586l7.296-7.294a1 1 0 011.408 0z"
-            clipRule="evenodd"
+            d="M4.5 10.5l3 3 8-8"
+            stroke="#FFB800"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
       </span>
@@ -360,65 +323,52 @@ function FreeScanBullet({ children }: { children: React.ReactNode }) {
   );
 }
 
-function HowItWorksCard({
-  step,
-  title,
-  body,
-}: {
-  step: string;
-  title: string;
-  body: string;
-}) {
+function HowCard({ step, title, body }: { step: string; title: string; body: string }) {
   return (
-    <div className={`${portal.card} p-5`}>
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
-        {step}
-      </span>
-      <h3 className="mt-3 text-lg font-bold tracking-tight text-slate-900">
-        {title}
-      </h3>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
+    <div className="relative rounded-2xl border border-white/5 bg-ink-900/60 p-6 backdrop-blur-xl transition-colors hover:border-white/10 sm:p-7">
+      <span className="font-mono text-xs tracking-[0.2em] text-signal">{step}</span>
+      <h3 className="mt-3 font-display text-lg font-semibold tracking-tight text-ink-0">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-ink-200">{body}</p>
     </div>
   );
 }
 
 function FreeScanSuccess({ domain, email }: { domain: string; email: string }) {
   return (
-    <div>
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="h-5 w-5"
-        >
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-signal/15 ring-1 ring-signal/40">
+        <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5">
           <path
-            fillRule="evenodd"
-            d="M16.704 5.292a1 1 0 010 1.416l-8 8a1 1 0 01-1.416 0l-4-4A1 1 0 014.704 9.29L8 12.586l7.296-7.294a1 1 0 011.408 0z"
-            clipRule="evenodd"
+            d="M4.5 10.5l3 3 8-8"
+            stroke="#FFB800"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
-      </div>
-      <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+      </span>
+      <h2 className="mt-5 font-display text-2xl font-bold tracking-tight text-ink-0">
         Scan requested.
       </h2>
-      <p className="mt-3 text-base leading-relaxed text-slate-600">
+      <p className="mt-4 text-base leading-relaxed text-ink-100">
         We kicked off an external attack surface scan on{" "}
-        <strong className="text-slate-900">{domain}</strong> the moment you hit submit. Your three finding
-        report will land at{" "}
-        <strong className="text-slate-900">{email}</strong> within{" "}
-        <strong className="text-slate-900">24 hours</strong>.
+        <strong className="text-ink-0">{domain}</strong> the moment you hit submit. Your three finding report will land at{" "}
+        <strong className="text-ink-0">{email}</strong> within{" "}
+        <strong className="text-ink-0">24 hours</strong>.
       </p>
-      <p className="mt-4 text-sm text-slate-500">
-        If anything is urgent, you&apos;ll see it flagged at the top of the report. No sales call
-        required to read it.
+      <p className="mt-4 text-sm leading-relaxed text-ink-200">
+        Anything urgent gets flagged at the top of the report. No sales call required to read it.
       </p>
       <Link
         href="/"
-        className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+        className="mt-6 inline-flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-ink-100 transition-colors hover:border-white/20 hover:text-ink-0"
       >
         Back to securedbyhawk.com
       </Link>
-    </div>
+    </motion.div>
   );
 }
