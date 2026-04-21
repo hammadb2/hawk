@@ -454,7 +454,7 @@ const PLANS: Array<{
     tagline: "For solo and small practices.",
     price: "$249",
     period: "per month",
-    cta: { label: "Start Core", href: "/portal/login?next=/portal/billing?plan=starter", style: "ghost" },
+    cta: { label: "Start Core", href: `/portal/login?next=${encodeURIComponent("/portal/billing?plan=starter")}`, style: "ghost" },
     highlights: [
       "Daily external scan",
       "Plain English monthly report",
@@ -467,7 +467,7 @@ const PLANS: Array<{
     tagline: "For growing multi seat practices.",
     price: "$449",
     period: "per month",
-    cta: { label: "Start Guard", href: "/portal/login?next=/portal/billing?plan=shield", style: "primary" },
+    cta: { label: "Start Guard", href: `/portal/login?next=${encodeURIComponent("/portal/billing?plan=shield")}`, style: "primary" },
     highlights: [
       "Everything in Core",
       "Weekly posture report",
