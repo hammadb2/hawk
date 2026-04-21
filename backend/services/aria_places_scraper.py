@@ -1,8 +1,9 @@
 """
 Google Places API scraper for ARIA nightly pipeline.
 
-Discovers dental clinics, law firms, and accounting practices across Canadian cities.
-Runs all city queries in parallel using asyncio.
+Discovers dental clinics, law firms, and accounting / CPA practices across the 30 US
+metros targeted by ``aria_apify_scraper.CITIES``. Runs all city queries in parallel
+using asyncio.
 """
 
 from __future__ import annotations
@@ -124,7 +125,19 @@ async def _search_places_for_query(
     """Run a single Google Places text search query."""
     async with semaphore:
         results: list[dict[str, Any]] = []
-        text_query = f"{query} in {city}, Canada"
+        # Pair each city with its US state using ``CITY_STATE`` from
+        # ``aria_apify_scraper`` so Google Places disambiguates metros like
+        # ``Portland`` (OR vs ME) and ``Columbus`` (OH vs GA). Falls back to
+        # a bare ``"... in {city}, USA"`` query if the mapping is missing
+        # (safe because ``regionCode="US"`` is already set on the request).
+        from services.aria_apify_scraper import CITY_STATE as _CITY_STATE
+
+        _entry = _CITY_STATE.get((city or "").strip().lower())
+        if _entry:
+            _state_full, _ = _entry
+            text_query = f"{query} in {city}, {_state_full}, USA"
+        else:
+            text_query = f"{query} in {city}, USA"
 
         headers = {
             "Content-Type": "application/json",
@@ -217,7 +230,8 @@ async def scrape_all_verticals(
     Scrape Google Places for all verticals across all cities.
 
     Args:
-        cities: List of Canadian cities to scrape
+        cities: List of US cities to scrape (see ``aria_apify_scraper.CITIES``
+            for the canonical 30-metro target list)
         verticals: List of verticals (default: dental, legal, accounting)
         concurrency: Max concurrent API requests
 
