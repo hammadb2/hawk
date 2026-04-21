@@ -427,6 +427,11 @@ def _map_apollo_person(p: dict[str, Any]) -> dict[str, Any]:
     if isinstance(org, str):
         org = {}
     email = (p.get("email") or p.get("primary_email") or "").strip()
+    # ``mixed_people/api_search`` returns locked emails as the string
+    # ``email_not_unlocked@domain_not_unlocked.com`` (truthy but unusable).
+    # Treat those as empty so the downstream bulk_match step unlocks them.
+    if "email_not_unlocked" in email.lower():
+        email = ""
     website = (
         org.get("website_url")
         or org.get("primary_domain")
@@ -515,7 +520,7 @@ def _apollo_bulk_match_emails(client: httpx.Client, people: list[dict[str, Any]]
             if not m:
                 continue
             em = (m.get("email") or m.get("primary_email") or "").strip()
-            if em:
+            if em and "email_not_unlocked" not in em.lower():
                 p["email"] = em
 
 
