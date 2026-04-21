@@ -10,7 +10,7 @@ export function StarterCheckoutButton() {
       href={`/portal/login?next=${next}`}
       className="mt-6 block w-full rounded-lg bg-accent py-3 text-center text-sm font-semibold text-white transition-opacity hover:bg-accent/90"
     >
-      Get Started
+      Get started
     </Link>
   );
 }
@@ -22,7 +22,7 @@ export function ShieldCheckoutButton() {
       href={`/portal/login?next=${next}`}
       className="mt-6 block w-full rounded-lg bg-accent py-3 text-center text-sm font-semibold text-white transition-opacity hover:bg-accent/90"
     >
-      Get Started — Most Popular
+      Get started. Most picked.
     </Link>
   );
 }
@@ -35,7 +35,7 @@ export function EnterpriseBookingLink({ href }: { href: string }) {
       rel="noopener noreferrer"
       className="mt-6 block w-full rounded-lg border border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
     >
-      Book a call — Enterprise
+      Book a Sentinel intro
     </a>
   );
 }

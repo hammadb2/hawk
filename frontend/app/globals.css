@@ -17,6 +17,15 @@
   --orange: #fb923c;
   --blue: #60a5fa;
   --yellow: #fbbf24;
+
+  /* Marketing (graphite + signal amber) */
+  --ink-950: #07070a;
+  --ink-900: #0b0b10;
+  --ink-800: #111117;
+  --ink-700: #16161e;
+  --ink-600: #1c1c26;
+  --signal: #ffb800;
+  --signal-glow: rgba(255, 184, 0, 0.18);
 }
 
 html {
@@ -27,7 +36,7 @@ html {
 body {
   background: var(--background);
   color: var(--text-primary);
-  font-feature-settings: "rlig" 1, "calt" 1;
+  font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "cv11" 1;
 }
 
 /* Applied while authenticated in CRM — prevents light html/body from showing when the page scrolls */
@@ -37,7 +46,6 @@ html.crm-route body {
   color-scheme: dark;
 }
 
-/* Reduce rubber-band overscroll exposing the default light canvas (esp. Safari / iOS) */
 html.crm-route {
   overscroll-behavior-y: none;
 }
@@ -55,7 +63,46 @@ html.crm-route ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
 
-/* Sharp, minimal scrollbar */
+/* Marketing (premium dark) route. Scoped to <html class="marketing-route"> so the CRM/portal stays light. */
+html.marketing-route,
+html.marketing-route body {
+  background-color: var(--ink-950);
+  color-scheme: dark;
+  color: #f5f5f7;
+  overscroll-behavior-y: none;
+}
+
+html.marketing-route ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html.marketing-route ::-webkit-scrollbar-track {
+  background: var(--ink-900);
+}
+html.marketing-route ::-webkit-scrollbar-thumb {
+  background: var(--ink-500, #232330);
+  border-radius: 8px;
+}
+html.marketing-route ::-webkit-scrollbar-thumb:hover {
+  background: #3a3a48;
+}
+
+/* Lenis smooth scroll. No vertical rubber band once the provider mounts. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+html.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* Global scrollbar default (light app shell) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -69,4 +116,88 @@ html.crm-route ::-webkit-scrollbar-thumb:hover {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ==============================
+   Marketing typography + utility
+   ============================== */
+
+.font-display {
+  font-family: var(--font-display), var(--font-cabinet), system-ui, sans-serif;
+  font-feature-settings: "ss01" 1, "cv11" 1;
+}
+
+.text-display-xl {
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+.text-display-lg {
+  font-size: clamp(2.5rem, 5.4vw, 4.75rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+.text-display-md {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+.text-eyebrow {
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.gradient-signal {
+  background: linear-gradient(135deg, #fff2b8 0%, #ffb800 55%, #e6a400 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.noise-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.85 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.grid-ink {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 60% 60% at 50% 30%, rgba(0, 0, 0, 0.9), transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 30%, rgba(0, 0, 0, 0.9), transparent 80%);
+}
+
+.hairline-top {
+  position: relative;
+}
+.hairline-top::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 184, 0, 0.55), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

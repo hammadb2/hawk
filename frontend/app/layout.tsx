@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { LiveRefreshBeacon } from "@/components/live-refresh-beacon";
@@ -11,25 +11,35 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700", "800"],
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
+});
+
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://hawk.akbstudios.com"),
+  metadataBase: new URL("https://securedbyhawk.com"),
   title: {
-    default: "HAWK — Cybersecurity for Canadian Small Business",
+    default: "HAWK. Cybersecurity for dental, legal, and CPA practices.",
     template: "%s | HAWK",
   },
   description:
-    "HAWK scans your business for exposed attack surfaces, breached credentials, and lookalike domains. Built for Canadian SMBs. Start free.",
+    "Continuous external attack surface monitoring built for dental, legal, and CPA practices. HIPAA, FTC Safeguards, and ABA 2024 cyber ethics coverage, with a breach response guarantee in writing at signup.",
   keywords: [
-    "cybersecurity canada",
+    "cybersecurity for dental practices",
+    "cybersecurity for law firms",
+    "cybersecurity for CPA firms",
+    "HIPAA external monitoring",
+    "FTC Safeguards Rule compliance",
+    "ABA formal opinion cybersecurity",
+    "breach response guarantee",
     "attack surface management",
-    "small business security",
-    "domain monitoring canada",
-    "breach detection",
   ],
   authors: [{ name: "AKB Studios" }],
   creator: "AKB Studios",
@@ -42,28 +52,30 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    type: 'website',
-    locale: 'en_CA',
-    url: 'https://hawk.akbstudios.com',
-    siteName: 'HAWK',
-    title: 'HAWK — Cybersecurity for Canadian Small Business',
-    description: 'HAWK scans your business for exposed attack surfaces, breached credentials, and lookalike domains. Built for Canadian SMBs.',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'HAWK Cybersecurity' }]
+    type: "website",
+    locale: "en_US",
+    url: "https://securedbyhawk.com",
+    siteName: "HAWK",
+    title: "HAWK. Cybersecurity for dental, legal, and CPA practices.",
+    description:
+      "Continuous external attack surface monitoring with a breach response guarantee up to $2.5M. Built for regulated US professional practices.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "HAWK Cybersecurity" }],
   },
   twitter: {
-    card: 'summary_large_image',
-    title: 'HAWK — Cybersecurity for Canadian Small Business',
-    description: 'Attack surface monitoring built for Canadian SMBs.',
-    images: ['/og-image.png']
+    card: "summary_large_image",
+    title: "HAWK. Cybersecurity for dental, legal, and CPA practices.",
+    description:
+      "Continuous external monitoring with a breach response guarantee in writing. Built for HIPAA, FTC Safeguards, and ABA 2024 cyber ethics coverage.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
     follow: true,
-    googleBot: { index: true, follow: true }
+    googleBot: { index: true, follow: true },
   },
   alternates: {
-    canonical: 'https://hawk.akbstudios.com'
-  }
+    canonical: "https://securedbyhawk.com",
+  },
 };
 
 export default function RootLayout({
@@ -72,7 +84,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+    >
       <body>
         <AuthProvider>
           <LiveRefreshBeacon />
