@@ -136,9 +136,13 @@ def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> bool:
     if not fetch_crm_bool("apollo_miss_to_va_queue_enabled", default=True):
         return False
     try:
+        # Prefer=return=representation so PostgREST responds with the actual
+        # updated rows — a 204 / empty list means the stage+status guard
+        # filtered the prospect out (e.g. a rep advanced it past `scanned`
+        # mid-Apollo) and we must not report a successful route.
         r = httpx.patch(
             f"{SUPABASE_URL}/rest/v1/prospects",
-            headers=_sb_headers(),
+            headers=_sb_headers(prefer="return=representation"),
             params={
                 "id": f"eq.{prospect_id}",
                 "stage": "in.(new,scanning,scanned)",
@@ -151,6 +155,13 @@ def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> bool:
             timeout=15.0,
         )
         r.raise_for_status()
+        rows = r.json() or []
+        if not rows:
+            logger.info(
+                "post-scan va-route no-op prospect=%s reason=%s (stage/status guard)",
+                prospect_id, reason,
+            )
+            return False
     except Exception as exc:
         logger.warning(
             "post-scan va-route patch prospect=%s reason=%s: %s",

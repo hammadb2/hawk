@@ -644,30 +644,37 @@ def apollo_miss_to_va_queue(
         }
 
     now_iso = datetime.now(timezone.utc).isoformat()
+    # Chunk the ID list to stay under typical URL-length limits (nginx /
+    # Railway gateways reject >8-32KB query strings). 36-char UUIDs at 200
+    # per chunk ≈ 7.4KB of id list — well inside every intermediary.
+    CHUNK_SIZE = 200
+    processed = 0
     try:
-        patch = httpx.patch(
-            f"{SUPABASE_URL}/rest/v1/prospects",
-            headers={**headers, "Prefer": "return=representation"},
-            params={
-                "id": f"in.({','.join(ids)})",
-                "stage": "in.(new,scanning,scanned)",
-                "pipeline_status": "eq.scanned",
-            },
-            json={
-                "pipeline_status": "va_queue",
-                "last_activity_at": now_iso,
-            },
-            timeout=60.0,
-        )
-        if patch.status_code >= 400:
-            raise HTTPException(
-                status_code=502,
-                detail=f"supabase {patch.status_code}: {patch.text[:300]}",
+        for i in range(0, len(ids), CHUNK_SIZE):
+            chunk = ids[i : i + CHUNK_SIZE]
+            patch = httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers={**headers, "Prefer": "return=representation"},
+                params={
+                    "id": f"in.({','.join(chunk)})",
+                    "stage": "in.(new,scanning,scanned)",
+                    "pipeline_status": "eq.scanned",
+                },
+                json={
+                    "pipeline_status": "va_queue",
+                    "last_activity_at": now_iso,
+                },
+                timeout=60.0,
             )
-        try:
-            processed = len(patch.json() or [])
-        except Exception:
-            processed = len(ids)
+            if patch.status_code >= 400:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"supabase {patch.status_code}: {patch.text[:300]}",
+                )
+            try:
+                processed += len(patch.json() or [])
+            except Exception:
+                processed += len(chunk)
     except HTTPException:
         raise
     except Exception as exc:
