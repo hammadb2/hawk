@@ -23,6 +23,7 @@ from services.portal_milestones import ensure_portal_milestones
 from services.aria_memory import run_memory_ingestion
 from services.aria_client_health import run_client_health_scores
 from services.aria_briefing import run_monday_briefing, run_competitive_brief
+from services.crm_free_scan import dispatch_pending_free_scan_reports
 
 logger = logging.getLogger(__name__)
 
@@ -1155,3 +1156,23 @@ def aria_competitive_brief_cron(
         logger.exception("aria competitive brief cron failed: %s", e)
         raise HTTPException(status_code=502, detail=str(e)) from e
 # scanner-health, va-reply-escalation, pipeline quality-check live in routers/crm_scale.cron_routes (mounted in main.py).
+
+
+@router.post("/free-scan-dispatch-reports")
+def free_scan_dispatch_reports_cron(
+    limit: int = 100,
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+):
+    """Send 3-finding reports to /free-scan leads whose scan has completed.
+
+    Picks prospects with ``source='free_scan_landing'``, ``scanned_at`` set,
+    ``free_scan_report_sent_at`` still NULL and mails them the top-3 findings.
+    Safe to run every 5–15 minutes — the partial index backs the lookup and
+    each prospect is stamped after a successful send so we never double-mail.
+    """
+    _require_secret(x_cron_secret)
+    try:
+        return dispatch_pending_free_scan_reports(limit=limit)
+    except Exception as e:
+        logger.exception("free-scan-dispatch-reports cron failed: %s", e)
+        raise HTTPException(status_code=502, detail=str(e)) from e

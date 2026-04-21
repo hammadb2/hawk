@@ -251,6 +251,24 @@ export const marketingApi = {
       return { ok: "true" };
     }
   },
+  /**
+   * `/free-scan` landing page — US business owner enters domain + email,
+   * receives a 3-finding report within 24 hours. Returns `{ok: true}` on
+   * success. Throws on 400 (invalid domain / email) so the form can show
+   * an inline error, and on 429 (rate-limit hit).
+   */
+  freeScan: async (body: {
+    name?: string;
+    email: string;
+    domain: string;
+    company_name?: string;
+    vertical?: string;
+  }) => {
+    return await request<{ ok: boolean }>("/api/marketing/free-scan", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
 };
 
 // Notifications
