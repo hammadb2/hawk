@@ -777,7 +777,10 @@ async def _generate_email_for_lead(lead: dict[str, Any]) -> dict[str, str]:
     domain = lead.get("domain", "")
     company = lead.get("company_name", "")
     vulnerability = lead.get("vulnerability_found", "")
-    booking_url = CAL_COM_BOOKING_URL
+    # Inline fallback — CAL_COM_BOOKING_URL defaults to "" in config so the outbound
+    # cold-email template never emits a bare empty href/link when the env var is
+    # unset in prod.
+    booking_url = CAL_COM_BOOKING_URL or "https://cal.com/hawksecurity/15min"
 
     if vulnerability:
         user_msg = f"""Generate a cold email for:
@@ -867,7 +870,8 @@ def step_generate_emails(run_id: str, leads: list[dict[str, Any]]) -> list[dict[
 
     if DRY_RUN or not OPENAI_API_KEY:
         logger.info("ARIA pipeline: Email generation dry run — using templates")
-        booking_url = CAL_COM_BOOKING_URL
+        # Same fallback as above — dry-run templates need a real URL too.
+        booking_url = CAL_COM_BOOKING_URL or "https://cal.com/hawksecurity/15min"
         for lead in leads:
             first_name = (lead.get("contact_name") or "").split()[0] if lead.get("contact_name") else "there"
             domain = lead.get("domain", "")

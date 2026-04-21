@@ -510,6 +510,29 @@ def handle_reply(
         _patch_inbound_reply(reply_id, status="classified")
         return {"status": "queued_for_va", "reason": "empty_draft"}
 
+    # Booking-link preservation guard. The model occasionally drops the
+    # ``{booking_url}`` token from its output (hallucinates a generic "happy to
+    # jump on a call" without actually giving the recipient a place to click).
+    # That completely defeats the autonomous-reply SLA — the recipient sees a
+    # friendly note with no CTA and ARIA looks broken. If the expected URL
+    # isn't present for a sentiment where we promised it (positive / question /
+    # objection except ``not_interested``, which intentionally has no link),
+    # append it inline before sending. Skip the ``not_interested`` objection
+    # playbook because it's the one path that intentionally omits the link.
+    expected_url = _booking_url()
+    needs_link = sentiment in ("positive", "question") or (
+        sentiment == "objection" and playbook != "not_interested"
+    )
+    if needs_link and expected_url and expected_url not in draft_body:
+        logger.info(
+            "auto_reply: booking link missing from draft (sentiment=%s playbook=%s) — appending",
+            sentiment, playbook,
+        )
+        draft_body = (
+            draft_body.rstrip()
+            + f"\n\nGrab a 15-minute slot when it suits you: {expected_url}"
+        )
+
     final_body = draft_body + _add_reply_quote(reply_body)
     subject = _build_subject(reply_subject)
 
