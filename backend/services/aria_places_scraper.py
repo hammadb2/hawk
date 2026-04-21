@@ -300,11 +300,14 @@ def score_lead(lead: dict[str, Any]) -> int:
     if lead.get("domain"):
         score += 1
 
-    major_cities = {
-        "toronto", "vancouver", "calgary", "edmonton", "ottawa", "montreal",
-        "winnipeg", "halifax", "hamilton", "mississauga", "brampton",
-    }
-    city = (lead.get("city") or "").lower()
+    # Major-metro +1 bonus — use the single source of truth (`CITIES`)
+    # from ``aria_apify_scraper`` so this always tracks the discovery target
+    # list. Previously hard-coded to Canadian cities, which biased every US
+    # lead's score downward by 1.
+    from services.aria_apify_scraper import CITIES as _CITIES
+
+    major_cities = {c.strip().lower() for c in _CITIES}
+    city = (lead.get("city") or "").strip().lower()
     if city in major_cities:
         score += 1
 
