@@ -189,11 +189,25 @@ def handle_free_scan_lead(
 
             if existing:
                 prospect_id = existing[0]["id"]
+                # On re-submission we clear both ``scanned_at`` and
+                # ``free_scan_report_sent_at``. Together they move the prospect
+                # back to the dispatch queue's eligibility window: dispatch
+                # only fires when ``scanned_at IS NOT NULL AND
+                # free_scan_report_sent_at IS NULL``. Without clearing
+                # ``scanned_at`` we would re-send a report from the *old*
+                # scan the instant the cron runs — before the new scan has
+                # even completed — and the recipient would get a stale
+                # report ahead of the fresh one.
+                patch_with_reset: dict[str, Any] = {
+                    **patch,
+                    "scanned_at": None,
+                    "free_scan_report_sent_at": None,
+                }
                 httpx.patch(
                     f"{SUPABASE_URL}/rest/v1/prospects",
                     headers=_sb_headers(),
                     params={"id": f"eq.{prospect_id}"},
-                    json=patch,
+                    json=patch_with_reset,
                     timeout=20.0,
                 ).raise_for_status()
             else:
