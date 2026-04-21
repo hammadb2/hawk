@@ -302,24 +302,46 @@ export function HeroScan() {
             transition={{ duration: 0.45 }}
             className="mt-5 rounded-2xl border border-red/20 bg-red/5 p-5 text-sm text-ink-100"
           >
-            The live scan timed out for this domain. Enter your email and we will run the full 24 hour
-            report in the background.
-            <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={sendReport}>
-              <input
-                type="email"
-                required
-                placeholder="you@yourpractice.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 rounded-xl bg-ink-700/80 px-4 py-3 text-sm font-medium text-ink-0 ring-1 ring-inset ring-white/5 placeholder:text-ink-300 focus:outline-none focus:ring-signal/60"
-              />
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-xl bg-signal px-5 py-3 text-sm font-semibold text-ink-950 hover:bg-signal-400"
-              >
-                Queue the report
-              </button>
-            </form>
+            {reportStatus === "sent" ? (
+              <div className="flex items-start gap-3">
+                <CheckDot />
+                <p className="text-sm text-ink-0">
+                  Queued. A plain English report with the three highest priority findings lands in
+                  your inbox within 24 hours.
+                </p>
+              </div>
+            ) : (
+              <>
+                The live scan timed out for this domain. Enter your email and we will run the full
+                24 hour report in the background.
+                <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={sendReport}>
+                  <label htmlFor="hero-report-email-failed" className="sr-only">
+                    Email address
+                  </label>
+                  <input
+                    id="hero-report-email-failed"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    disabled={reportStatus === "sending"}
+                    placeholder="you@yourpractice.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="flex-1 rounded-xl bg-ink-700/80 px-4 py-3 text-sm font-medium text-ink-0 ring-1 ring-inset ring-white/5 placeholder:text-ink-300 focus:outline-none focus:ring-signal/60 disabled:opacity-60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!email.trim() || reportStatus === "sending"}
+                    className="inline-flex items-center justify-center rounded-xl bg-signal px-5 py-3 text-sm font-semibold text-ink-950 transition-colors hover:bg-signal-400 disabled:opacity-40"
+                  >
+                    {reportStatus === "sending" ? "Queuing" : "Queue the report"}
+                  </button>
+                </form>
+                {reportStatus === "error" && reportError && (
+                  <p className="mt-2 text-xs text-red">{reportError}</p>
+                )}
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
