@@ -478,6 +478,7 @@ def apollo_bulk_enrich(
                 "select": "id,domain,vertical,industry,company_name,city,province",
                 "pipeline_status": "eq.scanned",
                 "contact_email": "is.null",
+                "domain": "not.is.null",
                 "order": "scanned_at.desc",
                 "limit": str(max(1, min(limit, 2000))),
             },
