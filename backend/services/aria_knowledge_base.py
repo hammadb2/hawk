@@ -115,7 +115,7 @@ def _default_snippets(sections: dict[str, str], n: int) -> list[str]:
         "what hawk security is plain english",
         "how the scanner works",
         "service tiers and pricing",
-        "pipeda context  why this matters in plain language",
+        "us regulatory context  why this matters in plain language",
         "common findings and what they mean",
     ]
     out: list[str] = []

@@ -1071,7 +1071,7 @@ You are speaking with {user_name} (role: {role_name}, type: {role_type}).
 Today is {today}.
 
 Hawk Security is a US cybersecurity company serving small US professional practices — dental clinics, law firms, and accounting / CPA firms.
-Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo.
+Three products (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo, each backed by a tiered Breach Response Guarantee ($250K / $1M / $2.5M).
 Target: 24 booked sales calls per day from cold email outreach.
 VA team managed by Kevin, runs Apollo, Clay, Smartlead, ZeroBounce pipeline.
 HAWK Certified badge and financial guarantee are key differentiators.

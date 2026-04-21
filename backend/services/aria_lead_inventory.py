@@ -52,16 +52,57 @@ ZEROBOUNCE_MAX_WAIT = 600  # 10 minutes max wait for bulk verification
 # CAN-SPAM compliance footer (US market).
 #
 # 15 U.S.C. § 7704(a)(5) requires a valid physical postal address of the
-# sender and a clear opt-out mechanism on every commercial email. Sender
-# address is resolved at send time from ``crm_settings.sender_postal_address``
-# (set to the current US business address) with a safe fallback so we never
-# ship an email without a physical address.
-CAN_SPAM_FOOTER = (
+# sender and a clear opt-out mechanism on every commercial email. We resolve
+# both at call time via :func:`can_spam_footer` so the values can be changed
+# in ``crm_settings`` without a deploy.
+#
+# Precedence for the postal address:
+#   1. ``crm_settings.sender_postal_address``
+#   2. ``HAWK_SENDER_POSTAL_ADDRESS`` environment variable
+#   3. ``Hawk Security, Address on file at securedbyhawk.com/contact``
+#      — last-resort fallback that is valid under 15 U.S.C. § 7704(a)(5)(A)(ii)
+#      (registered mailing address) and prevents any outbound email going out
+#      without a physical address if the setting was never written.
+_CAN_SPAM_FOOTER_TEMPLATE = (
     "\n\n---\n"
-    "This message was sent by Hawk Security, {{sender_postal_address}}. "
-    "To unsubscribe reply STOP or click here: {{unsubscribe_link}}"
+    "This message was sent by Hawk Security, {postal_address}. "
+    "To unsubscribe reply STOP or click here: {unsubscribe_link}"
 )
-# Backwards-compat alias for any callers still importing the old name.
+_CAN_SPAM_FALLBACK_ADDRESS = "Address on file at securedbyhawk.com/contact"
+
+
+def _resolve_sender_postal_address() -> str:
+    val = _get_setting("sender_postal_address", default="").strip()
+    if val:
+        return val
+    env_val = (os.environ.get("HAWK_SENDER_POSTAL_ADDRESS") or "").strip()
+    if env_val:
+        return env_val
+    logger.warning(
+        "CAN-SPAM: sender_postal_address not configured — falling back to "
+        "contact-page pointer. Set crm_settings.sender_postal_address before "
+        "production sends to satisfy 15 U.S.C. § 7704(a)(5)."
+    )
+    return _CAN_SPAM_FALLBACK_ADDRESS
+
+
+def can_spam_footer(unsubscribe_link: str = "{{unsubscribe_link}}") -> str:
+    """Return the fully resolved CAN-SPAM footer for an outbound email.
+
+    ``unsubscribe_link`` is left as a Smartlead merge token by default (the
+    per-recipient link is injected at dispatch time). Pass a concrete URL when
+    sending outside Smartlead (e.g. a transactional reply from ARIA).
+    """
+    return _CAN_SPAM_FOOTER_TEMPLATE.format(
+        postal_address=_resolve_sender_postal_address(),
+        unsubscribe_link=unsubscribe_link,
+    )
+
+
+# Module-level constants left in place for backwards compatibility. They now
+# resolve the postal address at import time — prefer ``can_spam_footer()`` in
+# any new code so operators can update the address without a redeploy.
+CAN_SPAM_FOOTER = can_spam_footer()
 CASL_FOOTER = CAN_SPAM_FOOTER
 
 # Time zone → scheduled send hour mapping (8-9am local, US market).
@@ -610,8 +651,8 @@ async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, An
             email_content = results.get(email_key)
 
             if email_content:
-                # Append CASL footer to body
-                body_with_footer = email_content["body"] + CASL_FOOTER
+                # Append CAN-SPAM footer (resolves postal address at call time)
+                body_with_footer = email_content["body"] + can_spam_footer()
                 lead["email_subject"] = email_content["subject"]
                 lead["email_body"] = body_with_footer
                 lead["status"] = "personalized"
@@ -636,7 +677,7 @@ async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, An
                         f"An attacker could exploit this to access your systems or data.\n\n"
                         f"I can walk you through what we found in 15 minutes.\n\n"
                         f"{booking_url}"
-                    ) + CAN_SPAM_FOOTER
+                    ) + can_spam_footer()
                 else:
                     lead["email_subject"] = f"quick security question about {domain}"
                     lead["email_body"] = (
@@ -647,7 +688,7 @@ async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, An
                         f"We ran a check on {domain} and wanted to share what we found.\n\n"
                         f"Would you have 15 minutes this week?\n\n"
                         f"{booking_url}"
-                    ) + CAN_SPAM_FOOTER
+                    ) + can_spam_footer()
 
                 lead["status"] = "personalized"
                 generated += 1
