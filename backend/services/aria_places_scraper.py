@@ -141,7 +141,9 @@ async def _search_places_for_query(
             body: dict[str, Any] = {
                 "textQuery": text_query,
                 "languageCode": "en",
-                "regionCode": "CA",
+                # US market: bias Google Places results to the US to match
+                # the US-only discovery targets.
+                "regionCode": "US",
                 "pageSize": 20,
             }
             r = await client.post(PLACES_SEARCH_URL, headers=headers, json=body, timeout=30.0)
