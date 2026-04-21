@@ -463,13 +463,11 @@ def _apollo_search_page(
         "person_locations": ["Canada"],
         "organization_num_employees_ranges": ["1,50"],
         "contact_email_status": ["verified", "unverified"],
-        "has_email": True,
-        "has_phone": False,
         "organization_industry_tag_ids": [],
         "q_organization_keyword_tags": industry["keywords"][:5],
     }
     r = client.post(
-        f"{APOLLO_BASE}/mixed_people/search",
+        f"{APOLLO_BASE}/mixed_people/api_search",
         headers=_apollo_headers(),
         json=body,
         timeout=120.0,

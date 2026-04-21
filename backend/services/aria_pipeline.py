@@ -230,7 +230,6 @@ def step_apollo_pull(
         "person_locations": [location],
         "organization_num_employees_ranges": ["1,50"],
         "contact_email_status": ["verified", "unverified"],
-        "has_email": True,
         "q_organization_keyword_tags": config["keywords"][:5],
     }
 
@@ -244,7 +243,7 @@ def step_apollo_pull(
             body["page"] = page
             try:
                 r = client.post(
-                    f"{APOLLO_BASE}/mixed_people/search",
+                    f"{APOLLO_BASE}/mixed_people/api_search",
                     headers=_apollo_headers(),
                     json=body,
                     timeout=120.0,
