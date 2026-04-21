@@ -475,7 +475,10 @@ def apollo_bulk_enrich(
             f"{SUPABASE_URL}/rest/v1/prospects",
             headers=headers,
             params={
-                "select": "id,domain,vertical,industry,company_name,city,province",
+                # Note: the prospects table only has `industry` — there is no
+                # separate `vertical` column. Downstream code treats industry
+                # as the vertical value (see _one() below).
+                "select": "id,domain,industry,company_name,city,province",
                 "pipeline_status": "eq.scanned",
                 "contact_email": "is.null",
                 "domain": "not.is.null",
