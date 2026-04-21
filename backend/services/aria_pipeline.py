@@ -230,11 +230,14 @@ def step_apollo_pull(
         "person_locations": [location],
         "organization_num_employees_ranges": ["1,50"],
         "contact_email_status": ["verified", "unverified"],
-        "has_email": True,
         "q_organization_keyword_tags": config["keywords"][:5],
     }
 
-    all_people: list[dict[str, Any]] = []
+    # ``mixed_people/api_search`` does not return email addresses — they come
+    # back locked (empty or ``email_not_unlocked@…``). Collect the raw person
+    # rows first, unlock emails in a follow-up ``people/bulk_match`` call, then
+    # filter + shape into lead records.
+    raw_people: list[dict[str, Any]] = []
     pages_needed = (batch_size + 99) // 100
 
     with httpx.Client(timeout=120.0) as client:
@@ -244,7 +247,7 @@ def step_apollo_pull(
             body["page"] = page
             try:
                 r = client.post(
-                    f"{APOLLO_BASE}/mixed_people/search",
+                    f"{APOLLO_BASE}/mixed_people/api_search",
                     headers=_apollo_headers(),
                     json=body,
                     timeout=120.0,
@@ -255,48 +258,88 @@ def step_apollo_pull(
                 for p in people:
                     if not isinstance(p, dict):
                         continue
-                    org = p.get("organization") or {}
-                    if isinstance(org, str):
-                        org = {}
-                    email = (p.get("email") or p.get("primary_email") or "").strip()
-                    website = (
-                        org.get("website_url")
-                        or org.get("primary_domain")
-                        or p.get("organization_website_url")
-                        or ""
-                    )
-                    domain = _normalize_domain(str(website))
-                    first_name = (p.get("first_name") or "").strip()
-                    last_name = (p.get("last_name") or "").strip()
-                    company = (org.get("name") or "").strip()
-
-                    if not email or not domain:
+                    if not p.get("id"):
                         continue
-
-                    all_people.append({
-                        "run_id": run_id,
-                        "company_name": company,
-                        "domain": domain,
-                        "contact_name": f"{first_name} {last_name}".strip(),
-                        "contact_email": email.lower(),
-                        "vertical": vertical,
-                        "apollo_data": {
-                            "person_id": p.get("id"),
-                            "first_name": first_name,
-                            "last_name": last_name,
-                            "title": (p.get("title") or "").strip(),
-                            "city": (p.get("city") or org.get("city") or "").strip(),
-                            "state": (p.get("state") or org.get("state") or "").strip(),
-                            "industry": str(org.get("industry") or "")[:200],
-                            "employees": org.get("estimated_num_employees"),
-                        },
-                        "status": "pulled",
-                    })
-                if len(all_people) >= batch_size:
+                    raw_people.append(p)
+                if len(raw_people) >= batch_size:
                     break
             except Exception as exc:
                 logger.exception("Apollo search page %d failed: %s", page, exc)
                 break
+
+        # Unlock emails in chunks of 10 via people/bulk_match.
+        unlocked_by_id: dict[str, str] = {}
+        for i in range(0, len(raw_people), 10):
+            chunk = raw_people[i : i + 10]
+            ids = [str(p["id"]) for p in chunk]
+            try:
+                m = client.post(
+                    f"{APOLLO_BASE}/people/bulk_match",
+                    headers=_apollo_headers(),
+                    json={
+                        "reveal_personal_emails": True,
+                        "details": [{"id": pid} for pid in ids],
+                    },
+                    timeout=120.0,
+                )
+                if m.status_code >= 400:
+                    logger.warning(
+                        "Apollo bulk_match HTTP %s body=%s",
+                        m.status_code, m.text[:300],
+                    )
+                    continue
+                matches = (m.json() or {}).get("matches") or (m.json() or {}).get("people") or []
+                for match in matches:
+                    if not isinstance(match, dict) or not match.get("id"):
+                        continue
+                    em = (match.get("email") or match.get("primary_email") or "").strip()
+                    if em and "email_not_unlocked" not in em:
+                        unlocked_by_id[str(match["id"])] = em.lower()
+            except Exception as exc:
+                logger.warning("Apollo bulk_match chunk failed: %s", exc)
+                continue
+
+    all_people: list[dict[str, Any]] = []
+    for p in raw_people:
+        pid = str(p.get("id") or "")
+        email = unlocked_by_id.get(pid) or (p.get("email") or "").strip().lower()
+        if not email or "email_not_unlocked" in email:
+            continue
+        org = p.get("organization") or {}
+        if isinstance(org, str):
+            org = {}
+        website = (
+            org.get("website_url")
+            or org.get("primary_domain")
+            or p.get("organization_website_url")
+            or ""
+        )
+        domain = _normalize_domain(str(website))
+        if not domain:
+            continue
+        first_name = (p.get("first_name") or "").strip()
+        last_name = (p.get("last_name") or "").strip()
+        company = (org.get("name") or "").strip()
+
+        all_people.append({
+            "run_id": run_id,
+            "company_name": company,
+            "domain": domain,
+            "contact_name": f"{first_name} {last_name}".strip(),
+            "contact_email": email,
+            "vertical": vertical,
+            "apollo_data": {
+                "person_id": p.get("id"),
+                "first_name": first_name,
+                "last_name": last_name,
+                "title": (p.get("title") or "").strip(),
+                "city": (p.get("city") or org.get("city") or "").strip(),
+                "state": (p.get("state") or org.get("state") or "").strip(),
+                "industry": str(org.get("industry") or "")[:200],
+                "employees": org.get("estimated_num_employees"),
+            },
+            "status": "pulled",
+        })
 
     # Trim to batch size
     all_people = all_people[:batch_size]

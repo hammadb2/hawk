@@ -1,19 +1,23 @@
 """Apollo.io contact enrichment — replaces Apify actors 2/3/4.
 
 Given a prospect (domain + vertical), find a decision-maker contact's name,
-email, title, phone, and LinkedIn URL. Uses Apollo's ``mixed_people/search``
-endpoint filtered by ``q_organization_domains`` + vertical-specific titles.
+email, title, phone, and LinkedIn URL. Uses Apollo's ``mixed_people/api_search``
+endpoint (formerly ``mixed_people/search`` — deprecated for API callers in
+early 2026) filtered by ``q_organization_domains_list`` + vertical-specific
+titles. Emails are then unlocked via ``people/bulk_match`` since the search
+endpoint itself does not return email addresses.
 
 Also provides ``apollo_people_topup`` for hybrid discovery: pull verified
 contacts directly from Apollo when Google Places volume is below the daily
 target (currently 2 000 contacts/day; see :mod:`services.apollo_discovery`).
 
 Design notes:
-- Costs are tracked per-day in ``crm_settings.apollo_credits_used_today`` and
+- Per Apollo docs, ``mixed_people/api_search`` does **not** consume credits.
+  Only the email-unlock (``people/bulk_match``) burns credits, so credit
+  tracking now increments solely around bulk-match.
+- Credits are tracked per-day in ``crm_settings.apollo_credits_used_today`` and
   ``crm_settings.apollo_credits_used_date`` so we can enforce
   ``apollo_daily_credit_cap`` without hitting Apollo's rate limits.
-- A single per-prospect enrichment costs 1 search credit + 1 email-unlock
-  credit (Apollo business rules change; we count conservatively).
 - Returns ``None`` when no verified contact is found so the post-scan pipeline
   soft-drops the prospect consistently with the previous Apify-based flow.
 """
@@ -219,7 +223,7 @@ async def _apollo_bulk_match_unlock(
 ) -> None:
     """Reveal obfuscated emails on ``people`` rows in place via ``people/bulk_match``.
 
-    Apollo's ``mixed_people/search`` endpoint returns person records but keeps
+    Apollo's ``mixed_people/api_search`` endpoint returns person records but keeps
     the actual ``email`` field locked (empty or ``email_not_unlocked@…``) until
     a separate unlock call is made. Without this step the post-scan pipeline
     can never produce a usable contact and soft-drops every prospect.
@@ -297,13 +301,16 @@ async def _apollo_people_search(
     titles_override: list[str] | None = None,
     diagnostics: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Execute one ``mixed_people/search`` call. Returns raw ``people`` list.
+    """Execute one ``mixed_people/api_search`` call. Returns raw ``people`` list.
 
-    ``has_email: true`` was historically part of the body; Apollo now rejects
-    the flag on several plan tiers and silently returns zero results with no
-    error, which is exactly the failure mode we've been hitting. It's gone.
-    ``status_filter`` + ``titles_override`` let callers progressively relax the
-    query when the strict pass returns nothing.
+    Uses Apollo's current API-only search endpoint. The legacy
+    ``mixed_people/search`` endpoint was deprecated for API callers in 2026
+    and now returns HTTP 422 with a deprecation pointer. ``status_filter`` +
+    ``titles_override`` let callers progressively relax the query when the
+    strict pass returns nothing.
+
+    Note: per Apollo, ``api_search`` does not consume search credits. Email
+    unlock via ``people/bulk_match`` still does; that's tracked separately.
     """
     body: dict[str, Any] = {
         "page": page,
@@ -314,7 +321,9 @@ async def _apollo_people_search(
         or ["verified", "likely to engage"],
     }
     if domain:
-        body["q_organization_domains"] = domain
+        # api_search expects ``q_organization_domains_list`` as an array.
+        # (Legacy ``q_organization_domains`` was a newline-delimited string.)
+        body["q_organization_domains_list"] = [domain]
     if city or province:
         body["person_locations"] = _location_strings(city, province)
 
@@ -323,7 +332,7 @@ async def _apollo_people_search(
         client = httpx.AsyncClient(timeout=45.0)
     try:
         r = await client.post(
-            f"{APOLLO_BASE}/mixed_people/search",
+            f"{APOLLO_BASE}/mixed_people/api_search",
             headers=_apollo_headers(),
             json=body,
             timeout=45.0,
@@ -342,11 +351,11 @@ async def _apollo_people_search(
             )
         if r.status_code >= 400:
             logger.warning(
-                "Apollo people/search HTTP %s domain=%s body=%s",
+                "Apollo mixed_people/api_search HTTP %s domain=%s body=%s",
                 r.status_code, domain, r.text[:300],
             )
             return []
-        _increment_credits(1)
+        # api_search is credit-free per Apollo docs; only bulk_match burns credits.
         data = r.json() or {}
         people = list(data.get("people") or data.get("contacts") or [])
         if diagnostics is not None:
@@ -361,7 +370,7 @@ async def _apollo_people_search(
             diagnostics["search_calls"][-1]["email_statuses"] = statuses
         return people
     except Exception as exc:
-        logger.warning("Apollo people/search error domain=%s: %s", domain, exc)
+        logger.warning("Apollo mixed_people/api_search error domain=%s: %s", domain, exc)
         if diagnostics is not None:
             diagnostics.setdefault("search_calls", []).append(
                 {"domain": domain, "error": str(exc)[:300]}
@@ -373,13 +382,14 @@ async def _apollo_people_search(
 
 
 # Progressive relaxation ladder. Each pass is tried in order until one
-# produces a verified contact (or we run out of credits). Keeps the default
-# verified-only gate for the common case while still recovering domains
-# Apollo has indexed at lower confidence.
+# produces people we can unlock. Valid ``contact_email_status`` values per
+# Apollo docs: verified, unverified, likely to engage, unavailable. Keeps the
+# default verified-only gate for the common case while still recovering
+# domains Apollo has indexed at lower confidence.
 _STATUS_LADDER: list[list[str]] = [
     ["verified"],
     ["verified", "likely to engage"],
-    ["verified", "likely to engage", "guessed"],
+    ["verified", "likely to engage", "unverified"],
 ]
 
 
