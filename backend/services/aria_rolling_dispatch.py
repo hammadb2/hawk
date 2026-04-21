@@ -1,8 +1,8 @@
 """ARIA Rolling Dispatcher — sends up to 200 emails/day per campaign (600/day total).
 
-Runs every hour 9am-4pm MST (8 ticks), each tick dispatches the per-vertical
-catch-up quota so the 600/day target is spread across business hours rather
-than blasted at 6:30am. Primary source is ``prospects`` rows where
+Runs every hour 9am-4pm ET (8 ticks), each tick dispatches the per-vertical
+catch-up quota so the 600/day target is spread across US business hours
+rather than blasted at 6:30am. Primary source is ``prospects`` rows where
 ``pipeline_status=ready`` (set by ``aria_post_scan_pipeline``), ordered by
 ``hawk_score desc`` so higher-signal leads go out first.
 
@@ -37,10 +37,15 @@ from services.mailbox_smtp_sender import send_via_mailbox
 
 logger = logging.getLogger(__name__)
 
-MST = ZoneInfo("America/Edmonton")
+# Dispatch runs on Eastern Time so emails land in US business hours.
+# Per-state TZ routing is a v2 enhancement — for v1 we anchor to ET, which
+# covers EST/CST comfortably and still lands before PT close-of-business.
+DISPATCH_TZ = ZoneInfo("America/New_York")
+# Backwards-compat alias (callers/tests may import ``MST``). Points to ET now.
+MST = DISPATCH_TZ
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
-# Per-vertical daily cap and the canonical tick schedule (9am–4pm MST inclusive = 8 ticks).
+# Per-vertical daily cap and the canonical tick schedule (9am–4pm ET inclusive = 8 ticks).
 # Keep in sync with backend/main.py scheduler registration.
 DAILY_CAP_PER_VERTICAL = int(os.environ.get("ARIA_DAILY_CAP_PER_VERTICAL", "200"))
 DISPATCH_TICK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16]
@@ -57,15 +62,15 @@ def _sb_headers() -> dict[str, str]:
 
 
 def _today_start_utc_iso() -> str:
-    """Start-of-day in MST, rendered as UTC ISO for Supabase timestamptz filters."""
-    now_mst = datetime.now(MST)
-    start_mst = now_mst.replace(hour=0, minute=0, second=0, microsecond=0)
-    return start_mst.astimezone(timezone.utc).isoformat()
+    """Start-of-day in ET, rendered as UTC ISO for Supabase timestamptz filters."""
+    now_local = datetime.now(DISPATCH_TZ)
+    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start_local.astimezone(timezone.utc).isoformat()
 
 
 def _remaining_ticks_today() -> int:
     """How many more dispatch ticks (inclusive of current one) are left today."""
-    current_hour = datetime.now(MST).hour
+    current_hour = datetime.now(DISPATCH_TZ).hour
     remaining = [h for h in DISPATCH_TICK_HOURS if h >= current_hour]
     return max(1, len(remaining))
 
@@ -319,8 +324,8 @@ def run_rolling_dispatch() -> dict[str, Any]:
         }
         stats["dispatched_total"] += sent
 
-    # Route overflow to VA queue after the last tick of the day (4pm MST).
-    current_hour = datetime.now(MST).hour
+    # Route overflow to VA queue after the last tick of the day (4pm ET).
+    current_hour = datetime.now(DISPATCH_TZ).hour
     if current_hour >= DISPATCH_TICK_HOURS[-1]:
         va_routed = _route_overflow_to_va_queue()
         stats["va_queue_routed"] = va_routed
