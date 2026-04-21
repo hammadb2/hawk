@@ -329,7 +329,11 @@ def dispatch_pending_free_scan_reports(limit: int = 100) -> dict[str, Any]:
                 to_email=email,
                 domain=domain,
                 first_name=(row.get("contact_name") or "").split(" ")[0] or None,
-                hawk_score=scan.get("hawk_score") or row.get("hawk_score"),
+                hawk_score=(
+                    scan.get("hawk_score")
+                    if scan.get("hawk_score") is not None
+                    else row.get("hawk_score")
+                ),
                 grade=scan.get("grade"),
                 findings=top,
                 industry=row.get("industry"),
