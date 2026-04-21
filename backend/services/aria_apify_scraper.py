@@ -191,6 +191,24 @@ def search_strings_for_maps(vertical: str, city: str) -> list[str]:
     return out[:12]
 
 
+def _topup_location_for(city: str) -> str:
+    """Best single ``person_locations`` string for Apollo **top-up** calls.
+
+    ``apollo_people_topup`` internally runs each string through
+    ``_parse_location`` which splits on commas and treats the **second** part
+    as a US state. Passing ``"City, USA"`` therefore corrupts downstream
+    ``_location_strings`` into nonsense like ``"City, USA, USA"``. Use the
+    ``CITY_STATE`` mapping so we emit ``"City, State"`` and downstream builds
+    the proper ``"City, State, USA"`` / ``"City, USA"`` variant set.
+    """
+    c = (city or "").strip()
+    entry = CITY_STATE.get(c.lower())
+    if entry:
+        state_full, _ = entry
+        return f"{c}, {state_full}"
+    return c  # bare city; _parse_location tolerates missing region
+
+
 def _apollo_location_strings(city: str) -> list[str]:
     """Apollo ``person_locations`` variants for a US metro (trial order).
 
@@ -920,7 +938,7 @@ async def _apollo_topup_if_needed(
     per_vertical = max(1, shortfall // max(1, len(VERTICALS)))
     topups: list[dict[str, Any]] = []
     for vertical in VERTICALS:
-        locations = [f"{c}, USA" for c in cities_list]
+        locations = [_topup_location_for(c) for c in cities_list]
         chunk = await apollo_people_topup(
             vertical=vertical, locations=locations, batch_size=per_vertical,
         )
@@ -1006,7 +1024,7 @@ async def run_ondemand_discovery(
 
         leads = await apollo_people_topup(
             vertical=vertical,
-            locations=[f"{city}, USA"],
+            locations=[_topup_location_for(city)],
             batch_size=batch_size,
         )
         meta["path"] = "apollo_only"
