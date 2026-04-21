@@ -596,6 +596,20 @@ def apollo_miss_to_va_queue(
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
+    # Honour the same kill switch the per-prospect _route_to_va_queue uses —
+    # flipping apollo_miss_to_va_queue_enabled=false should stop every path
+    # that routes Apollo-miss to va_queue, including manual/scheduled calls
+    # to this bulk endpoint.
+    from services.crm_bool_setting import fetch_crm_bool
+
+    if not fetch_crm_bool("apollo_miss_to_va_queue_enabled", default=True):
+        return {
+            "ok": True,
+            "skipped": "apollo_miss_to_va_queue_enabled=false",
+            "matched": 0,
+            "processed": 0,
+        }
+
     headers = {
         "apikey": SUPABASE_SERVICE_ROLE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
