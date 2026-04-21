@@ -338,6 +338,32 @@ def dispatch_pending_free_scan_reports(limit: int = 100) -> dict[str, Any]:
             skipped += 1
             continue
 
+        # At-most-once semantics. We stamp ``free_scan_report_sent_at`` BEFORE
+        # calling the email provider so that a transient failure on the
+        # bookkeeping PATCH after a successful send can't cause us to re-mail
+        # the same report on the next cron run. If the send itself fails we
+        # roll the stamp back to NULL so the prospect is re-picked next tick.
+        # If the rollback PATCH also fails we prefer the false-negative
+        # (one missing report) over the false-positive (duplicate reports to
+        # a paying-attention US business owner, which would leak our double-
+        # send).
+        stamp_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            httpx.patch(
+                f"{SUPABASE_URL}/rest/v1/prospects",
+                headers=_sb_headers(),
+                params={"id": f"eq.{prospect_id}"},
+                json={
+                    "free_scan_report_sent_at": stamp_iso,
+                    "last_activity_at": stamp_iso,
+                },
+                timeout=20.0,
+            ).raise_for_status()
+        except Exception:
+            logger.exception("free-scan-dispatch: pre-send stamp failed prospect_id=%s", prospect_id)
+            errors += 1
+            continue
+
         try:
             send_free_scan_report_email(
                 to_email=email,
@@ -352,25 +378,22 @@ def dispatch_pending_free_scan_reports(limit: int = 100) -> dict[str, Any]:
                 findings=top,
                 industry=row.get("industry"),
             )
-        except Exception:
-            logger.exception("free-scan-dispatch: send failed prospect_id=%s", prospect_id)
-            errors += 1
-            continue
-
-        try:
-            httpx.patch(
-                f"{SUPABASE_URL}/rest/v1/prospects",
-                headers=_sb_headers(),
-                params={"id": f"eq.{prospect_id}"},
-                json={
-                    "free_scan_report_sent_at": datetime.now(timezone.utc).isoformat(),
-                    "last_activity_at": datetime.now(timezone.utc).isoformat(),
-                },
-                timeout=20.0,
-            ).raise_for_status()
             sent += 1
         except Exception:
-            logger.exception("free-scan-dispatch: mark-sent failed prospect_id=%s", prospect_id)
+            logger.exception("free-scan-dispatch: send failed prospect_id=%s — rolling back stamp", prospect_id)
             errors += 1
+            try:
+                httpx.patch(
+                    f"{SUPABASE_URL}/rest/v1/prospects",
+                    headers=_sb_headers(),
+                    params={"id": f"eq.{prospect_id}"},
+                    json={"free_scan_report_sent_at": None},
+                    timeout=20.0,
+                ).raise_for_status()
+            except Exception:
+                logger.exception(
+                    "free-scan-dispatch: rollback failed prospect_id=%s — prospect will NOT be retried "
+                    "(manual intervention required)", prospect_id,
+                )
 
     return {"ok": True, "sent": sent, "skipped": skipped, "errors": errors, "candidates": len(candidates)}

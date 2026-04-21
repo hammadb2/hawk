@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { marketingApi } from "@/lib/api";
+import { HttpError, marketingApi } from "@/lib/api";
 import { portal } from "@/lib/portal-ui";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -65,14 +65,24 @@ export function FreeScanLanding() {
       });
       setStatus("success");
     } catch (err) {
-      const msg =
-        err instanceof Error && err.message
-          ? err.message.includes("429")
-            ? "Too many requests — please try again in a minute."
-            : err.message.includes("400")
-            ? "Double-check the domain and email address."
-            : "Something went wrong on our side. Try again in a minute."
-          : "Something went wrong. Try again in a minute.";
+      // Branch on HTTP status, not message text. The request layer used to
+      // throw a plain Error whose message was just the server's `detail`
+      // string — status 429/400 were never *in* the message, so the old
+      // `err.message.includes("429")` checks never matched and every error
+      // fell through to the generic server-side message. `HttpError.status`
+      // is the canonical signal.
+      let msg: string;
+      if (err instanceof HttpError) {
+        if (err.status === 429) {
+          msg = "Too many requests — please try again in a minute.";
+        } else if (err.status === 400 || err.status === 422) {
+          msg = "Double-check the domain and email address.";
+        } else {
+          msg = "Something went wrong on our side. Try again in a minute.";
+        }
+      } else {
+        msg = "Something went wrong. Try again in a minute.";
+      }
       setErrorMsg(msg);
       setStatus("error");
     }
