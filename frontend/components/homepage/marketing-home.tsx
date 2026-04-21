@@ -1,97 +1,28 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { HeroScan } from "@/components/marketing/hero-scan";
-import { SmoothScroll } from "@/components/marketing/smooth-scroll";
+import { MarketingShell } from "@/components/marketing/marketing-shell";
 
 const ENTERPRISE_BOOKING =
   process.env.NEXT_PUBLIC_CAL_COM_BOOKING_URL || "https://cal.com/hawksecurity/15min";
 
 /**
  * Marketing home. Premium dark canvas, graphite surfaces, signal amber accent.
- * Scoped to html.marketing-route via <SmoothScroll /> so the portal/CRM stays light.
+ * Chrome (nav + footer + smooth scroll + theme scope) lives in MarketingShell.
  */
 export function MarketingHome() {
   return (
-    <div className="relative min-h-dvh w-full overflow-x-hidden bg-ink-950 font-display text-ink-0 antialiased selection:bg-signal/40 selection:text-ink-950">
-      <SmoothScroll />
-
-      {/* Ambient amber glow behind the top of the page */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[720px] bg-ink-vignette"
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-0 grid-ink" />
-      <div aria-hidden className="noise-overlay" />
-
-      <MarketingNav />
-
-      <main className="relative z-10">
-        <HeroSection />
-        <RegulatorySection />
-        <HowItWorks />
-        <GuaranteeSection />
-        <HawkCertified />
-        <PricingSection />
-        <FinalCTA />
-      </main>
-
-      <MarketingFooter />
-    </div>
-  );
-}
-
-/* ============================== NAV ============================== */
-
-function MarketingNav() {
-  return (
-    <header className="sticky top-0 z-40 border-b border-white/5 bg-ink-950/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8">
-        <Link href="/" className="group inline-flex items-center" title="HAWK" aria-label="HAWK home">
-          <Image
-            src="/hawk-wordmark.png"
-            alt="HAWK"
-            width={350}
-            height={200}
-            priority
-            className="h-8 w-auto select-none"
-          />
-        </Link>
-        <nav className="hidden items-center gap-8 md:flex">
-          <a href="#regulatory" className="text-sm text-ink-100 transition-colors hover:text-ink-0">
-            Regulatory
-          </a>
-          <a href="#how" className="text-sm text-ink-100 transition-colors hover:text-ink-0">
-            How it works
-          </a>
-          <a href="#guarantee" className="text-sm text-ink-100 transition-colors hover:text-ink-0">
-            Guarantee
-          </a>
-          <a href="#pricing" className="text-sm text-ink-100 transition-colors hover:text-ink-0">
-            Pricing
-          </a>
-          <a href="#certified" className="text-sm text-ink-100 transition-colors hover:text-ink-0">
-            Certification
-          </a>
-        </nav>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/portal/login"
-            className="hidden text-sm font-medium text-ink-100 transition-colors hover:text-ink-0 sm:inline-flex"
-          >
-            Log in
-          </Link>
-          <a
-            href="#scan"
-            className="inline-flex items-center gap-1.5 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
-          >
-            Free scan
-          </a>
-        </div>
-      </div>
-    </header>
+    <MarketingShell>
+      <HeroSection />
+      <RegulatorySection />
+      <HowItWorks />
+      <GuaranteeSection />
+      <HawkCertified />
+      <PricingSection />
+      <FinalCTA />
+    </MarketingShell>
   );
 }
 
@@ -603,44 +534,6 @@ function FinalCTA() {
         </div>
       </div>
     </section>
-  );
-}
-
-/* ========================== FOOTER ============================= */
-
-function MarketingFooter() {
-  return (
-    <footer className="relative border-t border-white/5 bg-ink-950 px-6 py-14 sm:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-10 lg:flex-row lg:items-center">
-        <div className="flex items-center gap-4">
-          <Image
-            src="/hawk-wordmark.png"
-            alt="HAWK"
-            width={350}
-            height={200}
-            className="h-9 w-auto select-none"
-          />
-          <p className="text-xs text-ink-200">Built by AKB Studios.</p>
-        </div>
-        <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-100">
-          <Link href="/privacy" className="transition-colors hover:text-ink-0">
-            Privacy
-          </Link>
-          <Link href="/guarantee-terms" className="transition-colors hover:text-ink-0">
-            Guarantee terms
-          </Link>
-          <Link href="/free-scan" className="transition-colors hover:text-ink-0">
-            Free scan
-          </Link>
-          <Link href="/portal/login" className="transition-colors hover:text-ink-0">
-            Client portal
-          </Link>
-        </nav>
-        <p className="text-xs text-ink-300">
-          HAWK Security. All rights reserved. {new Date().getFullYear()}.
-        </p>
-      </div>
-    </footer>
   );
 }
 
