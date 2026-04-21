@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { HeroScan } from "@/components/marketing/hero-scan";
@@ -48,9 +49,15 @@ function MarketingNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-ink-950/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8">
-        <Link href="/" className="group inline-flex items-center gap-2.5" title="HAWK">
-          <HawkMark />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-ink-0">HAWK</span>
+        <Link href="/" className="group inline-flex items-center" title="HAWK" aria-label="HAWK home">
+          <Image
+            src="/hawk-wordmark.png"
+            alt="HAWK"
+            width={350}
+            height={200}
+            priority
+            className="h-8 w-auto select-none"
+          />
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
           <a href="#regulatory" className="text-sm text-ink-100 transition-colors hover:text-ink-0">
@@ -85,22 +92,6 @@ function MarketingNav() {
         </div>
       </div>
     </header>
-  );
-}
-
-function HawkMark() {
-  return (
-    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-signal/10 ring-1 ring-signal/40">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M12 3l8 5.5v6.5a9 9 0 0 1-16 0V8.5L12 3z"
-          stroke="#FFB800"
-          strokeWidth="1.75"
-          strokeLinejoin="round"
-        />
-        <path d="M9 12l2.2 2.2L15 10" stroke="#FFB800" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
   );
 }
 
@@ -621,12 +612,15 @@ function MarketingFooter() {
   return (
     <footer className="relative border-t border-white/5 bg-ink-950 px-6 py-14 sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-10 lg:flex-row lg:items-center">
-        <div className="flex items-center gap-3">
-          <HawkMark />
-          <div>
-            <p className="font-display text-base font-semibold text-ink-0">HAWK</p>
-            <p className="text-xs text-ink-200">Built by AKB Studios.</p>
-          </div>
+        <div className="flex items-center gap-4">
+          <Image
+            src="/hawk-wordmark.png"
+            alt="HAWK"
+            width={350}
+            height={200}
+            className="h-9 w-auto select-none"
+          />
+          <p className="text-xs text-ink-200">Built by AKB Studios.</p>
         </div>
         <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-100">
           <Link href="/privacy" className="transition-colors hover:text-ink-0">
