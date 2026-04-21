@@ -72,8 +72,6 @@ const config: Config = {
       },
       letterSpacing: {
         tightest: "-0.04em",
-        tighter: "-0.03em",
-        tight: "-0.02em",
       },
       backgroundImage: {
         "signal-sheen":
