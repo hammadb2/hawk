@@ -569,6 +569,123 @@ def apollo_bulk_enrich(
     return {"ok": True, "processed": len(prospects), "outcomes": outcomes}
 
 
+@router.post("/apollo-miss-to-va-queue")
+def apollo_miss_to_va_queue(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    limit: int = 1000,
+    dry_run: bool = False,
+) -> dict:
+    """One-shot sweep that re-routes every Apollo-miss prospect to the VA queue.
+
+    Finds prospects at ``stage=scanned, pipeline_status=scanned`` with
+    ``contact_email IS NULL`` and flips them to ``pipeline_status=va_queue``
+    (stage stays ``scanned``). These are the leads Apollo can't source —
+    typically Canadian SMB long-tail (dental / tax / law shops Apollo doesn't
+    index) — so the rolling dispatcher will never send them, but a human VA
+    can LinkedIn / phone / website-scrape the contact and dispatch manually.
+
+    Unlike the post-scan pipeline's per-prospect route, this endpoint is a
+    bulk PostgREST PATCH so it runs in seconds even for a 900+ backlog.
+    Pass ``dry_run=true`` to just count the matching prospects without
+    mutating anything.
+
+    Returns ``{processed, sample_domains}``. Safe to re-run — the filter only
+    matches prospects still stuck at ``pipeline_status=scanned``.
+    """
+    _require_secret(x_cron_secret)
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    # First, page a bounded batch of matching ids so we can (a) report
+    # sample_domains and (b) bound the bulk PATCH to ``limit`` rows rather
+    # than flipping every matching row in the table at once.
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=headers,
+            params={
+                "select": "id,domain",
+                "stage": "eq.scanned",
+                "pipeline_status": "eq.scanned",
+                "contact_email": "is.null",
+                "order": "scanned_at.asc",
+                "limit": str(max(1, min(limit, 5000))),
+            },
+            timeout=30.0,
+        )
+        if r.status_code >= 400:
+            raise HTTPException(
+                status_code=502,
+                detail=f"supabase {r.status_code}: {r.text[:300]}",
+            )
+        rows = r.json() or []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("apollo-miss-to-va-queue query failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    ids = [row["id"] for row in rows if row.get("id")]
+    sample_domains = [row.get("domain") for row in rows[:10] if row.get("domain")]
+
+    if dry_run or not ids:
+        return {
+            "ok": True,
+            "dry_run": dry_run,
+            "matched": len(ids),
+            "processed": 0,
+            "sample_domains": sample_domains,
+        }
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        patch = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers={**headers, "Prefer": "return=representation"},
+            params={
+                "id": f"in.({','.join(ids)})",
+                "stage": "in.(new,scanning,scanned)",
+                "pipeline_status": "eq.scanned",
+            },
+            json={
+                "pipeline_status": "va_queue",
+                "last_activity_at": now_iso,
+            },
+            timeout=60.0,
+        )
+        if patch.status_code >= 400:
+            raise HTTPException(
+                status_code=502,
+                detail=f"supabase {patch.status_code}: {patch.text[:300]}",
+            )
+        try:
+            processed = len(patch.json() or [])
+        except Exception:
+            processed = len(ids)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("apollo-miss-to-va-queue patch failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    logger.info(
+        "apollo-miss-to-va-queue routed=%d sample_domains=%s",
+        processed, sample_domains[:3],
+    )
+    return {
+        "ok": True,
+        "matched": len(ids),
+        "processed": processed,
+        "sample_domains": sample_domains,
+    }
+
+
 @router.post("/pipeline-doctor")
 def pipeline_doctor_trigger(
     x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),

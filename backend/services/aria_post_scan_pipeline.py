@@ -31,6 +31,15 @@ re-enable without a redeploy.
 Soft-drop path: ``stage=lost``, ``pipeline_status=suppressed``, plus a
 ``suppressions`` row keyed by domain so the nightly discovery never re-queues
 the lead. We never hard-delete.
+
+Apollo-miss path (new): when Apollo returns no contact for a domain — which
+is the common case for the Canadian SMB long tail (small dental / tax / law
+shops Apollo simply doesn't index) — the prospect is routed to
+``pipeline_status=va_queue`` instead of soft-dropped, so a human VA can
+source the email manually. Stage stays ``scanned``. This unsticks the
+``scanned_backlog`` without synthesising contacts or bypassing the verified
+gate. Governed by ``crm_settings.apollo_miss_to_va_queue_enabled`` (default
+true) — flip to false to restore the old soft-drop behaviour.
 """
 
 from __future__ import annotations
@@ -109,6 +118,50 @@ def _patch_prospect(prospect_id: str, payload: dict[str, Any]) -> None:
         )
     except Exception as exc:
         logger.warning("post-scan patch prospect=%s failed: %s", prospect_id, exc)
+
+
+def _route_to_va_queue(prospect_id: str, domain: str, *, reason: str) -> bool:
+    """Move an Apollo-miss prospect into ``pipeline_status=va_queue``.
+
+    Stage stays ``scanned`` — the scan finding is still valid; only the
+    automated outreach path is unavailable because Apollo could not source
+    a contact. The VA console (``/crm/va``) surfaces every ``va_queue`` row
+    regardless of whether ``contact_email`` is populated, so a human can
+    LinkedIn / phone / website-scrape the contact and dispatch manually.
+
+    Returns ``True`` if the prospect was routed, ``False`` otherwise (kill
+    switch off, prospect stage advanced past ``scanned``, or HTTP error).
+    Stage guard matches the one in ``_soft_drop`` and the final ready patch.
+    """
+    if not fetch_crm_bool("apollo_miss_to_va_queue_enabled", default=True):
+        return False
+    try:
+        r = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "id": f"eq.{prospect_id}",
+                "stage": "in.(new,scanning,scanned)",
+                "pipeline_status": "eq.scanned",
+            },
+            json={
+                "pipeline_status": "va_queue",
+                "last_activity_at": datetime.now(timezone.utc).isoformat(),
+            },
+            timeout=15.0,
+        )
+        r.raise_for_status()
+    except Exception as exc:
+        logger.warning(
+            "post-scan va-route patch prospect=%s reason=%s: %s",
+            prospect_id, reason, exc,
+        )
+        return False
+    logger.info(
+        "post-scan routed-to-va-queue prospect=%s domain=%s reason=%s",
+        prospect_id, domain, reason,
+    )
+    return True
 
 
 def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
@@ -319,6 +372,21 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
         enrichment = await _enrich_single(prospect, vertical) or {}
 
     if not enrichment.get("email"):
+        # Apollo couldn't source a contact — most common for Canadian SMB
+        # long-tail (small dental / tax / law shops Apollo doesn't index).
+        # Route to VA queue for manual sourcing instead of soft-dropping so
+        # the lead is still reachable.
+        routed = _route_to_va_queue(
+            prospect_id, domain, reason="post_scan:no_contact_after_enrichment",
+        )
+        if routed:
+            return {
+                "ok": True,
+                "prospect_id": prospect_id,
+                "domain": domain,
+                "outcome": "routed_to_va_queue",
+            }
+        # Kill switch off or stage advanced — fall back to the old behaviour.
         _soft_drop(prospect_id, domain, reason="post_scan:no_contact_after_enrichment")
         return {
             "ok": True,
