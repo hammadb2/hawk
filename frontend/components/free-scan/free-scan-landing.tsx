@@ -74,9 +74,9 @@ export function FreeScanLanding() {
       let msg: string;
       if (err instanceof HttpError) {
         if (err.status === 429) {
-          msg = "Too many requests — please try again in a minute.";
+          msg = "Too many requests. Please try again in a minute.";
         } else if (err.status === 400 || err.status === 422) {
-          msg = "Double-check the domain and email address.";
+          msg = "Double check the domain and email address.";
         } else {
           msg = "Something went wrong on our side. Try again in a minute.";
         }
@@ -121,14 +121,14 @@ export function FreeScanLanding() {
                 Free · US small businesses
               </p>
               <h1 className="mt-3 text-balance text-3xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
-                See what ransomware crews see on your business —{" "}
-                <span className="text-emerald-600">before they email you.</span>
+                See what ransomware crews see on your practice.{" "}
+                <span className="text-emerald-600">Before they contact you.</span>
               </h1>
               <p className="mt-5 text-pretty text-lg leading-relaxed text-slate-600">
-                Enter your domain below. Within 24 hours we&apos;ll email you a plain-English
-                report with the <strong className="text-slate-900">3 highest-priority external findings</strong>{" "}
-                on your business — the same signals attackers harvest from DNS, mail, and TLS
-                before they pick targets.
+                Enter your domain below. Within 24 hours we&apos;ll email you a plain English
+                report with the <strong className="text-slate-900">three highest priority external findings</strong>{" "}
+                on your business. The same signals attackers harvest from DNS, mail, and TLS before
+                they pick targets.
               </p>
 
               <ul className="mt-8 space-y-4 text-base leading-relaxed text-slate-700">
@@ -139,8 +139,8 @@ export function FreeScanLanding() {
                   Plain English, not log dumps. If something needs fixing urgently, we flag it at the top.
                 </FreeScanBullet>
                 <FreeScanBullet>
-                  Mapped to the US regulation that applies to your practice — HIPAA (dental), FTC
-                  Safeguards Rule (CPA/tax), ABA Opinion 24-514 (legal).
+                  Mapped to the US regulation that applies to your practice. HIPAA for dental. FTC
+                  Safeguards Rule for CPA and tax. ABA 2024 cyber ethics for legal.
                 </FreeScanBullet>
               </ul>
 
@@ -162,7 +162,7 @@ export function FreeScanLanding() {
                   <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                     <div>
                       <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                        Get your free 3-finding report
+                        Get your free three finding report
                       </h2>
                       <p className="mt-1 text-sm text-slate-500">
                         Report arrives within 24 hours.
@@ -182,7 +182,7 @@ export function FreeScanLanding() {
                       />
                       {domainRaw && !DOMAIN_RE.test(domain) ? (
                         <p className="mt-1 text-xs text-amber-600">
-                          Enter the domain without http/https — e.g. yourpractice.com
+                          Enter the domain without http or https. For example yourpractice.com
                         </p>
                       ) : null}
                     </Field>
@@ -278,17 +278,17 @@ export function FreeScanLanding() {
               <HowItWorksCard
                 step="1"
                 title="You submit"
-                body="Domain plus your work email. That's it — no credit card, no sales form dance."
+                body="Domain plus your work email. That is it. No credit card. No sales form dance."
               />
               <HowItWorksCard
                 step="2"
                 title="We scan"
-                body="Real external attack-surface scan on your domain — DNS, mail, TLS, exposed services, auth posture."
+                body="Real external attack surface scan on your domain. DNS, mail, TLS, exposed services, auth posture."
               />
               <HowItWorksCard
                 step="3"
                 title="You get the report"
-                body="Plain-English summary of the 3 highest-priority findings, mapped to the US regulation that applies to your practice."
+                body="Plain English summary of the three highest priority findings, mapped to the US regulation that applies to your practice."
               />
             </div>
           </div>
@@ -403,8 +403,8 @@ function FreeScanSuccess({ domain, email }: { domain: string; email: string }) {
         Scan requested.
       </h2>
       <p className="mt-3 text-base leading-relaxed text-slate-600">
-        We kicked off an external attack-surface scan on{" "}
-        <strong className="text-slate-900">{domain}</strong> the moment you hit submit. Your 3-finding
+        We kicked off an external attack surface scan on{" "}
+        <strong className="text-slate-900">{domain}</strong> the moment you hit submit. Your three finding
         report will land at{" "}
         <strong className="text-slate-900">{email}</strong> within{" "}
         <strong className="text-slate-900">24 hours</strong>.
