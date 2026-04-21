@@ -82,7 +82,7 @@ def _require_pipeline_access(uid: str) -> dict[str, Any]:
 
 class RunPipelineRequest(BaseModel):
     vertical: str  # "dental", "legal", "accounting"
-    location: str  # e.g. "Canada", "Ontario, Canada"
+    location: str  # e.g. "USA", "New York, NY"
     batch_size: int = 50
 
 

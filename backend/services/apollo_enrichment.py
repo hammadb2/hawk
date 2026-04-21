@@ -174,18 +174,24 @@ def _normalize_domain(raw: str) -> str:
     return d
 
 
-def _location_strings(city: str | None, province: str | None) -> list[str]:
-    """Build Apollo person_locations strings (city + province/state + country)."""
+def _location_strings(city: str | None, state: str | None) -> list[str]:
+    """Build Apollo ``person_locations`` strings for the US market.
+
+    Parameter name is ``state`` to reflect the US pivot. Callers may still
+    pass a ``province``-shaped value from legacy rows — it's treated as a
+    free-text region string, so anything Apollo recognises as a state name
+    or two-letter abbreviation will match.
+    """
     out: list[str] = []
     city = (city or "").strip()
-    province = (province or "").strip()
-    if city and province:
-        out.append(f"{city}, {province}, Canada")
+    state = (state or "").strip()
+    if city and state:
+        out.append(f"{city}, {state}, USA")
     if city:
-        out.append(f"{city}, Canada")
-    if province:
-        out.append(f"{province}, Canada")
-    return out or ["Canada"]
+        out.append(f"{city}, USA")
+    if state:
+        out.append(f"{state}, USA")
+    return out or ["USA"]
 
 
 def _select_person(people: list[dict[str, Any]]) -> dict[str, Any] | None:

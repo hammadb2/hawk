@@ -125,12 +125,12 @@ def _ensure_campaign(vertical: str) -> str:
     if campaign_id:
         return campaign_id
 
-    # Create new campaign
+    # Create new campaign (US market).
     campaign_name = {
-        "dental": "Dental Clinics Canada",
-        "legal": "Law Firms Canada",
-        "accounting": "Accounting Practices Canada",
-    }.get(vertical, f"{vertical.title()} Canada")
+        "dental": "Dental Clinics US",
+        "legal": "Law Firms US",
+        "accounting": "Accounting Practices US",
+    }.get(vertical, f"{vertical.title()} US")
 
     new_id = _create_smartlead_campaign(campaign_name)
     if new_id:

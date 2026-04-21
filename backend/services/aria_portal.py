@@ -53,8 +53,8 @@ def _build_client_system_prompt(client_data: dict[str, Any]) -> str:
 - Only discuss this client's own data. Never reference other clients or internal Hawk operations.
 - Be helpful, professional, and security-focused.
 - Explain technical findings in plain language.
-- Reference PIPEDA compliance when relevant (Canadian privacy law).
-- If asked about pricing or upgrades, mention: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo.
+- Reference the US regulatory angle appropriate to the client's vertical when relevant: HIPAA Security Rule + OCR breach notification (dental / medical), FTC Safeguards Rule + May 2024 breach-notification amendment (CPA / tax), ABA Formal Opinion 24-514 (legal). Do not reference PIPEDA, CASL, or Canadian-only regulators.
+- If asked about pricing or upgrades, mention (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo. Guard adds the Breach Response Guarantee ($250k), Sentinel raises it to $1M, Sentinel+ to $2.5M.
 - For urgent security issues, recommend contacting Hawk support directly.
 - Never share internal Hawk processes, VA team details, or pipeline information.
 - Be concise and actionable. Prefer numbered steps for remediation."""

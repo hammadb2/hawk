@@ -12,9 +12,9 @@ Certificate of Protection
 
 Guarantee Reference: HAWK-BRG-2026     Version: 1.0
 
-Issued by: HAWK Security, a division of AKB Company Ltd, Calgary, Alberta, Canada
+Issued by: HAWK Security, a division of AKB Company Ltd
 
-Governing Jurisdiction: Province of Alberta, Canada
+Governing Jurisdiction: The jurisdiction in which the Subscriber operates, as further described in Part VII
 
 Effective Date: Upon execution of HAWK Shield Subscription Agreement
 
@@ -28,7 +28,7 @@ Effective Date: Upon execution of HAWK Shield Subscription Agreement
 
 This Breach Response Guarantee (the "Guarantee") is issued by HAWK Security, a division of AKB Company Ltd ("HAWK", "we", "us", or "our") to the subscribing entity ("Subscriber", "you", or "your") upon execution of a valid HAWK Shield Subscription Agreement and payment of all applicable subscription fees.
 
-This Guarantee is not an insurance policy. HAWK is not a licensed insurer and this Guarantee does not constitute insurance under the Insurance Act (Alberta) or any equivalent legislation in any other jurisdiction.
+This Guarantee is not an insurance policy. HAWK is not a licensed insurer and this Guarantee does not constitute insurance under the insurance laws or regulations of any US state, US federal agency, or any other jurisdiction.
 
 This Guarantee is expressly limited in scope, duration, eligibility, and remedy. The Subscriber acknowledges having read, understood, and accepted all terms herein as a condition of receiving this Guarantee.
 
@@ -50,7 +50,7 @@ A confirmed, verified, unauthorized access to the Subscriber's systems or data b
 
 Business Day
 
-Any day that is not a Saturday, Sunday, or statutory holiday in the Province of Alberta, Canada.
+Any day that is not a Saturday, Sunday, or a US federal holiday.
 
 Claim Window
 
@@ -110,7 +110,7 @@ The complete resolution of a Finding as verified exclusively by HAWK's automated
 
 Reimbursement
 
-The Coverage Amount applied as a credit to the Subscriber's HAWK Shield subscription account. Not payable in cash, bank transfer, cheque, cryptocurrency, or any other form.
+The Coverage Amount applied as a credit to the Subscriber's HAWK Shield subscription account. Not payable in cash, bank transfer, check, cryptocurrency, or any other form.
 
 
 ## PART II — GUARANTEE COVERAGE
@@ -172,11 +172,19 @@ Any consequential, indirect, punitive, exemplary, special, or reputational damag
 
 3.1 Coverage Amount
 
-The maximum Coverage Amount available under this Guarantee is two thousand five hundred Canadian dollars ($2,500 CAD) per Incident, applied exclusively as a credit toward future HAWK Shield subscription fees.
+The maximum Coverage Amount available under this Guarantee is determined by the Subscriber's active HAWK Shield subscription tier at the time the Incident is first reported. All amounts are stated in United States dollars (USD). Coverage is applied exclusively as a credit toward future HAWK Shield subscription fees.
+
+(a) **HAWK Core** subscribers: up to two hundred fifty thousand US dollars ($250,000 USD) per Incident.
+
+(b) **HAWK Guard** subscribers: up to one million US dollars ($1,000,000 USD) per Incident.
+
+(c) **HAWK Sentinel** subscribers: up to two million five hundred thousand US dollars ($2,500,000 USD) per Incident.
+
+Subscribers on any legacy or custom tier are capped at the HAWK Core Coverage Amount unless a higher Coverage Amount is expressly stated in writing on the applicable HAWK Shield Subscription Agreement.
 
 3.2 Reimbursement Format
 
-All Reimbursement shall be provided exclusively as a credit applied to the Subscriber's HAWK Shield subscription account. Reimbursement is not payable in any other form including cash, cheque, bank transfer, electronic funds transfer, cryptocurrency, gift card, or any other monetary instrument.
+All Reimbursement shall be provided exclusively as a credit applied to the Subscriber's HAWK Shield subscription account. Reimbursement is not payable in any other form including cash, check, bank transfer, electronic funds transfer, cryptocurrency, gift card, or any other monetary instrument.
 
 3.3 Claim Frequency
 
@@ -360,11 +368,11 @@ This Guarantee terminates immediately and automatically upon: cancellation of th
 
 7.4 Governing Law
 
-This Guarantee is governed exclusively by the laws of the Province of Alberta, Canada, without regard to conflict of law principles.
+This Guarantee is governed by the laws of the jurisdiction in which the Subscriber operates, without regard to conflict of law principles. Where the Subscriber operates in multiple jurisdictions, this Guarantee is governed by the laws of the Subscriber's primary place of business as identified on the HAWK Shield Subscription Agreement.
 
 7.5 Dispute Resolution
 
-Any dispute arising from or related to this Guarantee, other than a dispute regarding a coverage decision which is final and binding under Section 6.6, shall be resolved exclusively through binding arbitration administered by the ADR Institute of Canada in Calgary, Alberta. The arbitration shall be conducted by a single arbitrator. The Subscriber waives any right to a jury trial or class action.
+Any dispute arising from or related to this Guarantee, other than a dispute regarding a coverage decision which is final and binding under Section 6.6, shall be resolved exclusively through binding arbitration administered by the American Arbitration Association under its Commercial Arbitration Rules. The arbitration shall be conducted by a single arbitrator and shall take place in the federal judicial district of the Subscriber's primary place of business, or remotely by mutual agreement. The Subscriber waives any right to a jury trial or class action.
 
 7.6 Limitation of Liability
 
@@ -389,9 +397,9 @@ They understand that coverage is strictly limited and subject to numerous condit
 
 They accept all terms herein as a binding contractual commitment
 
-Subscriber acceptance is recorded electronically via the HAWK portal at the time of onboarding. The acceptance timestamp and IP address are stored permanently in HAWK's systems and constitute a binding electronic signature under Alberta law.
+Subscriber acceptance is recorded electronically via the HAWK portal at the time of onboarding. The acceptance timestamp and IP address are stored permanently in HAWK's systems and constitute a binding electronic signature under the US Electronic Signatures in Global and National Commerce Act (ESIGN, 15 U.S.C. ch. 96) and the Uniform Electronic Transactions Act (UETA) as adopted by the Subscriber's state of operation.
 
-HAWK Security  ·  AKB Studios  ·  Calgary, Alberta, Canada
+HAWK Security  ·  AKB Studios
 
 hello@securedbyhawk.com  ·  securedbyhawk.com  ·  +1 (825) 945-8282
 

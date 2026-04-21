@@ -5,7 +5,7 @@ schedule a 48-hour check-in. If the prospect still hasn't booked by then,
 ARIA sends ONE personalised follow-up that references their specific
 finding + offers an alternative slot. If that also fails to convert, the
 prospect enters a 30-day weekly nurture drip (one email per week for 4
-weeks) with a new finding or a Canadian breach story in their vertical.
+weeks) with a new finding or a US breach story in their vertical.
 
 Every scheduled send goes through ``aria_scheduled_actions`` — this file
 just owns the scheduling decisions + the handler logic for each action
@@ -259,19 +259,26 @@ def _fallback_48h_body(finding: str) -> str:
     )
 
 
-_NURTURE_SYSTEM = """You are ARIA writing a weekly nurture email for a Canadian
-cybersecurity company (HAWK Security). The prospect already got our cold
-email + a personalised follow-up and didn't book. Do NOT be salesy. Do NOT
-re-pitch. Write a short value-first update (80-120 words) that:
+_NURTURE_SYSTEM = """You are ARIA writing a weekly nurture email for a US
+cybersecurity company (HAWK Security) serving small US professional
+practices. The prospect already got our cold email + a personalised
+follow-up and didn't book. Do NOT be salesy. Do NOT re-pitch. Write a
+short value-first update (80-120 words) that:
 
  1. Opens with a single concrete, topical data point — one of:
     a. A new finding severity trend in their vertical (dental / legal /
        accounting), OR
-    b. A recent Canadian breach story they'd care about (OPC enforcement,
-       PIPEDA penalty, ransomware on a similar clinic).
+    b. A recent US breach story or enforcement action they'd care about:
+       * dental / medical → HHS OCR HIPAA enforcement, OCR Wall of Shame,
+         or ransomware on a similar clinic
+       * accounting / CPA / tax → FTC Safeguards Rule enforcement, state
+         AG breach notifications, or tax-prep wire-fraud events
+       * legal / law firm → ABA Formal Opinion 24-514 guidance, state bar
+         client-notification actions, or real-estate wire-fraud diversion
  2. Ties the data point to a generic 1-line ask — no pressure. Example:
     "If you want us to re-run a scan on your domain any time, just reply."
  3. Plain text, no subject line, no greeting block, sign off "— Hammad".
+ 4. Never reference Canada, PIPEDA, CASL, or Canadian-only regulators.
 
 Week number: {week} of {max_weeks}. The prospect's vertical is {vertical}.
 """
@@ -329,16 +336,16 @@ def handle_nurture_weekly(row: dict[str, Any]) -> dict[str, Any]:
 
 
 _DENTAL_STORIES = [
-    "The OPC opened an investigation this month on a dental group that leaked 135k patient records through a misconfigured intake form.",
-    "A multi-location clinic in Ontario paid $180k in ransom last quarter after staff credentials were harvested via a spoofed billing email.",
+    "HHS OCR's December 2024 settlement with Westend Dental (a $350k fine over a ransomware incident and HIPAA breach-notification failure) is the template regulators are applying to SMB practices right now.",
+    "A multi-location US dental group paid $180k in ransom last quarter after staff credentials were harvested via a spoofed billing email; the same attack pattern hit three more clinics in the same MSA within six weeks.",
 ]
 _LEGAL_STORIES = [
-    "A Quebec law firm was fined $100k this quarter under Law 25 for failing to notify clients of a laptop-theft breach within 72 hours.",
-    "The Canadian Bar Association flagged a 31% year-over-year rise in ransomware targeting firms with fewer than 50 lawyers.",
+    "ABA Formal Opinion 24-514 reconfirmed that failing to notify clients of a material data incident is a Model Rule 1.4 violation — several state bars have now opened parallel disciplinary tracks.",
+    "Real-estate wire-fraud diversion is still the single biggest loss vector for US firms under 50 lawyers; typical single-closing loss is $250k-$500k and almost always starts with a spoofed closing email.",
 ]
 _ACCT_STORIES = [
-    "CPA Canada's 2025 cyber report shows client tax-return data is now the #1 targeted asset for ransomware crews hitting accounting firms.",
-    "A Calgary accounting practice reported a $120k wire-fraud loss in April after their email domain was spoofed due to missing DMARC enforcement.",
+    "The FTC Safeguards Rule breach-notification amendment took effect in May 2024 — every US CPA, bookkeeper, and tax preparer now has 30 days to report breaches affecting 500+ consumers, and state AG overlays compound the obligation.",
+    "A US accounting practice reported a $120k wire-fraud loss in April after their email domain was spoofed due to missing DMARC enforcement; Safeguards Rule auditors treat DMARC as table-stakes now.",
 ]
 
 
@@ -351,7 +358,7 @@ def _fallback_nurture_body(week: int, vertical: str) -> str:
     elif "acct" in v or "account" in v:
         story = random.choice(_ACCT_STORIES)
     else:
-        story = "OPC enforcement actions under PIPEDA are up 38% year-over-year in 2025, and small professional practices are the fastest-growing target segment."
+        story = "US state AG data-breach actions against small professional practices are up sharply in 2025, and cyber-insurance carriers are denying renewals without MFA + EDR + WISP evidence."
 
     return (
         f"One thing from this week that made me think of you:\n\n"

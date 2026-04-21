@@ -107,10 +107,11 @@ def build_playbook_from_deals() -> dict[str, Any]:
                 {
                     "role": "system",
                     "content": (
-                        "You are a sales strategist for Hawk Security, a Canadian cybersecurity company "
-                        "targeting dental clinics, law firms, and accounting practices. "
-                        "Products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo. "
-                        "Differentiators: HAWK Certified badge, financial guarantee, PIPEDA compliance. "
+                        "You are a sales strategist for Hawk Security, a US cybersecurity company "
+                        "serving small US professional practices — dental clinics, law firms, and accounting / CPA firms. "
+                        "Products (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo. "
+                        "Differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), "
+                        "vertical-specific US compliance artifacts (HIPAA risk analysis, FTC Safeguards WISP, ABA Opinion 24-514 workbook). "
                         "Build a comprehensive sales playbook from the deal data. "
                         "Return JSON: {\"playbook\": {\"title\": \"...\", \"updated_at\": \"...\", "
                         "\"ideal_customer_profile\": {\"verticals\": [...], \"company_size\": \"...\", "

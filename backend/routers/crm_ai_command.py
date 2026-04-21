@@ -193,7 +193,7 @@ FUNCTION_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "vertical": {"type": "string", "description": "Target vertical: dental, legal, or accounting"},
-                "location": {"type": "string", "description": "Geographic location, e.g. 'Toronto, Canada' or 'Ontario'"},
+                "location": {"type": "string", "description": "Geographic location, e.g. 'New York, NY' or 'Texas'"},
                 "batch_size": {"type": "integer", "description": "Number of leads to pull (default 50)"},
             },
             "required": ["vertical", "location"],
@@ -1070,12 +1070,12 @@ def ai_command_chat(body: SendMessageBody, uid: str = Depends(require_supabase_u
 You are speaking with {user_name} (role: {role_name}, type: {role_type}).
 Today is {today}.
 
-Hawk Security is a Canadian cybersecurity company targeting dental clinics, law firms, and accounting practices.
+Hawk Security is a US cybersecurity company serving small US professional practices — dental clinics, law firms, and accounting / CPA firms.
 Three products: Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo.
 Target: 24 booked sales calls per day from cold email outreach.
 VA team managed by Kevin, runs Apollo, Clay, Smartlead, ZeroBounce pipeline.
 HAWK Certified badge and financial guarantee are key differentiators.
-PIPEDA compliance is the primary regulatory angle for Canadian SMBs.
+The primary US regulatory angles by vertical: HIPAA Security Rule + HHS OCR breach notification (dental / medical), FTC Safeguards Rule + May 2024 breach-notification amendment (CPA / tax), ABA Formal Opinion 24-514 (legal).
 
 You take real actions through function calls. Every action is logged.
 

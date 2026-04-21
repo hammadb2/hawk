@@ -49,30 +49,54 @@ OPENAI_BATCH_SIZE = 20
 ZEROBOUNCE_POLL_INTERVAL = 15  # seconds
 ZEROBOUNCE_MAX_WAIT = 600  # 10 minutes max wait for bulk verification
 
-# CASL compliance footer
-CASL_FOOTER = (
+# CAN-SPAM compliance footer (US market).
+#
+# 15 U.S.C. § 7704(a)(5) requires a valid physical postal address of the
+# sender and a clear opt-out mechanism on every commercial email. Sender
+# address is resolved at send time from ``crm_settings.sender_postal_address``
+# (set to the current US business address) with a safe fallback so we never
+# ship an email without a physical address.
+CAN_SPAM_FOOTER = (
     "\n\n---\n"
-    "This message was sent by Hawk Security, Calgary, AB, Canada. "
+    "This message was sent by Hawk Security, {{sender_postal_address}}. "
     "To unsubscribe reply STOP or click here: {{unsubscribe_link}}"
 )
+# Backwards-compat alias for any callers still importing the old name.
+CASL_FOOTER = CAN_SPAM_FOOTER
 
-# Time zone → scheduled send hour mapping (8-9am local)
+# Time zone → scheduled send hour mapping (8-9am local, US market).
 TIMEZONE_SCHEDULE: dict[str, dict[str, Any]] = {
-    "AT": {"tz": "America/Halifax", "hour": 8},       # Atlantic
-    "ET": {"tz": "America/Toronto", "hour": 8},       # Eastern
-    "CT": {"tz": "America/Winnipeg", "hour": 8},      # Central
-    "MT": {"tz": "America/Edmonton", "hour": 8},      # Mountain
-    "PT": {"tz": "America/Vancouver", "hour": 8},     # Pacific
+    "ET": {"tz": "America/New_York", "hour": 8},     # Eastern
+    "CT": {"tz": "America/Chicago", "hour": 8},      # Central
+    "MT": {"tz": "America/Denver", "hour": 8},       # Mountain
+    "PT": {"tz": "America/Los_Angeles", "hour": 8},  # Pacific
+    "AKT": {"tz": "America/Anchorage", "hour": 8},   # Alaska
+    "HT": {"tz": "Pacific/Honolulu", "hour": 8},     # Hawaii
 }
 
-# Province → timezone mapping
-PROVINCE_TZ: dict[str, str] = {
-    "NL": "AT", "NS": "AT", "NB": "AT", "PE": "AT",
-    "QC": "ET", "ON": "ET",
-    "MB": "CT", "SK": "CT",
-    "AB": "MT", "NT": "MT", "NU": "CT",
-    "BC": "PT", "YT": "PT",
+# US state → timezone mapping. Five true-mixed states (FL, IN, KY, MI, TN)
+# are mapped to their dominant business-population zone; if needed we can
+# split on county-level data later but the accuracy is good enough for
+# send-time scheduling.
+STATE_TZ: dict[str, str] = {
+    # Eastern
+    "CT": "ET", "DC": "ET", "DE": "ET", "GA": "ET", "MA": "ET", "MD": "ET",
+    "ME": "ET", "NC": "ET", "NH": "ET", "NJ": "ET", "NY": "ET", "OH": "ET",
+    "PA": "ET", "RI": "ET", "SC": "ET", "VA": "ET", "VT": "ET", "WV": "ET",
+    "FL": "ET", "IN": "ET", "KY": "ET", "MI": "ET",
+    # Central
+    "AL": "CT", "AR": "CT", "IA": "CT", "IL": "CT", "LA": "CT", "MN": "CT",
+    "MO": "CT", "MS": "CT", "OK": "CT", "TX": "CT", "WI": "CT", "TN": "CT",
+    # Mountain
+    "AZ": "MT", "CO": "MT", "ID": "MT", "MT": "MT", "NM": "MT", "UT": "MT",
+    "WY": "MT", "ND": "MT", "SD": "MT", "NE": "CT", "KS": "CT",
+    # Pacific
+    "CA": "PT", "NV": "PT", "OR": "PT", "WA": "PT",
+    # Non-contiguous
+    "AK": "AKT", "HI": "HT",
 }
+# Backwards-compat alias for any callers still referencing the old name.
+PROVINCE_TZ = STATE_TZ
 
 
 def _sb_headers() -> dict[str, str]:
@@ -469,9 +493,9 @@ async def step_scan_domains(leads: list[dict[str, Any]]) -> list[dict[str, Any]]
 
 # ── Step 6: Batched OpenAI Email Generation (20 per call) ───────────────
 
-EMAIL_SYSTEM_PROMPT = """You are ARIA, the outbound email writer for Hawk Security — a Canadian cybersecurity company.
+EMAIL_SYSTEM_PROMPT = """You are ARIA, the outbound email writer for Hawk Security — a US cybersecurity company.
 
-You write short, high-converting cold emails for Canadian small businesses (dental clinics, law firms, accounting practices).
+You write short, high-converting cold emails for small US professional practices (dental clinics, law firms, accounting / CPA firms).
 
 Rules:
 1. Open with the most alarming finding. Never open with "I hope this finds you well" or "My name is"
@@ -486,8 +510,12 @@ Rules:
 10. No hyphens or dashes anywhere in the output
 11. No bullet points or numbered lists in the body
 12. Short punchy sentences. No sentence over 20 words.
-13. If no vulnerability was found, use a PIPEDA compliance angle instead
+13. If no vulnerability was found, use the US regulatory angle that matches the prospect's vertical:
+    - dental / medical → HIPAA Security Rule + OCR 60-day breach notification
+    - accounting / CPA / tax → FTC Safeguards Rule + 30-day breach notification (May 2024 amendment)
+    - legal / law firm → ABA Formal Opinion 24-514 duty to notify clients (Model Rules 1.1, 1.4, 1.6)
 14. Vary your opening line every time
+15. Never reference Canada, PIPEDA, CASL, or any Canadian-only regulator
 
 Return ONLY valid JSON array with objects: [{"email": "lead_email", "subject": "...", "body": "..."}]
 """
@@ -517,7 +545,9 @@ async def _generate_batch(
             prompts.append(
                 f"- Email: {lead.get('contact_email')}, Name: {first_name}, Company: {company}, "
                 f"Domain: {domain}, Vertical: {vertical}, "
-                f"No vulnerability found. Use PIPEDA compliance angle. Booking: {booking_url}"
+                f"No vulnerability found. Use the US regulatory angle for {vertical}: "
+                f"HIPAA (dental/medical), FTC Safeguards Rule (CPA/tax), or ABA Opinion 24-514 (legal). "
+                f"Booking: {booking_url}"
             )
 
     user_msg = f"Generate personalized cold emails for these {len(leads_batch)} leads:\n" + "\n".join(prompts)
@@ -606,16 +636,18 @@ async def step_generate_emails(leads: list[dict[str, Any]]) -> list[dict[str, An
                         f"An attacker could exploit this to access your systems or data.\n\n"
                         f"I can walk you through what we found in 15 minutes.\n\n"
                         f"{booking_url}"
-                    ) + CASL_FOOTER
+                    ) + CAN_SPAM_FOOTER
                 else:
                     lead["email_subject"] = f"quick security question about {domain}"
                     lead["email_body"] = (
                         f"{first_name},\n\n"
-                        f"Under PIPEDA, Canadian {vertical} practices must protect client data. "
+                        f"US {vertical} practices are now under direct regulatory pressure "
+                        f"(HIPAA for dental/medical, FTC Safeguards Rule for CPA/tax, "
+                        f"ABA Formal Opinion 24-514 for legal) to protect client data. "
                         f"We ran a check on {domain} and wanted to share what we found.\n\n"
                         f"Would you have 15 minutes this week?\n\n"
                         f"{booking_url}"
-                    ) + CASL_FOOTER
+                    ) + CAN_SPAM_FOOTER
 
                 lead["status"] = "personalized"
                 generated += 1

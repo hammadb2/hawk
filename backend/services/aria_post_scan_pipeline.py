@@ -11,7 +11,7 @@ Runs immediately after a prospect's scan completes (SLA auto-scan or manual
 4. Classify the vertical (uses industry / business_name / canonical_vertical)
    to pick the correct Smartlead campaign id from crm_settings.
 5. Generate a personalized first-touch email via ARIA (reuses
-   ``aria_pipeline._generate_email_for_lead`` so prompt / tone / PIPEDA
+   ``aria_pipeline._generate_email_for_lead`` so prompt / tone / US regulatory angle
    fallback stay consistent with the rest of the stack). Greet the contact
    by first name whenever available.
 6. Persist ``contact_email``, ``contact_name``, ``contact_title``,
@@ -33,7 +33,7 @@ Soft-drop path: ``stage=lost``, ``pipeline_status=suppressed``, plus a
 the lead. We never hard-delete.
 
 Apollo-miss path (new): when Apollo returns no contact for a domain — which
-is the common case for the Canadian SMB long tail (small dental / tax / law
+is the common case for the long tail of small US dental / tax / law
 shops Apollo simply doesn't index) — the prospect is routed to
 ``pipeline_status=va_queue`` instead of soft-dropped, so a human VA can
 source the email manually. Stage stays ``scanned``. This unsticks the
@@ -394,7 +394,7 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
         enrichment = await _enrich_single(prospect, vertical) or {}
 
     if not enrichment.get("email"):
-        # Apollo couldn't source a contact — most common for Canadian SMB
+        # Apollo couldn't source a contact — most common for the long-tail US SMB
         # long-tail (small dental / tax / law shops Apollo doesn't index).
         # Route to VA queue for manual sourcing instead of soft-dropping so
         # the lead is still reachable.

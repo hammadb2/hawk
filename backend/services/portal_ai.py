@@ -214,7 +214,7 @@ def build_advisor_system_prompt(bundle: dict[str, Any]) -> str:
     if isinstance(ap, list) and ap:
         ap_note = "\nAttack path narratives (use to explain chaining risk):\n" + json.dumps(ap[:3])[:4000]
 
-    return f"""You are **ARIA Advisor**, Hawk Security's AI cybersecurity consultant focused on Canadian SMBs.
+    return f"""You are **ARIA Advisor**, Hawk Security's AI cybersecurity consultant focused on US small professional practices (dental, legal, accounting / CPA).
 
 **Client context**
 - Organization: {cpp.get("company_name") or domain}
@@ -226,9 +226,12 @@ def build_advisor_system_prompt(bundle: dict[str, Any]) -> str:
 - Guarantee status: {guarantee}
 
 **Regulatory framing (when relevant)**
-- Reference **PIPEDA** (federal private-sector privacy) for handling personal information.
-- Mention **Bill C-26** (CCCS) when discussing critical infrastructure or incident reporting obligations where applicable.
-- For health-related practices, note provincial health privacy laws (e.g. PHIPA in Ontario) briefly when it strengthens the story.
+- Map findings to the US regulatory angle that matches the client's vertical:
+  - Dental / medical → **HIPAA Security Rule** + **HHS OCR** breach notification (60-day rule).
+  - Accounting / CPA / tax → **FTC Safeguards Rule** (WISP, designated qualified individual) + **May 2024 breach-notification amendment** (30 days).
+  - Legal → **ABA Formal Opinion 24-514** (duty to notify clients) + Model Rules 1.1, 1.4, 1.6.
+- Mention state AG breach-notification obligations when locally relevant.
+- Do not reference PIPEDA, CASL, Bill C-26, or Canadian-only regulators.
 - Never invent legal citations; speak in practical compliance terms.
 
 **Instructions**
@@ -268,7 +271,7 @@ def advisor_chat(*, system: str, user_message: str, conversation_history: list[d
 def generate_weekly_threat_briefing_md(bundle: dict[str, Any]) -> tuple[str, str]:
     """Returns (title, markdown body) — three paragraphs + bullets."""
     prospect = bundle.get("prospect") or {}
-    industry = str(prospect.get("industry") or "Canadian SMBs")
+    industry = str(prospect.get("industry") or "US professional practice SMBs")
     domain = str((prospect.get("domain") or bundle["cpp"].get("domain") or "")).strip()
     company = str(bundle["cpp"].get("company_name") or domain)
     scan = bundle.get("scan") or {}
@@ -290,7 +293,7 @@ def generate_weekly_threat_briefing_md(bundle: dict[str, Any]) -> tuple[str, str
         )
         return f"Weekly briefing — {company}", body
 
-    prompt = f"""Write a **weekly threat intelligence briefing** for a Canadian business.
+    prompt = f"""Write a **weekly threat intelligence briefing** for a US business.
 
 Company: {company}
 Industry vertical: {industry}
@@ -299,7 +302,7 @@ Surfaces we watch (from last scan): {top_layers or "general perimeter, email aut
 
 **Requirements**
 1. Exactly **3 paragraphs** (no more): (a) What threat activity or campaigns mattered this week for similar organizations in this sector (generic but realistic — you may reference well-known attack types: ransomware, credential stuffing, invoice fraud, phishing, exposed RDP/VPN). (b) What HAWK is watching on their domain / attack surface in plain language. (c) **One** concrete, actionable recommendation they can do this week.
-2. Mention Canadian context where natural (PIPEDA breach notification pressure, sector-specific risk).
+2. Mention US regulatory context where natural — use the angle that matches the vertical: HIPAA / OCR breach notification for dental / medical, FTC Safeguards Rule + May 2024 breach-notification amendment for CPA / tax, ABA Formal Opinion 24-514 for legal. Never reference PIPEDA or Canadian-only regulators.
 3. Professional tone — like a dedicated analyst email. No hype emojis.
 4. Markdown: use ## title line, then paragraphs. Optional short bullet list at the end with 2–3 items max.
 
@@ -419,7 +422,7 @@ def generate_competitor_benchmark(
         if peer_avg is not None:
             extra = f" Anonymized peer scan average from similar local businesses: **{peer_avg:.1f}/100** (n={len(peer_scores)})."
         narrative = (
-            f"Your HAWK score is **{you:.0f}/100**. For **{industry}** organizations in Canada, "
+            f"Your HAWK score is **{you:.0f}/100**. For **{industry}** organizations in the US, "
             f"our reference dataset suggests a typical peer score around **{avg:.0f}**, with top quartile near **{topq:.0f}**.{extra}"
         )
         return {"scores": scores, "narrative_md": narrative, "competitor_domains": internal_domains}

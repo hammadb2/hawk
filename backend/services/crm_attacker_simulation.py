@@ -44,7 +44,7 @@ def _generate_body_md(bundle: dict[str, Any]) -> tuple[str, str]:
         paths = str(scan.get("attack_paths"))[:6000]
 
     prompt = (
-        f"You are a careful red-team style analyst writing for a Canadian SMB security portal.\n"
+        f"You are a careful red-team style analyst writing for a US SMB security portal.\n"
         f"Company: {company} ({domain}).\n"
         f"Summarized findings from their latest HAWK scan:\n{findings_txt}\n\n"
         f"Optional attack-path hints from tooling:\n{paths or '(none)'}\n\n"

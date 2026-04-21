@@ -81,8 +81,8 @@ def analyze_document_text(
         return {"error": "OpenAI API key not configured"}
 
     type_prompts = {
-        "contract": "Analyze this contract for key terms, obligations, risks, and compliance with Canadian law (PIPEDA).",
-        "compliance": "Review this compliance document and identify gaps, risks, and recommendations for a Canadian cybersecurity firm.",
+        "contract": "Analyze this contract for key terms, obligations, risks, and compliance with the US regulatory angle relevant to the counterparty (HIPAA Security Rule for dental / medical, FTC Safeguards Rule for CPA / tax, ABA Formal Opinion 24-514 for legal).",
+        "compliance": "Review this compliance document and identify gaps, risks, and recommendations for a US cybersecurity firm serving small professional practices (HIPAA / FTC Safeguards / ABA Opinion 24-514).",
         "report": "Summarize this report with key metrics, trends, and actionable insights.",
         "email_thread": "Analyze this email thread for sentiment, key requests, and recommended follow-up actions.",
         "general": "Analyze this document and provide a summary with key findings and recommended actions.",
