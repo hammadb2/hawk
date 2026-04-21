@@ -479,14 +479,23 @@ def apollo_bulk_enrich(
                 "pipeline_status": "eq.scanned",
                 "contact_email": "is.null",
                 "domain": "not.is.null",
-                "stage": "in.(new,scanning,scanned)",
-                "order": "scanned_at.asc.nullslast",
+                "order": "scanned_at.desc",
                 "limit": str(max(1, min(limit, 2000))),
             },
             timeout=30.0,
         )
-        r.raise_for_status()
-        prospects = r.json() or []
+        if r.status_code >= 400:
+            logger.warning(
+                "apollo-bulk-enrich query HTTP %s body=%s",
+                r.status_code, r.text[:400],
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"supabase {r.status_code}: {r.text[:300]}",
+            )
+        prospects = [p for p in (r.json() or []) if p.get("domain")]
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("apollo-bulk-enrich query failed")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -530,13 +539,17 @@ def apollo_bulk_enrich(
                 "email_finder": contact.get("source") or "apollo",
                 "last_activity_at": datetime.now(timezone.utc).isoformat(),
             }
+            # No stage guard on the PATCH: the SELECT already narrowed to
+            # contact_email IS NULL, so we're only writing contact fields to
+            # prospects that genuinely need enrichment — safe at any stage.
+            # Guarding here would silently drop updates for prospects that
+            # somehow have pipeline_status=scanned but stage advanced (e.g.
+            # via patch_prospect_by_domain which has no stage guard), and we
+            # would re-fetch + re-Apollo them every run, burning credits.
             resp = httpx.patch(
                 f"{SUPABASE_URL}/rest/v1/prospects",
                 headers=headers,
-                params={
-                    "id": f"eq.{pid}",
-                    "stage": "in.(new,scanning,scanned)",
-                },
+                params={"id": f"eq.{pid}"},
                 json=patch,
                 timeout=15.0,
             )
