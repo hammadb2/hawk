@@ -103,11 +103,25 @@ def _plain_english(f: dict, interpreted: dict | None) -> str:
 
 
 def pick_top_findings(scan_row: dict, limit: int = 3) -> list[dict[str, str]]:
-    """Top-``limit`` non-ok findings, severity-sorted, plain English."""
+    """Top-``limit`` non-ok findings, severity-sorted, plain English.
+
+    ``crm_prospect_scans.findings`` is not a uniform shape across the
+    codebase. The SLA auto-scan writer wraps the list in a provenance
+    envelope (``{"source": ..., "findings": [...]}`` — see
+    ``aria_sla_auto_scan.py:331``), while older writers persist the bare
+    list. We accept both here; otherwise every free-scan prospect scanned
+    via the SLA pipeline would silently dispatch an empty report.
+    """
     findings = scan_row.get("findings") or []
+    if isinstance(findings, dict):
+        findings = findings.get("findings") or []
     interpreted = scan_row.get("interpreted_findings") or []
+    if isinstance(interpreted, dict):
+        interpreted = interpreted.get("findings") or interpreted.get("interpreted_findings") or []
     if not isinstance(findings, list):
         return []
+    if not isinstance(interpreted, list):
+        interpreted = []
     merged: list[tuple[dict, str]] = []
     for idx, f in enumerate(findings):
         if not isinstance(f, dict):
