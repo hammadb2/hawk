@@ -99,11 +99,11 @@ def can_spam_footer(unsubscribe_link: str = "{{unsubscribe_link}}") -> str:
     )
 
 
-# Module-level constants left in place for backwards compatibility. They now
-# resolve the postal address at import time — prefer ``can_spam_footer()`` in
-# any new code so operators can update the address without a redeploy.
-CAN_SPAM_FOOTER = can_spam_footer()
-CASL_FOOTER = CAN_SPAM_FOOTER
+# Module-level ``CAN_SPAM_FOOTER`` / ``CASL_FOOTER`` backwards-compat constants
+# are defined *after* ``_get_setting`` further down the file, because
+# ``can_spam_footer()`` transitively reads ``crm_settings`` and needs
+# ``_get_setting`` to exist at import time. See the ``# Backwards-compat
+# CAN-SPAM constants`` block below.
 
 # Time zone → scheduled send hour mapping (8-9am local, US market).
 TIMEZONE_SCHEDULE: dict[str, dict[str, Any]] = {
@@ -130,7 +130,7 @@ STATE_TZ: dict[str, str] = {
     "MO": "CT", "MS": "CT", "OK": "CT", "TX": "CT", "WI": "CT", "TN": "CT",
     # Mountain
     "AZ": "MT", "CO": "MT", "ID": "MT", "MT": "MT", "NM": "MT", "UT": "MT",
-    "WY": "MT", "ND": "MT", "SD": "MT", "NE": "CT", "KS": "CT",
+    "WY": "MT", "NE": "CT", "KS": "CT", "ND": "CT", "SD": "CT",
     # Pacific
     "CA": "PT", "NV": "PT", "OR": "PT", "WA": "PT",
     # Non-contiguous
@@ -198,6 +198,16 @@ def _set_setting(key: str, value: str) -> None:
             ).raise_for_status()
     except Exception as exc:
         logger.warning("Failed to write setting %s: %s", key, exc)
+
+
+# Backwards-compat CAN-SPAM constants. Kept so pre-existing call sites that
+# reference ``CAN_SPAM_FOOTER`` / ``CASL_FOOTER`` directly still work; new code
+# should call :func:`can_spam_footer` so operators can update the address in
+# ``crm_settings`` without a deploy. Deliberately defined *after* ``_get_setting``
+# because ``can_spam_footer()`` reads that setting at call time — resolving at
+# import time requires the reader to exist first.
+CAN_SPAM_FOOTER = can_spam_footer()
+CASL_FOOTER = CAN_SPAM_FOOTER
 
 
 def _normalize_domain(raw: str) -> str:
