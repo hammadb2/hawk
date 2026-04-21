@@ -800,6 +800,166 @@ def send_homepage_scan_followup_email(
     )
 
 
+def send_free_scan_ack_email(
+    *,
+    to_email: str,
+    domain: str,
+    first_name: str | None = None,
+) -> dict[str, Any]:
+    """Ack email for securedbyhawk.com/free-scan submissions.
+
+    Sets the 24-hour expectation so the recipient doesn't bounce if the full
+    scan + report hasn't landed yet. Deliberately spare — no marketing fluff.
+    """
+    esc = _esc
+    d = esc(domain)
+    hello = esc((first_name or "").strip()) or "there"
+    inner = f"""
+          <tr>
+            <td style="padding:40px 48px 32px;">
+              <p style="margin:0 0 16px;font-size:22px;font-weight:700;color:#ffffff;line-height:1.3;">
+                Scan requested — report coming within 24 hours
+              </p>
+              <p style="margin:0 0 18px;font-size:15px;color:#9090A8;line-height:1.6;">
+                Hi {hello}, we kicked off an external attack-surface scan on
+                <strong style="color:#00C48C;">{d}</strong> the moment you hit submit.
+              </p>
+              <p style="margin:0 0 18px;font-size:15px;color:#9090A8;line-height:1.6;">
+                Within <strong style="color:#ffffff;">24 hours</strong> you&apos;ll get a
+                plain-English report with the <strong style="color:#ffffff;">3 highest-priority
+                findings</strong> on your external surface — the same signals ransomware crews and
+                credential-stuffing bots harvest before they ever contact you.
+              </p>
+              <p style="margin:0 0 0;font-size:14px;color:#9090A8;line-height:1.6;">
+                No credit card. No sales call required to see the report. If anything in it needs
+                fixing urgently we&apos;ll flag it at the top.
+              </p>
+              <p style="margin:24px 0 0;font-size:13px;color:#5C5876;">
+                Questions: <a href="mailto:hello@securedbyhawk.com" style="color:#00C48C;text-decoration:none;">hello@securedbyhawk.com</a>
+              </p>
+            </td>
+          </tr>
+"""
+    return send_resend(
+        to_email=to_email,
+        subject=f"Your HAWK free scan — report for {domain} in 24 hours",
+        html=_wrap(inner + _security_notice_block()),
+        tags=[{"name": "category", "value": "free_scan_ack"}],
+    )
+
+
+def send_free_scan_report_email(
+    *,
+    to_email: str,
+    domain: str,
+    first_name: str | None,
+    hawk_score: int | None,
+    grade: str | None,
+    findings: list[dict[str, str]],
+    industry: str | None = None,
+) -> dict[str, Any]:
+    """3-finding report for a free-scan lead. ``findings`` is a list of
+    ``{text, severity, title}`` from ``pick_top_findings``.
+    """
+    import os as _os
+
+    booking_url = (
+        _os.environ.get("CAL_COM_BOOKING_URL")
+        or "https://cal.com/hawksecurity/15min"
+    ).strip()
+
+    esc = _esc
+    d = esc(domain)
+    hello = esc((first_name or "").strip()) or "there"
+    score_s = f"{hawk_score}/100" if hawk_score is not None else "—"
+    grade_s = esc(grade) if grade else "—"
+
+    sev_color = {
+        "critical": "#FF4D4D",
+        "high": "#FF8C42",
+        "medium": "#E8B54A",
+        "warning": "#E8B54A",
+        "low": "#3BA7FF",
+        "info": "#9090A8",
+    }
+
+    items = ""
+    for i, f in enumerate(findings[:3], start=1):
+        sev = (f.get("severity") or "medium").lower()
+        color = sev_color.get(sev, "#9090A8")
+        text = esc(f.get("text") or "")
+        items += f"""
+              <tr>
+                <td style="padding:16px 0;border-top:1px solid #2a2a40;">
+                  <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:{color};font-weight:700;">
+                    Finding {i} · {esc(sev)}
+                  </p>
+                  <p style="margin:0;font-size:14px;color:#d6d6e8;line-height:1.55;">{text}</p>
+                </td>
+              </tr>"""
+
+    # Vertical-specific regulatory angle, mirrors EMAIL_SYSTEM_PROMPT
+    angles = {
+        "dental": "Under the HIPAA Security Rule and HHS OCR 60-day breach-notification rule, exposures like these can become a reportable incident if an attacker gets to PHI.",
+        "legal": "ABA Formal Opinion 24-514 and Model Rules 1.1, 1.4, 1.6 obligate you to take reasonable technical safeguards and notify affected clients if this surface is exploited.",
+        "accounting": "Under the FTC Safeguards Rule (and the May 2024 breach-notification amendment) any unauthorized access to client data triggers a 30-day FTC notification obligation.",
+    }
+    angle = angles.get((industry or "").lower(), "")
+    angle_block = (
+        f"""
+          <tr>
+            <td style="padding:0 48px 18px;">
+              <p style="margin:0;font-size:13px;color:#9090A8;line-height:1.6;">
+                {esc(angle)}
+              </p>
+            </td>
+          </tr>
+"""
+        if angle
+        else ""
+    )
+
+    inner = f"""
+          <tr>
+            <td style="padding:40px 48px 16px;">
+              <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#ffffff;line-height:1.3;">
+                Your 3-finding security report — {d}
+              </p>
+              <p style="margin:0 0 16px;font-size:14px;color:#9090A8;line-height:1.6;">
+                Hi {hello}, here&apos;s what attackers can see on your external surface today.
+              </p>
+              <p style="margin:0 0 0;font-size:14px;color:#9090A8;line-height:1.6;">
+                Grade <strong style="color:#ffffff;">{grade_s}</strong> · score <strong style="color:#ffffff;">{score_s}</strong>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 16px;">
+              <table cellpadding="0" cellspacing="0" width="100%">{items}
+              </table>
+            </td>
+          </tr>
+{angle_block}
+          <tr>
+            <td align="center" style="padding:8px 48px 32px;">
+              <a href="{esc(booking_url)}"
+                 style="display:inline-block;padding:14px 28px;border-radius:8px;background:#00C48C;color:#0B0B12;font-weight:700;font-size:14px;text-decoration:none;">
+                Book a 15-min walkthrough
+              </a>
+              <p style="margin:16px 0 0;font-size:12px;color:#5C5876;line-height:1.6;">
+                We&apos;ll walk through how to fix each finding above. No pitch deck, no obligation.
+              </p>
+            </td>
+          </tr>
+"""
+    return send_resend(
+        to_email=to_email,
+        subject=f"Your 3-finding HAWK report — {domain}",
+        html=_wrap(inner + _security_notice_block()),
+        tags=[{"name": "category", "value": "free_scan_report"}],
+    )
+
+
 def send_guarantee_verification_code_email(*, to_email: str, code: str, full_name: str) -> dict[str, Any]:
     """6-digit code for Breach Response Guarantee PDF — same visual system."""
     esc = _esc

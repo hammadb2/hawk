@@ -14,6 +14,21 @@ function guaranteeApiUrl(): string {
 
 export type ApiError = { detail: string | { msg: string }[] };
 
+/**
+ * Error thrown by {@link request} on non-2xx responses. The HTTP status code
+ * is attached as `.status` so callers can branch on it without string-matching
+ * the server's human-readable detail (which varies per endpoint and may be
+ * localised in the future).
+ */
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit & { token?: string | null } = {}
@@ -30,7 +45,7 @@ async function request<T>(
 
   if (!res.ok) {
     const detail = typeof data.detail === "string" ? data.detail : data.detail?.[0]?.msg || "Request failed";
-    throw new Error(detail);
+    throw new HttpError(res.status, detail);
   }
   return data as T;
 }
@@ -250,6 +265,24 @@ export const marketingApi = {
       console.error("marketing homepage-lead", e);
       return { ok: "true" };
     }
+  },
+  /**
+   * `/free-scan` landing page — US business owner enters domain + email,
+   * receives a 3-finding report within 24 hours. Returns `{ok: true}` on
+   * success. Throws on 400 (invalid domain / email) so the form can show
+   * an inline error, and on 429 (rate-limit hit).
+   */
+  freeScan: async (body: {
+    name?: string;
+    email: string;
+    domain: string;
+    company_name?: string;
+    vertical?: string;
+  }) => {
+    return await request<{ ok: boolean }>("/api/marketing/free-scan", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   },
 };
 
