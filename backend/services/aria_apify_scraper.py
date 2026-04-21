@@ -7,8 +7,9 @@ Replaces Google Places + Prospeo + Apollo discovery with four Apify actors:
 3. code_crafter/leads-finder — 250M+ contact database fallback
 4. apify/website-email-crawler — last-resort website crawl
 
-All 54 city x vertical combinations run in parallel for Actor 1.
-Actors 2-4 run in async batches of 50 for leads still missing emails.
+All 90 city x vertical combinations (30 US metros × 3 verticals) run in
+parallel for Actor 1. Actors 2-4 run in async batches of 50 for leads
+still missing emails.
 """
 
 from __future__ import annotations
@@ -45,18 +46,56 @@ def _actor_path(actor_id: str) -> str:
     """
     return actor_id.replace("/", "~")
 
-# 18 Canadian cities
+# 30 US metros — discovery target set (dental / legal / accounting SMBs).
 CITIES: list[str] = [
-    "Toronto", "Vancouver", "Calgary", "Edmonton", "Ottawa", "Montreal",
-    "Winnipeg", "Halifax", "Quebec City", "Saskatoon", "Regina", "Victoria",
-    "Kelowna", "London Ontario", "Hamilton", "Waterloo", "Mississauga", "Brampton",
+    "New York", "Los Angeles", "Chicago", "Houston", "Dallas", "Washington DC",
+    "Miami", "Phoenix", "Atlanta", "Boston", "San Francisco", "Seattle",
+    "Denver", "Minneapolis", "Tampa", "Detroit", "Philadelphia", "San Diego",
+    "Portland", "Charlotte", "Orlando", "Austin", "Nashville", "San Antonio",
+    "Indianapolis", "Columbus", "Jacksonville", "Las Vegas", "St. Louis",
+    "Kansas City",
 ]
+
+# Map each metro to its US state (used by Google Maps + Apollo location strings).
+# Keep keys lowercase-stripped-equal to CITIES entries.
+CITY_STATE: dict[str, tuple[str, str]] = {
+    "new york": ("New York", "NY"),
+    "los angeles": ("California", "CA"),
+    "chicago": ("Illinois", "IL"),
+    "houston": ("Texas", "TX"),
+    "dallas": ("Texas", "TX"),
+    "washington dc": ("District of Columbia", "DC"),
+    "miami": ("Florida", "FL"),
+    "phoenix": ("Arizona", "AZ"),
+    "atlanta": ("Georgia", "GA"),
+    "boston": ("Massachusetts", "MA"),
+    "san francisco": ("California", "CA"),
+    "seattle": ("Washington", "WA"),
+    "denver": ("Colorado", "CO"),
+    "minneapolis": ("Minnesota", "MN"),
+    "tampa": ("Florida", "FL"),
+    "detroit": ("Michigan", "MI"),
+    "philadelphia": ("Pennsylvania", "PA"),
+    "san diego": ("California", "CA"),
+    "portland": ("Oregon", "OR"),
+    "charlotte": ("North Carolina", "NC"),
+    "orlando": ("Florida", "FL"),
+    "austin": ("Texas", "TX"),
+    "nashville": ("Tennessee", "TN"),
+    "san antonio": ("Texas", "TX"),
+    "indianapolis": ("Indiana", "IN"),
+    "columbus": ("Ohio", "OH"),
+    "jacksonville": ("Florida", "FL"),
+    "las vegas": ("Nevada", "NV"),
+    "st. louis": ("Missouri", "MO"),
+    "kansas city": ("Missouri", "MO"),
+}
 
 # Vertical search queries
 VERTICAL_QUERIES: dict[str, str] = {
-    "dental": "dental clinics {city} Canada",
-    "legal": "law firms {city} Canada",
-    "accounting": "accounting practices {city} Canada",
+    "dental": "dental clinics {city}",
+    "legal": "law firms {city}",
+    "accounting": "accounting practices {city}",
 }
 
 VERTICALS = list(VERTICAL_QUERIES.keys())
@@ -97,7 +136,7 @@ def normalize_city_for_discovery(location: str) -> str:
     """Pick a display city string for Google Maps + dedup, from user/LLM location text."""
     raw = (location or "").strip()
     if not raw:
-        return "Toronto"
+        return "New York"
     lower = raw.lower()
     for c in CITIES:
         cl = c.lower()
@@ -107,18 +146,25 @@ def normalize_city_for_discovery(location: str) -> str:
     for c in CITIES:
         if c.lower() == first.lower():
             return c
-    return first.title() if first else "Toronto"
+    return first.title() if first else "New York"
+
+
+def _state_suffix(city: str) -> str:
+    """Return ``", {State}"`` for known US metros, else ``""``."""
+    state = CITY_STATE.get((city or "").strip().lower())
+    return f", {state[0]}" if state else ""
 
 
 def search_strings_for_maps(vertical: str, city: str) -> list[str]:
     """Several Google Maps query variants for better recall (one Apify run, deduped strings)."""
     city = (city or "").strip()
+    state_suffix = _state_suffix(city)
     primary = VERTICAL_QUERIES[vertical].format(city=city)
     extras: dict[str, list[str]] = {
         "dental": [
             f"dentist {city}",
             f"dental office {city}",
-            f"dental clinic {city} Ontario",
+            f"dental practice {city}{state_suffix}",
             f"family dentist {city}",
             f"dentistry {city}",
         ],
@@ -126,12 +172,12 @@ def search_strings_for_maps(vertical: str, city: str) -> list[str]:
             f"law firm {city}",
             f"lawyers {city}",
             f"law office {city}",
-            f"solicitor {city} Ontario",
+            f"attorney {city}{state_suffix}",
         ],
         "accounting": [
             f"CPA {city}",
             f"accounting firm {city}",
-            f"chartered accountant {city}",
+            f"tax preparer {city}",
             f"bookkeeping {city}",
         ],
     }
@@ -145,28 +191,56 @@ def search_strings_for_maps(vertical: str, city: str) -> list[str]:
     return out[:12]
 
 
+def _topup_location_for(city: str) -> str:
+    """Best single ``person_locations`` string for Apollo **top-up** calls.
+
+    ``apollo_people_topup`` internally runs each string through
+    ``_parse_location`` which splits on commas and treats the **second** part
+    as a US state. Passing ``"City, USA"`` therefore corrupts downstream
+    ``_location_strings`` into nonsense like ``"City, USA, USA"``. Use the
+    ``CITY_STATE`` mapping so we emit ``"City, State"`` and downstream builds
+    the proper ``"City, State, USA"`` / ``"City, USA"`` variant set.
+    """
+    c = (city or "").strip()
+    entry = CITY_STATE.get(c.lower())
+    if entry:
+        state_full, _ = entry
+        return f"{c}, {state_full}"
+    return c  # bare city; _parse_location tolerates missing region
+
+
 def _apollo_location_strings(city: str) -> list[str]:
-    """Apollo person_locations — include province for Canadian metros (trial order)."""
+    """Apollo ``person_locations`` variants for a US metro (trial order).
+
+    Emits ``City, State``, ``City, ST`` (abbrev), ``City, State, USA`` and a
+    ``City, USA`` tail. Apollo matches any of these so we feed the richer
+    variants first and fall back to the loose ``City, USA`` form.
+    """
     city = (city or "").strip()
     lc = city.lower()
     locs: list[str] = []
-    if "toronto" in lc or lc == "gta":
+    entry = CITY_STATE.get(lc)
+    if entry:
+        state_full, state_abbr = entry
         locs.extend(
             [
-                "Toronto, Ontario, Canada",
-                "Toronto, ON, Canada",
-                "Greater Toronto Area, Ontario, Canada",
+                f"{city}, {state_full}",
+                f"{city}, {state_abbr}",
+                f"{city}, {state_full}, USA",
+                f"{city}, {state_abbr}, USA",
             ]
         )
-    elif "vancouver" in lc:
-        locs.extend(["Vancouver, British Columbia, Canada", "Vancouver, BC, Canada"])
-    elif "calgary" in lc:
-        locs.extend(["Calgary, Alberta, Canada", "Calgary, AB, Canada"])
-    elif "montreal" in lc or "montréal" in lc:
-        locs.extend(["Montreal, Quebec, Canada", "Montreal, QC, Canada"])
-    elif "ottawa" in lc:
-        locs.extend(["Ottawa, Ontario, Canada", "Ottawa, ON, Canada"])
-    tail = f"{city}, Canada"
+    # NYC variant
+    if lc == "new york":
+        locs.extend([
+            "New York City, New York, USA",
+            "Manhattan, New York, USA",
+            "Brooklyn, New York, USA",
+        ])
+    # DC variant
+    if lc == "washington dc":
+        locs.extend(["Washington, DC, USA", "Washington, District of Columbia, USA"])
+    tail = f"{city}, USA"
     if tail not in locs:
         locs.append(tail)
     deduped: list[str] = []
@@ -214,8 +288,12 @@ def _extract_place_website(item: dict[str, Any]) -> str:
     return ""
 
 
-# Major cities for scoring bonus
-MAJOR_CITIES = {"toronto", "vancouver", "calgary", "edmonton", "ottawa"}
+# Major US metros for scoring bonus (lead ranker gives +N for large urban footprint).
+MAJOR_CITIES = {
+    "new york", "los angeles", "chicago", "houston", "dallas",
+    "washington dc", "miami", "phoenix", "atlanta", "boston",
+    "san francisco", "seattle", "philadelphia", "san diego",
+}
 
 # Polling config (Actor 1 Google Maps only)
 APIFY_POLL_INTERVAL = 10  # seconds
@@ -860,7 +938,7 @@ async def _apollo_topup_if_needed(
     per_vertical = max(1, shortfall // max(1, len(VERTICALS)))
     topups: list[dict[str, Any]] = []
     for vertical in VERTICALS:
-        locations = [f"{c}, Canada" for c in cities_list]
+        locations = [_topup_location_for(c) for c in cities_list]
         chunk = await apollo_people_topup(
             vertical=vertical, locations=locations, batch_size=per_vertical,
         )
@@ -946,7 +1024,7 @@ async def run_ondemand_discovery(
 
         leads = await apollo_people_topup(
             vertical=vertical,
-            locations=[f"{city}, Canada"],
+            locations=[_topup_location_for(city)],
             batch_size=batch_size,
         )
         meta["path"] = "apollo_only"

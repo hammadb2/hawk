@@ -140,7 +140,10 @@ async def _search_one(
         "textQuery": query,
         "pageSize": GOOGLE_PLACES_PAGE_SIZE,
         "languageCode": "en",
-        "regionCode": "CA",
+        # US market: bias Google Places results to the US to match the 30 US
+        # metros in ``aria_apify_scraper.CITIES`` and the US-only
+        # ``VERTICAL_QUERIES`` search strings.
+        "regionCode": "US",
     }
 
     async with sem:
