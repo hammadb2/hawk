@@ -581,8 +581,8 @@ def apollo_miss_to_va_queue(
     Finds prospects at ``stage=scanned, pipeline_status=scanned`` with
     ``contact_email IS NULL`` and flips them to ``pipeline_status=va_queue``
     (stage stays ``scanned``). These are the leads Apollo can't source —
-    typically Canadian SMB long-tail (dental / tax / law shops Apollo doesn't
-    index) — so the rolling dispatcher will never send them, but a human VA
+    typically US SMB long-tail (dental / tax / law shops Apollo doesn't
+    index) so the rolling dispatcher will never send them, but a human VA
     can LinkedIn / phone / website-scrape the contact and dispatch manually.
 
     Unlike the post-scan pipeline's per-prospect route, this endpoint is a
@@ -735,7 +735,7 @@ def nightly_pipeline_run(
     ARIA Unified Nightly Pipeline — runs at 11pm MST:
     Apify 4-actor discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
     → Deduplicate → Bulk ZeroBounce → Domain Scan (30 concurrent) →
-    Batched OpenAI (20 per call) → CASL footer + timezone scheduling →
+    Batched OpenAI (20 per call) → CAN-SPAM footer + timezone scheduling →
     Store in aria_lead_inventory as 'ready'.
 
     Replaces the legacy nightly agent run.
@@ -761,15 +761,6 @@ def nightly_pipeline_run(
         except Exception:
             pass
         raise HTTPException(status_code=502, detail=str(e)) from e
-
-
-# Legacy alias — external schedulers (cron-job.org) may still target the
-# old Charlotte path. Keeps them working while teams migrate URLs.
-@router.post("/charlotte-run", include_in_schema=False)
-def nightly_pipeline_run_legacy(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    return nightly_pipeline_run(x_cron_secret=x_cron_secret)
 
 
 @router.post("/morning-dispatch")
@@ -989,7 +980,7 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
 
     payload = action.get("action_payload", {})
     vertical = payload.get("vertical", "dental")
-    location = payload.get("location", "Canada")
+    location = payload.get("location", "United States")
     batch_size = payload.get("batch_size", 50)
     uid = action.get("triggered_by", "")
 

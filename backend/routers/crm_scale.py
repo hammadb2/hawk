@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 
 from config import CRM_PUBLIC_BASE_URL
 from routers.crm_auth import require_supabase_uid
-from services.crm_charlotte_quality import run_charlotte_quality_check
 from services.crm_va_escalation import run_va_reply_escalation
 from services.crm_onboarding_sequences import run_shield_onboarding_sequences
 from services.scanner_health_service import run_scanner_health_check
@@ -156,12 +155,12 @@ def va_action(body: VaActionBody, uid: str = Depends(require_supabase_uid)):
 
 @router.get("/pipeline-runs")
 def list_pipeline_runs(uid: str = Depends(require_supabase_uid)):
-    """Recent ARIA pipeline / legacy automation runs with stats."""
+    """Recent ARIA outbound pipeline runs with stats."""
     _require_va_dashboard(uid)
     if not SUPABASE_URL:
         raise HTTPException(status_code=503, detail="Supabase not configured")
     r = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/charlotte_runs",
+        f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
         headers=_sb_headers(),
         params={
             "select": "*",
@@ -174,13 +173,6 @@ def list_pipeline_runs(uid: str = Depends(require_supabase_uid)):
     return {"ok": True, "runs": r.json() or []}
 
 
-# Legacy alias — old /crm/charlotte page polled this path; kept so in-flight
-# clients don't 404 but not referenced from any page in the repo.
-@router.get("/charlotte-runs", include_in_schema=False)
-def list_pipeline_runs_legacy(uid: str = Depends(require_supabase_uid)):
-    return list_pipeline_runs(uid)
-
-
 @router.get("/health-dashboard")
 def health_dashboard(uid: str = Depends(require_supabase_uid)):
     _require_va_dashboard(uid)
@@ -188,7 +180,7 @@ def health_dashboard(uid: str = Depends(require_supabase_uid)):
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
     cr = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/charlotte_runs",
+        f"{SUPABASE_URL}/rest/v1/aria_pipeline_runs",
         headers=_sb_headers(),
         params={"select": "*", "order": "created_at.desc", "limit": "1"},
         timeout=20.0,
@@ -221,9 +213,6 @@ def health_dashboard(uid: str = Depends(require_supabase_uid)):
     return {
         "ok": True,
         "pipeline_last_run": last_run,
-        # Legacy key kept so the old /crm/health client build renders until
-        # every deployed frontend picks up the new `pipeline_last_run` name.
-        "charlotte_last_run": last_run,
         "replies_unhandled": pending_n,
         "scanner_health_last": last_scan_health,
     }
@@ -264,23 +253,6 @@ def cron_va_reply_escalation(
     """CEO WhatsApp if reply unhandled > 30 min."""
     _require_cron_secret(x_cron_secret)
     return run_va_reply_escalation()
-
-
-@cron_routes.post("/pipeline-quality-check")
-def cron_pipeline_quality(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    """ARIA outbound QA metrics; alert CEO if out of range."""
-    _require_cron_secret(x_cron_secret)
-    return run_charlotte_quality_check()
-
-
-# Legacy cron alias — external scheduler may still hit the old path.
-@cron_routes.post("/charlotte-quality-check", include_in_schema=False)
-def cron_pipeline_quality_legacy(
-    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
-):
-    return cron_pipeline_quality(x_cron_secret)
 
 
 @cron_routes.post("/onboarding-sequences")

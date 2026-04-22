@@ -156,7 +156,3 @@ def format_aria_reply_ceo_message(
 ) -> str:
     return f"ARIA reply. {company} scored {score}/100. Assigned to {rep_name}."
 
-
-# Legacy aliases kept so older imports keep working.
-format_charlotte_reply_rep_message = format_aria_reply_rep_message
-format_charlotte_reply_ceo_message = format_aria_reply_ceo_message

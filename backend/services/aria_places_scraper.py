@@ -29,21 +29,22 @@ VERTICAL_QUERIES: dict[str, list[str]] = {
     "accounting": ["accounting firm", "CPA firm", "accountant office"],
 }
 
-# Province mapping from Google Places address components
-PROVINCE_MAP: dict[str, str] = {
-    "alberta": "AB",
-    "british columbia": "BC",
-    "manitoba": "MB",
-    "new brunswick": "NB",
-    "newfoundland and labrador": "NL",
-    "nova scotia": "NS",
-    "ontario": "ON",
-    "prince edward island": "PE",
-    "quebec": "QC",
-    "saskatchewan": "SK",
-    "northwest territories": "NT",
-    "nunavut": "NU",
-    "yukon": "YT",
+# US state mapping from Google Places address components.
+# Keys are lowercase full state names; values are the standard 2 letter USPS codes.
+STATE_MAP: dict[str, str] = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+    "district of columbia": "DC", "florida": "FL", "georgia": "GA", "hawaii": "HI",
+    "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
+    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME",
+    "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
+    "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE",
+    "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM",
+    "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH",
+    "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI",
+    "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX",
+    "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
 }
 
 
@@ -60,7 +61,10 @@ def _normalize_domain(raw: str) -> str:
 
 
 def _extract_province(address_components: list[dict[str, Any]]) -> str:
-    """Extract province abbreviation from Google Places address components."""
+    """Extract US state abbreviation from Google Places address components.
+
+    Name retained for schema compatibility with ``aria_lead_inventory.province``.
+    """
     for comp in address_components:
         types = comp.get("types") or []
         if "administrative_area_level_1" in types:
@@ -68,7 +72,7 @@ def _extract_province(address_components: list[dict[str, Any]]) -> str:
             short_name = comp.get("shortText") or ""
             if short_name and len(short_name) == 2:
                 return short_name.upper()
-            return PROVINCE_MAP.get(long_name, short_name.upper())
+            return STATE_MAP.get(long_name, short_name.upper())
     return ""
 
 

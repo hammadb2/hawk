@@ -211,9 +211,9 @@ def step_apollo_pull(
             stubs.append({
                 "run_id": run_id,
                 "company_name": f"Test {vertical.title()} Co {i+1}",
-                "domain": f"test{vertical}{i+1}.ca",
+                "domain": f"test{vertical}{i+1}.com",
                 "contact_name": f"John Doe {i+1}",
-                "contact_email": f"john{i+1}@test{vertical}{i+1}.ca",
+                "contact_email": f"john{i+1}@test{vertical}{i+1}.com",
                 "vertical": vertical,
                 "apollo_data": {"stub": True, "location": location},
                 "status": "pulled",

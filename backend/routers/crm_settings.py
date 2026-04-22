@@ -77,9 +77,11 @@ DEFAULT_KEYS: dict[str, str] = {
     "sla_scan_concurrency": "3",
     # Pipeline — discovery
     "google_places_cities": (
-        '["Toronto","Vancouver","Calgary","Edmonton","Ottawa","Montreal",'
-        '"Winnipeg","Halifax","Quebec City","Saskatoon","Regina","Victoria",'
-        '"Kelowna","London","Hamilton","Waterloo","Mississauga","Brampton"]'
+        '["New York","Los Angeles","Chicago","Houston","Dallas","Washington DC",'
+        '"Miami","Phoenix","Atlanta","Boston","San Francisco","Seattle","Denver",'
+        '"Minneapolis","Tampa","Detroit","Philadelphia","San Diego","Portland",'
+        '"Charlotte","Orlando","Austin","Nashville","San Antonio","Indianapolis",'
+        '"Columbus","Jacksonville","Las Vegas","St. Louis","Kansas City"]'
     ),
     "google_places_max_per_search": "40",
     "discovery_verticals_enabled": '["dental","legal","accounting"]',

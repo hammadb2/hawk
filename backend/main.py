@@ -151,7 +151,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="HAWK API",
-    description="B2B cybersecurity SaaS for Canadian SMBs — attack surface scans, dashboard, Ask HAWK, billing.",
+    description="B2B cybersecurity SaaS for US small and midsize practices. Attack surface scans, dashboard, Ask HAWK, billing.",
     version="1.0.0",
     lifespan=lifespan,
 )

@@ -850,12 +850,12 @@ async def run_nightly_pipeline() -> dict[str, Any]:
     # Get cities list
     cities_json = _get_setting(
         "google_places_cities",
-        '["Toronto","Vancouver","Calgary","Edmonton","Ottawa","Montreal","Winnipeg","Halifax","Quebec City","Saskatoon","Regina","Victoria","Kelowna","London","Hamilton","Waterloo","Mississauga","Brampton"]',
+        '["New York","Los Angeles","Chicago","Houston","Dallas","Washington DC","Miami","Phoenix","Atlanta","Boston","San Francisco","Seattle","Denver","Minneapolis","Tampa","Detroit","Philadelphia","San Diego","Portland","Charlotte","Orlando","Austin","Nashville","San Antonio","Indianapolis","Columbus","Jacksonville","Las Vegas","St. Louis","Kansas City"]',
     )
     try:
         cities = json.loads(cities_json)
     except (json.JSONDecodeError, TypeError):
-        cities = ["Toronto", "Vancouver", "Calgary", "Edmonton", "Ottawa"]
+        cities = ["New York", "Los Angeles", "Chicago", "Houston", "Dallas"]
 
     try:
         # Step 1: Discover leads from Google Places

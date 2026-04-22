@@ -394,7 +394,7 @@ async def run_scan_fast(
     trust_level: str = "public",
 ) -> ScanResponse:
     """
-    Fast tier for homepage / Charlotte: email + TLS + breach + subdomains, plus a **bounded**
+    Fast tier for the homepage scanner: email + TLS + breach + subdomains, plus a **bounded**
     naabu slice, httpx probes on derived URLs, and Shodan InternetDB hints — still **no** nuclei,
     dnstwist, GitHub, or OpenAI interpretation (keeps wall clock predictable vs full pipeline).
     """
