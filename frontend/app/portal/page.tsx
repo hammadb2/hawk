@@ -86,7 +86,7 @@ function PortalHomeContent() {
   const [portal, setPortal] = useState<PortalProfile | null>(null);
   const [client, setClient] = useState<ClientRow | null>(null);
   const [scan, setScan] = useState<ScanRow | null>(null);
-  const [pipedaBusy, setPipedaBusy] = useState(false);
+  const [complianceBusy, setComplianceBusy] = useState(false);
   const [remediation, setRemediation] = useState<{
     fixedThisMonth: number;
     inProgress: number;
@@ -320,10 +320,10 @@ function PortalHomeContent() {
     Boolean(portal.guarantee_terms_accepted_at) &&
     needsCompanyDomainForMonitoring(userEmail, portal.domain);
 
-  async function downloadPipedaPdf() {
-    setPipedaBusy(true);
+  async function downloadCompliancePdf() {
+    setComplianceBusy(true);
     try {
-      const res = await fetch("/api/portal/pipeda-report");
+      const res = await fetch("/api/portal/compliance-report");
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         toast.error(j.error || "Could not generate the report. Try again later.");
@@ -333,13 +333,13 @@ function PortalHomeContent() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "hawk-pipeda-overview.pdf";
+      a.download = "hawk-compliance-overview.pdf";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
       toast.error("Download failed. Check your connection and try again.");
     } finally {
-      setPipedaBusy(false);
+      setComplianceBusy(false);
     }
   }
 
@@ -536,7 +536,7 @@ function PortalHomeContent() {
           { href: "/portal/attack-paths", label: "Attack paths", sub: "Breach scenarios" },
           { href: "/portal/enterprise", label: "Enterprise", sub: "Multi-domain rollup" },
           { href: "/portal/attacker-simulation", label: "Attacker sim", sub: "Weekly narrative" },
-          { href: "/portal/compliance", label: "C-27 primer", sub: "Canada privacy reform" },
+          { href: "/portal/compliance", label: "Compliance", sub: "US framework for your vertical" },
           { href: "/portal/billing", label: "Billing", sub: "Subscription & invoices" },
           { href: "/portal/settings", label: "Settings", sub: "Account & domain" },
         ].map((x) => (
@@ -596,16 +596,16 @@ function PortalHomeContent() {
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <h2 className="text-sm font-semibold text-slate-800">Reports</h2>
           <p className="mt-2 text-sm text-slate-600">
-            PIPEDA-oriented overview from your latest scan: which issues map to privacy duties, rough risk framing, and
-            remediation themes.
+            Compliance overview tailored to your vertical. Maps your latest findings to HIPAA, FTC Safeguards, or
+            ABA Formal Opinion 24-514 with remediation priorities and breach notification context.
           </p>
           <Button
             type="button"
             className="mt-3 border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-50"
-            disabled={pipedaBusy || !scan}
-            onClick={() => void downloadPipedaPdf()}
+            disabled={complianceBusy || !scan}
+            onClick={() => void downloadCompliancePdf()}
           >
-            {pipedaBusy ? "Preparing PDF…" : "Download PIPEDA overview (PDF)"}
+            {complianceBusy ? "Preparing PDF…" : "Download compliance overview (PDF)"}
           </Button>
           {!scan && (
             <p className="mt-2 text-xs text-slate-500">Run or complete a scan first — then this button enables.</p>

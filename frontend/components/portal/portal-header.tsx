@@ -15,7 +15,7 @@ const NAV_LINKS = [
   { href: "/portal/attack-paths", label: "Attack paths" },
   { href: "/portal/enterprise", label: "Enterprise" },
   { href: "/portal/attacker-simulation", label: "Attacker sim" },
-  { href: "/portal/compliance", label: "C-27 primer" },
+  { href: "/portal/compliance", label: "Compliance" },
   { href: "/portal/billing", label: "Billing" },
   { href: "/portal/settings", label: "Settings" },
 ] as const;

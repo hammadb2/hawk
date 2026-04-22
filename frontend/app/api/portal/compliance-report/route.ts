@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/** Proxy PIPEDA PDF from API (portal session cookie → Bearer). */
+/** Proxy the vertical aware US compliance PDF from the API (portal session cookie to Bearer). */
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   const base = API_URL.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/portal/pipeda-report.pdf`, {
+  const res = await fetch(`${base}/api/portal/compliance-report.pdf`, {
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
 
@@ -28,7 +28,7 @@ export async function GET() {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="hawk-pipeda-overview.pdf"',
+      "Content-Disposition": 'attachment; filename="hawk-compliance-overview.pdf"',
     },
   });
 }

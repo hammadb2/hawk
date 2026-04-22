@@ -19,7 +19,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from routers.crm_auth import require_supabase_uid
-from services.crm_pipeda_report import build_pipeda_html, html_to_pdf_bytes
+from services.crm_compliance_report import build_compliance_html, html_to_pdf_bytes
 from services.crm_openphone import send_sms
 from services.portal_milestones import ensure_portal_milestones
 from services.scanner import run_scan
@@ -113,9 +113,14 @@ def _can_access_prospect(uid: str, prospect_id: str) -> bool:
     return False
 
 
-@router.get("/api/portal/pipeda-report.pdf")
-def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
-    """2D — One-click PIPEDA overview PDF for authenticated portal user."""
+@router.get("/api/portal/compliance-report.pdf")
+def compliance_report_pdf(uid: str = Depends(require_supabase_uid)):
+    """2D. Vertical aware US compliance overview PDF for the authenticated portal user.
+
+    Routes the client's ``vertical`` column to the framework that applies to
+    their practice (HIPAA for dental and medical, FTC Safeguards for CPA and
+    tax, ABA Formal Opinion 24-514 for legal, generic US baseline otherwise).
+    """
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
@@ -141,6 +146,7 @@ def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
     client = (cl_r.json() or [None])[0]
     prospect_id = (client or {}).get("prospect_id")
     scan = None
+    vertical: str | None = None
     if prospect_id:
         sc_r = httpx.get(
             f"{SUPABASE_URL}/rest/v1/crm_prospect_scans",
@@ -156,10 +162,20 @@ def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
         if sc_r.status_code == 200 and sc_r.json():
             scan = sc_r.json()[0]
 
-    html = build_pipeda_html(
+        pr_r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb(),
+            params={"id": f"eq.{prospect_id}", "select": "vertical", "limit": "1"},
+            timeout=20.0,
+        )
+        if pr_r.status_code == 200 and pr_r.json():
+            vertical = (pr_r.json()[0] or {}).get("vertical")
+
+    html = build_compliance_html(
         company_name=str(cpp.get("company_name") or cpp.get("domain") or "Client"),
         domain=str(cpp.get("domain") or ""),
         scan=scan,
+        vertical=vertical,
     )
     pdf = html_to_pdf_bytes(html)
     if not pdf:
@@ -168,7 +184,7 @@ def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="hawk-pipeda-overview.pdf"'},
+        headers={"Content-Disposition": 'attachment; filename="hawk-compliance-overview.pdf"'},
     )
 
 
