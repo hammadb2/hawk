@@ -150,20 +150,32 @@ class DomainResponse(BaseModel):
 
 @app.post("/api/domains", response_model=DomainResponse, status_code=201)
 async def add_domain(body: DomainCreate, session: AsyncSession = Depends(get_session)):
+    global _ct_listener
     domain = body.domain.lower().strip()
     existing = await get_monitored_domain(session, domain)
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Domain {domain} already monitored")
 
-    md = MonitoredDomain(domain=domain, owner_email=body.owner_email)
-    session.add(md)
-    await session.commit()
-    await session.refresh(md)
+    if existing and existing.active:
+        raise HTTPException(status_code=409, detail=f"Domain {domain} already monitored")
+    if existing and not existing.active:
+        existing.active = True
+        existing.owner_email = body.owner_email or existing.owner_email
+        await session.commit()
+        await session.refresh(existing)
+        md = existing
+    else:
+        md = MonitoredDomain(domain=domain, owner_email=body.owner_email)
+        session.add(md)
+        await session.commit()
+        await session.refresh(md)
 
     if _ct_listener:
         _ct_listener.update_domains(
             _ct_listener._monitored | {domain}
         )
+    else:
+        settings = get_settings()
+        _ct_listener = await start_ct_listener({domain}, _on_ct_match, settings.certstream_url)
+        logger.info("CT listener lazily started for first domain: %s", domain)
 
     logger.info("Domain added for monitoring: %s", domain)
     return DomainResponse(
