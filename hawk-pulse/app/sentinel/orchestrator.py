@@ -63,20 +63,11 @@ async def _get_pulse_data(domain_id: str, domain: str) -> dict[str, Any]:
     return pulse_data
 
 
-async def run_full_audit(
+async def _run_full_audit_inner(
     audit_id: str,
     ws_manager: ConnectionManager | None = None,
 ) -> None:
-    """
-    Run the complete Sentinel audit pipeline as a background task.
-
-    Phases:
-      1. Provision sandbox
-      2. Run agent swarm (Planner → Ghost → Operator → Cleanup)
-      3. Generate CISO report + PDF
-      4. Teardown sandbox
-      5. Push AUDIT_COMPLETE via WebSocket
-    """
+    """Inner implementation of the audit pipeline (called with a timeout wrapper)."""
     settings = get_settings()
     factory = get_session_factory()
     container_id: str | None = None
@@ -252,3 +243,50 @@ async def run_full_audit(
                 await loop.run_in_executor(None, destroy_sandbox, container_id)
             except Exception:
                 logger.exception("Failed to destroy sandbox for audit %s", audit_id[:12])
+
+
+async def run_full_audit(
+    audit_id: str,
+    ws_manager: ConnectionManager | None = None,
+) -> None:
+    """
+    Run the complete Sentinel audit pipeline with an overall timeout.
+
+    Uses sentinel_container_timeout from config as the wall-clock limit.
+    If the timeout fires, the inner implementation's except block handles
+    marking the audit as failed and destroying the sandbox.
+    """
+    settings = get_settings()
+    try:
+        await asyncio.wait_for(
+            _run_full_audit_inner(audit_id, ws_manager),
+            timeout=settings.sentinel_container_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "Audit %s exceeded %ds timeout — aborting",
+            audit_id[:12], settings.sentinel_container_timeout,
+        )
+        factory = get_session_factory()
+        try:
+            async with factory() as session:
+                result = await session.execute(
+                    select(SentinelAudit).where(
+                        SentinelAudit.id == uuid.UUID(audit_id)
+                    )
+                )
+                audit = result.scalar_one_or_none()
+                if audit:
+                    audit.status = "failed"
+                    audit.completed_at = datetime.now(timezone.utc)
+                    if audit.container_id:
+                        try:
+                            loop = asyncio.get_event_loop()
+                            await loop.run_in_executor(
+                                None, destroy_sandbox, audit.container_id
+                            )
+                        except Exception:
+                            logger.exception("Failed to destroy sandbox after timeout")
+                    await session.commit()
+        except Exception:
+            logger.exception("Failed to mark timed-out audit %s as failed", audit_id[:12])

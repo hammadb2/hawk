@@ -11,6 +11,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import func as sa_func
+
+from app.config import get_settings
 from app.db import get_session
 from app.models import MonitoredDomain, SentinelAudit
 from app.sentinel.roe_chat import roe_chat_turn
@@ -214,6 +217,20 @@ async def start_audit(
         raise HTTPException(
             status_code=400,
             detail=f"Audit must be in 'roe_agreed' state to start (current: {audit.status})",
+        )
+
+    # Enforce max concurrent audits
+    settings = get_settings()
+    active_count_result = await session.execute(
+        select(sa_func.count()).select_from(SentinelAudit).where(
+            SentinelAudit.status.in_(("provisioning", "scanning", "reporting"))
+        )
+    )
+    active_count = active_count_result.scalar() or 0
+    if active_count >= settings.sentinel_max_concurrent:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Max concurrent audits ({settings.sentinel_max_concurrent}) reached. Try again later.",
         )
 
     # Atomically mark as provisioning to prevent duplicate launches
