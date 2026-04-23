@@ -135,6 +135,8 @@ See `.env.example`. Key variables:
 - `OPENAI_API_KEY` — required for HAWK Guard AI remediation
 - `OPENAI_MODEL` — LLM model (default: `gpt-4o-mini`; supports DeepSeek via `OPENAI_BASE_URL`)
 - `REMEDIATION_ENABLED` — toggle auto-remediation on/off (default: `true`)
+- `SENTINEL_LLM_API_KEY` — API key for the Sentinel agent swarm
+- `SENTINEL_DOCKER_IMAGE` — Kali container image (default: `kalilinux/kali-rolling`)
 
 ## HAWK Guard (Step 2) — AI Remediation
 
@@ -155,6 +157,96 @@ curl -X POST http://localhost:8080/api/alerts/{alert_id}/remediate
 curl http://localhost:8080/api/alerts/{alert_id}/remediation
 ```
 
-## Next Steps
+## HAWK Sentinel (Step 3) — AI Red Team
 
-- **HAWK Sentinel (Step 3):** Ephemeral Kali Docker swarm for automated penetration testing with boardroom-grade reports.
+Automated penetration testing with a 4-agent LLM swarm running inside ephemeral Kali Linux Docker containers.
+
+### Architecture
+
+```
+Customer Chat ──▶ ROE Legal AI ──▶ scope.json contract
+                                         │
+                                         ▼
+                              ┌─────────────────────┐
+                              │  Kali Docker Sandbox │
+                              │  (ephemeral, per     │
+                              │   audit lifecycle)   │
+                              └──────────┬──────────┘
+                                         │
+                        ┌────────────────┼────────────────┐
+                        │                │                │
+                   Agent 1          Agent 2          Agent 3
+                   Planner       Ghost/OPSEC       Operator
+                (attack plan)   (proxychains)    (execute in
+                                                  sandbox)
+                        │                │                │
+                        └────────────────┼────────────────┘
+                                         │
+                                    Agent 4
+                                    Cleanup
+                                         │
+                                         ▼
+                              ┌─────────────────────┐
+                              │  Agent 5 (CISO)     │
+                              │  Boardroom Report   │
+                              │  (WeasyPrint PDF)   │
+                              └──────────┬──────────┘
+                                         │
+                              WebSocket AUDIT_COMPLETE
+                              + docker kill/rm sandbox
+```
+
+### Flow
+
+1. **ROE Chat** — Customer negotiates scope with a Legal AI agent via `POST /api/sentinel/roe-chat`. The AI asks about risk tolerance, in-scope domains, excluded IPs, and outputs a `scope.json` contract.
+2. **Sandbox Provisioning** — Docker SDK spins up an isolated `kalilinux/kali-rolling` container with the open-source arsenal (nmap, nuclei, httpx, proxychains, etc.).
+3. **Agent Swarm** — 4 LLM agents coordinate the pentest:
+   - **Planner**: reads scope + Pulse recon data, writes JSON attack plan
+   - **Ghost**: configures OPSEC/evasion (proxychains, proxy pools)
+   - **Operator**: executes commands in the sandbox (scope-enforced — exploitation tools blocked when `exploitation_allowed: false`)
+   - **Cleanup**: removes artifacts, clears traces
+4. **CISO Report** — Agent 5 writes a boardroom-grade Markdown narrative, rendered to a branded PDF via WeasyPrint/Jinja2.
+5. **Teardown** — Container destroyed, WebSocket `AUDIT_COMPLETE` pushed to dashboard.
+
+### Sentinel API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/sentinel/roe-chat` | Interactive ROE negotiation chat |
+| `GET` | `/api/sentinel/audits/{audit_id}` | Get audit status and findings |
+| `POST` | `/api/sentinel/audits/start` | Start the full audit pipeline (after ROE agreed) |
+| `POST` | `/api/sentinel/test-container` | PoC: spin up a Kali sandbox with arsenal |
+| `DELETE` | `/api/sentinel/containers/{id}` | Tear down a sandbox container |
+
+### Sentinel Env Vars
+
+- `SENTINEL_LLM_API_KEY` — API key for the agent swarm (DeepSeek recommended)
+- `SENTINEL_LLM_BASE_URL` — LLM API base URL
+- `SENTINEL_LLM_MODEL` — Model name (default: `gpt-4o-mini`)
+- `SENTINEL_DOCKER_IMAGE` — Container image (default: `kalilinux/kali-rolling`)
+- `SENTINEL_CONTAINER_TIMEOUT` — Max audit duration in seconds (default: 3600)
+- `SENTINEL_MAX_CONCURRENT` — Max concurrent audits (default: 2)
+
+### Example: Run a Sentinel Audit
+
+```bash
+# 1. Start ROE chat (negotiate scope)
+curl -X POST http://localhost:8080/api/sentinel/roe-chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain_id": "<domain-uuid>",
+    "user_message": "I want a deep scan of *.example.com, no exploitation"
+  }'
+
+# 2. Continue chat until scope.json is finalized (roe_finalized: true)
+# 3. Start the audit
+curl -X POST http://localhost:8080/api/sentinel/audits/start \
+  -H "Content-Type: application/json" \
+  -d '{"audit_id": "<audit-uuid>"}'
+
+# 4. Monitor progress
+curl http://localhost:8080/api/sentinel/audits/<audit-uuid>
+
+# 5. Test container spin-up (PoC)
+curl -X POST http://localhost:8080/api/sentinel/test-container
+```

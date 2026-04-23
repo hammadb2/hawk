@@ -96,6 +96,33 @@ class Alert(Base):
     )
 
 
+class SentinelAudit(Base):
+    """A HAWK Sentinel penetration test audit."""
+
+    __tablename__ = "sentinel_audits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    domain_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("monitored_domains.id"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="roe_pending",
+        comment="roe_pending | roe_agreed | provisioning | scanning | reporting | complete | failed",
+    )
+    scope_json: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    roe_chat_history: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    container_id: Mapped[str | None] = mapped_column(String(80), comment="Docker container ID for the Kali sandbox")
+    agent_log: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    findings: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    report_markdown: Mapped[str | None] = mapped_column(Text, comment="Final pentest report (Markdown)")
+    report_url: Mapped[str | None] = mapped_column(String(1024), comment="URL to the generated PDF report")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_sentinel_audits_domain_status", "domain_id", "status"),
+    )
+
+
 class ScanEvent(Base):
     """Audit log of every micro-scan triggered by a listener."""
 
