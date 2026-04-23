@@ -17,7 +17,7 @@ from openai import AsyncOpenAI
 
 from app.config import Settings, get_settings
 from app.sentinel.sandbox import exec_in_sandbox
-from app.sentinel.scope_enforcer import ScopeViolation, enforce_scope, safe_execute
+from app.sentinel.scope_enforcer import ScopeViolation, async_safe_execute, enforce_scope, safe_execute
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +237,7 @@ async def run_ghost_setup(
         if not isinstance(cmd, str):
             continue
         try:
-            exit_code, stdout, stderr = safe_execute(
+            exit_code, stdout, stderr = await async_safe_execute(
                 command=cmd, scope=scope,
                 executor_fn=exec_in_sandbox, container_id=container_id,
             )
@@ -266,7 +266,7 @@ async def run_operator(
         step_num = step.get("step", "?")
 
         try:
-            exit_code, stdout, stderr = safe_execute(
+            exit_code, stdout, stderr = await async_safe_execute(
                 command=command,
                 scope=scope,
                 executor_fn=exec_in_sandbox,
@@ -337,7 +337,7 @@ async def run_cleanup(
         if not isinstance(cmd, str):
             continue
         try:
-            exit_code, stdout, _ = safe_execute(
+            exit_code, stdout, _ = await async_safe_execute(
                 command=cmd, scope=scope,
                 executor_fn=exec_in_sandbox, container_id=container_id,
             )

@@ -253,6 +253,8 @@ async def test_container(
             None, setup_arsenal, container_id
         )
     except RuntimeError as e:
+        from app.sentinel.sandbox import destroy_sandbox
+        await loop.run_in_executor(None, destroy_sandbox, container_id)
         raise HTTPException(
             status_code=500,
             detail=f"Arsenal setup failed: {e}",

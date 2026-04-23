@@ -217,8 +217,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Mount Sentinel routes
-app.include_router(sentinel_router)
+# Mount Sentinel routes (only when enabled)
+if get_settings().sentinel_enabled:
+    app.include_router(sentinel_router)
 
 
 # ---------------------------------------------------------------------------

@@ -195,3 +195,18 @@ def safe_execute(
 
     logger.info("SCOPE OK: executing %s", command[:100])
     return executor_fn(container_id, command)
+
+
+async def async_safe_execute(
+    command: str,
+    scope: dict[str, Any],
+    executor_fn: Any,
+    container_id: str,
+) -> tuple[int, str, str]:
+    """Async wrapper around safe_execute — offloads blocking Docker exec to a thread."""
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, safe_execute, command, scope, executor_fn, container_id
+    )
