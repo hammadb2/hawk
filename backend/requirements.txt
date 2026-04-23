@@ -13,7 +13,7 @@ redis>=5.0.0
 openai>=1.40.0
 stripe>=8.0.0
 python-multipart>=0.0.6
-# PDF — user scan reports (ReportLab); PIPEDA / CRM monthly still use WeasyPrint — see backend/Dockerfile for Railway.
+# PDF. User scan reports use ReportLab. Vertical aware US compliance PDF and CRM monthly reports use WeasyPrint. See backend/Dockerfile for Railway system libs.
 reportlab>=4.0
 weasyprint>=61.0
 supabase>=2.7.0

@@ -735,7 +735,7 @@ def nightly_pipeline_run(
     ARIA Unified Nightly Pipeline — runs at 11pm MST:
     Apify 4-actor discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
     → Deduplicate → Bulk ZeroBounce → Domain Scan (30 concurrent) →
-    Batched OpenAI (20 per call) → CASL footer + timezone scheduling →
+    Batched OpenAI (20 per call) → CAN-SPAM footer + timezone scheduling →
     Store in aria_lead_inventory as 'ready'.
 
     Replaces the legacy nightly agent run.

@@ -107,7 +107,7 @@ See **backend/.env.example**. Main ones:
 | Plan | Domains | Ask HAWK | PDFs | Notes |
 |------|---------|----------|------|--------|
 | Starter | 1 | unlimited | 1/mo | Weekly scans |
-| Pro | 3 | unlimited | unlimited | Daily, PIPEDA/C-26 |
+| Pro | 3 | unlimited | unlimited | Daily, vertical aware US compliance |
 | Agency | 10 | unlimited | unlimited | White-label, client report, API |
 
 ---

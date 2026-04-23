@@ -78,7 +78,7 @@ function objectionTemplates(industry: string | null): { objection: string; respo
           "Patient data lives in more than the EMR — email, portals, and staff devices are where most healthcare breaches start. HAWK shows what criminals can see from the outside before they ever touch your charting system.",
       },
       { objection: "We're too small to be a target.", response: "SMBs are the majority of ransomware victims because defenses are lighter. Automated scans find you the same way they find enterprises — size doesn't matter to a bot." },
-      { objection: "This sounds expensive for what we get.", response: "Compare to one privacy incident: PIPEDA notification, downtime, and reputation damage typically dwarf preventive monitoring. Starter is $199/mo to see value before Shield." },
+      { objection: "This sounds expensive for what we get.", response: "Compare to one HIPAA incident: OCR notification, downtime, and reputation damage typically dwarf preventive monitoring. HAWK Core is $249/mo with a $250K Breach Response Guarantee built in." },
     ];
   }
   if (isLegal) {

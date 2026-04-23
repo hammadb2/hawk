@@ -33,7 +33,7 @@ const OBJECTIONS: Record<string, { q: string; a: string }[]> = {
   ],
   dental: [
     { q: "We use a managed IT vendor.", a: "Great. This shows what shows up from the outside on your domain, vendor aside." },
-    { q: "We're PHIPA compliant already.", a: "PHIPA covers internal processes, but external attack surface is different. This scan checks what a hacker sees from outside." },
+    { q: "We're HIPAA compliant already.", a: "HIPAA compliance covers internal policy and process. External attack surface is different. This scan checks what a hacker sees from outside before any breach notification would ever apply." },
     { q: "Our patient data is in the cloud.", a: "Cloud apps still connect through your domain. If your email or DNS is compromised, patient data is at risk regardless of where it's stored." },
   ],
   law: [
@@ -43,16 +43,16 @@ const OBJECTIONS: Record<string, { q: string; a: string }[]> = {
   ],
   accounting: [
     { q: "We use QuickBooks Online, it's secure.", a: "QuickBooks itself may be, but your domain, email, and login portals are separate attack surfaces. That's what we scan." },
-    { q: "CRA already audits us.", a: "CRA audits your books, not your cybersecurity. If client SINs or financial data leak, that's a privacy breach — different liability entirely." },
-    { q: "Tax season is too busy for this.", a: "That's actually when you're most vulnerable — staff are rushing, phishing emails spike. A quick scan now prevents a crisis during crunch time." },
+    { q: "The IRS already audits us.", a: "The IRS audits your books, not your cybersecurity. If client SSNs or financial data leak, that triggers the FTC Safeguards Rule breach notification, which is a different liability entirely." },
+    { q: "Tax season is too busy for this.", a: "That is actually when you are most vulnerable. Staff are rushing, phishing emails spike. A quick scan now prevents a crisis during crunch time." },
   ],
   financial: [
-    { q: "We're regulated by IIROC/MFDA.", a: "Regulation requires you to protect client data, but doesn't tell you what's exposed externally. This scan fills that gap." },
+    { q: "We're regulated by FINRA and the SEC.", a: "Regulation requires you to protect client data, but it does not tell you what is exposed externally. This scan fills that gap." },
     { q: "Our compliance team handles this.", a: "Compliance ensures policy — this scan shows technical reality. We often find gaps between what policy says and what's actually exposed." },
     { q: "Our clients trust us already.", a: "Trust is built on protection. If a breach hits the news, clients leave. This scan helps you verify the trust is warranted." },
   ],
   medical: [
-    { q: "We're PHIPA/PIPEDA compliant.", a: "Compliance is about process. This scan shows technical exposure — open ports, vulnerable services, leaked credentials. Compliance doesn't catch those." },
+    { q: "We're HIPAA compliant.", a: "HIPAA compliance is about process and policy. This scan shows technical exposure. Open ports, vulnerable services, leaked credentials. A compliance program does not catch those on its own." },
     { q: "Our EMR vendor handles security.", a: "They secure their platform, but your clinic's domain, email, and network are your responsibility. That's what we check." },
     { q: "We don't store data on our servers.", a: "Your email, patient portal login, and DNS records are still on your domain. If those are compromised, attackers can intercept or redirect patient data." },
   ],
@@ -63,7 +63,7 @@ const OBJECTIONS: Record<string, { q: string; a: string }[]> = {
   ],
   physiotherapy: [
     { q: "We mostly use paper records.", a: "If you have email, a website, or any online booking, you have an attack surface. We scan what's visible from the outside." },
-    { q: "Our patients wouldn't care about a breach.", a: "Patient health records are worth 10x more than credit cards on the dark web. PHIPA requires you to protect them regardless." },
+    { q: "Our patients wouldn't care about a breach.", a: "Patient health records are worth 10x more than credit cards on the dark web. HIPAA requires you to protect them regardless." },
     { q: "We can't afford cybersecurity.", a: "The average breach costs a small health practice $150K+. Our plans start at $97/month — that's insurance for your digital front door." },
   ],
 };

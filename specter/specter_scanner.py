@@ -56,8 +56,16 @@ class ScanResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-COMPLIANCE_PIPEDA = ["PIPEDA 4.7"]
-COMPLIANCE_BILL_C26 = ["Bill C-26 S.7"]
+# US framework tags attached to findings. Mapping is framework neutral at scan
+# time because scans run before the prospect's vertical is confirmed. The
+# downstream vertical aware compliance PDF in services/crm_compliance_report.py
+# re-maps findings to HIPAA, FTC Safeguards, or ABA Formal Opinion 24-514 based
+# on the client's vertical when the report is generated.
+COMPLIANCE_TRANSMISSION = ["HIPAA 164.312(e)", "FTC 314.4(c)(3)"]
+COMPLIANCE_RISK_MGMT = ["HIPAA 164.308(a)(1)", "FTC 314.4(b)"]
+COMPLIANCE_EMAIL_AUTH = ["HIPAA 164.308(a)(5)", "FTC 314.4(d)", "ABA Rule 1.6(c)"]
+COMPLIANCE_ACCESS = ["HIPAA 164.312(a)", "FTC 314.4(c)(1)"]
+COMPLIANCE_AVAILABILITY = ["HIPAA 164.308(a)(7)", "FTC 314.4(h)"]
 
 # Ports to scan; (port, "label", severity_if_open: warning | critical)
 PORT_CHECKS = [
@@ -153,7 +161,7 @@ def _check_dns(domain: str) -> list[Finding]:
                 f"No TXT record containing v=spf1 found for {domain}",
                 base_asset,
                 f"Add a TXT record for {domain} with value similar to: v=spf1 include:_spf.google.com ~all (adjust for your mail provider).",
-                COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+                COMPLIANCE_EMAIL_AUTH,
             ))
         elif not spf_valid:
             findings.append(_make_finding(
@@ -164,7 +172,7 @@ def _check_dns(domain: str) -> list[Finding]:
                 f"SPF record found for {domain} but structure may be invalid or too restrictive.",
                 base_asset,
                 "Ensure your SPF record includes all servers that send email for your domain (e.g. include: or ip4:).",
-                COMPLIANCE_PIPEDA,
+                COMPLIANCE_EMAIL_AUTH,
             ))
         else:
             findings.append(_make_finding(
@@ -186,7 +194,7 @@ def _check_dns(domain: str) -> list[Finding]:
             str(e),
             base_asset,
             "Add a TXT record with v=spf1 and ensure DNS is correctly configured.",
-            COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+            COMPLIANCE_EMAIL_AUTH,
         ))
 
     # DMARC
@@ -215,7 +223,7 @@ def _check_dns(domain: str) -> list[Finding]:
                 f"No DMARC TXT record at {dmarc_domain}",
                 base_asset,
                 f"Add a TXT record for _dmarc.{domain} with at least: v=DMARC1; p=quarantine; (or p=reject for stronger protection).",
-                COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+                COMPLIANCE_EMAIL_AUTH,
             ))
         elif not policy_ok:
             findings.append(_make_finding(
@@ -226,7 +234,7 @@ def _check_dns(domain: str) -> list[Finding]:
                 f"DMARC record: {dmarc_raw[:200]}",
                 base_asset,
                 "Change DMARC to p=quarantine or p=reject once you have validated SPF/DKIM.",
-                COMPLIANCE_PIPEDA,
+                COMPLIANCE_EMAIL_AUTH,
             ))
         else:
             findings.append(_make_finding(
@@ -248,7 +256,7 @@ def _check_dns(domain: str) -> list[Finding]:
             str(e),
             base_asset,
             f"Add a TXT record for _dmarc.{domain} with v=DMARC1; p=quarantine;",
-            COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+            COMPLIANCE_EMAIL_AUTH,
         ))
 
     # DKIM (default selector)
@@ -270,7 +278,7 @@ def _check_dns(domain: str) -> list[Finding]:
                 f"No TXT record at {dkim_domain} containing DKIM1",
                 base_asset,
                 "If you use a different DKIM selector, ensure it is published. Otherwise add a TXT record at default._domainkey.{domain} with your mail provider's DKIM public key.",
-                COMPLIANCE_PIPEDA,
+                COMPLIANCE_EMAIL_AUTH,
             ))
         else:
             findings.append(_make_finding(
@@ -292,7 +300,7 @@ def _check_dns(domain: str) -> list[Finding]:
             f"No TXT at default._domainkey.{domain}",
             base_asset,
             "Publish DKIM for the selector your mail server uses, or confirm default._domainkey is correct.",
-            COMPLIANCE_PIPEDA,
+            COMPLIANCE_EMAIL_AUTH,
         ))
 
     # MX records
@@ -345,7 +353,7 @@ def _check_dns(domain: str) -> list[Finding]:
                 f"No NS records for {domain}",
                 base_asset,
                 "Configure nameservers at your domain registrar.",
-                COMPLIANCE_BILL_C26,
+                COMPLIANCE_AVAILABILITY,
             ))
         else:
             ns_list = [str(r) for r in answers]
@@ -368,7 +376,7 @@ def _check_dns(domain: str) -> list[Finding]:
             str(e),
             base_asset,
             "Ensure nameservers are set correctly at your registrar.",
-            COMPLIANCE_BILL_C26,
+            COMPLIANCE_AVAILABILITY,
         ))
 
     return findings
@@ -409,7 +417,7 @@ def _check_ssl(domain: str) -> list[Finding]:
                         f"Certificate expired {abs(days_left)} days ago. notAfter: {cert['notAfter']}",
                         asset,
                         "Renew your SSL certificate with your provider (e.g. Let's Encrypt, your hosting provider) and install it on your web server.",
-                        COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+                        COMPLIANCE_TRANSMISSION,
                     ))
                 elif days_left <= 7:
                     findings.append(_make_finding(
@@ -420,7 +428,7 @@ def _check_ssl(domain: str) -> list[Finding]:
                         f"Expires in {days_left} days. notAfter: {cert['notAfter']}",
                         asset,
                         "Renew your SSL certificate and deploy it before the expiry date.",
-                        COMPLIANCE_BILL_C26,
+                        COMPLIANCE_TRANSMISSION,
                     ))
                 elif days_left <= 30:
                     findings.append(_make_finding(
@@ -455,7 +463,7 @@ def _check_ssl(domain: str) -> list[Finding]:
                         f"Negotiated: {version}",
                         asset,
                         "Disable SSLv3, TLS 1.0, and TLS 1.1 on your web server. Use only TLS 1.2 and 1.3.",
-                        COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+                        COMPLIANCE_TRANSMISSION,
                     ))
                 else:
                     findings.append(_make_finding(
@@ -481,7 +489,7 @@ def _check_ssl(domain: str) -> list[Finding]:
                         f"Cipher: {cipher_name}",
                         asset,
                         "Configure your web server to use only strong ciphers (e.g. AES-GCM, ChaCha20). Disable NULL, EXPORT, RC4, DES, and MD5 ciphers.",
-                        COMPLIANCE_BILL_C26,
+                        COMPLIANCE_TRANSMISSION,
                     ))
                 else:
                     findings.append(_make_finding(
@@ -504,7 +512,7 @@ def _check_ssl(domain: str) -> list[Finding]:
             str(e),
             asset,
             "Install a valid certificate from a trusted CA (e.g. Let's Encrypt) and ensure the certificate matches your domain name.",
-            COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+            COMPLIANCE_TRANSMISSION,
         ))
     except (socket.timeout, socket.gaierror, OSError) as e:
         findings.append(_make_finding(
@@ -553,7 +561,7 @@ def _check_port(domain: str, port: int, label: str, severity_if_open: str) -> Fi
                     f"TCP {port} open on {domain}",
                     f"{domain}:{port}",
                     f"Close port {port} on your firewall if {label} should not be publicly accessible. If it must be open, restrict by IP and use strong authentication.",
-                    COMPLIANCE_BILL_C26 if severity_if_open == "critical" else [],
+                    COMPLIANCE_ACCESS if severity_if_open == "critical" else [],
                 )
     except (socket.gaierror, OSError):
         pass
@@ -612,7 +620,7 @@ def _check_web_headers_and_redirect(domain: str) -> list[Finding]:
                 f"GET {base_url_http} returned final URL: {r.url}",
                 base_url_http,
                 "Configure your web server to redirect HTTP to HTTPS (301 or 302). In Nginx: return 301 https://$host$request_uri;",
-                COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+                COMPLIANCE_TRANSMISSION,
             ))
     except requests.RequestException as e:
         findings.append(_make_finding(
@@ -661,7 +669,7 @@ def _check_web_headers_and_redirect(domain: str) -> list[Finding]:
                     f"Strict-Transport-Security: {hsts}",
                     base_url_https,
                     "Set Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
-                    COMPLIANCE_BILL_C26,
+                    COMPLIANCE_TRANSMISSION,
                 ))
         else:
             findings.append(_make_finding(
@@ -672,7 +680,7 @@ def _check_web_headers_and_redirect(domain: str) -> list[Finding]:
                 "No Strict-Transport-Security header in response",
                 base_url_https,
                 "Add header: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
-                COMPLIANCE_PIPEDA + COMPLIANCE_BILL_C26,
+                COMPLIANCE_TRANSMISSION,
             ))
 
         # X-Frame-Options or CSP frame-ancestors
@@ -713,7 +721,7 @@ def _check_web_headers_and_redirect(domain: str) -> list[Finding]:
                 "No X-Frame-Options or CSP frame-ancestors",
                 base_url_https,
                 "Add X-Frame-Options: DENY or SAMEORIGIN, or add frame-ancestors to Content-Security-Policy.",
-                COMPLIANCE_PIPEDA,
+                COMPLIANCE_ACCESS,
             ))
 
         # Content-Security-Policy
@@ -737,7 +745,7 @@ def _check_web_headers_and_redirect(domain: str) -> list[Finding]:
                 "No Content-Security-Policy header",
                 base_url_https,
                 "Add a Content-Security-Policy header. Start with default-src 'self' and relax as needed.",
-                COMPLIANCE_PIPEDA,
+                COMPLIANCE_ACCESS,
             ))
 
         # X-Content-Type-Options

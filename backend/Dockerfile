@@ -1,4 +1,4 @@
-# HAWK API — OS libs for WeasyPrint (PIPEDA PDF, monthly reports) + Python deps from requirements.txt
+# HAWK API. OS libs for WeasyPrint (vertical aware US compliance PDF, monthly reports) plus Python deps from requirements.txt
 FROM python:3.13-slim-bookworm
 
 # System WeasyPrint + Cairo/Pango stack (Railway). Python package also in requirements.txt.

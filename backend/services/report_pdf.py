@@ -424,7 +424,7 @@ def render_report_pdf(
             else:
                 story.append(Paragraph(
                     "No specific compliance references detected in this scan. "
-                    "Visit your HAWK dashboard Compliance page for PIPEDA / Bill C-26 mapping.",
+                    "Visit your HAWK dashboard Compliance page for HIPAA, FTC Safeguards, and ABA Formal Opinion 24-514 mapping.",
                     s_body,
                 ))
             story.append(Spacer(1, 16))

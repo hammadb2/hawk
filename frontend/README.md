@@ -34,7 +34,7 @@ npm start
 - **/dashboard/reports** — Generate PDF, list and download
 - **/dashboard/domains** — Add/remove domains
 - **/dashboard/hawk** — Ask HAWK: chat with scan context, DeepSeek R1
-- **/dashboard/compliance** — PIPEDA §4.7, Bill C-26 S.7, NIST mapping (Pro+)
+- **/dashboard/compliance** — HIPAA, FTC Safeguards, ABA Formal Opinion 24-514, NIST mapping (Pro+)
 - **/dashboard/agency** — Client list, ROI calculator, white-label report (Agency)
 - **/dashboard/notifications** — Inbox, mark all read
 - **/dashboard/settings** — Account, billing portal, upgrade buttons
