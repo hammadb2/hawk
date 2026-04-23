@@ -153,13 +153,19 @@ def exec_in_sandbox(container_id: str, command: str, timeout: int = 120) -> tupl
     """
     Execute a command inside the Sentinel sandbox.
 
+    Uses the ``timeout`` coreutil inside the container to enforce a
+    wall-clock limit so commands against unresponsive targets cannot
+    block the audit pipeline indefinitely.
+
     Returns (exit_code, stdout, stderr).
     """
+    import shlex
+
     client = get_docker_client()
     container = client.containers.get(container_id)
 
     exit_code, output = container.exec_run(
-        cmd=["bash", "-c", command],
+        cmd=["bash", "-c", f"timeout {timeout} bash -c {shlex.quote(command)}"],
         demux=True,
     )
 

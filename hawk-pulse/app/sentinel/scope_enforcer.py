@@ -92,7 +92,7 @@ def _extract_all_commands(cmd: str) -> list[str]:
 def _check_ip_exclusions(cmd: str, excluded_ips: list[str]) -> str | None:
     """Check if a command targets an excluded IP."""
     for ip in excluded_ips:
-        if ip in cmd:
+        if re.search(r'(?<![\d.])' + re.escape(ip) + r'(?![\d.])', cmd):
             return f"Command targets excluded IP: {ip}"
     return None
 

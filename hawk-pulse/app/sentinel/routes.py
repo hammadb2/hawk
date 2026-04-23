@@ -216,6 +216,10 @@ async def start_audit(
             detail=f"Audit must be in 'roe_agreed' state to start (current: {audit.status})",
         )
 
+    # Atomically mark as provisioning to prevent duplicate launches
+    audit.status = "provisioning"
+    await session.commit()
+
     # Launch the full audit pipeline as a background task
     task = asyncio.create_task(run_full_audit(str(audit.id)))
     _background_tasks.add(task)
