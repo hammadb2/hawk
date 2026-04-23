@@ -229,6 +229,12 @@ async def process_scan_results(
         "alerts_generated": len(alerts),
     }
 
+    # Mark remediation-eligible alerts as pending
+    from app.engine.ai_remediation import should_generate_remediation
+    for alert in alerts:
+        if should_generate_remediation(alert.severity):
+            alert.remediation_status = "pending"
+
     await session.commit()
     return alerts
 

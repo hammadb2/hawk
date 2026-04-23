@@ -45,6 +45,23 @@ class Settings:
         default_factory=lambda: int(os.environ.get("MICROSCAN_WORKERS", "4"))
     )
 
+    # AI Remediation (HAWK Guard)
+    openai_api_key: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_API_KEY", "")
+    )
+    openai_base_url: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    )
+    openai_model: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    )
+    remediation_timeout_sec: float = field(
+        default_factory=lambda: float(os.environ.get("REMEDIATION_TIMEOUT_SEC", "60"))
+    )
+    remediation_enabled: bool = field(
+        default_factory=lambda: os.environ.get("REMEDIATION_ENABLED", "true").lower() in ("true", "1", "yes")
+    )
+
 
 _settings: Settings | None = None
 

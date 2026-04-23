@@ -6,3 +6,4 @@ psycopg2-binary>=2.9,<3
 certstream>=1.12,<2
 pydantic>=2.5,<3
 httpx>=0.27,<1
+openai>=1.30,<2
