@@ -428,7 +428,7 @@ async def trigger_remediation(alert_id: str, session: AsyncSession = Depends(get
     md = md_result.scalar_one_or_none()
     domain = md.domain if md else "unknown"
 
-    asyncio.create_task(_run_remediation_for_alert(alert_id, domain))
+    asyncio.create_task(_bounded_remediation(alert_id, domain))
 
     return {
         "alert_id": alert_id,

@@ -108,7 +108,7 @@ async def generate_remediation(
 
     if not settings.openai_api_key:
         logger.warning("OPENAI_API_KEY not set — skipping remediation generation")
-        return "_Remediation guide unavailable: API key not configured._"
+        raise RuntimeError("Remediation guide unavailable: API key not configured.")
 
     tech_stack = _extract_tech_stack(detail, asset_metadata)
     vulnerability = _build_vulnerability_description(alert_type, severity, title, detail)
