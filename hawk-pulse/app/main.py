@@ -83,6 +83,7 @@ def _alert_to_dict(alert: Alert) -> dict[str, Any]:
 
 
 _remediation_semaphore: asyncio.Semaphore | None = None
+_background_tasks: set[asyncio.Task] = set()
 
 
 async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
@@ -140,7 +141,8 @@ async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
         )
         alert = result.scalar_one_or_none()
         if alert:
-            alert.remediation_markdown = markdown
+            if markdown is not None:
+                alert.remediation_markdown = markdown
             alert.remediation_status = status
             await session.commit()
 
@@ -163,9 +165,11 @@ async def _trigger_remediations(alerts: list[Alert], domain: str) -> None:
         _remediation_semaphore = asyncio.Semaphore(settings.microscan_workers)
     for alert in alerts:
         if should_generate_remediation(alert.severity):
-            asyncio.create_task(
+            task = asyncio.create_task(
                 _bounded_remediation(str(alert.id), domain)
             )
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
 
 
 async def _bounded_remediation(alert_id: str, domain: str) -> None:
@@ -428,7 +432,9 @@ async def trigger_remediation(alert_id: str, session: AsyncSession = Depends(get
     md = md_result.scalar_one_or_none()
     domain = md.domain if md else "unknown"
 
-    asyncio.create_task(_bounded_remediation(alert_id, domain))
+    task = asyncio.create_task(_bounded_remediation(alert_id, domain))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return {
         "alert_id": alert_id,
