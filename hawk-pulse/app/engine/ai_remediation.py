@@ -124,31 +124,27 @@ async def generate_remediation(
         timeout=settings.remediation_timeout_sec,
     )
 
-    try:
-        response = await client.chat.completions.create(
-            model=settings.openai_model,
-            messages=[
-                {"role": "system", "content": system_message},
-                {
-                    "role": "user",
-                    "content": (
-                        f"Generate a remediation guide for this vulnerability:\n\n"
-                        f"**{title}**\n\n"
-                        f"Tech stack: {tech_stack}\n\n"
-                        f"Details:\n{vulnerability}"
-                    ),
-                },
-            ],
-            temperature=0.3,
-            max_tokens=2000,
-        )
-        content = response.choices[0].message.content
-        if not content:
-            return "_LLM returned empty response._"
-        return content.strip()
-    except Exception as e:
-        logger.exception("Remediation generation failed for alert: %s", title)
-        return f"_Remediation generation failed: {e!s}_"
+    response = await client.chat.completions.create(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": system_message},
+            {
+                "role": "user",
+                "content": (
+                    f"Generate a remediation guide for this vulnerability:\n\n"
+                    f"**{title}**\n\n"
+                    f"Tech stack: {tech_stack}\n\n"
+                    f"Details:\n{vulnerability}"
+                ),
+            },
+        ],
+        temperature=0.3,
+        max_tokens=2000,
+    )
+    content = response.choices[0].message.content
+    if not content:
+        raise RuntimeError("LLM returned empty response")
+    return content.strip()
 
 
 def should_generate_remediation(severity: str) -> bool:
