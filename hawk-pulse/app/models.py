@@ -108,10 +108,10 @@ class SentinelAudit(Base):
         comment="roe_pending | roe_agreed | provisioning | scanning | reporting | complete | failed",
     )
     scope_json: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
-    roe_chat_history: Mapped[dict] = mapped_column(JSONB, default=list, server_default="[]")
+    roe_chat_history: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     container_id: Mapped[str | None] = mapped_column(String(80), comment="Docker container ID for the Kali sandbox")
-    agent_log: Mapped[dict] = mapped_column(JSONB, default=list, server_default="[]")
-    findings: Mapped[dict] = mapped_column(JSONB, default=list, server_default="[]")
+    agent_log: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    findings: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     report_markdown: Mapped[str | None] = mapped_column(Text, comment="Final pentest report (Markdown)")
     report_url: Mapped[str | None] = mapped_column(String(1024), comment="URL to the generated PDF report")
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

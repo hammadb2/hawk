@@ -211,7 +211,10 @@ async def run_full_audit(
         await loop.run_in_executor(None, destroy_sandbox, container_id)
         container_id = None
 
-        # Push WebSocket event
+        # Push WebSocket event (lazy-import ws_manager if not provided)
+        if ws_manager is None:
+            from app.main import ws_manager as _ws
+            ws_manager = _ws
         if ws_manager:
             await ws_manager.broadcast_alert(domain, {
                 "type": "AUDIT_COMPLETE",

@@ -71,7 +71,7 @@ def _extract_all_commands(cmd: str) -> list[str]:
     Splits on shell chaining operators (;, &&, ||, |, $(), backticks)
     so that every sub-command is checked against the scope rules.
     """
-    segments = re.split(r"\s*(?:;|&&|\|\||\|)\s*", cmd)
+    segments = re.split(r"\s*(?:;|&&|\|\||\||\n)\s*", cmd)
 
     # Also catch $(...) and backtick subshells
     for match in re.finditer(r"\$\((.+?)\)", cmd):
