@@ -75,7 +75,7 @@ export function CrmSidebar() {
           className="flex shrink-0 items-center rounded-lg bg-crmSurface px-2 py-1 shadow-sm ring-1 ring-crmBorder"
           title="HAWK"
         >
-          <img src="/hawk-logo.png" alt="HAWK" className="h-7 w-auto xl:h-8" />
+          <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto xl:h-11" />
         </div>
         <span className="hidden text-sm font-semibold tracking-tight text-slate-200 xl:inline">CRM</span>
       </div>

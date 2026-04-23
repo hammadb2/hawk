@@ -46,7 +46,7 @@ export default function DashboardLayout({
     <div className="min-h-screen flex flex-col bg-background">
       <header className="flex items-center justify-between border-b border-surface-3 bg-white px-6 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
         <Link href="/dashboard" className="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-1.5 ring-1 ring-slate-800/80">
-          <img src="/hawk-logo.png" alt="HAWK" className="h-9 w-auto" />
+          <img src="/hawk-logo.png" alt="HAWK" className="h-12 w-auto" />
         </Link>
         <div className="flex items-center gap-4">
           <Link href="/dashboard/notifications" className="text-text-secondary hover:text-text-primary text-sm">

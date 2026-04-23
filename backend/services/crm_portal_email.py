@@ -37,8 +37,8 @@ _MASTER_HTML = """<!DOCTYPE html>
             <td align="center" style="padding:40px 48px 32px;">
               <img src="https://securedbyhawk.com/hawk-logo.png"
                    alt="HAWK Security"
-                   width="120"
-                   style="display:block;margin:0 auto 12px;max-width:120px;" />
+                   width="180"
+                   style="display:block;margin:0 auto 12px;max-width:180px;" />
               <div style="font-size:11px;letter-spacing:4px;color:#9090A8;
                           text-transform:uppercase;">Security Platform</div>
             </td>

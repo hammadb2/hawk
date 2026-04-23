@@ -63,7 +63,7 @@ export function PortalHeader() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link href="https://securedbyhawk.com" className="flex items-center gap-2.5" title="HAWK">
             <span className="inline-flex items-center rounded-lg bg-slate-900 px-2 py-1.5 ring-1 ring-slate-800/80">
-              <img src="/hawk-logo.png" alt="HAWK" className="h-7 w-auto" />
+              <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
             </span>
             <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
               Client
@@ -82,7 +82,7 @@ export function PortalHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
         <Link href="/portal" className="flex shrink-0 items-center gap-2.5" title="HAWK Client">
           <span className="inline-flex items-center rounded-lg bg-slate-900 px-2 py-1.5 ring-1 ring-slate-800/80">
-            <img src="/hawk-logo.png" alt="HAWK" className="h-7 w-auto" />
+            <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
           </span>
           <span className="hidden rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 sm:inline">
             Client
