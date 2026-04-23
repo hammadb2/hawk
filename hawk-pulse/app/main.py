@@ -157,12 +157,9 @@ async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
 
 async def _trigger_remediations(alerts: list[Alert], domain: str) -> None:
     """Spawn background tasks for all remediation-eligible alerts."""
-    global _remediation_semaphore
     settings = get_settings()
     if not settings.remediation_enabled:
         return
-    if _remediation_semaphore is None:
-        _remediation_semaphore = asyncio.Semaphore(settings.microscan_workers)
     for alert in alerts:
         if should_generate_remediation(alert.severity):
             task = asyncio.create_task(
@@ -183,9 +180,10 @@ async def _bounded_remediation(alert_id: str, domain: str) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _ct_listener, _scan_semaphore
+    global _ct_listener, _scan_semaphore, _remediation_semaphore
     settings = get_settings()
     _scan_semaphore = asyncio.Semaphore(settings.microscan_workers)
+    _remediation_semaphore = asyncio.Semaphore(settings.microscan_workers)
 
     engine = get_engine()
     async with engine.begin() as conn:
