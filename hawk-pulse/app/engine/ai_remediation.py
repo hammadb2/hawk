@@ -118,33 +118,32 @@ async def generate_remediation(
         vulnerability=vulnerability,
     )
 
-    client = AsyncOpenAI(
+    async with AsyncOpenAI(
         api_key=settings.openai_api_key,
         base_url=settings.openai_base_url,
         timeout=settings.remediation_timeout_sec,
-    )
-
-    response = await client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": system_message},
-            {
-                "role": "user",
-                "content": (
-                    f"Generate a remediation guide for this vulnerability:\n\n"
-                    f"**{title}**\n\n"
-                    f"Tech stack: {tech_stack}\n\n"
-                    f"Details:\n{vulnerability}"
-                ),
-            },
-        ],
-        temperature=0.3,
-        max_tokens=2000,
-    )
-    content = response.choices[0].message.content
-    if not content:
-        raise RuntimeError("LLM returned empty response")
-    return content.strip()
+    ) as client:
+        response = await client.chat.completions.create(
+            model=settings.openai_model,
+            messages=[
+                {"role": "system", "content": system_message},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Generate a remediation guide for this vulnerability:\n\n"
+                        f"**{title}**\n\n"
+                        f"Tech stack: {tech_stack}\n\n"
+                        f"Details:\n{vulnerability}"
+                    ),
+                },
+            ],
+            temperature=0.3,
+            max_tokens=2000,
+        )
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError("LLM returned empty response")
+        return content.strip()
 
 
 def should_generate_remediation(severity: str) -> bool:

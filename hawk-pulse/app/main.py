@@ -82,11 +82,16 @@ def _alert_to_dict(alert: Alert) -> dict[str, Any]:
     }
 
 
+_remediation_semaphore: asyncio.Semaphore | None = None
+
+
 async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
     """Background task: generate AI remediation and push REMEDIATION_READY via WebSocket."""
     import uuid as _uuid
 
     factory = get_session_factory()
+
+    # Phase 1: fetch alert context, mark as generating, close session
     async with factory() as session:
         result = await session.execute(
             select(Alert).where(Alert.id == _uuid.UUID(alert_id))
@@ -96,8 +101,10 @@ async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
             logger.warning("Remediation: alert %s not found", alert_id)
             return
 
-        alert.remediation_status = "generating"
-        await session.commit()
+        alert_type = alert.alert_type
+        severity = alert.severity
+        title = alert.title
+        detail = alert.detail or {}
 
         asset_metadata: dict[str, Any] | None = None
         if alert.asset_id:
@@ -106,25 +113,38 @@ async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
             )
             asset = asset_result.scalar_one_or_none()
             if asset:
-                asset_metadata = asset.metadata_
+                asset_metadata = dict(asset.metadata_)
 
-        try:
-            markdown = await generate_remediation(
-                alert_type=alert.alert_type,
-                severity=alert.severity,
-                title=alert.title,
-                detail=alert.detail or {},
-                asset_metadata=asset_metadata,
-            )
-            alert.remediation_markdown = markdown
-            alert.remediation_status = "complete"
-        except Exception:
-            logger.exception("Remediation generation failed for alert %s", alert_id)
-            alert.remediation_status = "failed"
-
+        alert.remediation_status = "generating"
         await session.commit()
 
-    if alert.remediation_status == "complete":
+    # Phase 2: call LLM (no DB session held open)
+    status = "failed"
+    markdown: str | None = None
+    try:
+        markdown = await generate_remediation(
+            alert_type=alert_type,
+            severity=severity,
+            title=title,
+            detail=detail,
+            asset_metadata=asset_metadata,
+        )
+        status = "complete"
+    except Exception:
+        logger.exception("Remediation generation failed for alert %s", alert_id)
+
+    # Phase 3: persist result, close session
+    async with factory() as session:
+        result = await session.execute(
+            select(Alert).where(Alert.id == _uuid.UUID(alert_id))
+        )
+        alert = result.scalar_one_or_none()
+        if alert:
+            alert.remediation_markdown = markdown
+            alert.remediation_status = status
+            await session.commit()
+
+    if status == "complete":
         await ws_manager.broadcast_alert(domain, {
             "type": "REMEDIATION_READY",
             "domain": domain,
@@ -135,14 +155,26 @@ async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
 
 async def _trigger_remediations(alerts: list[Alert], domain: str) -> None:
     """Spawn background tasks for all remediation-eligible alerts."""
+    global _remediation_semaphore
     settings = get_settings()
     if not settings.remediation_enabled:
         return
+    if _remediation_semaphore is None:
+        _remediation_semaphore = asyncio.Semaphore(settings.microscan_workers)
     for alert in alerts:
         if should_generate_remediation(alert.severity):
             asyncio.create_task(
-                _run_remediation_for_alert(str(alert.id), domain)
+                _bounded_remediation(str(alert.id), domain)
             )
+
+
+async def _bounded_remediation(alert_id: str, domain: str) -> None:
+    """Run remediation with semaphore to bound concurrency."""
+    if _remediation_semaphore:
+        async with _remediation_semaphore:
+            await _run_remediation_for_alert(alert_id, domain)
+    else:
+        await _run_remediation_for_alert(alert_id, domain)
 
 
 @asynccontextmanager
