@@ -217,7 +217,7 @@ async def _run_full_audit_inner(
 
         logger.info("Audit %s: COMPLETE", audit_id[:12])
 
-    except Exception:
+    except BaseException:
         logger.exception("Audit %s failed", audit_id[:12])
 
         # Mark as failed
@@ -236,7 +236,8 @@ async def _run_full_audit_inner(
         except Exception:
             logger.exception("Failed to mark audit %s as failed", audit_id[:12])
 
-        # Teardown sandbox on failure
+    finally:
+        # Always teardown sandbox if it was created
         if container_id:
             try:
                 loop = asyncio.get_event_loop()

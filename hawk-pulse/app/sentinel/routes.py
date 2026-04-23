@@ -205,19 +205,7 @@ async def start_audit(
     """Start a full Sentinel audit (after ROE is finalized)."""
     from app.sentinel.orchestrator import run_full_audit
 
-    result = await session.execute(
-        select(SentinelAudit).where(
-            SentinelAudit.id == uuid.UUID(req.audit_id)
-        )
-    )
-    audit = result.scalar_one_or_none()
-    if not audit:
-        raise HTTPException(status_code=404, detail="Audit not found")
-    if audit.status != "roe_agreed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Audit must be in 'roe_agreed' state to start (current: {audit.status})",
-        )
+    from sqlalchemy import update
 
     # Enforce max concurrent audits
     settings = get_settings()
@@ -233,17 +221,29 @@ async def start_audit(
             detail=f"Max concurrent audits ({settings.sentinel_max_concurrent}) reached. Try again later.",
         )
 
-    # Atomically mark as provisioning to prevent duplicate launches
-    audit.status = "provisioning"
+    # Atomically transition status — prevents TOCTOU race from concurrent requests
+    result = await session.execute(
+        update(SentinelAudit)
+        .where(SentinelAudit.id == uuid.UUID(req.audit_id))
+        .where(SentinelAudit.status == "roe_agreed")
+        .values(status="provisioning")
+        .returning(SentinelAudit.id)
+    )
+    updated = result.scalar_one_or_none()
+    if not updated:
+        raise HTTPException(
+            status_code=400,
+            detail="Audit not found or not in 'roe_agreed' state",
+        )
     await session.commit()
 
     # Launch the full audit pipeline as a background task
-    task = asyncio.create_task(run_full_audit(str(audit.id)))
+    task = asyncio.create_task(run_full_audit(str(updated)))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 
     return StartAuditResponse(
-        audit_id=str(audit.id),
+        audit_id=str(updated),
         status="provisioning",
         message="Sentinel audit started. Monitor via GET /api/sentinel/audits/{audit_id}",
     )

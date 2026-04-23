@@ -158,7 +158,7 @@ def enforce_scope(
     # For exploit_safe, block destructive patterns
     if intensity == "exploit_safe":
         destructive_patterns = [
-            r"rm\s+-rf\s+/\s*$",
+            r"rm\s+-r\S*f\S*\s+/(?:\s|$)",
             r"format\s+[cC]:",
             r"dd\s+if=.*of=/dev/",
             r"mkfs\.",
