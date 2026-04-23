@@ -97,9 +97,9 @@ export function FreeScanLanding() {
               <img
                 src="/hawk-logo.png"
                 alt="HAWK Security"
-                className="h-8 w-auto sm:h-9"
-                width={168}
-                height={56}
+                className="h-11 w-auto sm:h-12"
+                width={252}
+                height={84}
               />
             </span>
           </Link>

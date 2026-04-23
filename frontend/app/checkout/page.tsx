@@ -176,7 +176,7 @@ function CheckoutPageContent() {
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
         <div className="mb-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
           <Link href="/" className="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-2 ring-1 ring-slate-800/80">
-            <Image src="/hawk-logo.png" alt="HAWK" width={120} height={40} className="h-8 w-auto" />
+            <Image src="/hawk-logo.png" alt="HAWK" width={180} height={60} className="h-11 w-auto" />
           </Link>
           <Link href="/#pricing" className="text-sm text-slate-600 hover:text-emerald-600">
             ← Back to pricing
