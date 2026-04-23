@@ -564,7 +564,7 @@ function PersonalDetailsForm({
     { key: "phone", label: "Phone Number", placeholder: "+1 555 123 4567" },
     { key: "whatsapp", label: "WhatsApp Number", placeholder: "+1 555 123 4567" },
     { key: "address", label: "Full Address", placeholder: "123 Main St, City, State" },
-    { key: "country", label: "Country", placeholder: "Canada" },
+    { key: "country", label: "Country", placeholder: "United States" },
     { key: "date_of_birth", label: "Date of Birth", placeholder: "YYYY-MM-DD", type: "date" },
     { key: "emergency_contact_name", label: "Emergency Contact Name", placeholder: "Jane Doe" },
     { key: "emergency_contact_phone", label: "Emergency Contact Phone", placeholder: "+1 555 987 6543" },

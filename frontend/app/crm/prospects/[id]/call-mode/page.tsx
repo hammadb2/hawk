@@ -52,7 +52,7 @@ const OBJECTIONS: Record<string, { q: string; a: string }[]> = {
     { q: "Our clients trust us already.", a: "Trust is built on protection. If a breach hits the news, clients leave. This scan helps you verify the trust is warranted." },
   ],
   medical: [
-    { q: "We're PHIPA/PIPEDA compliant.", a: "Compliance is about process. This scan shows technical exposure — open ports, vulnerable services, leaked credentials. Compliance doesn't catch those." },
+    { q: "We're HIPAA compliant.", a: "Compliance is about process. This scan shows technical exposure: open ports, vulnerable services, leaked credentials. HIPAA policy checklists don't catch those in real time." },
     { q: "Our EMR vendor handles security.", a: "They secure their platform, but your clinic's domain, email, and network are your responsibility. That's what we check." },
     { q: "We don't store data on our servers.", a: "Your email, patient portal login, and DNS records are still on your domain. If those are compromised, attackers can intercept or redirect patient data." },
   ],

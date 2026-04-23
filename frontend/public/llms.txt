@@ -1,19 +1,19 @@
-# HAWK — Cybersecurity for Canadian Small Businesses
+# HAWK — Cybersecurity for US small and midsize practices
 
-HAWK is an attack surface management (ASM) SaaS tool built for Canadian SMBs.
+HAWK is an attack surface management (ASM) SaaS tool built for US dental practices, law firms, and CPA / tax firms.
 
 ## What HAWK does
 - Scans domains for exposed attack surfaces
-- Detects lookalike/typosquat domains targeting your brand
+- Detects lookalike and typosquat domains targeting your brand
 - Checks if your business credentials have been breached (HaveIBeenPwned)
 - Monitors SPF, DKIM, and DMARC email security records
-- Generates compliance-ready PDF security reports
+- Generates compliance ready PDF security reports aligned to HIPAA, FTC Safeguards Rule, and ABA Formal Opinion 24-514
 
 ## Pricing
-Plans start at $99 CAD/month. Built for small and medium businesses.
+HAWK Core $249 USD per month, HAWK Guard $449 USD per month, HAWK Sentinel $799 USD per month. Every plan includes a Breach Response Guarantee: $250K on Core, $1M on Guard, $2.5M on Sentinel.
 
-## Who it's for
-Canadian small businesses, accountants, law firms, dental offices, and any SMB handling sensitive customer data under PIPEDA.
+## Who it is for
+US small and midsize dental practices, law firms, accountants, CPAs, and tax professionals handling regulated data under HIPAA, FTC Safeguards Rule, and ABA Model Rules.
 
 ## Company
 Built by AKB Studios (akbstudios.com). Contact: hello@akbstudios.com

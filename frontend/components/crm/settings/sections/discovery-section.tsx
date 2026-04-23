@@ -16,7 +16,7 @@ export function DiscoverySection({ value, onChange }: { value: ValueGetter; onCh
           <ChipListField
             value={value("google_places_cities")}
             onChange={(v) => onChange("google_places_cities", v)}
-            placeholder="Toronto, Vancouver, Calgary, …"
+            placeholder="New York, Los Angeles, Chicago, Houston, …"
           />
         </Field>
         <Field label="Max results per search" hint="Google Places cap per city+vertical. Default 40.">

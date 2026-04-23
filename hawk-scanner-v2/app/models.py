@@ -57,7 +57,7 @@ class ScanRequest(BaseModel):
     company_name: str | None = Field(None, description="Display name for narrative features (attack paths)")
     scan_depth: str = Field(
         default="full",
-        description="full = all pipeline layers; fast = Charlotte tier (email, TLS, breach, subdomains)",
+        description="full = all pipeline layers; fast = homepage tier (email, TLS, breach, subdomains)",
     )
     trust_level: Literal["public", "subscriber", "certified"] = Field(
         default="public",

@@ -29,8 +29,6 @@ type ScannerHealth = {
 type HealthData = {
   ok: boolean;
   pipeline_last_run: PipelineRun | null;
-  /** Legacy key kept for wire-compat with older backends. */
-  charlotte_last_run?: PipelineRun | null;
   replies_unhandled: number;
   scanner_health_last: ScannerHealth | null;
 };
@@ -100,7 +98,7 @@ export default function CrmHealthPage() {
     };
   }, [supabase]);
 
-  const pipeline = data?.pipeline_last_run ?? data?.charlotte_last_run ?? null;
+  const pipeline = data?.pipeline_last_run ?? null;
   const scanner = data?.scanner_health_last;
   const repliesUnhandled = data?.replies_unhandled ?? 0;
 

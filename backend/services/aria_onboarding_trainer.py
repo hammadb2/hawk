@@ -34,7 +34,7 @@ SCENARIO_TYPES = {
         "title": "Cold Call Simulation",
         "description": "Practice cold calling a dental clinic owner about cybersecurity.",
         "persona": (
-            "You are Dr. Sarah Chen, owner of Bright Smile Dental Clinic in Toronto. "
+            "You are Dr. Sarah Chen, owner of Bright Smile Dental Clinic in Austin, Texas. "
             "You have 12 employees and no IT staff. You've heard about cybersecurity "
             "but think it's only for big companies. You're busy and skeptical. "
             "Respond naturally as this persona would."
