@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_engine, get_session, get_session_factory
+from app.engine.ai_remediation import generate_remediation, should_generate_remediation
 from app.engine.state_diff import (
     get_all_monitored_domains,
     get_monitored_domain,
@@ -65,6 +66,8 @@ async def _on_ct_match(root_domain: str, cert_domains: list[str]) -> None:
     for alert in alerts:
         await ws_manager.broadcast_alert(root_domain, _alert_to_dict(alert))
 
+    await _trigger_remediations(alerts, root_domain)
+
 
 def _alert_to_dict(alert: Alert) -> dict[str, Any]:
     return {
@@ -74,15 +77,113 @@ def _alert_to_dict(alert: Alert) -> dict[str, Any]:
         "severity": alert.severity,
         "title": alert.title,
         "detail": alert.detail,
+        "remediation_status": alert.remediation_status,
         "created_at": alert.created_at.isoformat() if alert.created_at else None,
     }
 
 
+_remediation_semaphore: asyncio.Semaphore | None = None
+_background_tasks: set[asyncio.Task] = set()
+
+
+async def _run_remediation_for_alert(alert_id: str, domain: str) -> None:
+    """Background task: generate AI remediation and push REMEDIATION_READY via WebSocket."""
+    import uuid as _uuid
+
+    factory = get_session_factory()
+
+    # Phase 1: fetch alert context, mark as generating, close session
+    async with factory() as session:
+        result = await session.execute(
+            select(Alert).where(Alert.id == _uuid.UUID(alert_id))
+        )
+        alert = result.scalar_one_or_none()
+        if not alert:
+            logger.warning("Remediation: alert %s not found", alert_id)
+            return
+
+        alert_type = alert.alert_type
+        severity = alert.severity
+        title = alert.title
+        detail = alert.detail or {}
+
+        asset_metadata: dict[str, Any] | None = None
+        if alert.asset_id:
+            asset_result = await session.execute(
+                select(Asset).where(Asset.id == alert.asset_id)
+            )
+            asset = asset_result.scalar_one_or_none()
+            if asset:
+                asset_metadata = dict(asset.metadata_)
+
+        alert.remediation_status = "generating"
+        await session.commit()
+
+    # Phase 2: call LLM (no DB session held open)
+    status = "failed"
+    markdown: str | None = None
+    try:
+        markdown = await generate_remediation(
+            alert_type=alert_type,
+            severity=severity,
+            title=title,
+            detail=detail,
+            asset_metadata=asset_metadata,
+        )
+        status = "complete"
+    except Exception:
+        logger.exception("Remediation generation failed for alert %s", alert_id)
+
+    # Phase 3: persist result, close session
+    async with factory() as session:
+        result = await session.execute(
+            select(Alert).where(Alert.id == _uuid.UUID(alert_id))
+        )
+        alert = result.scalar_one_or_none()
+        if alert:
+            if markdown is not None:
+                alert.remediation_markdown = markdown
+            alert.remediation_status = status
+            await session.commit()
+
+    if status == "complete":
+        await ws_manager.broadcast_alert(domain, {
+            "type": "REMEDIATION_READY",
+            "domain": domain,
+            "alert_id": alert_id,
+        })
+        logger.info("REMEDIATION_READY pushed for alert %s on %s", alert_id, domain)
+
+
+async def _trigger_remediations(alerts: list[Alert], domain: str) -> None:
+    """Spawn background tasks for all remediation-eligible alerts."""
+    settings = get_settings()
+    if not settings.remediation_enabled:
+        return
+    for alert in alerts:
+        if should_generate_remediation(alert.severity):
+            task = asyncio.create_task(
+                _bounded_remediation(str(alert.id), domain)
+            )
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
+
+
+async def _bounded_remediation(alert_id: str, domain: str) -> None:
+    """Run remediation with semaphore to bound concurrency."""
+    if _remediation_semaphore:
+        async with _remediation_semaphore:
+            await _run_remediation_for_alert(alert_id, domain)
+    else:
+        await _run_remediation_for_alert(alert_id, domain)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _ct_listener, _scan_semaphore
+    global _ct_listener, _scan_semaphore, _remediation_semaphore
     settings = get_settings()
     _scan_semaphore = asyncio.Semaphore(settings.microscan_workers)
+    _remediation_semaphore = asyncio.Semaphore(settings.microscan_workers)
 
     engine = get_engine()
     async with engine.begin() as conn:
@@ -242,6 +343,8 @@ async def trigger_scan(body: ScanTriggerRequest, session: AsyncSession = Depends
     for alert in alerts:
         await ws_manager.broadcast_alert(domain, _alert_to_dict(alert))
 
+    await _trigger_remediations(alerts, domain)
+
     return {
         "domain": domain,
         "scan_result": {
@@ -286,6 +389,56 @@ async def acknowledge_alert(alert_id: str, session: AsyncSession = Depends(get_s
     alert.acknowledged = True
     await session.commit()
     return {"status": "acknowledged", "alert_id": alert_id}
+
+
+# ---------------------------------------------------------------------------
+# Remediation API (HAWK Guard)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/alerts/{alert_id}/remediation")
+async def get_remediation(alert_id: str, session: AsyncSession = Depends(get_session)):
+    """Fetch the AI-generated remediation guide for an alert."""
+    import uuid as _uuid
+    result = await session.execute(select(Alert).where(Alert.id == _uuid.UUID(alert_id)))
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {
+        "alert_id": alert_id,
+        "remediation_status": alert.remediation_status,
+        "remediation_markdown": alert.remediation_markdown,
+    }
+
+
+@app.post("/api/alerts/{alert_id}/remediate")
+async def trigger_remediation(alert_id: str, session: AsyncSession = Depends(get_session)):
+    """Manually trigger (or re-trigger) AI remediation for an alert."""
+    import uuid as _uuid
+    result = await session.execute(select(Alert).where(Alert.id == _uuid.UUID(alert_id)))
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY not configured")
+
+    # Look up the domain for WebSocket broadcast
+    md_result = await session.execute(
+        select(MonitoredDomain).where(MonitoredDomain.id == alert.domain_id)
+    )
+    md = md_result.scalar_one_or_none()
+    domain = md.domain if md else "unknown"
+
+    task = asyncio.create_task(_bounded_remediation(alert_id, domain))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+    return {
+        "alert_id": alert_id,
+        "status": "remediation_queued",
+        "message": "AI remediation generation started. Listen on WebSocket for REMEDIATION_READY event.",
+    }
 
 
 # ---------------------------------------------------------------------------

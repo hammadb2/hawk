@@ -87,11 +87,19 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 |--------|----------|-------------|
 | `GET` | `/api/assets/{domain}` | List discovered assets (optional `?asset_type=open_port`) |
 
+### Remediation (HAWK Guard)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/alerts/{alert_id}/remediation` | Fetch AI-generated fix guide for an alert |
+| `POST` | `/api/alerts/{alert_id}/remediate` | Manually trigger (or re-trigger) AI remediation |
+
 ### Real-time
 
 | Protocol | Endpoint | Description |
 |----------|----------|-------------|
 | WebSocket | `/ws/alerts/{domain}` | Live alert stream. Sends JSON on every state change. |
+| WebSocket | `/ws/alerts/{domain}` | Also receives `REMEDIATION_READY` events when fix guides complete. |
 
 ### Audit
 
@@ -124,8 +132,29 @@ See `.env.example`. Key variables:
 - `CERTSTREAM_URL` — CT log WebSocket (default: calidog.io)
 - `NAABU_BIN`, `HTTPX_BIN` — paths to scanner binaries (empty = `$PATH`)
 - `MICROSCAN_WORKERS` — max concurrent micro-scans
+- `OPENAI_API_KEY` — required for HAWK Guard AI remediation
+- `OPENAI_MODEL` — LLM model (default: `gpt-4o-mini`; supports DeepSeek via `OPENAI_BASE_URL`)
+- `REMEDIATION_ENABLED` — toggle auto-remediation on/off (default: `true`)
 
-## Next Steps (Step 2 & 3)
+## HAWK Guard (Step 2) — AI Remediation
 
-- **HAWK Guard (Step 2):** AI remediation engine — auto-generate fix guides per finding, tailored to detected tech stack.
+When the State Diffing Engine detects a critical or warning-severity alert, it automatically triggers a background AI remediation task:
+
+1. **Context Gathering** — bundles the vulnerability details (port, service, alert type) with the asset's tech stack fingerprint (from httpx: webserver, tech frameworks, page title).
+2. **LLM Generation** — sends the bundled context to OpenAI/DeepSeek with a strict system prompt that produces copy-paste terminal commands and config changes tailored to the detected stack.
+3. **DB Persistence** — saves the Markdown guide to `alerts.remediation_markdown`.
+4. **WebSocket Push** — fires a `{"type": "REMEDIATION_READY", "domain": "...", "alert_id": "..."}` event so the dashboard can instantly display the fix guide.
+
+You can also manually trigger remediation for any alert:
+
+```bash
+# Trigger remediation for a specific alert
+curl -X POST http://localhost:8080/api/alerts/{alert_id}/remediate
+
+# Fetch the generated guide
+curl http://localhost:8080/api/alerts/{alert_id}/remediation
+```
+
+## Next Steps
+
 - **HAWK Sentinel (Step 3):** Ephemeral Kali Docker swarm for automated penetration testing with boardroom-grade reports.
