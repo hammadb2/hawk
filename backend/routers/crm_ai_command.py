@@ -1008,6 +1008,123 @@ def analyze_file(body: AnalyzeFileBody, uid: str = Depends(require_supabase_uid)
     return {"reply": result.get("analysis", "Analysis complete.")}
 
 
+# ── Reply queue endpoints ──────────────────────────────────────────────────
+
+
+def _require_reply_queue_access(uid: str) -> dict:
+    """Verify user has access to the reply approval queue (CEO, HoS, Team Lead)."""
+    prof = _require_ai_access(uid)
+    role = prof.get("role", "")
+    role_type = prof.get("role_type", "")
+    if role not in ("ceo", "hos", "team_lead") and role_type not in ("ceo", "hos", "team_lead"):
+        raise HTTPException(status_code=403, detail="Reply queue access denied for this role")
+    return prof
+
+
+@router.get("/replies/pending")
+def list_replies(
+    status: str = "pending_review",
+    limit: int = 50,
+    uid: str = Depends(require_supabase_uid),
+):
+    """List inbound replies filtered by status, with joined prospect data."""
+    _require_reply_queue_access(uid)
+    headers = _sb_headers()
+    r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/aria_inbound_replies",
+        headers=headers,
+        params={
+            "status": f"eq.{status}",
+            "select": "*,prospects(id,company_name,domain,contact_name,contact_email,industry,hawk_score,stage)",
+            "order": "created_at.desc",
+            "limit": str(limit),
+        },
+        timeout=20.0,
+    )
+    if r.status_code >= 400:
+        return []
+    return r.json()
+
+
+@router.get("/replies/stats")
+def reply_stats(uid: str = Depends(require_supabase_uid)):
+    """Count replies by status."""
+    _require_reply_queue_access(uid)
+    headers = {**_sb_headers(), "Prefer": "count=exact"}
+    statuses = ["pending_review", "approved", "sent", "rejected", "auto_handled"]
+    result = {}
+    for s in statuses:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/aria_inbound_replies",
+            headers=headers,
+            params={"status": f"eq.{s}", "select": "id", "limit": "0"},
+            timeout=15.0,
+        )
+        cr = r.headers.get("content-range", "")
+        count = 0
+        if "/" in cr:
+            try:
+                count = int(cr.split("/")[1])
+            except (ValueError, IndexError):
+                pass
+        result[s] = count
+    return result
+
+
+class ApproveReplyBody(BaseModel):
+    edited_body: str | None = None
+
+
+@router.post("/replies/{reply_id}/approve")
+def approve_reply_endpoint(
+    reply_id: str,
+    body: ApproveReplyBody | None = None,
+    uid: str = Depends(require_supabase_uid),
+):
+    """Approve a reply draft. Optionally provide an edited body."""
+    _require_reply_queue_access(uid)
+    from services.aria_reply_classifier import approve_reply
+
+    edited = body.edited_body if body else None
+    result = approve_reply(reply_id, reviewer_id=uid, edited_body=edited)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Approve failed"))
+    return result
+
+
+class RejectReplyBody(BaseModel):
+    note: str | None = None
+
+
+@router.post("/replies/{reply_id}/reject")
+def reject_reply_endpoint(
+    reply_id: str,
+    body: RejectReplyBody | None = None,
+    uid: str = Depends(require_supabase_uid),
+):
+    """Reject a reply draft."""
+    _require_reply_queue_access(uid)
+    from services.aria_reply_classifier import reject_reply
+
+    note = body.note if body else None
+    result = reject_reply(reply_id, reviewer_id=uid, note=note)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Reject failed"))
+    return result
+
+
+@router.post("/replies/{reply_id}/send")
+def send_reply_endpoint(reply_id: str, uid: str = Depends(require_supabase_uid)):
+    """Send an approved reply via Smartlead."""
+    _require_reply_queue_access(uid)
+    from services.aria_reply_classifier import send_approved_reply
+
+    result = send_approved_reply(reply_id)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Send failed"))
+    return result
+
+
 class SendMessageBody(BaseModel):
     conversation_id: str
     content: str

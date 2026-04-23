@@ -439,6 +439,49 @@ def _notify_aria_reply(*, prospect_id: str, body: EmailEventIn, sentiment: str |
         logger.exception("Activity insert failed prospect=%s", prospect_id)
 
 
+def _trigger_aria_reply_classification(
+    *,
+    prospect_id: str,
+    body: EmailEventIn,
+    email_event_id: str | None,
+) -> None:
+    """Trigger ARIA reply classification + response drafting (best-effort, non-blocking)."""
+    try:
+        from services.aria_reply_classifier import process_inbound_reply
+
+        md = body.metadata or {}
+        # Reply content can come from metadata fields depending on the source
+        reply_content = (
+            md.get("reply_text")
+            or md.get("reply_body")
+            or md.get("message")
+            or md.get("body")
+            or md.get("text")
+            or ""
+        )
+        if not reply_content:
+            logger.info("ARIA reply skip — no reply content in metadata prospect=%s", prospect_id)
+            return
+
+        result = process_inbound_reply(
+            prospect_id=prospect_id,
+            reply_content=reply_content,
+            reply_subject=body.subject,
+            reply_from_email=body.contact_email,
+            reply_from_name=body.first_name,
+            email_event_id=email_event_id,
+            metadata={"source": body.source, "external_id": body.external_id},
+        )
+        logger.info(
+            "ARIA reply classified prospect=%s classification=%s status=%s",
+            prospect_id,
+            result.get("classification"),
+            result.get("status"),
+        )
+    except Exception:
+        logger.exception("ARIA reply classification failed prospect=%s", prospect_id)
+
+
 @router.post("/email-events")
 def ingest_email_event(
     body: EmailEventIn,
@@ -509,6 +552,13 @@ def ingest_email_event(
         raw_sent = (body.sentiment or (md_sent.get("sentiment") if isinstance(md_sent.get("sentiment"), str) else "") or "").strip().lower()
         reply_sentiment = raw_sent or None
         _notify_aria_reply(prospect_id=pid, body=body, sentiment=reply_sentiment)
+        # Run ARIA classification in a background thread to avoid blocking the webhook response
+        import threading
+        threading.Thread(
+            target=_trigger_aria_reply_classification,
+            kwargs={"prospect_id": pid, "body": body, "email_event_id": eid},
+            daemon=True,
+        ).start()
 
     return {"ok": True, "id": eid, "prospect_id": pid}
 
