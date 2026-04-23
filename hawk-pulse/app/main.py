@@ -29,8 +29,9 @@ from app.engine.state_diff import (
     process_scan_results,
 )
 from app.listeners.certstream import start_ct_listener
-from app.models import Alert, Asset, Base, MonitoredDomain, ScanEvent
+from app.models import Alert, Asset, Base, MonitoredDomain, ScanEvent, SentinelAudit
 from app.scanner.microscan import micro_scan
+from app.sentinel.routes import router as sentinel_router
 from app.ws.manager import ConnectionManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -215,6 +216,9 @@ app = FastAPI(
     version="3.0.0-poc",
     lifespan=lifespan,
 )
+
+# Mount Sentinel routes
+app.include_router(sentinel_router)
 
 
 # ---------------------------------------------------------------------------

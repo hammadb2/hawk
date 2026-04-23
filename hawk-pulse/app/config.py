@@ -81,6 +81,31 @@ class Settings:
         default_factory=lambda: os.environ.get("REMEDIATION_ENABLED", "true").lower() in ("true", "1", "yes")
     )
 
+    # HAWK Sentinel (AI Red Team)
+    sentinel_enabled: bool = field(
+        default_factory=lambda: os.environ.get("SENTINEL_ENABLED", "true").lower() in ("true", "1", "yes")
+    )
+    sentinel_llm_api_key: str = field(
+        default_factory=lambda: os.environ.get("SENTINEL_LLM_API_KEY", "")
+    )
+    sentinel_llm_base_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "SENTINEL_LLM_BASE_URL", "https://api.openai.com/v1"
+        )
+    )
+    sentinel_llm_model: str = field(
+        default_factory=lambda: os.environ.get("SENTINEL_LLM_MODEL", "gpt-4o-mini")
+    )
+    sentinel_docker_image: str = field(
+        default_factory=lambda: os.environ.get("SENTINEL_DOCKER_IMAGE", "kalilinux/kali-rolling")
+    )
+    sentinel_container_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("SENTINEL_CONTAINER_TIMEOUT", "3600"))
+    )
+    sentinel_max_concurrent: int = field(
+        default_factory=lambda: int(os.environ.get("SENTINEL_MAX_CONCURRENT", "2"))
+    )
+
 
 _settings: Settings | None = None
 
