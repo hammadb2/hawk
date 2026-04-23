@@ -52,13 +52,41 @@ class ScopeViolation(Exception):
     pass
 
 
-def _extract_first_command(cmd: str) -> str:
-    """Extract the base command name from a shell command string."""
-    cleaned = cmd.strip()
-    for prefix in ("sudo ", "proxychains ", "proxychains4 ", "torify "):
-        if cleaned.startswith(prefix):
-            cleaned = cleaned[len(prefix):].strip()
-    return cleaned.split()[0].split("/")[-1] if cleaned else ""
+def _strip_wrappers(segment: str) -> str:
+    """Strip sudo/proxychains/torify prefixes from a command segment."""
+    cleaned = segment.strip()
+    changed = True
+    while changed:
+        changed = False
+        for prefix in ("sudo ", "proxychains ", "proxychains4 ", "torify "):
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+                changed = True
+    return cleaned
+
+
+def _extract_all_commands(cmd: str) -> list[str]:
+    """Extract all base command names from a shell command string.
+
+    Splits on shell chaining operators (;, &&, ||, |, $(), backticks)
+    so that every sub-command is checked against the scope rules.
+    """
+    segments = re.split(r"\s*(?:;|&&|\|\||\|)\s*", cmd)
+
+    # Also catch $(...) and backtick subshells
+    for match in re.finditer(r"\$\((.+?)\)", cmd):
+        segments.extend(re.split(r"\s*(?:;|&&|\|\||\|)\s*", match.group(1)))
+    for match in re.finditer(r"`(.+?)`", cmd):
+        segments.extend(re.split(r"\s*(?:;|&&|\|\||\|)\s*", match.group(1)))
+
+    commands: list[str] = []
+    for seg in segments:
+        cleaned = _strip_wrappers(seg)
+        if cleaned:
+            base = cleaned.split()[0].split("/")[-1]
+            if base:
+                commands.append(base)
+    return commands
 
 
 def _check_ip_exclusions(cmd: str, excluded_ips: list[str]) -> str | None:
@@ -92,9 +120,9 @@ def enforce_scope(
     excluded_ips = scope.get("excluded_ips", [])
     intensity = scope.get("intensity", "deep_scan_only")
 
-    base_cmd = _extract_first_command(command)
+    all_cmds = _extract_all_commands(command)
 
-    if not base_cmd:
+    if not all_cmds:
         return False, "Empty command"
 
     # Check IP exclusions (always enforced)
@@ -102,13 +130,15 @@ def enforce_scope(
     if ip_issue:
         return False, ip_issue
 
-    # Block exploitation tools when not allowed
-    if not exploitation_allowed and base_cmd.lower() in EXPLOITATION_TOOLS:
-        return False, (
-            f"Blocked: '{base_cmd}' is an exploitation tool but "
-            f"exploitation_allowed=false (intensity={intensity}). "
-            f"Only passive/enumeration tools are permitted."
-        )
+    # Block exploitation tools when not allowed — check EVERY sub-command
+    if not exploitation_allowed:
+        for base_cmd in all_cmds:
+            if base_cmd.lower() in EXPLOITATION_TOOLS:
+                return False, (
+                    f"Blocked: '{base_cmd}' is an exploitation tool but "
+                    f"exploitation_allowed=false (intensity={intensity}). "
+                    f"Only passive/enumeration tools are permitted."
+                )
 
     # For deep_scan_only, also block any tool that could deliver payloads
     if intensity == "deep_scan_only":

@@ -17,7 +17,7 @@ from openai import AsyncOpenAI
 
 from app.config import Settings, get_settings
 from app.sentinel.sandbox import exec_in_sandbox
-from app.sentinel.scope_enforcer import ScopeViolation, safe_execute
+from app.sentinel.scope_enforcer import ScopeViolation, enforce_scope, safe_execute
 
 logger = logging.getLogger(__name__)
 
@@ -237,8 +237,13 @@ async def run_ghost_setup(
         if not isinstance(cmd, str):
             continue
         try:
-            exit_code, stdout, stderr = exec_in_sandbox(container_id, cmd)
+            exit_code, stdout, stderr = safe_execute(
+                command=cmd, scope=scope,
+                executor_fn=exec_in_sandbox, container_id=container_id,
+            )
             results.append(f"[{exit_code}] {cmd}: {stdout[:200]}")
+        except ScopeViolation as e:
+            results.append(f"[SCOPE BLOCKED] {cmd}: {e}")
         except Exception as e:
             results.append(f"[ERR] {cmd}: {e}")
 
@@ -305,10 +310,11 @@ async def run_operator(
 
 
 async def run_cleanup(
+    scope: dict[str, Any],
     container_id: str,
     settings: Settings | None = None,
 ) -> list[str]:
-    """Agent 4: Run cleanup commands in the sandbox."""
+    """Agent 4: Run cleanup commands in the sandbox (scope-enforced)."""
     settings = settings or get_settings()
 
     response = await _llm_call(
@@ -331,8 +337,13 @@ async def run_cleanup(
         if not isinstance(cmd, str):
             continue
         try:
-            exit_code, stdout, _ = exec_in_sandbox(container_id, cmd)
+            exit_code, stdout, _ = safe_execute(
+                command=cmd, scope=scope,
+                executor_fn=exec_in_sandbox, container_id=container_id,
+            )
             results.append(f"[{exit_code}] {cmd}")
+        except ScopeViolation as e:
+            results.append(f"[SCOPE BLOCKED] {cmd}: {e}")
         except Exception as e:
             results.append(f"[ERR] {cmd}: {e}")
 

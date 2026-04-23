@@ -163,7 +163,7 @@ async def run_full_audit(
         findings = await run_operator(scope, attack_plan, container_id, settings)
 
         logger.info("Audit %s: running cleanup agent", audit_id[:12])
-        cleanup_results = await run_cleanup(container_id, settings)
+        cleanup_results = await run_cleanup(scope, container_id, settings)
 
         # Phase 4: CISO Report
         async with factory() as session:

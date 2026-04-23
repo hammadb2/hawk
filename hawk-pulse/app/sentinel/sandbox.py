@@ -170,10 +170,20 @@ def exec_in_sandbox(container_id: str, command: str, timeout: int = 120) -> tupl
 
 
 def destroy_sandbox(container_id: str) -> None:
-    """Kill and remove the Sentinel sandbox container."""
+    """Kill and remove the Sentinel sandbox container.
+
+    Only destroys containers with the ``hawk.sentinel`` label to prevent
+    accidental destruction of unrelated Docker containers.
+    """
     try:
         client = get_docker_client()
         container = client.containers.get(container_id)
+
+        if container.labels.get("hawk.sentinel") != "true":
+            raise RuntimeError(
+                f"Container {container_id[:12]} is not a HAWK Sentinel container"
+            )
+
         container.kill()
         container.remove(force=True)
         logger.info("Sentinel sandbox destroyed: %s", container_id[:12])
