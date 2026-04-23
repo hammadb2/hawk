@@ -30,11 +30,13 @@ class CTListener:
         monitored_domains: set[str],
         on_match: Callable[[str, list[str]], Coroutine],
         certstream_url: str = "wss://certstream.calidog.io/",
+        loop: asyncio.AbstractEventLoop | None = None,
     ):
         self._monitored = monitored_domains
         self._on_match = on_match
         self._url = certstream_url
         self._running = False
+        self._loop = loop
 
     def update_domains(self, domains: set[str]) -> None:
         self._monitored = {d.lower().strip() for d in domains}
@@ -62,8 +64,9 @@ class CTListener:
                 matched_root = self._matches(cd)
                 if matched_root:
                     logger.info("CT match: %s (root: %s)", cd, matched_root)
-                    asyncio.get_event_loop().create_task(
-                        self._on_match(matched_root, cert_domains)
+                    asyncio.run_coroutine_threadsafe(
+                        self._on_match(matched_root, cert_domains),
+                        self._loop,
                     )
                     break
 
@@ -79,7 +82,7 @@ async def start_ct_listener(
     certstream_url: str = "wss://certstream.calidog.io/",
 ) -> CTListener:
     """Create and start a CT listener in a background thread."""
-    listener = CTListener(monitored_domains, on_match, certstream_url)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
+    listener = CTListener(monitored_domains, on_match, certstream_url, loop=loop)
     loop.run_in_executor(None, listener.start)
     return listener

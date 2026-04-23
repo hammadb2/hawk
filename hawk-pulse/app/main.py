@@ -44,7 +44,7 @@ async def _on_ct_match(root_domain: str, cert_domains: list[str]) -> None:
     """Callback fired by the CT listener when a monitored domain gets a new cert."""
     logger.info("CT event for %s — cert domains: %s", root_domain, cert_domains[:5])
 
-    new_hosts = [d for d in cert_domains if d.endswith(root_domain) or d == root_domain]
+    new_hosts = [d for d in cert_domains if d.endswith(f".{root_domain}") or d == root_domain]
 
     if _scan_semaphore:
         async with _scan_semaphore:
