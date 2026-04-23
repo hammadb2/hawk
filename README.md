@@ -10,11 +10,12 @@ B2B cybersecurity SaaS for Canadian SMBs. External attack-surface scans, finding
 
 | Path | Purpose |
 |------|--------|
-| **specter/** | Scanner engine (runs on Specter 10.0.0.2:8002). DNS, SSL, ports, headers, subdomains, grade. |
-| **ghost/** | Scanner relay (runs on Ghost 178.104.27.211:8002). Forwards scan requests to Specter. |
+| **hawk-pulse/** | **HAWK 3.0 Pulse Engine (CTEM).** Event-driven continuous monitoring: certstream CT listener, micro-scanner, state diffing, WebSocket alerts. |
+| **hawk-scanner-v2/** | Scanner v2 pipeline (subfinder, naabu, httpx, nuclei, breach monitoring). Core tool wrappers reused by Pulse. |
 | **backend/** | Core API (FastAPI). Auth, scans, findings, domains, reports, billing, Ask HAWK, agency, notifications. |
 | **frontend/** | Next.js app. Gate, onboarding, main dashboard, and **CRM** at `/crm/*`. |
 | **supabase/** | SQL migrations for CRM (Supabase: prospects, RLS, commissions, scoreboard, tickets). |
+| **_archive/** | Archived legacy scanner (Specter engine + Ghost relay). No longer maintained. |
 
 ### Vercel (frontend)
 
@@ -24,26 +25,20 @@ The Next.js app lives under **`frontend/`**, not `crm/`. In the Vercel project: 
 
 ## Run locally (dev)
 
-### 1. Specter scanner (optional if using Ghost relay to real Specter)
+### 1. HAWK Pulse Engine (v3.0 — CTEM)
 
 ```bash
-cd specter
+cd hawk-pulse
+docker compose up -d          # starts Postgres + Pulse on :8080
+# OR run locally:
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn specter_scanner:app --host 0.0.0.0 --port 8002
+uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-### 2. Scanner relay (Ghost)
+See `hawk-pulse/README.md` for full API docs and WebSocket usage.
 
-Only needed if you’re not on Ghost. Point it at Specter (e.g. `HAWK_SPECTER_URL=http://10.0.0.2:8002` or `http://localhost:8002` for local Specter).
-
-```bash
-cd ghost
-pip install -r requirements.txt
-uvicorn scanner_relay:app --host 0.0.0.0 --port 8002
-```
-
-### 3. Backend API
+### 2. Backend API
 
 ```bash
 cd backend
@@ -54,7 +49,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 Database: SQLite at `./hawk.db` by default. Set `DATABASE_URL` for PostgreSQL.
 
-### 4. Frontend
+### 3. Frontend
 
 ```bash
 cd frontend

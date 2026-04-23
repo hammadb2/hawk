@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hawk
+      POSTGRES_PASSWORD: hawk
+      POSTGRES_DB: hawk_pulse
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hawk -d hawk_pulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  pulse:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://hawk:hawk@postgres:5432/hawk_pulse"
+      DATABASE_URL_SYNC: "postgresql://hawk:hawk@postgres:5432/hawk_pulse"
+      CERTSTREAM_URL: "wss://certstream.calidog.io/"
+      MICROSCAN_WORKERS: "4"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
