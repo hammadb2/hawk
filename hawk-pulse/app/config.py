@@ -5,18 +5,37 @@ import os
 from dataclasses import dataclass, field
 
 
+def _to_asyncpg(url: str) -> str:
+    """Ensure a PostgreSQL URL uses the asyncpg driver."""
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+def _to_sync(url: str) -> str:
+    """Ensure a PostgreSQL URL uses the sync (psycopg2) driver."""
+    return url.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(
-        default_factory=lambda: os.environ.get(
-            "DATABASE_URL",
-            "postgresql+asyncpg://hawk:hawk@localhost:5432/hawk_pulse",
+        default_factory=lambda: _to_asyncpg(
+            os.environ.get(
+                "DATABASE_URL",
+                "postgresql+asyncpg://hawk:hawk@localhost:5432/hawk_pulse",
+            )
         )
     )
     database_url_sync: str = field(
-        default_factory=lambda: os.environ.get(
-            "DATABASE_URL_SYNC",
-            "postgresql://hawk:hawk@localhost:5432/hawk_pulse",
+        default_factory=lambda: _to_sync(
+            os.environ.get(
+                "DATABASE_URL_SYNC",
+                os.environ.get(
+                    "DATABASE_URL",
+                    "postgresql://hawk:hawk@localhost:5432/hawk_pulse",
+                ),
+            )
         )
     )
 
