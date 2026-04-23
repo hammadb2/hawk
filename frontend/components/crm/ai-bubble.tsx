@@ -105,7 +105,7 @@ export function AiBubble() {
         type="button"
         onClick={() => setOpen(!open)}
         className="group fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-crmSurface text-emerald-400 shadow-lg ring-2 ring-emerald-500/50 transition-all hover:scale-105 hover:bg-crmSurface2 hover:ring-emerald-400/70"
-        title="AI Command Center"
+        title="ARIA"
       >
         <span
           className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-emerald-500/40 opacity-70 animate-pulse"
@@ -120,8 +120,8 @@ export function AiBubble() {
         <div className="fixed bottom-24 right-6 z-50 flex h-[500px] w-[380px] flex-col overflow-hidden rounded-2xl border border-crmBorder bg-crmSurface shadow-2xl">
           <div className="flex items-center justify-between border-b border-crmBorder bg-crmSurface2 px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-white">HAWK AI</p>
-              <p className="text-xs text-slate-500">Command Center</p>
+              <p className="text-sm font-semibold text-white">ARIA</p>
+              <p className="text-xs text-slate-500">Automated Revenue &amp; Intelligence Assistant</p>
             </div>
             <div className="flex items-center gap-2">
               <Link

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { portal } from "@/lib/portal-ui";
 
 const NAV_LINKS = [
-  { href: "/portal/ask", label: "Ask HAWK" },
+  { href: "/portal/ask", label: "Ask ARIA" },
   { href: "/portal/briefing", label: "Weekly briefing" },
   { href: "/portal/findings", label: "Findings" },
   { href: "/portal/journey", label: "Journey" },
