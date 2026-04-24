@@ -35,8 +35,8 @@ export function CrmMobileNav() {
             key={t.href}
             href={t.href}
             className={cn(
-              "flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] text-slate-500",
-              active && "text-emerald-400"
+              "flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[10px] text-ink-0",
+              active && "text-signal"
             )}
           >
             <span className="leading-none">{t.icon}</span>

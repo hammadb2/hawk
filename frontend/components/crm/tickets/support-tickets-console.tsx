@@ -102,8 +102,8 @@ export function SupportTicketsConsole() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-400">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-ink-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-signal" />
       </div>
     );
   }
@@ -112,14 +112,14 @@ export function SupportTicketsConsole() {
     <div className="space-y-8">
       <section className={`${crmSurfaceCard} p-4`}>
         <h2 className="text-sm font-semibold text-white">New ticket</h2>
-        <p className="mt-1 text-xs text-slate-400">Describe the issue. CEO and HoS get an in-app notification.</p>
+        <p className="mt-1 text-xs text-ink-200">Describe the issue. CEO and HoS get an in-app notification.</p>
         <form className="mt-4 space-y-3" onSubmit={(e) => void createTicket(e)}>
           <div>
-            <Label className="text-slate-400">Subject</Label>
+            <Label className="text-ink-200">Subject</Label>
             <Input className={`mt-1 ${crmFieldSurface}`} value={subject} onChange={(e) => setSubject(e.target.value)} required />
           </div>
           <div>
-            <Label className="text-slate-400">Details</Label>
+            <Label className="text-ink-200">Details</Label>
             <textarea
               className={`mt-1 min-h-[100px] w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
               value={body}
@@ -127,7 +127,7 @@ export function SupportTicketsConsole() {
             />
           </div>
           <div>
-            <Label className="text-slate-400">Priority</Label>
+            <Label className="text-ink-200">Priority</Label>
             <select
               className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
               value={priority}
@@ -140,7 +140,7 @@ export function SupportTicketsConsole() {
               ))}
             </select>
           </div>
-          <Button type="submit" className="bg-emerald-600" disabled={saving}>
+          <Button type="submit" className="bg-signal-400" disabled={saving}>
             {saving ? "Submitting…" : "Submit ticket"}
           </Button>
         </form>
@@ -153,14 +153,14 @@ export function SupportTicketsConsole() {
             type="button"
             variant="outline"
             size="sm"
-            className="border-[#1e1e2e] bg-[#111118] text-slate-200 hover:bg-[#1a1a24]"
+            className="border-[#1e1e2e] bg-[#111118] text-ink-100 hover:bg-[#1a1a24]"
             onClick={() => void load()}
           >
             Refresh
           </Button>
         </div>
         {loading ? (
-          <p className="py-8 text-center text-slate-400">Loading…</p>
+          <p className="py-8 text-center text-ink-200">Loading…</p>
         ) : rows.length === 0 ? (
           <p className={`${crmEmptyState} py-8`}>No tickets yet.</p>
         ) : (
@@ -171,7 +171,7 @@ export function SupportTicketsConsole() {
                   <div>
                     <div className="font-medium text-white">{t.subject}</div>
                     {isExec && (
-                      <div className="mt-1 text-xs text-slate-400">
+                      <div className="mt-1 text-xs text-ink-200">
                         From: {names[t.requester_id] ?? t.requester_id.slice(0, 8)}
                       </div>
                     )}
@@ -206,7 +206,7 @@ export function SupportTicketsConsole() {
                       <span
                         className={cn(
                           "rounded px-2 py-1 text-xs",
-                          t.status === "open" ? "bg-amber-500/20 text-amber-200" : "bg-[#1a1a24] text-slate-400",
+                          t.status === "open" ? "bg-signal/20 text-amber-200" : "bg-[#1a1a24] text-ink-200",
                         )}
                       >
                         {t.status} · {t.priority}
@@ -214,8 +214,8 @@ export function SupportTicketsConsole() {
                     )}
                   </div>
                 </div>
-                {t.body ? <p className="mt-2 whitespace-pre-wrap text-slate-400">{t.body}</p> : null}
-                <div className="mt-2 text-[11px] text-slate-500">
+                {t.body ? <p className="mt-2 whitespace-pre-wrap text-ink-200">{t.body}</p> : null}
+                <div className="mt-2 text-[11px] text-ink-0">
                   {new Date(t.created_at).toLocaleString()}
                   {t.updated_at !== t.created_at && <span> · updated {new Date(t.updated_at).toLocaleString()}</span>}
                 </div>
@@ -225,9 +225,9 @@ export function SupportTicketsConsole() {
         )}
       </section>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-0">
         For product issues with the HAWK security app your clients use, track internal coordination here.{" "}
-        <Link href="/crm/pipeline" className="text-emerald-400 hover:underline">
+        <Link href="/crm/pipeline" className="text-signal hover:underline">
           Pipeline
         </Link>
       </p>

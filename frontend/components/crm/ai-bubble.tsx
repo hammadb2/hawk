@@ -104,15 +104,15 @@ export function AiBubble() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="group fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-crmSurface text-emerald-400 shadow-lg ring-2 ring-emerald-500/50 transition-all hover:scale-105 hover:bg-crmSurface2 hover:ring-emerald-400/70"
+        className="group fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-crmSurface text-signal shadow-lg ring-2 ring-signal/50 transition-all hover:scale-105 hover:bg-crmSurface2 hover:ring-signal/50/70"
         title="AI Command Center"
       >
         <span
-          className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-emerald-500/40 opacity-70 animate-pulse"
+          className="pointer-events-none absolute inset-[-4px] rounded-full border-2 border-signal/40 opacity-70 animate-pulse"
           aria-hidden
         />
-        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-crmSurface ring-1 ring-emerald-500/30">
-          {open ? <X className="h-6 w-6 text-slate-200" /> : <MessageCircle className="h-6 w-6" strokeWidth={1.75} />}
+        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-crmSurface ring-1 ring-signal/30">
+          {open ? <X className="h-6 w-6 text-ink-100" /> : <MessageCircle className="h-6 w-6" strokeWidth={1.75} />}
         </span>
       </button>
 
@@ -121,16 +121,16 @@ export function AiBubble() {
           <div className="flex items-center justify-between border-b border-crmBorder bg-crmSurface2 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-white">HAWK AI</p>
-              <p className="text-xs text-slate-500">Command Center</p>
+              <p className="text-xs text-ink-0">Command Center</p>
             </div>
             <div className="flex items-center gap-2">
               <Link
                 href="/crm/ai"
-                className="rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-2 py-1 text-xs text-emerald-400 transition hover:bg-emerald-500/25"
+                className="rounded-lg border border-signal/30 bg-signal/15 px-2 py-1 text-xs text-signal transition hover:bg-signal/25"
               >
                 Full page
               </Link>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white">
+              <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-1 text-ink-200 hover:bg-ink-800/5 hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -140,8 +140,8 @@ export function AiBubble() {
             {messages.length === 0 && (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
-                  <p className="text-sm font-medium text-slate-300">How can I help?</p>
-                  <p className="mt-1 text-xs text-slate-500">Ask about reports, team, pipeline, or give commands.</p>
+                  <p className="text-sm font-medium text-ink-100">How can I help?</p>
+                  <p className="mt-1 text-xs text-ink-0">Ask about reports, team, pipeline, or give commands.</p>
                 </div>
               </div>
             )}
@@ -151,24 +151,24 @@ export function AiBubble() {
                   <div
                     className={
                       msg.role === "user"
-                        ? "max-w-[85%] rounded-xl border border-emerald-500/25 bg-emerald-950/40 px-3 py-2 text-sm text-slate-100"
-                        : "max-w-[85%] rounded-xl border border-crmBorder border-l-4 border-l-emerald-500 bg-crmSurface2 px-3 py-2 text-sm text-slate-200"
+                        ? "max-w-[85%] rounded-xl border border-signal/25 bg-ink-800/40 px-3 py-2 text-sm text-ink-0"
+                        : "max-w-[85%] rounded-xl border border-crmBorder border-l-4 border-l-signal bg-crmSurface2 px-3 py-2 text-sm text-ink-100"
                     }
                   >
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                     {msg.function_name && (
-                      <p className="mt-1 font-mono text-xs text-emerald-400/90">{msg.function_name}</p>
+                      <p className="mt-1 font-mono text-xs text-signal/90">{msg.function_name}</p>
                     )}
                   </div>
                 </div>
               ))}
               {sending && (
                 <div className="flex justify-start">
-                  <div className="rounded-xl border border-crmBorder border-l-4 border-l-emerald-500 bg-crmSurface2 px-3 py-2">
+                  <div className="rounded-xl border border-crmBorder border-l-4 border-l-signal bg-crmSurface2 px-3 py-2">
                     <div className="flex gap-1">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0ms" }} />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "150ms" }} />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "300ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-9000" style={{ animationDelay: "0ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-9000" style={{ animationDelay: "150ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-9000" style={{ animationDelay: "300ms" }} />
                     </div>
                   </div>
                 </div>
@@ -185,13 +185,13 @@ export function AiBubble() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
                 placeholder="Type a command..."
-                className="flex-1 rounded-lg border border-crmBorder bg-crmSurface px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none"
+                className="flex-1 rounded-lg border border-crmBorder bg-crmSurface px-3 py-2 text-sm text-white placeholder:text-ink-0 focus:border-signal/50 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => void sendMessage()}
                 disabled={sending || !input.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-signal-400 text-white transition hover:bg-signal disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
               </button>

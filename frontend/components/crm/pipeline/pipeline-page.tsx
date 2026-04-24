@@ -54,7 +54,7 @@ function Column({
     <div className="flex w-[280px] shrink-0 flex-col rounded-xl border border-[#1e1e2e] bg-[#111118]">
       <div className="flex items-center justify-between border-b border-[#1e1e2e] px-3 py-2">
         <div className="text-sm font-semibold text-white">{meta.label}</div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-ink-0">
           {count} · ${value.toLocaleString()}
         </div>
       </div>
@@ -62,7 +62,7 @@ function Column({
         ref={setNodeRef}
         className={cn(
           "flex min-h-[320px] flex-1 flex-col gap-2 p-2 transition-colors",
-          isOver && "rounded-lg border border-emerald-500/50 bg-emerald-500/5",
+          isOver && "rounded-lg border border-signal/50 bg-signal/5",
         )}
       >
         {children}
@@ -104,20 +104,20 @@ function StageList({
     <div className="space-y-4">
       {STAGE_ORDER.map((stage) => (
         <div key={stage}>
-          <div className="mb-2 text-sm font-medium text-slate-300">{STAGE_META[stage].label}</div>
+          <div className="mb-2 text-sm font-medium text-ink-100">{STAGE_META[stage].label}</div>
           <div className="space-y-2">
             {byStage[stage].map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => onOpenProspect(p)}
-                className="w-full rounded-xl border border-[#1e1e2e] bg-[#16161f] px-3 py-2 text-left text-sm transition-colors hover:border-emerald-500/30"
+                className="w-full rounded-xl border border-[#1e1e2e] bg-[#16161f] px-3 py-2 text-left text-sm transition-colors hover:border-signal/30"
               >
                 <div className="font-semibold text-white">{p.company_name ?? p.domain}</div>
-                <div className="text-xs text-slate-500">{p.domain}</div>
+                <div className="text-xs text-ink-0">{p.domain}</div>
               </button>
             ))}
-            {!byStage[stage].length && <div className="text-xs text-slate-600">Empty</div>}
+            {!byStage[stage].length && <div className="text-xs text-ink-200">Empty</div>}
           </div>
         </div>
       ))}
@@ -344,7 +344,7 @@ export function PipelinePage() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Pipeline</h1>
-          <p className="text-sm text-slate-400">Drag cards between stages. Lost and Closed Won require confirmation.</p>
+          <p className="text-sm text-ink-200">Drag cards between stages. Lost and Closed Won require confirmation.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className={cn("flex p-0.5", crmSurfaceCard)}>
@@ -355,23 +355,23 @@ export function PipelinePage() {
                 onClick={() => setPipelineView(v)}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-medium capitalize",
-                  pipelineView === v ? "bg-emerald-500/15 text-emerald-400" : "text-slate-500 hover:text-slate-300"
+                  pipelineView === v ? "bg-signal/15 text-signal" : "text-ink-0 hover:text-ink-100"
                 )}
               >
                 {v}
               </button>
             ))}
           </div>
-          <Button variant="outline" className="border-crmBorder bg-crmSurface text-slate-200 hover:bg-crmSurface2" onClick={() => setAddOpen(true)}>
+          <Button variant="outline" className="border-crmBorder bg-crmSurface text-ink-100 hover:bg-crmSurface2" onClick={() => setAddOpen(true)}>
             Add prospect
           </Button>
-          <Button variant="outline" className="border-crmBorder bg-crmSurface text-slate-200 hover:bg-crmSurface2" onClick={() => setFilterOpen(true)}>
+          <Button variant="outline" className="border-crmBorder bg-crmSurface text-ink-100 hover:bg-crmSurface2" onClick={() => setFilterOpen(true)}>
             Filters{filterCount ? ` (${filterCount})` : ""}
           </Button>
           <Button
             variant={bulkMode ? "default" : "outline"}
             className={cn(
-              bulkMode ? "bg-emerald-600 text-white" : "border-crmBorder bg-crmSurface text-slate-200 hover:bg-crmSurface2",
+              bulkMode ? "bg-signal-400 text-white" : "border-crmBorder bg-crmSurface text-ink-100 hover:bg-crmSurface2",
             )}
             onClick={() => setBulkMode(!bulkMode)}
           >
@@ -385,12 +385,12 @@ export function PipelinePage() {
           placeholder="Search company or domain…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md border-crmBorder bg-crmSurface text-white placeholder:text-slate-500"
+          className="max-w-md border-crmBorder bg-crmSurface text-white placeholder:text-ink-0"
         />
       </div>
 
       {bottleneck && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <div className="rounded-lg border border-signal/40 bg-signal/10 px-4 py-3 text-sm text-amber-200">
           Bottleneck detected at <strong>{STAGE_META[bottleneck].label}</strong> — {counts[bottleneck]} prospects stalled vs next stage.
         </div>
       )}
@@ -430,7 +430,7 @@ export function PipelinePage() {
                 {activeDrag ? (
                   <div className="w-[260px] rounded-xl border border-[#1e1e2e] bg-[#16161f] p-3 shadow-xl">
                     <div className="font-semibold text-white">{activeDrag.company_name ?? activeDrag.domain}</div>
-                    <div className="text-xs text-slate-500">{activeDrag.domain}</div>
+                    <div className="text-xs text-ink-0">{activeDrag.domain}</div>
                   </div>
                 ) : null}
               </DragOverlay>
@@ -460,7 +460,7 @@ export function PipelinePage() {
                   ] as const
                 ).map(([key, label]) => (
                   <th key={key} className="px-3 py-2">
-                    <button type="button" className="font-semibold text-slate-300 hover:text-white" onClick={() => toggleSort(key)}>
+                    <button type="button" className="font-semibold text-ink-100 hover:text-white" onClick={() => toggleSort(key)}>
                       {label}
                       {sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                     </button>
@@ -476,11 +476,11 @@ export function PipelinePage() {
                   onClick={() => setDrawerId(p.id)}
                 >
                   <td className="px-3 py-2 text-white">{p.company_name ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-400">{p.domain}</td>
+                  <td className="px-3 py-2 text-ink-200">{p.domain}</td>
                   <td className="px-3 py-2">{STAGE_META[p.stage].label}</td>
                   <td className="px-3 py-2">{p.hawk_score}</td>
                   <td className="px-3 py-2 capitalize">{p.source}</td>
-                  <td className="px-3 py-2 text-slate-400">{new Date(p.last_activity_at).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-ink-200">{new Date(p.last_activity_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

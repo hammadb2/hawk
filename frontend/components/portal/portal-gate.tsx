@@ -108,7 +108,7 @@ export function PortalGate({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+      <div className="flex min-h-[50vh] items-center justify-center text-ink-0">
         <div className={portal.spinner} />
       </div>
     );

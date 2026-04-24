@@ -28,13 +28,13 @@ export function BookCallModal({
       <DialogContent className={`max-h-[90vh] max-w-3xl p-0 ${crmDialogSurface}`}>
         <DialogHeader className="border-b border-[#1e1e2e] px-4 py-3">
           <DialogTitle className="text-white">Book a call</DialogTitle>
-          <p className="text-xs text-slate-400">Set NEXT_PUBLIC_CALCOM_URL to your Cal.com link.</p>
+          <p className="text-xs text-ink-200">Set NEXT_PUBLIC_CALCOM_URL to your Cal.com link.</p>
         </DialogHeader>
         <div className="h-[min(70vh,640px)] w-full bg-[#0d0d14]">
-          <iframe title="Cal.com" src={url} className="h-full w-full rounded-b-xl bg-white" />
+          <iframe title="Cal.com" src={url} className="h-full w-full rounded-b-xl bg-ink-800" />
         </div>
         <div className="flex justify-end border-t border-[#1e1e2e] px-4 py-2">
-          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
             Close
           </Button>
         </div>

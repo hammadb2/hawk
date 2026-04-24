@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 function PortalGateFallback() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+    <div className="flex min-h-[50vh] items-center justify-center text-ink-0">
       <div className={portal.spinner} />
     </div>
   );
@@ -24,7 +24,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       className={cn(
         portal.pageBg,
         // Duplicated here so Tailwind always emits these utilities from `app/` (belt + suspenders).
-        "min-h-dvh w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
+        "min-h-dvh w-full bg-gradient-to-b from-ink-900 via-ink-950 to-ink-950 text-ink-0 antialiased",
       )}
     >
       <PortalHeader />

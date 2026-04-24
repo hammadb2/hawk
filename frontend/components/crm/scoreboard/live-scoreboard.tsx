@@ -179,8 +179,8 @@ export function LiveScoreboard() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-400">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-ink-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-signal" />
       </div>
     );
   }
@@ -188,14 +188,14 @@ export function LiveScoreboard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-200">
           Ranked by pending commission, then open pipeline count. Updates live when prospects, clients, or commissions change.
         </p>
-        <div className="flex items-center gap-3 text-xs text-slate-400">
+        <div className="flex items-center gap-3 text-xs text-ink-200">
           {updatedAt && <span>Updated {updatedAt.toLocaleTimeString()}</span>}
           <button
             type="button"
-            className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-2 py-1 text-slate-200 hover:bg-[#1a1a24]"
+            className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-2 py-1 text-ink-100 hover:bg-[#1a1a24]"
             onClick={() => void load()}
           >
             Refresh
@@ -204,7 +204,7 @@ export function LiveScoreboard() {
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-slate-400">Loading…</div>
+        <div className="py-12 text-center text-ink-200">Loading…</div>
       ) : rows.length === 0 ? (
         <p className={`${crmEmptyState} py-8`}>No reps to show.</p>
       ) : (
@@ -223,12 +223,12 @@ export function LiveScoreboard() {
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.repId} className={crmTableRow}>
-                  <td className="px-3 py-2 font-mono text-slate-500">{i + 1}</td>
+                  <td className="px-3 py-2 font-mono text-ink-0">{i + 1}</td>
                   <td className="px-3 py-2 font-medium text-white">{r.name}</td>
-                  <td className="px-3 py-2 text-slate-300">{r.pipeline}</td>
+                  <td className="px-3 py-2 text-ink-100">{r.pipeline}</td>
                   <td className="px-3 py-2 text-sky-400">{r.monthlyWins}</td>
-                  <td className="px-3 py-2 text-slate-300">{r.activeClients}</td>
-                  <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.pendingCents)}</td>
+                  <td className="px-3 py-2 text-ink-100">{r.activeClients}</td>
+                  <td className="px-3 py-2 font-medium text-signal">{formatUsd(r.pendingCents)}</td>
                 </tr>
               ))}
             </tbody>

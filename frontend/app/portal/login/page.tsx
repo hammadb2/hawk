@@ -41,34 +41,34 @@ function PortalLoginForm() {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-5.5rem)] flex-col items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 py-8">
-      <div className="w-full max-w-md space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+    <div className="flex min-h-[calc(100dvh-5.5rem)] flex-col items-center justify-center bg-gradient-to-b from-ink-900 via-ink-950 to-ink-950 px-4 py-8">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-ink-800 p-8 shadow-xl">
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">HAWK Client</p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-900">Portal sign in</h1>
-          <p className="mt-1 text-sm text-slate-600">Security score, findings, and guidance for your organization.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-signal">HAWK Client</p>
+          <h1 className="mt-2 text-2xl font-semibold text-ink-0">Portal sign in</h1>
+          <p className="mt-1 text-sm text-ink-200">Security score, findings, and guidance for your organization.</p>
           {postCheckout && (
-            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-left text-xs leading-relaxed text-slate-800">
-              <strong className="text-emerald-600">Payment confirmed.</strong> You aren&apos;t signed in yet — that&apos;s
+            <p className="mt-3 rounded-lg border border-signal/30 bg-signal/10 px-3 py-3 text-left text-xs leading-relaxed text-ink-0">
+              <strong className="text-signal">Payment confirmed.</strong> You aren&apos;t signed in yet — that&apos;s
               normal. Use the <strong>same email you entered in Stripe</strong>. Check your inbox for the HAWK portal invite
               (magic link), or enter that email below and we&apos;ll send a new link.
             </p>
           )}
           {err === "not_linked" && (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="mt-3 rounded-lg border border-signal/30 bg-signal/10 px-3 py-2 text-xs text-signal-700">
               This account isn&apos;t linked to a client portal yet. Use the email from your welcome message after checkout,
               or contact your CSM.
             </p>
           )}
         </div>
         {sent ? (
-          <p className="text-center text-sm text-slate-600">
-            We sent a link to <span className="text-slate-800">{email}</span>. Open it on this device to continue.
+          <p className="text-center text-sm text-ink-200">
+            We sent a link to <span className="text-ink-0">{email}</span>. Open it on this device to continue.
           </p>
         ) : (
           <form onSubmit={sendLink} className="space-y-4">
             <div>
-              <Label className="text-slate-600">Work email</Label>
+              <Label className="text-ink-200">Work email</Label>
               <Input
                 type="email"
                 required
@@ -79,14 +79,14 @@ function PortalLoginForm() {
                 placeholder="you@company.com"
               />
             </div>
-            <Button type="submit" className="w-full bg-emerald-500 text-white hover:bg-emerald-600" disabled={loading}>
+            <Button type="submit" className="w-full bg-signal text-white hover:bg-signal-400" disabled={loading}>
               {loading ? "Sending…" : "Email me a magic link"}
             </Button>
           </form>
         )}
-        <p className="text-center text-xs text-slate-500">
+        <p className="text-center text-xs text-ink-0">
           Sales team?{" "}
-          <Link href="/crm/login" className="text-emerald-600 hover:underline">
+          <Link href="/crm/login" className="text-signal hover:underline">
             HAWK CRM login
           </Link>
         </p>
@@ -99,7 +99,7 @@ export default function PortalLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[calc(100dvh-5.5rem)] items-center justify-center bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-600">
+        <div className="flex min-h-[calc(100dvh-5.5rem)] items-center justify-center bg-gradient-to-b from-ink-900 via-ink-950 to-ink-950 text-ink-200">
           <div className={portal.spinnerSm} />
         </div>
       }

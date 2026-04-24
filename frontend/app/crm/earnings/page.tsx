@@ -149,8 +149,8 @@ export default function EarningsPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-400">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-ink-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-signal" />
       </div>
     );
   }
@@ -174,21 +174,21 @@ export default function EarningsPage() {
 
       <div className="grid gap-3 sm:grid-cols-4">
         <div className={`${crmSurfaceCard} px-4 py-3`}>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Pending</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Pending</div>
           <div className="mt-1 text-xl font-semibold text-amber-200">{formatUsd(totalPending)}</div>
-          <div className="text-xs text-slate-500">{pendingCount} record{pendingCount !== 1 ? "s" : ""}</div>
+          <div className="text-xs text-ink-0">{pendingCount} record{pendingCount !== 1 ? "s" : ""}</div>
         </div>
         <div className={`${crmSurfaceCard} px-4 py-3`}>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Approved</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Approved</div>
           <div className="mt-1 text-xl font-semibold text-sky-300">{formatUsd(totalApproved)}</div>
-          <div className="text-xs text-slate-500">{approvedCount} record{approvedCount !== 1 ? "s" : ""}</div>
+          <div className="text-xs text-ink-0">{approvedCount} record{approvedCount !== 1 ? "s" : ""}</div>
         </div>
         <div className={`${crmSurfaceCard} px-4 py-3`}>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Paid</div>
-          <div className="mt-1 text-xl font-semibold text-emerald-400">{formatUsd(totalPaid)}</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Paid</div>
+          <div className="mt-1 text-xl font-semibold text-signal">{formatUsd(totalPaid)}</div>
         </div>
         <div className={`${crmSurfaceCard} px-4 py-3`}>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Records</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Records</div>
           <div className="mt-1 text-xl font-semibold text-white">{rows.length}</div>
         </div>
       </div>
@@ -209,7 +209,7 @@ export default function EarningsPage() {
             <button
               type="button"
               disabled={bulkUpdating}
-              className="rounded-md border border-emerald-600 bg-emerald-900/40 px-4 py-2 text-sm font-medium text-emerald-300 hover:bg-emerald-800/60 disabled:opacity-50"
+              className="rounded-md border border-signal/50 bg-ink-800/40 px-4 py-2 text-sm font-medium text-signal-200 hover:bg-ink-700/60 disabled:opacity-50"
               onClick={() => void bulkUpdate("paid")}
             >
               {bulkUpdating ? "Updating…" : `Mark all approved as paid (${approvedCount})`}
@@ -219,7 +219,7 @@ export default function EarningsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12 text-slate-400">Loading…</div>
+        <div className="flex justify-center py-12 text-ink-200">Loading…</div>
       ) : rows.length === 0 ? (
         <p className={crmEmptyState}>
           No commissions yet. Close a deal from the pipeline to create a client and commission row.
@@ -241,24 +241,24 @@ export default function EarningsPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className={crmTableRow}>
-                  <td className="px-3 py-2 text-slate-400">{new Date(r.created_at).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-ink-200">{new Date(r.created_at).toLocaleDateString()}</td>
                   <td className="px-3 py-2 text-white">
                     {r.clients?.company_name ?? r.clients?.domain ?? "—"}
                     {r.clients?.domain && (
-                      <span className="ml-1 text-xs text-slate-500">({r.clients.domain})</span>
+                      <span className="ml-1 text-xs text-ink-0">({r.clients.domain})</span>
                     )}
                   </td>
-                  {closerCol && <td className="px-3 py-2 text-slate-300">{repNames[r.rep_id] ?? r.rep_id.slice(0, 8)}</td>}
-                  <td className="px-3 py-2 text-slate-300">{formatUsd(r.basis_mrr_cents)}</td>
-                  <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.amount_cents)}</td>
+                  {closerCol && <td className="px-3 py-2 text-ink-100">{repNames[r.rep_id] ?? r.rep_id.slice(0, 8)}</td>}
+                  <td className="px-3 py-2 text-ink-100">{formatUsd(r.basis_mrr_cents)}</td>
+                  <td className="px-3 py-2 font-medium text-signal">{formatUsd(r.amount_cents)}</td>
                   <td className="px-3 py-2">
                     <span
                       className={
                         r.status === "paid"
-                          ? "text-emerald-400"
+                          ? "text-signal"
                           : r.status === "approved"
                             ? "text-sky-400"
-                            : "text-amber-400"
+                            : "text-signal"
                       }
                     >
                       {r.status}
@@ -281,7 +281,7 @@ export default function EarningsPage() {
                           <button
                             type="button"
                             disabled={updating === r.id}
-                            className="rounded border border-emerald-600 bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-300 hover:bg-emerald-800/50 disabled:opacity-50"
+                            className="rounded border border-signal/50 bg-ink-800/30 px-2 py-0.5 text-xs text-signal-200 hover:bg-ink-700/50 disabled:opacity-50"
                             onClick={() => void updateCommissionStatus(r.id, "paid")}
                           >
                             {updating === r.id ? "…" : "Mark paid"}

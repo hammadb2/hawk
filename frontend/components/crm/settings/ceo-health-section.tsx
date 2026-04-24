@@ -32,15 +32,15 @@ export function CeoHealthSection() {
   return (
     <section className={`p-5 ${crmSurfaceCard}`}>
       <h2 className="text-sm font-semibold text-white">Integration monitor</h2>
-      <p className="mt-1 text-xs text-slate-400">
-        Latest checks from <code className="text-slate-500">POST /api/monitor/health-check</code> (Railway cron +{" "}
-        <code className="text-slate-500">X-Cron-Secret</code>). CEO-only.
+      <p className="mt-1 text-xs text-ink-200">
+        Latest checks from <code className="text-ink-0">POST /api/monitor/health-check</code> (Railway cron +{" "}
+        <code className="text-ink-0">X-Cron-Secret</code>). CEO-only.
       </p>
-      {err && <p className="mt-2 text-sm text-rose-400">{err}</p>}
-      {!err && rows.length === 0 && <p className="mt-3 text-sm text-slate-400">No rows yet — run the monitor cron.</p>}
+      {err && <p className="mt-2 text-sm text-red">{err}</p>}
+      {!err && rows.length === 0 && <p className="mt-3 text-sm text-ink-200">No rows yet — run the monitor cron.</p>}
       {rows.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-400">
+          <table className="w-full text-left text-xs text-ink-200">
             <thead className={crmTableThead}>
               <tr>
                 <th className="py-2 pr-2">Time</th>
@@ -53,16 +53,16 @@ export function CeoHealthSection() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className={crmTableRow}>
-                  <td className="py-2 pr-2 whitespace-nowrap text-slate-300">{new Date(r.checked_at).toLocaleString()}</td>
-                  <td className="py-2 pr-2 font-mono text-slate-300">{r.service}</td>
+                  <td className="py-2 pr-2 whitespace-nowrap text-ink-100">{new Date(r.checked_at).toLocaleString()}</td>
+                  <td className="py-2 pr-2 font-mono text-ink-100">{r.service}</td>
                   <td className="py-2 pr-2">
                     <span
                       className={
                         r.status === "ok"
-                          ? "text-emerald-400"
+                          ? "text-signal"
                           : r.status === "degraded"
-                            ? "text-amber-400"
-                            : "text-rose-400"
+                            ? "text-signal"
+                            : "text-red"
                       }
                     >
                       {r.status}

@@ -26,10 +26,10 @@ function minutesSince(iso: string | null): number | null {
 }
 
 function slaClass(mins: number | null) {
-  if (mins === null) return "border-slate-200";
-  if (mins > 30) return "border-rose-600 bg-rose-950/40";
-  if (mins >= 10) return "border-amber-500 bg-amber-950/30";
-  return "border-emerald-500 bg-emerald-950/20";
+  if (mins === null) return "border-white/10";
+  if (mins > 30) return "border-red bg-red/15";
+  if (mins >= 10) return "border-signal bg-ink-800/30";
+  return "border-signal bg-ink-800/20";
 }
 
 export default function AriaRepliesPage() {
@@ -103,15 +103,15 @@ export default function AriaRepliesPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-4">
       <div>
         <h1 className="text-xl font-semibold text-white">ARIA replies</h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-200">
           Unhandled Smartlead replies, oldest first. Target: act within 30 minutes.
         </p>
       </div>
-      {err && <p className="text-sm text-rose-400">{err}</p>}
+      {err && <p className="text-sm text-red">{err}</p>}
       {loading ? (
-        <p className="text-slate-400">Loading…</p>
+        <p className="text-ink-200">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-slate-400">No pending replies.</p>
+        <p className="text-ink-200">No pending replies.</p>
       ) : (
         <ul className="space-y-3">
           {rows.map((p) => {
@@ -121,17 +121,17 @@ export default function AriaRepliesPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="font-medium text-white">{p.company_name || p.domain || "Prospect"}</p>
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-ink-100">
                       {p.contact_name || "—"} · {p.contact_email || "—"}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-ink-200">
                       Score {p.hawk_score ?? "—"} · {p.industry || "—"} · waiting {mins ?? "—"} min
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
-                      className="bg-emerald-700 hover:bg-emerald-600"
+                      className="bg-signal-600 hover:bg-signal-400"
                       disabled={busy === p.id}
                       onClick={() => void runAction(p.id, "book_call")}
                     >

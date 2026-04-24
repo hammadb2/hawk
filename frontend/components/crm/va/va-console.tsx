@@ -118,8 +118,8 @@ function TabButton({
       className={cn(
         "rounded-lg px-4 py-2 text-sm font-medium transition",
         active
-          ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
-          : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+          ? "bg-signal/20 text-signal-200 ring-1 ring-signal/40"
+          : "text-ink-200 hover:bg-ink-800/5 hover:text-ink-100",
       )}
     >
       {children}
@@ -222,7 +222,7 @@ function QueueTab() {
     <div className="space-y-4">
       <div className={cn(crmSurfaceCard, "flex flex-wrap items-end gap-3 p-4")}>
         <div className="w-36">
-          <Label className="text-xs text-slate-400">Vertical</Label>
+          <Label className="text-xs text-ink-200">Vertical</Label>
           <select
             value={vertical}
             onChange={(e) => setVertical(e.target.value)}
@@ -235,7 +235,7 @@ function QueueTab() {
           </select>
         </div>
         <div className="w-32">
-          <Label className="text-xs text-slate-400">Min score</Label>
+          <Label className="text-xs text-ink-200">Min score</Label>
           <Input
             className={cn(crmFieldSurface, "mt-1")}
             type="number"
@@ -245,7 +245,7 @@ function QueueTab() {
           />
         </div>
         <div className="flex-1 min-w-[200px]">
-          <Label className="text-xs text-slate-400">Assign selected to</Label>
+          <Label className="text-xs text-ink-200">Assign selected to</Label>
           <select
             value={assignVAId}
             onChange={(e) => setAssignVAId(e.target.value)}
@@ -273,7 +273,7 @@ function QueueTab() {
         <div className={crmEmptyState}>Nothing in the VA queue yet.</div>
       ) : (
         <div className={crmTableWrap}>
-          <table className="w-full text-sm text-slate-200">
+          <table className="w-full text-sm text-ink-100">
             <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2 w-8"></th>
@@ -296,11 +296,11 @@ function QueueTab() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{p.company_name || p.domain}</div>
-                    <div className="text-xs text-slate-500">{p.domain}</div>
+                    <div className="text-xs text-ink-0">{p.domain}</div>
                   </td>
                   <td className="px-3 py-2">
                     <div>{p.contact_name || "—"}</div>
-                    <div className="text-xs text-slate-500">{p.contact_email || "—"}</div>
+                    <div className="text-xs text-ink-0">{p.contact_email || "—"}</div>
                   </td>
                   <td className="px-3 py-2 capitalize">{p.industry || "—"}</td>
                   <td className="px-3 py-2">{p.city || "—"}</td>
@@ -377,7 +377,7 @@ function TeamTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-400">
+        <div className="text-sm text-ink-200">
           {vas.length} VA{vas.length === 1 ? "" : "s"} on the roster
         </div>
         <div className="flex gap-2">
@@ -394,11 +394,11 @@ function TeamTab() {
 
       {vas.length === 0 ? (
         <div className={crmEmptyState}>
-          No VAs invited yet. Click <span className="text-slate-200">Invite VA</span> to send the first one.
+          No VAs invited yet. Click <span className="text-ink-100">Invite VA</span> to send the first one.
         </div>
       ) : (
         <div className={crmTableWrap}>
-          <table className="w-full text-sm text-slate-200">
+          <table className="w-full text-sm text-ink-100">
             <thead className={crmTableThead}>
               <tr>
                 <th className="px-3 py-2 text-left">Name</th>
@@ -413,11 +413,11 @@ function TeamTab() {
               {vas.map((v) => (
                 <tr key={v.id} className={crmTableRow}>
                   <td className="px-3 py-2 font-medium">{v.full_name || "—"}</td>
-                  <td className="px-3 py-2 text-slate-400">{v.email || "—"}</td>
+                  <td className="px-3 py-2 text-ink-200">{v.email || "—"}</td>
                   <td className="px-3 py-2 capitalize">{v.role_type.replace("_", " ")}</td>
                   <td className="px-3 py-2 text-right">{v.today_assigned}</td>
                   <td className="px-3 py-2 text-right">{v.today_reached_out}</td>
-                  <td className="px-3 py-2 text-right text-emerald-400">{v.today_booked}</td>
+                  <td className="px-3 py-2 text-right text-signal">{v.today_booked}</td>
                 </tr>
               ))}
             </tbody>
@@ -505,7 +505,7 @@ function MyQueueTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-400">{rows.length} open assignment{rows.length === 1 ? "" : "s"}</div>
+        <div className="text-sm text-ink-200">{rows.length} open assignment{rows.length === 1 ? "" : "s"}</div>
         <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
           <RefreshCw size={14} className={cn("mr-2", loading && "animate-spin")} />
           Refresh
@@ -542,20 +542,20 @@ function AssignmentCard({ assignment, onOpen }: { assignment: Assignment; onOpen
     <div className={cn(crmSurfaceCard, "p-4 space-y-2")}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-medium text-slate-100">{p.company_name || p.domain}</div>
-          <div className="text-xs text-slate-500">
+          <div className="font-medium text-ink-0">{p.company_name || p.domain}</div>
+          <div className="text-xs text-ink-0">
             {p.city || "—"} • {p.industry || "—"} • Hawk score {p.hawk_score ?? "—"}
           </div>
         </div>
-        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300 capitalize">
+        <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs text-ink-100 capitalize">
           {assignment.status.replace("_", " ")}
         </span>
       </div>
       <div className="text-sm">
-        <span className="text-slate-400">Contact: </span>
+        <span className="text-ink-200">Contact: </span>
         <span>{p.contact_name || "—"}</span>
       </div>
-      <div className="text-xs text-slate-500 break-all">{p.contact_email || "—"}</div>
+      <div className="text-xs text-ink-0 break-all">{p.contact_email || "—"}</div>
       <div className="flex gap-2 pt-2">
         <Button size="sm" onClick={onOpen}>
           <Mail size={14} className="mr-2" />
@@ -630,7 +630,7 @@ function OutreachDialog({
         <DialogHeader>
           <DialogTitle>
             {p.company_name || p.domain}
-            <span className="ml-2 text-xs font-normal text-slate-500">
+            <span className="ml-2 text-xs font-normal text-ink-0">
               {p.contact_name ? `— ${p.contact_name}` : ""}
             </span>
           </DialogTitle>
@@ -639,19 +639,19 @@ function OutreachDialog({
         <div className="space-y-4">
           <div className={cn(crmSurfaceCard, "p-3 text-sm space-y-1")}>
             <div>
-              <span className="text-slate-400">Email: </span>
+              <span className="text-ink-200">Email: </span>
               <span>{p.contact_email || "—"}</span>
             </div>
             {p.contact_phone && (
               <div>
-                <span className="text-slate-400">Phone: </span>
+                <span className="text-ink-200">Phone: </span>
                 <span>{p.contact_phone}</span>
               </div>
             )}
             {p.contact_linkedin_url && (
               <div className="break-all">
-                <span className="text-slate-400">LinkedIn: </span>
-                <a href={p.contact_linkedin_url} target="_blank" rel="noreferrer" className="text-emerald-400 underline">
+                <span className="text-ink-200">LinkedIn: </span>
+                <a href={p.contact_linkedin_url} target="_blank" rel="noreferrer" className="text-signal underline">
                   {p.contact_linkedin_url}
                 </a>
               </div>

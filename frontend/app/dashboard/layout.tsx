@@ -44,8 +44,8 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="flex items-center justify-between border-b border-surface-3 bg-white px-6 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
-        <Link href="/dashboard" className="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-1.5 ring-1 ring-slate-800/80">
+      <header className="flex items-center justify-between border-b border-surface-3 bg-ink-800 px-6 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <Link href="/dashboard" className="inline-flex items-center rounded-lg bg-ink-950 px-2.5 py-1.5 ring-1 ring-white/10">
           <img src="/hawk-logo.png" alt="HAWK" className="h-12 w-auto" />
         </Link>
         <div className="flex items-center gap-4">
@@ -59,7 +59,7 @@ export default function DashboardLayout({
         </div>
       </header>
       <div className="flex flex-1">
-        <aside className="flex w-56 flex-col gap-1 border-r border-surface-3 bg-white p-4">
+        <aside className="flex w-56 flex-col gap-1 border-r border-surface-3 bg-ink-800 p-4">
           {NAV.map(({ href, label }) => (
             <Link
               key={href}
@@ -67,8 +67,8 @@ export default function DashboardLayout({
               className={cn(
                 "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 pathname === href
-                  ? "bg-emerald-50 font-medium text-slate-900 ring-1 ring-emerald-200/70"
-                  : "text-text-secondary hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-signal/10 font-medium text-ink-0 ring-1 ring-signal/20"
+                  : "text-text-secondary hover:bg-ink-900 hover:text-ink-0"
               )}
             >
               {label}

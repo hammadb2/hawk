@@ -46,15 +46,15 @@ export default function CrmDashboardPage() {
 
   if (!profile) {
     return (
-      <div className="space-y-4 rounded-xl border border-amber-200/90 bg-amber-50 p-6 text-sm text-amber-950">
-        <p className="font-medium text-amber-900">CRM profile not found</p>
-        <p className="text-slate-600">
-          There is no row in <code className="text-slate-700">public.profiles</code> for your signed-in user, or Supabase
-          blocked the read (RLS). Check the browser console for <code className="text-slate-700">[CRM auth]</code> logs.
+      <div className="space-y-4 rounded-xl border border-signal/30/90 bg-signal/10 p-6 text-sm text-signal-800">
+        <p className="font-medium text-signal-700">CRM profile not found</p>
+        <p className="text-ink-200">
+          There is no row in <code className="text-ink-100">public.profiles</code> for your signed-in user, or Supabase
+          blocked the read (RLS). Check the browser console for <code className="text-ink-100">[CRM auth]</code> logs.
         </p>
-        <p className="text-slate-600">
-          Your auth user id is <code className="break-all text-emerald-600">{session.user.id}</code> — the{" "}
-          <code className="text-slate-700">profiles.id</code> column must match exactly.
+        <p className="text-ink-200">
+          Your auth user id is <code className="break-all text-signal">{session.user.id}</code> — the{" "}
+          <code className="text-ink-100">profiles.id</code> column must match exactly.
         </p>
       </div>
     );
@@ -70,16 +70,16 @@ export default function CrmDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-        <p className="text-sm text-slate-400">
-          Signed in as <span className="text-slate-200">{profile.full_name ?? profile.email}</span> —{" "}
-          <span className="font-medium uppercase tracking-wider text-emerald-400">{roleLabel}</span>
+        <p className="text-sm text-ink-200">
+          Signed in as <span className="text-ink-100">{profile.full_name ?? profile.email}</span> —{" "}
+          <span className="font-medium uppercase tracking-wider text-signal">{roleLabel}</span>
         </p>
       </div>
 
       {!onboardingDone && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="rounded-xl border border-signal/30 bg-signal/10 p-4 text-sm text-amber-100">
           Complete your first-login checklist.{" "}
-          <Link href="/crm/onboarding" className="font-medium text-amber-400 underline">
+          <Link href="/crm/onboarding" className="font-medium text-signal underline">
             Continue onboarding
           </Link>
         </div>
@@ -90,13 +90,13 @@ export default function CrmDashboardPage() {
       )}
 
       {["ceo", "hos"].includes(profile.role) && hotLeads.length > 0 && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-950/40 p-4">
-          <h2 className="text-sm font-semibold text-rose-300">Hot leads</h2>
+        <div className="rounded-xl border border-red/30 bg-red/15 p-4">
+          <h2 className="text-sm font-semibold text-red">Hot leads</h2>
           <ul className="mt-2 space-y-2">
             {hotLeads.map((p) => (
               <li key={p.id}>
-                <Link href={`/crm/prospects/${p.id}`} className="text-sm text-slate-200 hover:text-emerald-400 hover:underline">
-                  {p.company_name ?? p.domain} <span className="text-slate-500">({p.domain})</span>
+                <Link href={`/crm/prospects/${p.id}`} className="text-sm text-ink-100 hover:text-signal hover:underline">
+                  {p.company_name ?? p.domain} <span className="text-ink-0">({p.domain})</span>
                 </Link>
               </li>
             ))}
@@ -107,17 +107,17 @@ export default function CrmDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/crm/pipeline"
-          className="rounded-xl border border-crmBorder bg-crmSurface p-5 shadow-lg transition-colors hover:border-emerald-500/40"
+          className="rounded-xl border border-crmBorder bg-crmSurface p-5 shadow-lg transition-colors hover:border-signal/40"
         >
-          <div className="text-sm font-medium text-emerald-400">Pipeline</div>
-          <p className="mt-1 text-sm text-slate-400">Kanban, list, table — click a card for the full prospect profile.</p>
+          <div className="text-sm font-medium text-signal">Pipeline</div>
+          <p className="mt-1 text-sm text-ink-200">Kanban, list, table — click a card for the full prospect profile.</p>
         </Link>
         <Link
           href="/crm/onboarding"
-          className="rounded-xl border border-crmBorder bg-crmSurface2 p-5 shadow-lg transition-colors hover:border-emerald-500/40"
+          className="rounded-xl border border-crmBorder bg-crmSurface2 p-5 shadow-lg transition-colors hover:border-signal/40"
         >
           <div className="text-sm font-medium text-white">Onboarding</div>
-          <p className="mt-1 text-sm text-slate-400">First-login checklist for new reps.</p>
+          <p className="mt-1 text-sm text-ink-200">First-login checklist for new reps.</p>
         </Link>
       </div>
     </div>

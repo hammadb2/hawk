@@ -52,11 +52,11 @@ export function PipelineRunTrigger({ accessToken, onRunStarted }: Props) {
       <h3 className="mb-3 text-sm font-semibold text-white">Run Outbound Pipeline</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-400">Vertical</label>
+          <label className="mb-1 block text-xs font-medium text-ink-200">Vertical</label>
           <select
             value={vertical}
             onChange={(e) => setVertical(e.target.value)}
-            className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
+            className={`w-full px-3 py-2 text-sm focus:border-signal/50 focus:outline-none ${crmFieldSurface}`}
           >
             {VERTICALS.map((v) => (
               <option key={v.value} value={v.value}>{v.label}</option>
@@ -64,32 +64,32 @@ export function PipelineRunTrigger({ accessToken, onRunStarted }: Props) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-400">Location</label>
+          <label className="mb-1 block text-xs font-medium text-ink-200">Location</label>
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g. Ontario, Canada"
-            className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
+            className={`w-full px-3 py-2 text-sm focus:border-signal/50 focus:outline-none ${crmFieldSurface}`}
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-400">Batch Size</label>
+          <label className="mb-1 block text-xs font-medium text-ink-200">Batch Size</label>
           <input
             type="number"
             value={batchSize}
             onChange={(e) => setBatchSize(Math.max(1, Math.min(500, parseInt(e.target.value) || 50)))}
             min={1}
             max={500}
-            className={`w-full px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
+            className={`w-full px-3 py-2 text-sm focus:border-signal/50 focus:outline-none ${crmFieldSurface}`}
           />
         </div>
       </div>
-      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
+      {error && <p className="mt-2 text-xs text-red">{error}</p>}
       <button
         onClick={() => void triggerRun()}
         disabled={loading || !location.trim()}
-        className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+        className="mt-3 w-full rounded-lg bg-signal-400 px-4 py-2.5 text-sm font-semibold text-white hover:bg-signal-600 disabled:opacity-50 transition"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">

@@ -55,7 +55,7 @@ export default function OnboardingReviewPage() {
   if (!profile || (profile.role !== "ceo" && profile.role !== "hos" && profile.role_type !== "va_manager")) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-400">You do not have permission to view this page.</p>
+        <p className="text-ink-200">You do not have permission to view this page.</p>
       </div>
     );
   }
@@ -76,8 +76,8 @@ export default function OnboardingReviewPage() {
             onClick={() => setFilter(f)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
               filter === f
-                ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40"
-                : "border border-[#1e1e2e] bg-[#111118] text-slate-400 hover:text-slate-200"
+                ? "bg-signal/15 text-signal-200 ring-1 ring-signal/40"
+                : "border border-[#1e1e2e] bg-[#111118] text-ink-200 hover:text-ink-100"
             }`}
           >
             {f === "pending_review" ? "Pending" : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -87,11 +87,11 @@ export default function OnboardingReviewPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
         </div>
       ) : items.length === 0 ? (
         <div className={`p-8 text-center ${crmEmptyState}`}>
-          <p className="text-sm text-slate-400">No submissions found.</p>
+          <p className="text-sm text-ink-200">No submissions found.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -99,30 +99,30 @@ export default function OnboardingReviewPage() {
             <Link
               key={item.id}
               href={`/crm/onboarding/review/${item.id}`}
-              className={`flex items-center justify-between p-4 transition hover:border-emerald-500/40 ${crmSurfaceCard}`}
+              className={`flex items-center justify-between p-4 transition hover:border-signal/40 ${crmSurfaceCard}`}
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1a1a24] text-sm font-bold text-slate-300">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1a1a24] text-sm font-bold text-ink-100">
                   {(item.profile_name || "?").charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <p className="font-medium text-white">{item.profile_name || "Unknown"}</p>
-                  <p className="text-xs text-slate-400">{item.profile_email || ""} &middot; {item.profile_role || ""}</p>
+                  <p className="text-xs text-ink-200">{item.profile_email || ""} &middot; {item.profile_role || ""}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     item.status === "pending_review"
-                      ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30"
+                      ? "bg-signal/15 text-signal-200 ring-1 ring-signal/30"
                       : item.status === "approved"
-                        ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
-                        : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30"
+                        ? "bg-signal/15 text-signal-200 ring-1 ring-signal/30"
+                        : "bg-red/100/15 text-red ring-1 ring-red/30"
                   }`}
                 >
                   {item.status === "pending_review" ? "Pending" : item.status}
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-ink-200">
                   {new Date(item.created_at).toLocaleDateString()}
                 </span>
               </div>

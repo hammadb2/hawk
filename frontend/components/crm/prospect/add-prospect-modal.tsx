@@ -90,7 +90,7 @@ export function AddProspectModal({
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <Label className="text-slate-400">Domain *</Label>
+              <Label className="text-ink-200">Domain *</Label>
               <Input
                 className={`mt-1 ${crmFieldSurface}`}
                 value={domain}
@@ -100,7 +100,7 @@ export function AddProspectModal({
               />
             </div>
             <div>
-              <Label className="text-slate-400">Company</Label>
+              <Label className="text-ink-200">Company</Label>
               <Input
                 className={`mt-1 ${crmFieldSurface}`}
                 value={company}
@@ -109,7 +109,7 @@ export function AddProspectModal({
               />
             </div>
             <div>
-              <Label className="text-slate-400">Industry</Label>
+              <Label className="text-ink-200">Industry</Label>
               <Input
                 className={`mt-1 ${crmFieldSurface}`}
                 value={industry}
@@ -119,10 +119,10 @@ export function AddProspectModal({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-emerald-600" disabled={saving}>
+            <Button type="submit" className="bg-signal-400" disabled={saving}>
               {saving ? "Saving…" : "Add"}
             </Button>
           </DialogFooter>

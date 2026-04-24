@@ -83,7 +83,7 @@ export default function ProspectsListPage() {
           </p>
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="pipeline-filter" className="text-xs font-medium uppercase text-slate-500">
+          <label htmlFor="pipeline-filter" className="text-xs font-medium uppercase text-ink-0">
             Pipeline status
           </label>
           <select
@@ -119,17 +119,17 @@ export default function ProspectsListPage() {
               {rows.map((p: Prospect) => (
                 <tr key={p.id} className={crmTableRow}>
                   <td className="px-3 py-2">
-                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
+                    <Link href={`/crm/prospects/${p.id}`} className="font-medium text-signal hover:underline">
                       {p.company_name ?? p.domain}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-slate-400">{p.domain}</td>
-                  <td className="px-3 py-2 text-slate-200">{STAGE_META[p.stage]?.label ?? p.stage}</td>
-                  <td className="px-3 py-2 text-slate-300">{pipelineLabel(p.pipeline_status ?? undefined)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">
+                  <td className="px-3 py-2 text-ink-200">{p.domain}</td>
+                  <td className="px-3 py-2 text-ink-100">{STAGE_META[p.stage]?.label ?? p.stage}</td>
+                  <td className="px-3 py-2 text-ink-100">{pipelineLabel(p.pipeline_status ?? undefined)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-100">
                     {p.lead_score != null ? p.lead_score : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">{p.hawk_score}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-ink-100">{p.hawk_score}</td>
                 </tr>
               ))}
             </tbody>

@@ -136,7 +136,7 @@ export default function CrmSettingsPage() {
           <h1 className={crmPageTitle}>Settings</h1>
           <p className={crmPageSubtitle}>Only the CEO can modify CRM settings.</p>
         </div>
-        <div className={`${crmSurfaceCard} p-5 text-sm text-slate-400`}>
+        <div className={`${crmSurfaceCard} p-5 text-sm text-ink-200`}>
           Contact your CEO if you need a setting changed.
         </div>
       </div>
@@ -154,21 +154,21 @@ export default function CrmSettingsPage() {
         </div>
         <div className="flex items-center gap-2">
           {hasDirty && (
-            <span className="text-xs text-amber-400">
+            <span className="text-xs text-signal">
               {Object.keys(dirty).length} unsaved change{Object.keys(dirty).length === 1 ? "" : "s"}
             </span>
           )}
           <button
             onClick={() => setDirty({})}
             disabled={!hasDirty || saving}
-            className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-xs text-slate-300 hover:bg-[#14141f] disabled:opacity-40"
+            className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-xs text-ink-100 hover:bg-[#14141f] disabled:opacity-40"
           >
             Discard
           </button>
           <button
             onClick={() => void save()}
             disabled={!hasDirty || saving}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-signal-400 px-4 py-2 text-xs font-semibold text-white hover:bg-signal disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -180,7 +180,7 @@ export default function CrmSettingsPage() {
 
         <div className="space-y-6">
           {loading ? (
-            <div className={`${crmSurfaceCard} p-12 text-center text-sm text-slate-400`}>Loading…</div>
+            <div className={`${crmSurfaceCard} p-12 text-center text-sm text-ink-200`}>Loading…</div>
           ) : (
             <>
               {activeTab === "general" && <GeneralSection value={value} onChange={setField} />}

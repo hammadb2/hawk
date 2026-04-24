@@ -136,29 +136,29 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
       <div>
-        <Label className="text-slate-600">Full name</Label>
+        <Label className="text-ink-200">Full name</Label>
         <Input
           type="text"
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Dr. Jane Smith"
-          className="mt-1.5 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
+          className="mt-1.5 border-white/10 bg-ink-800 text-ink-0 placeholder:text-ink-0"
         />
       </div>
       <div>
-        <Label className="text-slate-600">Account email</Label>
+        <Label className="text-ink-200">Account email</Label>
         <Input
           type="email"
           readOnly
           value={email}
-          className="mt-1.5 border-slate-200 bg-slate-50 text-slate-600"
+          className="mt-1.5 border-white/10 bg-ink-900 text-ink-200"
         />
-        <p className="mt-1 text-xs text-slate-600">Must match your portal sign-in. Charged to this account.</p>
+        <p className="mt-1 text-xs text-ink-200">Must match your portal sign-in. Charged to this account.</p>
       </div>
       <div>
-        <Label className="text-slate-600">Card details</Label>
-        <div className="mt-1.5 rounded-lg border border-slate-200 bg-white px-3 py-3">
+        <Label className="text-ink-200">Card details</Label>
+        <div className="mt-1.5 rounded-lg border border-white/10 bg-ink-800 px-3 py-3">
           <CardElement
             options={{
               style: {
@@ -173,15 +173,15 @@ function PortalBillingFormInner({ plan }: { plan: "shield" | "starter" }) {
           />
         </div>
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red">{error}</p> : null}
       <Button
         type="submit"
         disabled={!stripe || loading || !email}
-        className="w-full bg-emerald-500 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60"
+        className="w-full bg-signal font-semibold text-white hover:bg-signal-400 disabled:opacity-60"
       >
         {loading ? "Processing…" : buttonLabel}
       </Button>
-      <p className="text-center text-xs text-slate-600">
+      <p className="text-center text-xs text-ink-200">
         Backed by our breach response guarantee. Cancel anytime.
       </p>
     </form>
@@ -243,8 +243,8 @@ function PortalBillingContent() {
 
   if (paidCheck === "loading" || paidCheck === "paid") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-slate-600">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[50vh] items-center justify-center text-ink-200">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -252,28 +252,28 @@ function PortalBillingContent() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">Subscribe</h1>
-        <Link href="/#pricing" className="text-sm text-slate-600 hover:text-emerald-600">
+        <h1 className="text-lg font-semibold text-ink-0">Subscribe</h1>
+        <Link href="/#pricing" className="text-sm text-ink-200 hover:text-signal">
           ← Back to pricing
         </Link>
       </div>
 
-      <p className="mb-6 text-center text-sm text-slate-600">
+      <p className="mb-6 text-center text-sm text-ink-200">
         Activate your subscription to open the full HAWK client portal.
       </p>
 
       {!stripePromise ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-800">
+        <p className="rounded-lg border border-red/30 bg-red/10 px-4 py-3 text-center text-sm text-red">
           Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
         </p>
       ) : (
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm sm:p-8">
-            <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+          <div className="rounded-2xl border border-white/10 bg-ink-800 p-6 shadow-sm sm:p-8">
+            <h2 className="text-2xl font-bold text-ink-0">{title}</h2>
             <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
               {price}
             </p>
-            <ul className="mt-6 space-y-2 text-sm text-slate-700">
+            <ul className="mt-6 space-y-2 text-sm text-ink-100">
               {features.map((f) => (
                 <li key={f} className="flex gap-2">
                   <span style={{ color: ACCENT }}>✓</span>
@@ -281,15 +281,15 @@ function PortalBillingContent() {
                 </li>
               ))}
             </ul>
-            <p className="mt-8 text-sm leading-relaxed text-slate-600">
+            <p className="mt-8 text-sm leading-relaxed text-ink-200">
               Backed by our breach response guarantee.
               <br />
               Cancel anytime.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm sm:p-8">
-            <h2 className="mb-6 text-lg font-semibold text-slate-900">Payment</h2>
+          <div className="rounded-2xl border border-white/10 bg-ink-800 p-6 shadow-sm sm:p-8">
+            <h2 className="mb-6 text-lg font-semibold text-ink-0">Payment</h2>
             <Elements stripe={stripePromise}>
               <PortalBillingFormInner plan={plan} />
             </Elements>
@@ -304,8 +304,8 @@ export default function PortalBillingPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+        <div className="flex min-h-screen items-center justify-center bg-ink-900">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
         </div>
       }
     >

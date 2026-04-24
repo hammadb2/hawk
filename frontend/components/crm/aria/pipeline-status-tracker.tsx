@@ -90,8 +90,8 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-4">
-        <p className="text-sm text-red-300">{error}</p>
+      <div className="rounded-xl border border-red/40 bg-red/15 p-4">
+        <p className="text-sm text-red">{error}</p>
       </div>
     );
   }
@@ -100,8 +100,8 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
     return (
       <div className="rounded-xl border border-crmBorder bg-crmSurface2 p-4">
         <div className="flex items-center gap-2">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
-          <p className="text-sm text-slate-500">Loading pipeline status...</p>
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-crmBorder border-t-signal" />
+          <p className="text-sm text-ink-0">Loading pipeline status...</p>
         </div>
       </div>
     );
@@ -120,7 +120,7 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
           <div
             className={cn(
               "h-2 w-2 rounded-full",
-              isCompleted ? "bg-emerald-500" : isFailed ? "bg-red-500" : isPaused ? "bg-amber-500" : "animate-pulse bg-emerald-500",
+              isCompleted ? "bg-signal" : isFailed ? "bg-red/100" : isPaused ? "bg-signal" : "animate-pulse bg-signal",
             )}
           />
           <span className="text-sm font-semibold text-white">
@@ -130,9 +130,9 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
         <span
           className={cn(
             "rounded-full px-2.5 py-0.5 text-xs font-medium",
-            isCompleted && "bg-emerald-500/15 text-emerald-400",
-            isFailed && "bg-red-500/15 text-red-300",
-            isPaused && "bg-amber-500/15 text-amber-300",
+            isCompleted && "bg-signal/15 text-signal",
+            isFailed && "bg-red/100/15 text-red",
+            isPaused && "bg-signal/15 text-signal-200",
             !isCompleted && !isFailed && !isPaused && "bg-blue-500/15 text-blue-300",
           )}
         >
@@ -150,23 +150,23 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
               <div key={step.key} className="flex items-center gap-3">
                 <div className="flex-shrink-0">
                   {isDone ? (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-signal/15 text-signal">
                       <Check className="h-4 w-4" strokeWidth={2.5} />
                     </div>
                   ) : isCurrent ? (
                     <div className="relative flex h-7 w-7 items-center justify-center">
-                      <span className="absolute inset-0 rounded-full bg-emerald-500/25 animate-ping" />
-                      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-emerald-500/60 bg-emerald-500/10 ring-2 ring-emerald-500/30">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="absolute inset-0 rounded-full bg-signal/25 animate-ping" />
+                      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-signal/60 bg-signal/10 ring-2 ring-signal/30">
+                        <span className="h-2.5 w-2.5 rounded-full bg-signal-400 animate-pulse" />
                       </span>
                     </div>
                   ) : isFailed && i === currentIdx ? (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/15 text-red-400">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red/100/15 text-red">
                       <span className="text-xs font-bold">!</span>
                     </div>
                   ) : (
                     <div className="flex h-7 w-7 items-center justify-center rounded-full border border-crmBorder bg-crmSurface2">
-                      <div className="h-2 w-2 rounded-full bg-slate-600" />
+                      <div className="h-2 w-2 rounded-full bg-ink-600" />
                     </div>
                   )}
                 </div>
@@ -175,18 +175,18 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
                   <p
                     className={cn(
                       "text-sm",
-                      isDone && "font-medium text-emerald-400",
-                      isCurrent && "font-medium text-emerald-300",
-                      !isDone && !isCurrent && "text-slate-500",
+                      isDone && "font-medium text-signal",
+                      isCurrent && "font-medium text-signal-200",
+                      !isDone && !isCurrent && "text-ink-0",
                     )}
                   >
                     {step.label}
                   </p>
-                  {isCurrent && <p className="mt-0.5 text-xs text-slate-500">{step.description}…</p>}
+                  {isCurrent && <p className="mt-0.5 text-xs text-ink-0">{step.description}…</p>}
                 </div>
 
                 {isDone && (
-                  <span className="font-mono text-xs text-slate-500">
+                  <span className="font-mono text-xs text-ink-0">
                     {step.key === "apify_discover" && status.leads_pulled > 0 && `${status.leads_pulled} leads`}
                     {step.key === "zerobounce_verify" && status.leads_verified > 0 && `${status.leads_verified} verified`}
                     {step.key === "hawk_scan" && status.leads_scanned > 0 && `${status.leads_scanned} scanned`}
@@ -205,23 +205,23 @@ export function PipelineStatusTracker({ runId, accessToken, onComplete }: Props)
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
               <p className="text-lg font-bold text-white">{status.leads_pulled}</p>
-              <p className="text-xs text-slate-500">Pulled</p>
+              <p className="text-xs text-ink-0">Pulled</p>
             </div>
             <div>
-              <p className="text-lg font-bold text-emerald-400">{status.vulnerabilities_found}</p>
-              <p className="text-xs text-slate-500">Vulns Found</p>
+              <p className="text-lg font-bold text-signal">{status.vulnerabilities_found}</p>
+              <p className="text-xs text-ink-0">Vulns Found</p>
             </div>
             <div>
               <p className="text-lg font-bold text-blue-400">{status.emails_sent}</p>
-              <p className="text-xs text-slate-500">Emails Sent</p>
+              <p className="text-xs text-ink-0">Emails Sent</p>
             </div>
           </div>
         </div>
       )}
 
       {isFailed && status.error_message && (
-        <div className="border-t border-red-500/30 bg-red-950/30 px-4 py-2">
-          <p className="text-xs text-red-300">{status.error_message}</p>
+        <div className="border-t border-red/30 bg-red/15 px-4 py-2">
+          <p className="text-xs text-red">{status.error_message}</p>
         </div>
       )}
     </div>

@@ -156,9 +156,9 @@ export function OnboardingQuiz({ module, onComplete }: Props) {
     const score = Math.round((correct / questions.length) * 100);
     const passed = score >= PASSING_SCORE;
     return (
-      <div className="rounded-lg border border-slate-700 bg-[#161625] p-6 text-center">
-        <p className={`text-2xl font-bold ${passed ? "text-emerald-400" : "text-red-400"}`}>{score}%</p>
-        <p className="mt-2 text-sm text-slate-400">
+      <div className="rounded-lg border border-ink-700 bg-[#161625] p-6 text-center">
+        <p className={`text-2xl font-bold ${passed ? "text-signal" : "text-red"}`}>{score}%</p>
+        <p className="mt-2 text-sm text-ink-200">
           {passed ? "You passed! Moving on..." : "You need 70% to pass. The AI will help you retry."}
         </p>
       </div>
@@ -170,10 +170,10 @@ export function OnboardingQuiz({ module, onComplete }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-0">
           Question {currentQ + 1} of {questions.length}
         </p>
-        <p className="text-xs text-slate-500">{module.replace(/_/g, " ")}</p>
+        <p className="text-xs text-ink-0">{module.replace(/_/g, " ")}</p>
       </div>
       <p className="text-sm font-medium text-white">{q.question}</p>
       <div className="space-y-2">
@@ -183,12 +183,12 @@ export function OnboardingQuiz({ module, onComplete }: Props) {
             onClick={() => selectAnswer(i)}
             className={`w-full rounded-lg border px-4 py-3 text-left text-sm transition ${
               selected === null
-                ? "border-slate-700 bg-[#161625] text-slate-300 hover:border-emerald-500/50"
+                ? "border-ink-700 bg-[#161625] text-ink-100 hover:border-signal/50"
                 : i === q.correct
-                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
+                  ? "border-signal bg-signal/10 text-signal"
                   : i === selected
-                    ? "border-red-500 bg-red-500/10 text-red-400"
-                    : "border-slate-700 bg-[#161625] text-slate-500"
+                    ? "border-red bg-red/100/10 text-red"
+                    : "border-ink-700 bg-[#161625] text-ink-0"
             }`}
           >
             {opt}
@@ -198,7 +198,7 @@ export function OnboardingQuiz({ module, onComplete }: Props) {
       {selected !== null && (
         <button
           onClick={nextQuestion}
-          className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+          className="rounded-lg bg-signal-400 px-5 py-2 text-sm font-semibold text-white hover:bg-signal-600 transition"
         >
           {currentQ + 1 >= questions.length ? "See Results" : "Next Question"}
         </button>

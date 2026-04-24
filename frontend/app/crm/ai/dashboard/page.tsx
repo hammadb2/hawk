@@ -65,17 +65,17 @@ interface PipelineHealth {
 
 function KPICard({ label, value, sub, color = "emerald" }: { label: string; value: string | number; sub?: string; color?: string }) {
   const colorMap: Record<string, string> = {
-    emerald: "border-emerald-500/30",
+    emerald: "border-signal/30",
     blue: "border-sky-500/30",
-    amber: "border-amber-500/30",
-    red: "border-rose-500/30",
+    amber: "border-signal/30",
+    red: "border-red/30",
     slate: "border-[#1e1e2e]",
   };
   return (
     <div className={`rounded-xl border bg-[#111118] p-4 ${colorMap[color] || colorMap.emerald}`}>
-      <p className="text-xs font-medium text-slate-400">{label}</p>
+      <p className="text-xs font-medium text-ink-200">{label}</p>
       <p className="mt-1 text-2xl font-bold text-white">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+      {sub && <p className="mt-0.5 text-xs text-ink-0">{sub}</p>}
     </div>
   );
 }
@@ -90,9 +90,9 @@ function PipelineDoctorCard({
   onRun: () => void;
 }) {
   const severityColor: Record<string, string> = {
-    critical: "text-rose-400 bg-rose-500/10 border-rose-500/30",
-    warn: "text-amber-300 bg-amber-500/10 border-amber-500/30",
-    info: "text-slate-400 bg-slate-500/10 border-slate-500/20",
+    critical: "text-red bg-red/100/10 border-red/30",
+    warn: "text-signal-200 bg-signal/10 border-signal/30",
+    info: "text-ink-200 bg-ink-9000/10 border-ink-500/20",
   };
   const buckets = health?.buckets ?? [];
   const stuckBuckets = buckets.filter((b) => (b.stuck ?? 0) > 0);
@@ -109,7 +109,7 @@ function PipelineDoctorCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-white">ARIA Pipeline Doctor</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-ink-0">
             {health
               ? `${health.summary ?? ""}${ageLabel ? ` · last run ${ageLabel}` : ""}`
               : "No snapshot yet — scheduler runs every 15 min"}
@@ -119,14 +119,14 @@ function PipelineDoctorCard({
           type="button"
           onClick={onRun}
           disabled={running}
-          className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-950/60 disabled:opacity-50"
+          className="rounded-lg border border-signal/30 bg-ink-800/30 px-3 py-1.5 text-xs font-medium text-signal-200 hover:bg-ink-800/60 disabled:opacity-50"
         >
           {running ? "Diagnosing…" : "Run now"}
         </button>
       </div>
 
       {healthy && (
-        <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-950/20 p-3 text-xs text-emerald-200">
+        <div className="mt-3 rounded-lg border border-signal/25 bg-ink-800/20 p-3 text-xs text-signal-200">
           Pipeline healthy — every stage flushing on schedule.
         </div>
       )}
@@ -149,10 +149,10 @@ function PipelineDoctorCard({
                   </span>
                 </div>
                 {b.diagnosis && (
-                  <p className="mt-1 whitespace-pre-wrap text-slate-200/80">{b.diagnosis}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-ink-100/80">{b.diagnosis}</p>
                 )}
                 {fix && (
-                  <p className="mt-1 text-[11px] text-slate-400">
+                  <p className="mt-1 text-[11px] text-ink-200">
                     Auto-fix: {fix.applied ? "applied" : "skipped"}
                     {fix.reason ? ` — ${String(fix.reason)}` : ""}
                     {fix.processed !== undefined ? ` · processed ${String(fix.processed)}` : ""}
@@ -177,9 +177,9 @@ function StageBar({ stages }: { stages: Record<string, number> }) {
     scanned: "bg-cyan-500",
     sent_email: "bg-indigo-400",
     replied: "bg-yellow-400",
-    call_booked: "bg-emerald-400",
+    call_booked: "bg-signal-400",
     closed_won: "bg-green-500",
-    lost: "bg-red-400",
+    lost: "bg-red/15",
   };
 
   return (
@@ -188,16 +188,16 @@ function StageBar({ stages }: { stages: Record<string, number> }) {
         {Object.entries(stages).map(([stage, count]) => (
           <div
             key={stage}
-            className={`${colors[stage] || "bg-slate-300"} transition-all`}
+            className={`${colors[stage] || "bg-ink-600"} transition-all`}
             style={{ width: `${(count / total) * 100}%` }}
             title={`${stage}: ${count}`}
           />
         ))}
       </div>
-      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+      <div className="flex flex-wrap gap-3 text-xs text-ink-200">
         {Object.entries(stages).map(([stage, count]) => (
           <span key={stage} className="flex items-center gap-1">
-            <span className={`inline-block h-2 w-2 rounded-full ${colors[stage] || "bg-slate-300"}`} />
+            <span className={`inline-block h-2 w-2 rounded-full ${colors[stage] || "bg-ink-600"}`} />
             {stage.replace("_", " ")}: {count}
           </span>
         ))}
@@ -270,7 +270,7 @@ export default function CEODashboardPage() {
   if (!profile) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -278,7 +278,7 @@ export default function CEODashboardPage() {
   if (profile.role !== "ceo") {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-slate-500">God Mode Dashboard is CEO-only.</p>
+        <p className="text-ink-0">God Mode Dashboard is CEO-only.</p>
       </div>
     );
   }
@@ -287,8 +287,8 @@ export default function CEODashboardPage() {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-          <p className="mt-3 text-sm text-slate-500">Loading God Mode Dashboard...</p>
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
+          <p className="mt-3 text-sm text-ink-0">Loading God Mode Dashboard...</p>
         </div>
       </div>
     );
@@ -297,7 +297,7 @@ export default function CEODashboardPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-red-500">{error}</p>
+        <p className="text-red">{error}</p>
       </div>
     );
   }
@@ -312,7 +312,7 @@ export default function CEODashboardPage() {
         </div>
         <button
           onClick={() => void fetchDashboard()}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
+          className="rounded-lg bg-signal-400 px-4 py-2 text-sm font-medium text-white hover:bg-signal-600 transition"
         >
           Refresh
         </button>
@@ -320,12 +320,12 @@ export default function CEODashboardPage() {
 
       {/* AI Narration */}
       {narration && (
-        <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/25 p-5">
+        <div className="rounded-xl border border-signal/25 bg-ink-800/25 p-5">
           <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal-400 text-white text-xs font-bold">
               A
             </div>
-            <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap text-sm text-slate-300">
+            <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap text-sm text-ink-100">
               {narration}
             </div>
           </div>
@@ -358,7 +358,7 @@ export default function CEODashboardPage() {
           <div className={`p-5 ${crmSurfaceCard}`}>
             <h2 className="mb-3 text-sm font-semibold text-white">Pipeline ({data.pipeline.total_prospects} total)</h2>
             <StageBar stages={data.pipeline.stages} />
-            <div className="mt-3 flex gap-6 text-xs text-slate-400">
+            <div className="mt-3 flex gap-6 text-xs text-ink-200">
               <span>New this week: {data.pipeline.new_this_week}</span>
               <span>Conversion rate: {data.pipeline.conversion_rate}%</span>
             </div>
@@ -378,7 +378,7 @@ export default function CEODashboardPage() {
               <div className="space-y-2">
                 {Object.entries(data.revenue.plan_breakdown).map(([plan, count]) => (
                   <div key={plan} className="flex items-center justify-between">
-                    <span className="text-sm capitalize text-slate-400">{plan}</span>
+                    <span className="text-sm capitalize text-ink-200">{plan}</span>
                     <span className="text-sm font-medium text-white">{count} clients</span>
                   </div>
                 ))}
@@ -389,11 +389,11 @@ export default function CEODashboardPage() {
               <h2 className="mb-3 text-sm font-semibold text-white">Outbound Status</h2>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-400">Pending replies</span>
+                  <span className="text-sm text-ink-200">Pending replies</span>
                   <span className="text-sm font-medium text-white">{data.outbound.pending_replies}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-400">Recent pipeline runs</span>
+                  <span className="text-sm text-ink-200">Recent pipeline runs</span>
                   <span className="text-sm font-medium text-white">{data.outbound.recent_pipeline_runs.length}</span>
                 </div>
               </div>

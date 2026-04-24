@@ -46,12 +46,12 @@ export function SettingsTabs({
                 className={[
                   "w-full rounded-lg border px-3 py-2 text-left transition",
                   isActive
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                    : "border-transparent text-slate-300 hover:bg-[#14141f]",
+                    ? "border-signal/40 bg-signal/10 text-signal-200"
+                    : "border-transparent text-ink-100 hover:bg-[#14141f]",
                 ].join(" ")}
               >
                 <div className="text-sm font-medium">{tab.label}</div>
-                <div className="mt-0.5 text-[11px] text-slate-500">{tab.description}</div>
+                <div className="mt-0.5 text-[11px] text-ink-0">{tab.description}</div>
               </button>
             </li>
           );

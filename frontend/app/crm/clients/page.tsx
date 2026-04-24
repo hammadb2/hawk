@@ -18,10 +18,10 @@ import {
 } from "@/lib/crm/crm-surface";
 
 function statusClass(s: string): string {
-  if (s === "active") return "text-emerald-400";
-  if (s === "past_due") return "text-amber-400";
-  if (s === "churned") return "text-rose-400";
-  return "text-slate-400";
+  if (s === "active") return "text-signal";
+  if (s === "past_due") return "text-signal";
+  if (s === "churned") return "text-red";
+  return "text-ink-200";
 }
 
 function ClientsTableSkeleton() {
@@ -100,7 +100,7 @@ export default function ClientsPage() {
         </div>
         <button
           type="button"
-          className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-3 py-1.5 text-sm text-slate-300 hover:bg-[#1a1a24]"
+          className="rounded-lg border border-[#1e1e2e] bg-[#111118] px-3 py-1.5 text-sm text-ink-100 hover:bg-[#1a1a24]"
           onClick={() => void mutate()}
         >
           Refresh
@@ -131,25 +131,25 @@ export default function ClientsPage() {
                 <tr key={c.id} className={crmTableRow}>
                   <td className="px-3 py-2">
                     {c.prospect_id ? (
-                      <Link href={`/crm/prospects/${c.prospect_id}`} className="font-medium text-emerald-400 hover:underline">
+                      <Link href={`/crm/prospects/${c.prospect_id}`} className="font-medium text-signal hover:underline">
                         {c.company_name ?? "—"}
                       </Link>
                     ) : (
                       <span className="font-medium text-white">{c.company_name ?? "—"}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-slate-400">{c.domain ?? "—"}</td>
-                  <td className="px-3 py-2 capitalize text-slate-300">{c.plan ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-200">{formatUsd(c.mrr_cents)}</td>
-                  <td className="px-3 py-2 text-slate-400">
+                  <td className="px-3 py-2 text-ink-200">{c.domain ?? "—"}</td>
+                  <td className="px-3 py-2 capitalize text-ink-100">{c.plan ?? "—"}</td>
+                  <td className="px-3 py-2 text-ink-100">{formatUsd(c.mrr_cents)}</td>
+                  <td className="px-3 py-2 text-ink-200">
                     {c.closing_rep_id ? (repNames[c.closing_rep_id] ?? c.closing_rep_id.slice(0, 8)) : "—"}
                   </td>
                   <td className={cn("px-3 py-2 font-medium", statusClass(c.status))}>{c.status}</td>
-                  <td className="px-3 py-2 text-slate-400">{new Date(c.close_date).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-ink-200">{new Date(c.close_date).toLocaleDateString()}</td>
                   <td className="px-3 py-2">
                     <Link
                       href={`/crm/clients/${c.id}/enterprise`}
-                      className="text-emerald-400/90 hover:underline"
+                      className="text-signal/90 hover:underline"
                     >
                       {(c.monitored_domains?.length ?? 0) > 0
                         ? `${c.monitored_domains?.length} extra`

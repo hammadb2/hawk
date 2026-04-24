@@ -95,7 +95,7 @@ export default function OnboardingReviewDetailPage() {
   if (!profile || (profile.role !== "ceo" && profile.role !== "hos" && profile.role_type !== "va_manager")) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-500">You do not have permission to view this page.</p>
+        <p className="text-ink-0">You do not have permission to view this page.</p>
       </div>
     );
   }
@@ -103,7 +103,7 @@ export default function OnboardingReviewDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -111,7 +111,7 @@ export default function OnboardingReviewDetailPage() {
   if (!detail) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-500">Submission not found.</p>
+        <p className="text-ink-0">Submission not found.</p>
       </div>
     );
   }
@@ -124,24 +124,24 @@ export default function OnboardingReviewDetailPage() {
         <div>
           <button
             onClick={() => router.push("/crm/onboarding/review")}
-            className="mb-2 text-xs text-emerald-600 hover:text-emerald-700"
+            className="mb-2 text-xs text-signal hover:text-signal-400"
           >
             &larr; Back to queue
           </button>
           <h1 className="text-xl font-semibold text-white">
             {hireProfile.full_name}&apos;s Onboarding
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-200">
             {hireProfile.email} &middot; {hireProfile.role_type || hireProfile.role}
           </p>
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-medium ${
             detail.session.status === "pending_review"
-              ? "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30"
+              ? "bg-signal/15 text-signal-200 ring-1 ring-signal/30"
               : detail.session.status === "approved"
-                ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
-                : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30"
+                ? "bg-signal/15 text-signal-200 ring-1 ring-signal/30"
+                : "bg-red/100/15 text-red ring-1 ring-red/30"
           }`}
         >
           {detail.session.status === "pending_review" ? "Pending Review" : detail.session.status}
@@ -154,13 +154,13 @@ export default function OnboardingReviewDetailPage() {
           <div className="grid grid-cols-2 gap-3">
             {Object.entries(personal_details).map(([k, v]) => (
               <div key={k}>
-                <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
-                <p className="text-sm text-slate-200">{v || "—"}</p>
+                <p className="text-xs text-ink-0">{k.replace(/_/g, " ")}</p>
+                <p className="text-sm text-ink-100">{v || "—"}</p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">Not submitted yet.</p>
+          <p className="text-sm text-ink-200">Not submitted yet.</p>
         )}
       </Section>
 
@@ -170,13 +170,13 @@ export default function OnboardingReviewDetailPage() {
           <div className="grid grid-cols-2 gap-3">
             {Object.entries(bank_details).map(([k, v]) => (
               <div key={k}>
-                <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
-                <p className="text-sm text-slate-200">{v || "—"}</p>
+                <p className="text-xs text-ink-0">{k.replace(/_/g, " ")}</p>
+                <p className="text-sm text-ink-100">{v || "—"}</p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">Not submitted yet.</p>
+          <p className="text-sm text-ink-200">Not submitted yet.</p>
         )}
       </Section>
 
@@ -187,12 +187,12 @@ export default function OnboardingReviewDetailPage() {
             href={submission.government_id_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-emerald-600 hover:underline"
+            className="text-sm text-signal hover:underline"
           >
             View uploaded ID
           </a>
         ) : (
-          <p className="text-sm text-slate-400">Not uploaded yet.</p>
+          <p className="text-sm text-ink-200">Not uploaded yet.</p>
         )}
       </Section>
 
@@ -202,14 +202,14 @@ export default function OnboardingReviewDetailPage() {
           <div className="space-y-2">
             {documents.map((doc) => (
               <div key={doc.document_type} className={`flex items-center justify-between px-3 py-2 ${crmFieldSurface}`}>
-                <span className="text-sm font-medium text-slate-300">{doc.document_type.replace("_", " ")}</span>
+                <span className="text-sm font-medium text-ink-100">{doc.document_type.replace("_", " ")}</span>
                 <div className="flex items-center gap-3">
                   {doc.file_url && (
-                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline">
+                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-signal hover:underline">
                       View PDF
                     </a>
                   )}
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-ink-0">
                     Signed {new Date(doc.signed_at).toLocaleString()}
                   </span>
                 </div>
@@ -217,7 +217,7 @@ export default function OnboardingReviewDetailPage() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">No documents signed yet.</p>
+          <p className="text-sm text-ink-200">No documents signed yet.</p>
         )}
       </Section>
 
@@ -227,12 +227,12 @@ export default function OnboardingReviewDetailPage() {
           <div className="space-y-2">
             {quiz_results.map((q) => (
               <div key={q.module} className={`flex items-center justify-between px-3 py-2 ${crmFieldSurface}`}>
-                <span className="text-sm text-slate-300">{q.module.replace(/_/g, " ")}</span>
+                <span className="text-sm text-ink-100">{q.module.replace(/_/g, " ")}</span>
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${q.passed ? "text-emerald-600" : "text-red-600"}`}>
+                  <span className={`text-sm font-medium ${q.passed ? "text-signal" : "text-red"}`}>
                     {q.score}%
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${q.passed ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${q.passed ? "bg-signal/15 text-signal-200" : "bg-red/100/15 text-red"}`}>
                     {q.passed ? "Passed" : "Failed"}
                   </span>
                 </div>
@@ -240,7 +240,7 @@ export default function OnboardingReviewDetailPage() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">No quizzes completed yet.</p>
+          <p className="text-sm text-ink-200">No quizzes completed yet.</p>
         )}
       </Section>
 
@@ -250,8 +250,8 @@ export default function OnboardingReviewDetailPage() {
           <div className="grid grid-cols-2 gap-3">
             {Object.entries(detail.session.agreed_terms).map(([k, v]) => (
               <div key={k}>
-                <p className="text-xs text-slate-500">{k.replace(/_/g, " ")}</p>
-                <p className="text-sm text-slate-200">{String(v) || "—"}</p>
+                <p className="text-xs text-ink-0">{k.replace(/_/g, " ")}</p>
+                <p className="text-sm text-ink-100">{String(v) || "—"}</p>
               </div>
             ))}
           </div>
@@ -265,14 +265,14 @@ export default function OnboardingReviewDetailPage() {
             <button
               onClick={() => void handleAction("approve")}
               disabled={submitting}
-              className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+              className="rounded-lg bg-signal-400 px-6 py-2.5 text-sm font-semibold text-white hover:bg-signal-600 disabled:opacity-50 transition"
             >
               Approve
             </button>
             <button
               onClick={() => setShowReject(!showReject)}
               disabled={submitting}
-              className="rounded-lg bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition"
+              className="rounded-lg bg-red/15 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red/15 disabled:opacity-50 transition"
             >
               Reject
             </button>
@@ -283,13 +283,13 @@ export default function OnboardingReviewDetailPage() {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Reason for rejection (required)..."
-                className={`w-full px-3 py-2 text-sm placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none ${crmFieldSurface}`}
+                className={`w-full px-3 py-2 text-sm placeholder:text-ink-0 focus:border-signal/50 focus:outline-none ${crmFieldSurface}`}
                 rows={3}
               />
               <button
                 onClick={() => void handleAction("reject")}
                 disabled={submitting || !rejectionReason.trim()}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition"
+                className="rounded-lg bg-red/15 px-4 py-2 text-sm font-semibold text-white hover:bg-red/15 disabled:opacity-50 transition"
               >
                 Confirm Rejection
               </button>

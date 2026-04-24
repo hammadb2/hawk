@@ -31,10 +31,10 @@ type ClientRow = {
 
 function StatusBadge({ label, variant }: { label: string; variant: "green" | "amber" | "red" | "zinc" }) {
   const colors = {
-    green: "bg-emerald-500/15 text-emerald-300 border-emerald-600/50",
-    amber: "bg-amber-900/50 text-amber-400 border-amber-700",
-    red: "bg-rose-900/50 text-rose-400 border-rose-700",
-    zinc: "bg-[#1a1a24] text-slate-400 border-[#1e1e2e]",
+    green: "bg-signal/15 text-signal-200 border-signal/50/50",
+    amber: "bg-ink-800/50 text-signal border-signal/50",
+    red: "bg-red/15 text-red border-red/30",
+    zinc: "bg-[#1a1a24] text-ink-200 border-[#1e1e2e]",
   };
   return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${colors[variant]}`}>{label}</span>;
 }
@@ -95,7 +95,7 @@ export default function ClientOnboardingChecklistPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" asChild>
+        <Button variant="outline" size="sm" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" asChild>
           <Link href="/crm/clients">← Clients</Link>
         </Button>
       </div>
@@ -107,14 +107,14 @@ export default function ClientOnboardingChecklistPage() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
         </div>
       ) : (
         <>
           {/* Client status cards */}
           <div className="grid gap-3 sm:grid-cols-3">
             <div className={`px-4 py-3 ${crmSurfaceCard}`}>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Account Status</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Account Status</div>
               <div className="mt-1">
                 <StatusBadge
                   label={client?.status || "unknown"}
@@ -123,11 +123,11 @@ export default function ClientOnboardingChecklistPage() {
               </div>
             </div>
             <div className={`px-4 py-3 ${crmSurfaceCard}`}>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Guarantee</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Guarantee</div>
               <div className="mt-1">{guaranteeBadge(client?.guarantee_status)}</div>
             </div>
             <div className={`px-4 py-3 ${crmSurfaceCard}`}>
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Portal</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-200">Portal</div>
               <div className="mt-1">
                 <StatusBadge
                   label={client?.portal_user_id ? "Portal linked" : "No portal account"}
@@ -143,10 +143,10 @@ export default function ClientOnboardingChecklistPage() {
             <div className="mt-4 space-y-3">
               {milestones.map((m, i) => (
                 <div key={i} className="flex items-center gap-3 text-sm">
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${m.done ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300" : "border-[#1e1e2e] bg-[#0d0d14] text-slate-500"}`}>
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${m.done ? "border-signal/60 bg-signal/15 text-signal-200" : "border-[#1e1e2e] bg-[#0d0d14] text-ink-0"}`}>
                     {m.done ? "\u2713" : i + 1}
                   </div>
-                  <span className={m.done ? "text-slate-300" : "text-slate-500"}>{m.label}</span>
+                  <span className={m.done ? "text-ink-100" : "text-ink-0"}>{m.label}</span>
                 </div>
               ))}
             </div>
@@ -156,11 +156,11 @@ export default function ClientOnboardingChecklistPage() {
           <div className={`p-5 ${crmSurfaceCard}`}>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">Onboarding Call Checklist</h2>
-              <span className="text-xs text-slate-400">{completedCount}/{CHECKLIST.length}</span>
+              <span className="text-xs text-ink-200">{completedCount}/{CHECKLIST.length}</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#0d0d14]">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
+                className="h-full rounded-full bg-signal transition-all"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -169,7 +169,7 @@ export default function ClientOnboardingChecklistPage() {
                 <li key={i} className={`flex items-start gap-3 p-3 ${crmFieldSurface}`}>
                   <input
                     type="checkbox"
-                    className="mt-0.5 accent-emerald-500"
+                    className="mt-0.5 accent-signal"
                     checked={done[i]}
                     onChange={(e) =>
                       setDone((d) => {
@@ -179,13 +179,13 @@ export default function ClientOnboardingChecklistPage() {
                       })
                     }
                   />
-                  <span className={`text-sm ${done[i] ? "text-slate-500 line-through" : "text-slate-200"}`}>{line}</span>
+                  <span className={`text-sm ${done[i] ? "text-ink-0 line-through" : "text-ink-100"}`}>{line}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-0">
             After the call — mark onboarding complete and update client status in CRM.
           </p>
         </>

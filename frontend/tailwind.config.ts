@@ -10,18 +10,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /** Page canvas (light app shell) */
-        background: "#f8fafc",
+        /** Unified marketing scheme: graphite ink canvas + signal amber accent. */
+        background: "#07070A",
         surface: {
-          1: "#ffffff",
-          2: "#f1f5f9",
-          3: "#e2e8f0",
+          1: "#0B0B10",
+          2: "#111117",
+          3: "#16161E",
         },
         accent: {
-          DEFAULT: "#22C55E",
-          light: "#BBF7D0",
+          DEFAULT: "#FFB800",
+          light: "#FFECB0",
         },
-        /** Marketing redesign tokens (graphite + signal amber). */
         ink: {
           950: "#07070A",
           900: "#0B0B10",
@@ -54,13 +53,14 @@ const config: Config = {
         green: "#34D399",
         blue: "#60A5FA",
         yellow: "#FBBF24",
-        crmBg: "#0a0a0f",
-        crmSurface: "#111118",
-        crmBorder: "#1e1e2e",
-        crmSurface2: "#16161f",
-        "text-primary": "#0f172a",
-        "text-secondary": "#475569",
-        "text-dim": "#64748b",
+        /** CRM + legacy dashboard now share the ink palette. */
+        crmBg: "#07070A",
+        crmSurface: "#111117",
+        crmBorder: "#232330",
+        crmSurface2: "#16161E",
+        "text-primary": "#F5F5F7",
+        "text-secondary": "#BDBDC6",
+        "text-dim": "#8A8A97",
       },
       fontFamily: {
         sans: ["var(--font-cabinet)", "system-ui", "sans-serif"],

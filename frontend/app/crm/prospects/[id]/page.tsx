@@ -12,11 +12,11 @@ export default function ProspectFullPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="border-slate-200" asChild>
+        <Button variant="outline" size="sm" className="border-white/10" asChild>
           <Link href="/crm/pipeline">← Pipeline</Link>
         </Button>
       </div>
-      {id ? <ProspectProfile prospectId={id} variant="page" /> : <p className="text-slate-600">Invalid prospect</p>}
+      {id ? <ProspectProfile prospectId={id} variant="page" /> : <p className="text-ink-200">Invalid prospect</p>}
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function VoiceOutput({ text, accessToken }: VoiceOutputProps) {
     <button
       onClick={() => void play()}
       disabled={loading}
-      className="ml-2 inline-flex items-center rounded-md p-1 text-slate-400 hover:text-emerald-600 transition"
+      className="ml-2 inline-flex items-center rounded-md p-1 text-ink-200 hover:text-signal transition"
       title={playing ? "Stop" : "Listen"}
     >
       {loading ? (

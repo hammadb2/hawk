@@ -49,11 +49,11 @@ export function CrmLoginForm() {
   return (
     <div className={`w-full max-w-md p-8 shadow-xl ${crmSurfaceCard}`}>
       <h1 className="text-2xl font-semibold tracking-tight text-white">HAWK CRM</h1>
-      <p className="mt-2 text-sm text-slate-400">Sign in with a magic link (invite required).</p>
-      {err && <p className="mt-4 text-sm text-rose-400">Authentication failed. Try again.</p>}
+      <p className="mt-2 text-sm text-ink-200">Sign in with a magic link (invite required).</p>
+      {err && <p className="mt-4 text-sm text-red">Authentication failed. Try again.</p>}
       <form className="mt-8 space-y-4" onSubmit={sendLink}>
         <div>
-          <Label htmlFor="email" className="text-slate-400">
+          <Label htmlFor="email" className="text-ink-200">
             Work email
           </Label>
           <Input
@@ -72,17 +72,17 @@ export function CrmLoginForm() {
         </div>
         <Button
           type="submit"
-          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-90"
+          className="w-full bg-signal-400 hover:bg-signal disabled:opacity-90"
           disabled={loading || linkSent}
         >
           {loading ? "Sending…" : linkSent ? "Sent" : "Send magic link"}
         </Button>
         {linkSent && (
-          <p className="text-center text-sm text-slate-400">Check your inbox — edit the email above to send again.</p>
+          <p className="text-center text-sm text-ink-200">Check your inbox — edit the email above to send again.</p>
         )}
       </form>
-      <p className="mt-6 text-center text-xs text-slate-500">
-        <Link href="/" className="underline hover:text-slate-300">
+      <p className="mt-6 text-center text-xs text-ink-0">
+        <Link href="/" className="underline hover:text-ink-100">
           Back to HAWK product site
         </Link>
       </p>
