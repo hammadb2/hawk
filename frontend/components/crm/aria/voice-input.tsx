@@ -72,10 +72,10 @@ export function VoiceInput({ accessToken, onTranscription, disabled }: VoiceInpu
       disabled={disabled || processing}
       className={`rounded-xl border px-3 py-3 transition ${
         recording
-          ? "border-rose-500/40 bg-rose-950/30 text-rose-300 animate-pulse"
+          ? "border-red/40 bg-red/15 text-red animate-pulse"
           : processing
-          ? "border-[#1e1e2e] bg-[#0d0d14] text-slate-500"
-          : "border-[#1e1e2e] bg-[#111118] text-slate-400 hover:border-emerald-500/40 hover:text-emerald-400"
+          ? "border-[#1e1e2e] bg-[#0d0d14] text-ink-0"
+          : "border-[#1e1e2e] bg-[#111118] text-ink-200 hover:border-signal/40 hover:text-signal"
       }`}
       title={recording ? "Stop recording" : processing ? "Processing..." : "Voice input"}
     >

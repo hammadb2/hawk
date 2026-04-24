@@ -38,26 +38,26 @@ export default function PortalBriefingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Weekly AI threat briefing</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="text-2xl font-semibold text-ink-0">Weekly AI threat briefing</h1>
+        <p className="mt-1 text-sm text-ink-200">
           Every Monday we email a sector-focused briefing. The latest copy is saved here.
         </p>
-        <Link href="/portal" className="mt-2 inline-block text-sm text-emerald-600 hover:underline">
+        <Link href="/portal" className="mt-2 inline-block text-sm text-signal hover:underline">
           ← Back to overview
         </Link>
       </div>
 
-      {loading && <p className="text-slate-600">Loading…</p>}
-      {err && <p className="text-rose-600">{err}</p>}
+      {loading && <p className="text-ink-200">Loading…</p>}
+      {err && <p className="text-red">{err}</p>}
       {!loading && !err && !md && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6 text-sm text-slate-600">
+        <div className="rounded-xl border border-white/10 bg-ink-800 shadow-sm p-6 text-sm text-ink-200">
           No briefing yet for this week. After the scheduled job runs (Mondays ~7am MT), your analyst-style digest will
           appear here and in your inbox.
         </div>
       )}
       {md && (
-        <article className="prose prose-slate prose-sm prose-headings:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 max-w-none rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
-          {title && <h2 className="!mt-0 text-lg font-semibold text-slate-900">{title}</h2>}
+        <article className="prose prose-invert prose-sm prose-headings:text-ink-0 prose-p:text-ink-200 prose-li:text-ink-200 max-w-none rounded-2xl border border-white/10 bg-ink-800 shadow-sm p-6">
+          {title && <h2 className="!mt-0 text-lg font-semibold text-ink-0">{title}</h2>}
           <ReactMarkdown>{md}</ReactMarkdown>
         </article>
       )}

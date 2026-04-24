@@ -97,11 +97,11 @@ export default function ScoreboardPage() {
       </div>
 
       <Tabs defaultValue="live">
-        <TabsList className="border border-[#1e1e2e] bg-[#111118] text-slate-400">
-          <TabsTrigger value="live" className="data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-300">
+        <TabsList className="border border-[#1e1e2e] bg-[#111118] text-ink-200">
+          <TabsTrigger value="live" className="data-[state=active]:bg-signal/15 data-[state=active]:text-signal-200">
             Live
           </TabsTrigger>
-          <TabsTrigger value="history" className="data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-300">
+          <TabsTrigger value="history" className="data-[state=active]:bg-signal/15 data-[state=active]:text-signal-200">
             Historical
           </TabsTrigger>
         </TabsList>
@@ -118,8 +118,8 @@ export default function ScoreboardPage() {
                 type="button"
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   selectedMonth === i
-                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
-                    : "border-[#1e1e2e] bg-[#111118] text-slate-400 hover:bg-[#1a1a24]"
+                    ? "border-signal bg-signal/15 text-signal-200"
+                    : "border-[#1e1e2e] bg-[#111118] text-ink-200 hover:bg-[#1a1a24]"
                 }`}
                 onClick={() => setSelectedMonth(i)}
               >
@@ -129,7 +129,7 @@ export default function ScoreboardPage() {
           </div>
 
           {histLoading ? (
-            <div className="py-12 text-center text-slate-400">Loading…</div>
+            <div className="py-12 text-center text-ink-200">Loading…</div>
           ) : histRows.length === 0 ? (
             <p className={`${crmEmptyState} py-8`}>No closed deals for {months[selectedMonth].label}.</p>
           ) : (
@@ -146,12 +146,12 @@ export default function ScoreboardPage() {
                 <tbody>
                   {histRows.map((r, i) => (
                     <tr key={r.name} className={crmTableRow}>
-                      <td className="px-3 py-2 font-mono text-slate-500">
+                      <td className="px-3 py-2 font-mono text-ink-0">
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
                       </td>
                       <td className="px-3 py-2 font-medium text-white">{r.name}</td>
                       <td className="px-3 py-2 text-sky-400">{r.wins}</td>
-                      <td className="px-3 py-2 font-medium text-emerald-400">{formatUsd(r.commission)}</td>
+                      <td className="px-3 py-2 font-medium text-signal">{formatUsd(r.commission)}</td>
                     </tr>
                   ))}
                 </tbody>

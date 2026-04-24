@@ -305,7 +305,7 @@ export default function AiCommandCenterPage() {
   if (profile && BLOCKED_ROLES.includes(profile.role || "")) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-slate-500">The AI Command Center is not available for your role.</p>
+        <p className="text-ink-0">The AI Command Center is not available for your role.</p>
       </div>
     );
   }
@@ -316,14 +316,14 @@ export default function AiCommandCenterPage() {
         <div className="flex shrink-0 items-center justify-between border-b border-crmBorder px-4 py-4">
           <div>
             <h2 className="text-sm font-semibold text-white">Conversations</h2>
-            <p className="mt-0.5 text-[11px] text-slate-500">
+            <p className="mt-0.5 text-[11px] text-ink-0">
               {conversations.length} total
             </p>
           </div>
           <button
             type="button"
             onClick={() => void createConversation()}
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow shadow-emerald-900/30 transition hover:bg-emerald-500"
+            className="inline-flex items-center gap-1 rounded-lg bg-signal-400 px-3 py-1.5 text-xs font-semibold text-white shadow shadow-signal/30 transition hover:bg-signal"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -334,12 +334,12 @@ export default function AiCommandCenterPage() {
         <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2">
           {loadingConvs ? (
             <div className="flex justify-center py-6">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-crmBorder border-t-signal" />
             </div>
           ) : conversations.length === 0 ? (
             <div className="px-3 py-8 text-center">
-              <p className="text-xs text-slate-500">No conversations yet.</p>
-              <p className="mt-1 text-[11px] text-slate-600">Click “New” to start chatting with ARIA.</p>
+              <p className="text-xs text-ink-0">No conversations yet.</p>
+              <p className="mt-1 text-[11px] text-ink-200">Click “New” to start chatting with ARIA.</p>
             </div>
           ) : (
             conversations.map((c) => (
@@ -349,12 +349,12 @@ export default function AiCommandCenterPage() {
                 onClick={() => selectConversation(c.id)}
                 className={`group w-full rounded-xl px-3 py-2.5 text-left text-sm transition ${
                   activeConvId === c.id
-                    ? "border border-emerald-500/30 bg-emerald-500/10 font-medium text-emerald-300 shadow-sm shadow-emerald-900/10"
-                    : "border border-transparent text-slate-400 hover:border-crmBorder hover:bg-white/5 hover:text-slate-100"
+                    ? "border border-signal/30 bg-signal/10 font-medium text-signal-200 shadow-sm shadow-signal/30"
+                    : "border border-transparent text-ink-200 hover:border-crmBorder hover:bg-ink-800/5 hover:text-ink-0"
                 }`}
               >
                 <p className="truncate">{c.title}</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
+                <p className="mt-0.5 text-[11px] text-ink-0">
                   {new Date(c.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                 </p>
               </button>
@@ -366,8 +366,8 @@ export default function AiCommandCenterPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-h-0 lg:h-full">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-crmBorder bg-gradient-to-r from-crmSurface via-crmSurface to-crmSurface2 px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30">
-              <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal/15 ring-1 ring-signal/30">
+              <svg className="h-5 w-5 text-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -379,12 +379,12 @@ export default function AiCommandCenterPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-semibold text-white">ARIA</h1>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/30">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-signal/10 px-2 py-0.5 text-[10px] font-medium text-signal ring-1 ring-signal/30">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-400" />
                   Online
                 </span>
               </div>
-              <p className="mt-0.5 text-[11px] text-slate-400">
+              <p className="mt-0.5 text-[11px] text-ink-200">
                 {profile?.role === "ceo"
                   ? "Full access — all commands available"
                   : `${profile?.role_type || profile?.role || ""} access`}
@@ -394,7 +394,7 @@ export default function AiCommandCenterPage() {
           <button
             type="button"
             onClick={() => void createConversation()}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 lg:hidden"
+            className="rounded-lg bg-signal-400 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-signal lg:hidden"
           >
             + New
           </button>
@@ -407,10 +407,10 @@ export default function AiCommandCenterPage() {
           <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-4">
             {/* Unread briefing banner */}
             {visibleBriefings.map((briefing) => (
-              <div key={briefing.id} className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <div key={briefing.id} className="rounded-xl border border-signal/30 bg-signal/10 px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="mb-1 text-xs font-semibold text-amber-400">
+                    <p className="mb-1 text-xs font-semibold text-signal">
                       Briefing —{" "}
                       {new Date(briefing.briefing_date + "T00:00:00").toLocaleDateString("en-US", {
                         weekday: "long",
@@ -418,14 +418,14 @@ export default function AiCommandCenterPage() {
                         day: "numeric",
                       })}
                     </p>
-                    <div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+                    <div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-ink-100">
                       {briefing.content}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => void dismissBriefing(briefing.id)}
-                    className="flex-shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/10"
+                    className="flex-shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-signal-200 transition hover:bg-signal/10"
                   >
                     Dismiss
                   </button>
@@ -434,8 +434,8 @@ export default function AiCommandCenterPage() {
             ))}
             {messages.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-                <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/25 to-emerald-600/10 ring-1 ring-emerald-500/40">
-                  <svg className="h-10 w-10 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-signal/25 to-signal-600/10 ring-1 ring-signal/40">
+                  <svg className="h-10 w-10 text-signal-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -445,10 +445,10 @@ export default function AiCommandCenterPage() {
                   </svg>
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight text-white">Meet ARIA</h2>
-                <p className="mt-1 text-xs font-medium uppercase tracking-wider text-emerald-400">
+                <p className="mt-1 text-xs font-medium uppercase tracking-wider text-signal">
                   Automated Revenue & Intelligence Assistant
                 </p>
-                <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-slate-400">
+                <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-200">
                   Your chief of staff. I run pipelines, pull reports, analyze data, generate documents, and monitor the business 24/7.
                 </p>
                 <div className="mt-7 grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
@@ -465,11 +465,11 @@ export default function AiCommandCenterPage() {
                       onClick={() => {
                         setInput(suggestion);
                       }}
-                      className="group flex items-center justify-between rounded-xl border border-crmBorder bg-crmSurface px-4 py-3 text-left text-sm text-slate-300 transition hover:-translate-y-0.5 hover:border-emerald-500/40 hover:bg-crmSurface2 hover:text-white hover:shadow-lg hover:shadow-emerald-900/10"
+                      className="group flex items-center justify-between rounded-xl border border-crmBorder bg-crmSurface px-4 py-3 text-left text-sm text-ink-100 transition hover:-translate-y-0.5 hover:border-signal/40 hover:bg-crmSurface2 hover:text-white hover:shadow-lg hover:shadow-signal/30"
                     >
                       <span>{suggestion}</span>
                       <svg
-                        className="h-4 w-4 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-emerald-400"
+                        className="h-4 w-4 text-ink-0 transition group-hover:translate-x-0.5 group-hover:text-signal"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -487,8 +487,8 @@ export default function AiCommandCenterPage() {
                 className={`flex items-start gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.role !== "user" && (
-                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
-                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal/15 ring-1 ring-signal/30">
+                    <svg className="h-4 w-4 text-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -501,13 +501,13 @@ export default function AiCommandCenterPage() {
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                     msg.role === "user"
-                      ? "rounded-tr-md bg-emerald-600/90 text-white shadow-emerald-900/20"
-                      : "rounded-tl-md border border-crmBorder bg-crmSurface text-slate-200 shadow-black/20"
+                      ? "rounded-tr-md bg-signal-400/90 text-white shadow-signal/30"
+                      : "rounded-tl-md border border-crmBorder bg-crmSurface text-ink-100 shadow-black/20"
                   }`}
                 >
                   {msg.role === "assistant" && (
                     <div className="mb-1 flex items-center gap-1.5">
-                      <p className="text-xs font-semibold text-emerald-400">ARIA</p>
+                      <p className="text-xs font-semibold text-signal">ARIA</p>
                       {session?.access_token && msg.content && (
                         <VoiceOutput text={msg.content} accessToken={session.access_token} />
                       )}
@@ -516,8 +516,8 @@ export default function AiCommandCenterPage() {
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                   {msg.function_name && (
                     <div className="mt-2 rounded-lg bg-crmSurface2 px-3 py-2">
-                      <p className="text-xs text-slate-500">
-                        Action: <span className="font-mono text-emerald-400">{msg.function_name}</span>
+                      <p className="text-xs text-ink-0">
+                        Action: <span className="font-mono text-signal">{msg.function_name}</span>
                       </p>
                     </div>
                   )}
@@ -555,8 +555,8 @@ export default function AiCommandCenterPage() {
             ))}
             {sending && (
               <div className="flex items-start gap-2.5">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
-                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal/15 ring-1 ring-signal/30">
+                  <svg className="h-4 w-4 text-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -566,11 +566,11 @@ export default function AiCommandCenterPage() {
                   </svg>
                 </div>
                 <div className="rounded-2xl rounded-tl-md border border-crmBorder bg-crmSurface px-4 py-3 shadow-sm shadow-black/20">
-                  <p className="mb-1 text-xs font-semibold text-emerald-400">ARIA</p>
+                  <p className="mb-1 text-xs font-semibold text-signal">ARIA</p>
                   <div className="flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400/60" style={{ animationDelay: "0ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400/60" style={{ animationDelay: "150ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400/60" style={{ animationDelay: "300ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-signal-400/60" style={{ animationDelay: "0ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-signal-400/60" style={{ animationDelay: "150ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-signal-400/60" style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -593,7 +593,7 @@ export default function AiCommandCenterPage() {
 
         <div className="shrink-0 border-t border-crmBorder bg-crmSurface px-4 py-4 sm:px-6">
           <div className="mx-auto max-w-3xl">
-            <div className="flex items-center gap-2 rounded-2xl border border-crmBorder bg-crmSurface2 px-2 py-2 shadow-inner shadow-black/20 transition focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/30">
+            <div className="flex items-center gap-2 rounded-2xl border border-crmBorder bg-crmSurface2 px-2 py-2 shadow-inner shadow-black/20 transition focus-within:border-signal/50 focus-within:ring-1 focus-within:ring-signal/30">
               {session?.access_token && (
                 <VoiceInput
                   accessToken={session.access_token}
@@ -620,8 +620,8 @@ export default function AiCommandCenterPage() {
                   onClick={() => setShowPipelineTrigger(!showPipelineTrigger)}
                   className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
                     showPipelineTrigger
-                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
-                      : "border-transparent text-slate-400 hover:bg-white/5 hover:text-emerald-400"
+                      ? "border-signal/40 bg-signal/15 text-signal"
+                      : "border-transparent text-ink-200 hover:bg-ink-800/5 hover:text-signal"
                   }`}
                   title="Run outbound pipeline"
                 >
@@ -636,13 +636,13 @@ export default function AiCommandCenterPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
                 placeholder="Ask ARIA anything…"
-                className="flex-1 bg-transparent px-2 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                className="flex-1 bg-transparent px-2 py-2 text-sm text-white placeholder:text-ink-0 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => void sendMessage()}
                 disabled={sending || !input.trim()}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow shadow-emerald-900/30 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-signal-400 px-4 text-sm font-semibold text-white shadow shadow-signal/30 transition hover:bg-signal disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
               >
                 <span>Send</span>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -650,8 +650,8 @@ export default function AiCommandCenterPage() {
                 </svg>
               </button>
             </div>
-            <p className="mt-2 text-center text-[11px] text-slate-500">
-              Press <kbd className="rounded border border-crmBorder bg-crmSurface2 px-1 font-mono text-[10px] text-slate-400">Enter</kbd> to send. ARIA can make mistakes — review actions before confirming.
+            <p className="mt-2 text-center text-[11px] text-ink-0">
+              Press <kbd className="rounded border border-crmBorder bg-crmSurface2 px-1 font-mono text-[10px] text-ink-200">Enter</kbd> to send. ARIA can make mistakes — review actions before confirming.
             </p>
           </div>
         </div>

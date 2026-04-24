@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { guaranteeApi } from "@/lib/api";
 
 const STORAGE_KEY = "hawk_guarantee_doc_jwt";
-const HAWK = "#00C48C";
+const HAWK = "#FFB800";
 
 type Step = "intro" | "details" | "code" | "doc";
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#22C55E";
+const BRAND = "#FFB800";
 
 function normalizeDomain(raw: string): string {
   let d = raw.trim().toLowerCase();
@@ -27,21 +27,21 @@ function gradeStroke(grade: string | undefined): string {
 function severityRowClass(severity: string | undefined): string {
   const s = (severity || "medium").toLowerCase();
   if (s === "critical" || s === "high") {
-    return "border-l-4 border-rose-600 bg-rose-50/90 text-slate-900 shadow-sm";
+    return "border-l-4 border-red bg-red/10/90 text-ink-0 shadow-sm";
   }
   if (s === "medium" || s === "warning") {
-    return "border-l-4 border-amber-500 bg-amber-50/85 text-slate-900 shadow-sm";
+    return "border-l-4 border-signal bg-signal/10/85 text-ink-0 shadow-sm";
   }
   if (s === "low") {
-    return "border-l-4 border-amber-400/90 bg-amber-50/50 text-slate-800";
+    return "border-l-4 border-signal/50/90 bg-signal/10/50 text-ink-0";
   }
   if (s === "ok") {
-    return "border-l-4 border-emerald-400/80 bg-emerald-50/40 text-slate-800";
+    return "border-l-4 border-signal/60/80 bg-signal/10/40 text-ink-0";
   }
   if (s === "info") {
-    return "border-l-4 border-slate-300 bg-slate-50/90 text-slate-700";
+    return "border-l-4 border-white/15 bg-ink-900/90 text-ink-100";
   }
-  return "border-l-4 border-slate-200 bg-white text-slate-800";
+  return "border-l-4 border-white/10 bg-ink-800 text-ink-0";
 }
 
 function formatUsdShort(n: number): string {
@@ -75,8 +75,8 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-extrabold tracking-tight text-slate-900">{score}</span>
-        <span className="text-xs text-slate-600">/ 100</span>
+        <span className="text-3xl font-extrabold tracking-tight text-ink-0">{score}</span>
+        <span className="text-xs text-ink-200">/ 100</span>
       </div>
     </div>
   );
@@ -105,8 +105,8 @@ const WAITING_TIPS = [
 function GlobeIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-      <circle cx="12" cy="12" r="10" className="text-slate-500" />
-      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="text-slate-500" />
+      <circle cx="12" cy="12" r="10" className="text-ink-0" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="text-ink-0" />
     </svg>
   );
 }
@@ -246,10 +246,10 @@ export function HomeScanner() {
       {/* Domain input — elevated card, icon, helper */}
       <div
         className={cn(
-          "rounded-2xl border bg-white/95 p-3 sm:p-4 shadow-lg transition-all duration-300",
+          "rounded-2xl border bg-ink-800/95 p-3 sm:p-4 shadow-lg transition-all duration-300",
           phase === "scanning"
             ? "border-accent/40 shadow-accent/5"
-            : "border-slate-200 focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]",
+            : "border-white/10 focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]",
         )}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-3">
@@ -260,8 +260,8 @@ export function HomeScanner() {
             <div
               className={cn(
                 "flex h-14 items-center gap-3 rounded-xl border px-3 transition-colors sm:h-[3.25rem]",
-                "border-slate-200 bg-slate-100/80",
-                "focus-within:border-accent/55 focus-within:bg-slate-100",
+                "border-white/10 bg-ink-800/80",
+                "focus-within:border-accent/55 focus-within:bg-ink-800",
               )}
             >
               <GlobeIcon className="h-5 w-5 shrink-0 text-accent/90" />
@@ -272,15 +272,15 @@ export function HomeScanner() {
                 onChange={(e) => onDomainChange(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && phase === "idle" && canSubmit && onScan()}
                 disabled={phase === "scanning"}
-                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-base text-slate-900 shadow-none placeholder:text-slate-500 focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-base text-ink-0 shadow-none placeholder:text-ink-0 focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
               />
             </div>
-            <p className="mt-2 text-left text-xs leading-snug text-slate-500 sm:text-[13px]">
-              Paste a URL or domain — we strip <span className="text-slate-600">https://</span> and{" "}
-              <span className="text-slate-600">www.</span> automatically.
+            <p className="mt-2 text-left text-xs leading-snug text-ink-0 sm:text-[13px]">
+              Paste a URL or domain — we strip <span className="text-ink-200">https://</span> and{" "}
+              <span className="text-ink-200">www.</span> automatically.
               {preview.length > 2 && canSubmit && (
                 <span className="mt-1 block font-mono text-[11px] text-accent/90">→ scans as {preview}</span>
               )}
@@ -307,12 +307,12 @@ export function HomeScanner() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
-            className="relative mt-8 overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-b from-white via-slate-50 to-slate-100/95 px-4 py-6 shadow-xl sm:px-6"
+            className="relative mt-8 overflow-hidden rounded-2xl border border-accent/25 bg-gradient-to-b from-ink-900 via-ink-900 to-ink-900/95 px-4 py-6 shadow-xl sm:px-6"
           >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_0%,rgba(34,197,94,0.12),transparent_55%)]" />
-            <div className="absolute inset-x-0 top-0 h-1 bg-slate-200">
+            <div className="absolute inset-x-0 top-0 h-1 bg-ink-700">
               <motion.div
-                className="h-full bg-gradient-to-r from-accent via-emerald-300 to-accent"
+                className="h-full bg-gradient-to-r from-accent via-signal to-accent"
                 initial={{ width: "0%" }}
                 animate={{ width: `${progressPct}%` }}
                 transition={{ type: "spring", stiffness: 120, damping: 18 }}
@@ -343,10 +343,10 @@ export function HomeScanner() {
                 </div>
               </div>
               <div className="min-w-0 flex-1 text-center sm:text-left">
-                <p className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
+                <p className="text-base font-semibold tracking-tight text-ink-0 sm:text-lg">
                   Scanning <span className="text-accent">{preview || "your domain"}</span>
                 </p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm text-ink-200">
                   Fast exposure pass — usually under a minute. Same mail, TLS, breach, and surface signals attackers
                   start from; Shield adds continuous deep scans.
                 </p>
@@ -357,7 +357,7 @@ export function HomeScanner() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.35 }}
-                    className="mt-3 text-xs italic leading-relaxed text-slate-500 sm:text-sm"
+                    className="mt-3 text-xs italic leading-relaxed text-ink-0 sm:text-sm"
                   >
                     {WAITING_TIPS[tipIndex]}
                   </motion.p>
@@ -365,7 +365,7 @@ export function HomeScanner() {
               </div>
             </div>
 
-            <ul className="relative mt-6 space-y-2 border-t border-slate-200/80 pt-5">
+            <ul className="relative mt-6 space-y-2 border-t border-white/10 pt-5">
               {PROGRESS_LINES.map((row, i) => {
                 const cap = PROGRESS_LINES.length;
                 const visualTick = Math.min(tickSlot, cap);
@@ -383,8 +383,8 @@ export function HomeScanner() {
                     className={cn(
                       "flex items-start gap-3 rounded-lg py-2 pl-1 text-sm sm:text-[15px]",
                       done && "text-accent",
-                      active && "bg-accent/5 text-slate-900",
-                      pending && "text-slate-500",
+                      active && "bg-accent/5 text-ink-0",
+                      pending && "text-ink-0",
                     )}
                   >
                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-base" aria-hidden>
@@ -398,7 +398,7 @@ export function HomeScanner() {
                     </span>
                     {active && (
                       <motion.span
-                        className="ml-auto hidden h-2 w-12 overflow-hidden rounded-full bg-slate-200 sm:block"
+                        className="ml-auto hidden h-2 w-12 overflow-hidden rounded-full bg-ink-700 sm:block"
                         aria-hidden
                       >
                         <motion.span
@@ -417,13 +417,13 @@ export function HomeScanner() {
       </AnimatePresence>
 
       {phase === "done" && !result && (showSlowLead || scanFailed) && (
-        <div className="mt-10 space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="mt-10 space-y-4 rounded-xl border border-white/10 bg-ink-800 p-6">
           {scanFailed ? (
-            <p className="text-slate-600 leading-relaxed">
+            <p className="text-ink-200 leading-relaxed">
               We could not finish the live preview. Drop your email — we will run the full pass and send what attackers would see on your perimeter.
             </p>
           ) : (
-            <p className="text-slate-900 leading-relaxed">
+            <p className="text-ink-0 leading-relaxed">
               Your scan is still running — the ugly stuff takes longer than a fake instant score.
               <br />
               <br />
@@ -442,7 +442,7 @@ export function HomeScanner() {
                 placeholder="you@company.com"
                 value={emailSlow}
                 onChange={(e) => setEmailSlow(e.target.value)}
-                className="h-12 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
+                className="h-12 border-white/10 bg-ink-800 text-ink-0 placeholder:text-ink-200"
               />
               <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
                 Email me the damage
@@ -470,7 +470,7 @@ export function HomeScanner() {
               (g === "C" || sc < 72 || (issues >= 5 && sc < 82 && g !== "A"));
             if (critical) {
               return (
-                <div className="rounded-xl border border-rose-500/80 bg-rose-50 px-4 py-3 text-sm leading-relaxed text-rose-950 shadow-sm sm:text-[15px]">
+                <div className="rounded-xl border border-red/80 bg-red/10 px-4 py-3 text-sm leading-relaxed text-red shadow-sm sm:text-[15px]">
                   <strong className="font-semibold">This is what serious exposure looks like from the outside.</strong> We
                   counted <strong>{issues}</strong> externally visible issue{issues === 1 ? "" : "s"} on{" "}
                   <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span> — and your score still
@@ -481,7 +481,7 @@ export function HomeScanner() {
             }
             if (elevated) {
               return (
-                <div className="rounded-xl border border-amber-500/80 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 shadow-sm sm:text-[15px]">
+                <div className="rounded-xl border border-signal/80 bg-signal/10 px-4 py-3 text-sm leading-relaxed text-signal-800 shadow-sm sm:text-[15px]">
                   <strong className="font-semibold">Real issues — not a crisis letter — yet.</strong> We flagged{" "}
                   <strong>{issues}</strong> item{issues === 1 ? "" : "s"} worth tightening on{" "}
                   <span className="font-mono text-xs sm:text-sm">{result.domain || dnorm}</span>. Your grade still has
@@ -490,7 +490,7 @@ export function HomeScanner() {
               );
             }
             return (
-              <div className="rounded-xl border border-amber-400/80 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 shadow-sm sm:text-[15px]">
+              <div className="rounded-xl border border-signal/50/80 bg-signal/10 px-4 py-3 text-sm leading-relaxed text-signal-800 shadow-sm sm:text-[15px]">
                 <strong className="font-semibold">Strong surface score — still not invincible.</strong> Bots do not care
                 about your {g === "A" || g === "B" ? `grade ${g}` : "score"}; they probe everyone. Shield keeps watching when you are busy
                 running the business.
@@ -501,11 +501,11 @@ export function HomeScanner() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
             <ScoreRing score={result.score ?? 0} grade={result.grade || "F"} />
             <div className="text-center sm:text-left">
-              <p className="text-sm uppercase tracking-wider text-slate-500">Grade</p>
+              <p className="text-sm uppercase tracking-wider text-ink-0">Grade</p>
               <p className="text-5xl font-extrabold tabular-nums" style={{ color: gradeStroke(result.grade) }}>
                 {result.grade || "—"}
               </p>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-ink-200">
                 All of this is visible to anyone on the internet — no VPN, no insider access. HAWK Engine{" "}
                 {result.scan_version ?? "2.1"}.
               </p>
@@ -515,8 +515,8 @@ export function HomeScanner() {
           {(result.breach_baseline_usd != null || result.breach_cost_summary || (result.attack_paths_count ?? 0) > 0) && (
             <div className="grid gap-3 sm:grid-cols-2">
               {result.breach_baseline_usd != null && (
-                <div className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
-                  <p className="font-semibold text-amber-900">What one bad day can cost</p>
+                <div className="rounded-xl border border-signal/30/90 bg-signal/10 px-4 py-3 text-sm text-signal-800 shadow-sm">
+                  <p className="font-semibold text-signal-700">What one bad day can cost</p>
                   <p className="mt-1 leading-relaxed">
                     Sector-style incident baseline (IBM-style averages):{" "}
                     <strong>{formatUsdShort(result.breach_baseline_usd)}</strong>. One successful hit usually dwarfs
@@ -525,8 +525,8 @@ export function HomeScanner() {
                 </div>
               )}
               {(result.attack_paths_count ?? 0) > 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm">
-                  <p className="font-semibold text-slate-900">Attack-path narratives</p>
+                <div className="rounded-xl border border-white/10 bg-ink-900 px-4 py-3 text-sm text-ink-0 shadow-sm">
+                  <p className="font-semibold text-ink-0">Attack-path narratives</p>
                   <p className="mt-1 leading-relaxed">
                     We mapped <strong>{result.attack_paths_count}</strong> plausible path
                     {result.attack_paths_count === 1 ? "" : "s"} from public signals to impact
@@ -542,34 +542,34 @@ export function HomeScanner() {
                 </div>
               )}
               {result.breach_cost_summary && !result.breach_baseline_usd && (
-                <div className="rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:col-span-2">
-                  <p className="font-semibold text-amber-900">Risk note</p>
+                <div className="rounded-xl border border-signal/30/90 bg-signal/10 px-4 py-3 text-sm text-signal-800 sm:col-span-2">
+                  <p className="font-semibold text-signal-700">Risk note</p>
                   <p className="mt-1 leading-relaxed">{result.breach_cost_summary}</p>
                 </div>
               )}
             </div>
           )}
 
-          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-white to-slate-100/90 p-5 shadow-lg sm:p-6">
+          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-ink-900 to-ink-900/90 p-5 shadow-lg sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-accent">They will not wait for you</p>
-                <h3 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
+                <h3 className="mt-1 text-lg font-bold text-ink-0 sm:text-xl">
                   You already saw the cracks — now get Shield before someone else drives a truck through them
                 </h3>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-200">
                   Free scan ends at this screen. Shield runs{" "}
-                  <strong className="text-slate-900">continuous Nuclei-grade checks</strong>,{" "}
-                  <strong className="text-slate-900">lookalike domain monitoring</strong>, scheduled re-tests, and a
+                  <strong className="text-ink-0">continuous Nuclei-grade checks</strong>,{" "}
+                  <strong className="text-ink-0">lookalike domain monitoring</strong>, scheduled re-tests, and a
                   breach-response guarantee in writing — so the next time your gut drops reading a headline, you already
                   have a plan.
                 </p>
               </div>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Free instant scan</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
+              <div className="rounded-xl border border-white/10 bg-ink-900/90 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-0">Free instant scan</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-ink-200">
                   <li>✓ Email auth & TLS deep check</li>
                   <li>✓ Multi-source breach / stealer signals</li>
                   <li>✓ Subdomains + ports + HTTP surface</li>
@@ -578,7 +578,7 @@ export function HomeScanner() {
               </div>
               <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-accent">HAWK Shield (paid)</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-slate-600">
+                <ul className="mt-2 space-y-1.5 text-sm text-ink-200">
                   <li>✓ Full Nuclei vulnerability templates</li>
                   <li>✓ dnstwist lookalike monitoring</li>
                   <li>✓ Scheduled scans & history</li>
@@ -593,15 +593,15 @@ export function HomeScanner() {
               >
                 <Link href="/portal/login?next=%2Fportal%2Fbilling%3Fplan%3Dshield">Get Shield — lock this down</Link>
               </Button>
-              <Button asChild variant="outline" className="h-12 flex-1 rounded-xl border-slate-200 bg-white font-semibold text-slate-900 hover:bg-slate-50">
+              <Button asChild variant="outline" className="h-12 flex-1 rounded-xl border-white/10 bg-ink-800 font-semibold text-ink-0 hover:bg-ink-900">
                 <Link href="#pricing">See plans & pricing</Link>
               </Button>
             </div>
           </div>
 
           <div>
-            <h3 className="mb-1 text-lg font-semibold text-slate-900">What strangers can already use against {result.domain || dnorm}</h3>
-            <p className="mb-4 text-sm text-slate-600">
+            <h3 className="mb-1 text-lg font-semibold text-ink-0">What strangers can already use against {result.domain || dnorm}</h3>
+            <p className="mb-4 text-sm text-ink-200">
               Worst first. Red and amber rows are not hygiene projects — they are how an attacker shortlists you. Fix
               them before you are answering uncomfortable questions from a client or regulator.
             </p>
@@ -611,14 +611,14 @@ export function HomeScanner() {
                   key={i}
                   className={cn("rounded-r-lg py-3 pl-4 pr-3 text-sm leading-relaxed sm:text-[15px]", severityRowClass(row.severity))}
                 >
-                  <span className="font-medium text-slate-500">{i + 1}.</span> {row.text}
+                  <span className="font-medium text-ink-0">{i + 1}.</span> {row.text}
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="text-slate-900 leading-relaxed">
+          <div className="rounded-xl border border-white/10 bg-ink-800 p-6">
+            <p className="text-ink-0 leading-relaxed">
               <strong>{issues}</strong> externally visible security issue{issues === 1 ? "" : "s"} on{" "}
               <span className="font-mono text-sm">{result.domain || dnorm}</span>. While you read this, automated tooling
               is still hammering the same URLs. Every day you wait is a day someone else might move first.
@@ -647,7 +647,7 @@ export function HomeScanner() {
                   placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
+                  className="h-12 border-white/10 bg-ink-800 text-ink-0 placeholder:text-ink-200"
                 />
                 <Button type="submit" className="h-12 font-semibold text-white bg-accent hover:bg-accent/90 sm:shrink-0">
                   Send the full report — free

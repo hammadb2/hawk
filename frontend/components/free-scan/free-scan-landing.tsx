@@ -89,11 +89,11 @@ export function FreeScanLanding() {
   }
 
   return (
-    <div className={`${portal.pageBg} selection:bg-emerald-500/15`}>
-      <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md">
+    <div className={`${portal.pageBg} selection:bg-signal/15`}>
+      <header className="border-b border-white/10 bg-ink-800/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2" title="HAWK Security">
-            <span className="flex items-center rounded-lg bg-slate-900 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 sm:px-2.5 sm:py-2">
+            <span className="flex items-center rounded-lg bg-ink-950 px-2 py-1.5 shadow-sm ring-1 ring-white/10 sm:px-2.5 sm:py-2">
               <img
                 src="/hawk-logo.png"
                 alt="HAWK Security"
@@ -105,7 +105,7 @@ export function FreeScanLanding() {
           </Link>
           <Link
             href="/"
-            className="text-sm font-medium text-slate-500 hover:text-emerald-600"
+            className="text-sm font-medium text-ink-0 hover:text-signal"
           >
             ← Back to homepage
           </Link>
@@ -117,21 +117,21 @@ export function FreeScanLanding() {
           <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
             {/* Left: pitch */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-signal">
                 Free · US small businesses
               </p>
-              <h1 className="mt-3 text-balance text-3xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
+              <h1 className="mt-3 text-balance text-3xl font-extrabold leading-tight tracking-tight text-ink-0 sm:text-4xl md:text-5xl">
                 See what ransomware crews see on your practice.{" "}
-                <span className="text-emerald-600">Before they contact you.</span>
+                <span className="text-signal">Before they contact you.</span>
               </h1>
-              <p className="mt-5 text-pretty text-lg leading-relaxed text-slate-600">
+              <p className="mt-5 text-pretty text-lg leading-relaxed text-ink-200">
                 Enter your domain below. Within 24 hours we&apos;ll email you a plain English
-                report with the <strong className="text-slate-900">three highest priority external findings</strong>{" "}
+                report with the <strong className="text-ink-0">three highest priority external findings</strong>{" "}
                 on your business. The same signals attackers harvest from DNS, mail, and TLS before
                 they pick targets.
               </p>
 
-              <ul className="mt-8 space-y-4 text-base leading-relaxed text-slate-700">
+              <ul className="mt-8 space-y-4 text-base leading-relaxed text-ink-100">
                 <FreeScanBullet>
                   No credit card. No sales call required to read the report.
                 </FreeScanBullet>
@@ -144,7 +144,7 @@ export function FreeScanLanding() {
                 </FreeScanBullet>
               </ul>
 
-              <p className="mt-8 text-sm leading-relaxed text-slate-500">
+              <p className="mt-8 text-sm leading-relaxed text-ink-0">
                 Built by HAWK Security. Backed by a written{" "}
                 <Link href="/guarantee-terms" className={portal.link}>
                   Breach Response Guarantee
@@ -161,10 +161,10 @@ export function FreeScanLanding() {
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                     <div>
-                      <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                      <h2 className="text-xl font-bold tracking-tight text-ink-0">
                         Get your free three finding report
                       </h2>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-1 text-sm text-ink-0">
                         Report arrives within 24 hours.
                       </p>
                     </div>
@@ -181,7 +181,7 @@ export function FreeScanLanding() {
                         className={inputClass}
                       />
                       {domainRaw && !DOMAIN_RE.test(domain) ? (
-                        <p className="mt-1 text-xs text-amber-600">
+                        <p className="mt-1 text-xs text-signal-400">
                           Enter the domain without http or https. For example yourpractice.com
                         </p>
                       ) : null}
@@ -239,7 +239,7 @@ export function FreeScanLanding() {
                     {errorMsg ? (
                       <p
                         role="alert"
-                        className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                        className="rounded-md border border-red/30 bg-red/10 px-3 py-2 text-sm text-red"
                       >
                         {errorMsg}
                       </p>
@@ -250,8 +250,8 @@ export function FreeScanLanding() {
                       disabled={!canSubmit}
                       className={`w-full rounded-lg px-5 py-3 text-base font-semibold transition-colors ${
                         canSubmit
-                          ? "bg-emerald-500 text-white shadow-sm hover:bg-emerald-600"
-                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                          ? "bg-signal text-white shadow-sm hover:bg-signal-400"
+                          : "bg-ink-700 text-ink-0 cursor-not-allowed"
                       }`}
                     >
                       {status === "submitting"
@@ -259,7 +259,7 @@ export function FreeScanLanding() {
                         : "Run my free scan"}
                     </button>
 
-                    <p className="text-center text-xs text-slate-400">
+                    <p className="text-center text-xs text-ink-200">
                       We email you the report within 24 hours. You can unsubscribe at any time.
                     </p>
                   </form>
@@ -269,9 +269,9 @@ export function FreeScanLanding() {
           </div>
         </section>
 
-        <section className="border-t border-slate-200 bg-slate-50 px-4 py-12 sm:px-6 sm:py-16">
+        <section className="border-t border-white/10 bg-ink-900 px-4 py-12 sm:px-6 sm:py-16">
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-ink-0 sm:text-3xl">
               What you&apos;ll get
             </h2>
             <div className="mt-10 grid gap-6 sm:grid-cols-3">
@@ -295,14 +295,14 @@ export function FreeScanLanding() {
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 px-4 py-8 sm:px-6">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-xs text-slate-400 sm:flex-row">
+      <footer className="border-t border-white/10 px-4 py-8 sm:px-6">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-xs text-ink-200 sm:flex-row">
           <span>© HAWK Security · securedbyhawk.com</span>
           <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-emerald-600">
+            <Link href="/privacy" className="hover:text-signal">
               Privacy
             </Link>
-            <Link href="/guarantee-terms" className="hover:text-emerald-600">
+            <Link href="/guarantee-terms" className="hover:text-signal">
               Guarantee terms
             </Link>
           </div>
@@ -313,7 +313,7 @@ export function FreeScanLanding() {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20";
+  "w-full rounded-lg border border-white/10 bg-ink-800 px-3 py-2.5 text-sm text-ink-0 shadow-sm placeholder:text-ink-200 focus:border-signal/60 focus:outline-none focus:ring-2 focus:ring-signal/20";
 
 function Field({
   label,
@@ -326,9 +326,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">
+      <span className="mb-1 block text-sm font-medium text-ink-100">
         {label}
-        {required ? <span className="ml-1 text-emerald-600">*</span> : null}
+        {required ? <span className="ml-1 text-signal">*</span> : null}
       </span>
       {children}
     </label>
@@ -340,7 +340,7 @@ function FreeScanBullet({ children }: { children: React.ReactNode }) {
     <li className="flex gap-3">
       <span
         aria-hidden
-        className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"
+        className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-signal/15 text-signal"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -371,13 +371,13 @@ function HowItWorksCard({
 }) {
   return (
     <div className={`${portal.card} p-5`}>
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-signal text-sm font-bold text-white">
         {step}
       </span>
-      <h3 className="mt-3 text-lg font-bold tracking-tight text-slate-900">
+      <h3 className="mt-3 text-lg font-bold tracking-tight text-ink-0">
         {title}
       </h3>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
+      <p className="mt-2 text-sm leading-relaxed text-ink-200">{body}</p>
     </div>
   );
 }
@@ -385,7 +385,7 @@ function HowItWorksCard({
 function FreeScanSuccess({ domain, email }: { domain: string; email: string }) {
   return (
     <div>
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-signal/15 text-signal">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
@@ -399,23 +399,23 @@ function FreeScanSuccess({ domain, email }: { domain: string; email: string }) {
           />
         </svg>
       </div>
-      <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+      <h2 className="mt-4 text-2xl font-bold tracking-tight text-ink-0">
         Scan requested.
       </h2>
-      <p className="mt-3 text-base leading-relaxed text-slate-600">
+      <p className="mt-3 text-base leading-relaxed text-ink-200">
         We kicked off an external attack surface scan on{" "}
-        <strong className="text-slate-900">{domain}</strong> the moment you hit submit. Your three finding
+        <strong className="text-ink-0">{domain}</strong> the moment you hit submit. Your three finding
         report will land at{" "}
-        <strong className="text-slate-900">{email}</strong> within{" "}
-        <strong className="text-slate-900">24 hours</strong>.
+        <strong className="text-ink-0">{email}</strong> within{" "}
+        <strong className="text-ink-0">24 hours</strong>.
       </p>
-      <p className="mt-4 text-sm text-slate-500">
+      <p className="mt-4 text-sm text-ink-0">
         If anything is urgent, you&apos;ll see it flagged at the top of the report. No sales call
         required to read it.
       </p>
       <Link
         href="/"
-        className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+        className="mt-6 inline-flex rounded-lg border border-white/10 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-100 shadow-sm hover:bg-ink-900"
       >
         Back to securedbyhawk.com
       </Link>

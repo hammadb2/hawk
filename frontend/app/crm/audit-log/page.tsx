@@ -104,8 +104,8 @@ export default function AuditLogPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-ink-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1e1e2e] border-t-signal" />
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function AuditLogPage() {
     return (
       <div className="mx-auto max-w-4xl space-y-4">
         <h1 className={crmPageTitle}>Audit log</h1>
-        <p className="text-sm text-slate-400">Only CEO and HoS can view the full audit log.</p>
+        <p className="text-sm text-ink-200">Only CEO and HoS can view the full audit log.</p>
       </div>
     );
   }
@@ -143,13 +143,13 @@ export default function AuditLogPage() {
             </option>
           ))}
         </select>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-ink-200">
           Page {page + 1} · Showing up to {PAGE_SIZE} entries
         </span>
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-slate-400">Loading…</div>
+        <div className="py-12 text-center text-ink-200">Loading…</div>
       ) : rows.length === 0 ? (
         <p className={crmEmptyState}>No activity found.</p>
       ) : (
@@ -167,7 +167,7 @@ export default function AuditLogPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className={crmTableRow}>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-400">
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-200">
                     {new Date(r.created_at).toLocaleString()}
                   </td>
                   <td className="px-3 py-2">
@@ -175,15 +175,15 @@ export default function AuditLogPage() {
                   </td>
                   <td className="px-3 py-2">
                     {r.prospect_id ? (
-                      <Link href={`/crm/prospects/${r.prospect_id}`} className="text-emerald-400 hover:underline">
+                      <Link href={`/crm/prospects/${r.prospect_id}`} className="text-signal hover:underline">
                         {r.prospect_company ?? r.prospect_domain ?? r.prospect_id.slice(0, 8)}
                       </Link>
                     ) : (
-                      <span className="text-slate-500">—</span>
+                      <span className="text-ink-0">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-slate-300">{r.author_name ?? "—"}</td>
-                  <td className="max-w-[200px] truncate px-3 py-2 text-xs text-slate-400">
+                  <td className="px-3 py-2 text-ink-100">{r.author_name ?? "—"}</td>
+                  <td className="max-w-[200px] truncate px-3 py-2 text-xs text-ink-200">
                     {r.notes ?? (r.metadata ? JSON.stringify(r.metadata) : "—")}
                   </td>
                 </tr>
@@ -197,7 +197,7 @@ export default function AuditLogPage() {
         <Button
           variant="outline"
           size="sm"
-          className="border-[#1e1e2e] bg-[#111118] text-slate-200 hover:bg-[#1a1a24]"
+          className="border-[#1e1e2e] bg-[#111118] text-ink-100 hover:bg-[#1a1a24]"
           disabled={page === 0}
           onClick={() => setPage((p) => Math.max(0, p - 1))}
         >
@@ -206,7 +206,7 @@ export default function AuditLogPage() {
         <Button
           variant="outline"
           size="sm"
-          className="border-[#1e1e2e] bg-[#111118] text-slate-200 hover:bg-[#1a1a24]"
+          className="border-[#1e1e2e] bg-[#111118] text-ink-100 hover:bg-[#1a1a24]"
           disabled={rows.length < PAGE_SIZE}
           onClick={() => setPage((p) => p + 1)}
         >

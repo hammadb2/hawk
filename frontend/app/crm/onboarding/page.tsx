@@ -16,7 +16,7 @@ export default function CrmOnboardingPage() {
 
   return (
     <div className="flex items-center justify-center p-12">
-      <p className="text-sm text-slate-500">Redirecting to onboarding portal...</p>
+      <p className="text-sm text-ink-0">Redirecting to onboarding portal...</p>
     </div>
   );
 }

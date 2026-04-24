@@ -10,7 +10,7 @@ import { SentryClientInit } from "@/components/crm/sentry-client";
 import { AiBubble } from "@/components/crm/ai-bubble";
 import { lightShell } from "@/lib/portal-ui";
 
-const crmAppShell = "min-h-dvh bg-crmBg text-slate-200";
+const crmAppShell = "min-h-dvh bg-crmBg text-ink-100";
 
 export function CrmShell({ children }: { children: React.ReactNode }) {
   const { authReady, session } = useCrmAuth();
@@ -29,7 +29,7 @@ export function CrmShell({ children }: { children: React.ReactNode }) {
       <div className={`flex min-h-dvh items-center justify-center ${lightShell.pageBg}`}>
         <div className="flex flex-col items-center gap-3">
           <div className={lightShell.spinnerSm} />
-          <p className="text-sm text-slate-600">Loading session…</p>
+          <p className="text-sm text-ink-200">Loading session…</p>
         </div>
       </div>
     );

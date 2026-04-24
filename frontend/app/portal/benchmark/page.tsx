@@ -43,39 +43,39 @@ export default function PortalBenchmarkPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Competitor benchmark</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="text-2xl font-semibold text-ink-0">Competitor benchmark</h1>
+        <p className="mt-1 text-sm text-ink-200">
           Your live score vs sector references, plus anonymized fast scans of suggested peer domains (never shown to
           those businesses — for your benchmarking only).
         </p>
-        <Link href="/portal" className="mt-2 inline-block text-sm text-emerald-600 hover:underline">
+        <Link href="/portal" className="mt-2 inline-block text-sm text-signal hover:underline">
           ← Back to overview
         </Link>
       </div>
 
-      {loading && <p className="text-slate-600">Building your benchmark…</p>}
-      {err && <p className="text-rose-400">{err}</p>}
+      {loading && <p className="text-ink-200">Building your benchmark…</p>}
+      {err && <p className="text-red">{err}</p>}
 
       {you != null && (
-        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white shadow-sm p-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 rounded-2xl border border-white/10 bg-ink-800 shadow-sm p-6 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <p className="text-xs uppercase text-slate-600">Your score</p>
-            <p className="text-3xl font-bold tabular-nums text-emerald-600">{you}</p>
+            <p className="text-xs uppercase text-ink-200">Your score</p>
+            <p className="text-3xl font-bold tabular-nums text-signal">{you}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-slate-600">Sector average (ref.)</p>
-            <p className="text-3xl font-bold tabular-nums text-slate-800">{avg ?? "—"}</p>
+            <p className="text-xs uppercase text-ink-200">Sector average (ref.)</p>
+            <p className="text-3xl font-bold tabular-nums text-ink-0">{avg ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-slate-600">Top quartile (ref.)</p>
-            <p className="text-3xl font-bold tabular-nums text-slate-800">{top ?? "—"}</p>
+            <p className="text-xs uppercase text-ink-200">Top quartile (ref.)</p>
+            <p className="text-3xl font-bold tabular-nums text-ink-0">{top ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs uppercase text-slate-600">Peer sample (anon.)</p>
-            <p className="text-3xl font-bold tabular-nums text-slate-800">
+            <p className="text-xs uppercase text-ink-200">Peer sample (anon.)</p>
+            <p className="text-3xl font-bold tabular-nums text-ink-0">
               {peerAvg != null ? peerAvg : "—"}
               {peerN != null && peerN > 0 ? (
-                <span className="ml-1 text-base font-normal text-slate-600">n={peerN}</span>
+                <span className="ml-1 text-base font-normal text-ink-200">n={peerN}</span>
               ) : null}
             </p>
           </div>
@@ -83,7 +83,7 @@ export default function PortalBenchmarkPage() {
       )}
 
       {narrative && (
-        <article className="prose prose-slate prose-sm prose-headings:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 max-w-none rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+        <article className="prose prose-invert prose-sm prose-headings:text-ink-0 prose-p:text-ink-200 prose-li:text-ink-200 max-w-none rounded-2xl border border-white/10 bg-ink-800 shadow-sm p-6">
           <ReactMarkdown>{narrative}</ReactMarkdown>
         </article>
       )}

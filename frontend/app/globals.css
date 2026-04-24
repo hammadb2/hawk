@@ -3,22 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --surface-1: #ffffff;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
-  --accent: #22c55e;
-  --accent-light: #bbf7d0;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-dim: #64748b;
+  /* Unified marketing scheme across the entire site. */
+  --background: #07070a;
+  --surface-1: #0b0b10;
+  --surface-2: #111117;
+  --surface-3: #16161e;
+  --accent: #ffb800;
+  --accent-light: #ffecb0;
+  --text-primary: #f5f5f7;
+  --text-secondary: #bdbdc6;
+  --text-dim: #8a8a97;
   --red: #f87171;
   --green: #34d399;
   --orange: #fb923c;
   --blue: #60a5fa;
   --yellow: #fbbf24;
 
-  /* Marketing (graphite + signal amber) */
+  /* Graphite + signal amber tokens. */
   --ink-950: #07070a;
   --ink-900: #0b0b10;
   --ink-800: #111117;
@@ -30,60 +31,40 @@
 
 html {
   background-color: var(--background);
-  color-scheme: light;
+  color-scheme: dark;
+  overscroll-behavior-y: none;
 }
 
 body {
   background: var(--background);
   color: var(--text-primary);
   font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "cv11" 1;
+  overscroll-behavior-y: none;
 }
 
-/* Applied while authenticated in CRM — prevents light html/body from showing when the page scrolls */
+/* Legacy route hooks kept as no-ops in case any layout still toggles them. */
 html.crm-route,
-html.crm-route body {
-  background-color: #0a0a0f;
-  color-scheme: dark;
-}
-
-html.crm-route {
-  overscroll-behavior-y: none;
-}
-html.crm-route body {
-  overscroll-behavior-y: none;
-}
-
-html.crm-route ::-webkit-scrollbar-track {
-  background: #16161f;
-}
-html.crm-route ::-webkit-scrollbar-thumb {
-  background: #334155;
-}
-html.crm-route ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* Marketing (premium dark) route. Scoped to <html class="marketing-route"> so the CRM/portal stays light. */
+html.crm-route body,
 html.marketing-route,
 html.marketing-route body {
   background-color: var(--ink-950);
-  color-scheme: dark;
   color: #f5f5f7;
+  color-scheme: dark;
   overscroll-behavior-y: none;
 }
 
-html.marketing-route ::-webkit-scrollbar {
+::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-html.marketing-route ::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: var(--ink-900);
 }
-html.marketing-route ::-webkit-scrollbar-thumb {
-  background: var(--ink-500, #232330);
+::-webkit-scrollbar-thumb {
+  background: #232330;
   border-radius: 8px;
 }
-html.marketing-route ::-webkit-scrollbar-thumb:hover {
+::-webkit-scrollbar-thumb:hover {
   background: #3a3a48;
 }
 

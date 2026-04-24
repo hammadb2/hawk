@@ -51,7 +51,7 @@ export function HawkScoreRing({
           fill="none"
           stroke="currentColor"
           strokeWidth={stroke}
-          className="text-slate-700/60"
+          className="text-ink-100/60"
         />
         <circle
           cx={size / 2}

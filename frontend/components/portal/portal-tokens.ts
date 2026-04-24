@@ -1,20 +1,25 @@
 /**
- * Portal + CRM light shell — lives under `components/` so Tailwind `content`
- * always picks up these class strings (avoids purging when `lib/` is missed).
+ * Shared shell tokens used by the portal, 404, and auth pages. Unified with
+ * the landing page: graphite ink canvas + signal amber accent. Kept under
+ * `components/` so Tailwind `content` always picks up these class strings.
  */
 export const portal = {
-  pageBg: "min-h-dvh w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-900 antialiased",
+  pageBg:
+    "min-h-dvh w-full bg-ink-950 font-display text-ink-0 antialiased",
   header:
-    "border-b border-slate-200/90 bg-white shadow-[0_1px_0_rgba(15,23,42,0.06)] backdrop-blur-sm",
-  card: "rounded-2xl border border-slate-200/90 bg-white shadow-sm",
-  cardMuted: "rounded-2xl border border-slate-200/80 bg-slate-50/80 shadow-sm",
-  link: "font-medium text-emerald-600 hover:text-emerald-700",
-  linkSubtle: "text-slate-500 hover:text-emerald-600",
-  spinner: "h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500",
-  spinnerSm: "h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500",
+    "border-b border-white/5 bg-ink-950/70 shadow-[0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl",
+  card: "rounded-2xl border border-white/5 bg-ink-800/60 shadow-ink",
+  cardMuted: "rounded-2xl border border-white/5 bg-ink-900/70 shadow-ink",
+  link: "font-medium text-signal hover:text-signal-400",
+  linkSubtle: "text-ink-200 hover:text-signal",
+  spinner:
+    "h-10 w-10 animate-spin rounded-full border-2 border-ink-700 border-t-signal",
+  spinnerSm:
+    "h-8 w-8 animate-spin rounded-full border-2 border-ink-700 border-t-signal",
   input:
-    "border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-400",
-  btnPrimary: "bg-emerald-500 font-semibold text-white shadow-sm hover:bg-emerald-600",
+    "border-white/10 bg-ink-900 text-ink-0 placeholder:text-ink-300 focus-visible:ring-signal/30 focus-visible:border-signal/50",
+  btnPrimary:
+    "bg-signal font-semibold text-ink-950 shadow-signal-sm hover:bg-signal-400",
 } as const;
 
 export const lightShell = portal;

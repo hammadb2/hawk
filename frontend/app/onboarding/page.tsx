@@ -315,8 +315,8 @@ export default function OnboardingPage() {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#0a0a12]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-500" />
-          <p className="text-sm text-slate-400">Loading onboarding...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-700 border-t-signal" />
+          <p className="text-sm text-ink-200">Loading onboarding...</p>
         </div>
       </div>
     );
@@ -325,10 +325,10 @@ export default function OnboardingPage() {
   return (
     <div className="flex min-h-dvh bg-[#0a0a12]">
       {/* Sidebar — step progress */}
-      <aside className="hidden w-72 flex-shrink-0 border-r border-slate-800 bg-[#0d0d18] p-6 lg:block">
+      <aside className="hidden w-72 flex-shrink-0 border-r border-ink-800 bg-[#0d0d18] p-6 lg:block">
         <div className="mb-8">
           <h2 className="text-lg font-bold text-white">HAWK</h2>
-          <p className="text-xs text-slate-500">Onboarding Portal</p>
+          <p className="text-xs text-ink-0">Onboarding Portal</p>
         </div>
         <nav className="space-y-1">
           {STEPS.map((s) => (
@@ -336,19 +336,19 @@ export default function OnboardingPage() {
               key={s.num}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
                 s.num === currentStep
-                  ? "bg-emerald-500/10 text-emerald-400 font-medium"
+                  ? "bg-signal/10 text-signal font-medium"
                   : s.num < currentStep
-                    ? "text-slate-400"
-                    : "text-slate-600"
+                    ? "text-ink-200"
+                    : "text-ink-200"
               }`}
             >
               <span
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                   s.num < currentStep
-                    ? "bg-emerald-500 text-white"
+                    ? "bg-signal text-white"
                     : s.num === currentStep
-                      ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40"
-                      : "bg-slate-800 text-slate-600"
+                      ? "bg-signal/20 text-signal ring-1 ring-signal/40"
+                      : "bg-ink-800 text-ink-200"
                 }`}
               >
                 {s.num < currentStep ? "\u2713" : s.num}
@@ -362,9 +362,9 @@ export default function OnboardingPage() {
       {/* Main chat area */}
       <div className="flex flex-1 flex-col">
         {/* Mobile step indicator */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0d0d18] px-4 py-3 lg:hidden">
+        <div className="flex items-center justify-between border-b border-ink-800 bg-[#0d0d18] px-4 py-3 lg:hidden">
           <span className="text-sm font-bold text-white">HAWK Onboarding</span>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-200">
             Step {currentStep} of {STEPS.length}
           </span>
         </div>
@@ -377,12 +377,12 @@ export default function OnboardingPage() {
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-emerald-600 text-white"
-                      : "bg-[#161625] text-slate-300 border border-slate-800"
+                      ? "bg-signal-400 text-white"
+                      : "bg-[#161625] text-ink-100 border border-ink-800"
                   }`}
                 >
                   {msg.role === "assistant" && (
-                    <p className="mb-1 text-xs font-semibold text-emerald-400">HAWK Guide</p>
+                    <p className="mb-1 text-xs font-semibold text-signal">HAWK Guide</p>
                   )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 </div>
@@ -390,12 +390,12 @@ export default function OnboardingPage() {
             ))}
             {sending && (
               <div className="flex justify-start">
-                <div className="rounded-2xl bg-[#161625] border border-slate-800 px-4 py-3">
-                  <p className="text-xs font-semibold text-emerald-400 mb-1">HAWK Guide</p>
+                <div className="rounded-2xl bg-[#161625] border border-ink-800 px-4 py-3">
+                  <p className="text-xs font-semibold text-signal mb-1">HAWK Guide</p>
                   <div className="flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "150ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "300ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-ink-9000" style={{ animationDelay: "0ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-ink-9000" style={{ animationDelay: "150ms" }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-ink-9000" style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -413,7 +413,7 @@ export default function OnboardingPage() {
           />
         )}
         {currentStep === 3 && showUpload && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] p-4">
+          <div className="border-t border-ink-800 bg-[#0d0d18] p-4">
             <div className="mx-auto max-w-2xl">
               <OnboardingFileUpload onUpload={handleGovIdUpload} />
             </div>
@@ -423,9 +423,9 @@ export default function OnboardingPage() {
           <BankDetailsForm details={bankDetails} onChange={setBankDetails} onSubmit={saveBankDetails} />
         )}
         {currentStep === 5 && showSignature && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] p-4">
+          <div className="border-t border-ink-800 bg-[#0d0d18] p-4">
             <div className="mx-auto max-w-2xl">
-              <p className="mb-3 text-sm text-slate-400">
+              <p className="mb-3 text-sm text-ink-200">
                 Sign the <span className="font-semibold text-white">{signingDocType.replace("_", " ")}</span>:
               </p>
               <OnboardingSignaturePad onSign={handleSignature} onCancel={() => setShowSignature(false)} />
@@ -433,18 +433,18 @@ export default function OnboardingPage() {
           </div>
         )}
         {currentStep === 6 && showQuiz && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] p-4">
+          <div className="border-t border-ink-800 bg-[#0d0d18] p-4">
             <div className="mx-auto max-w-2xl">
               <OnboardingQuiz module={quizModule} onComplete={handleQuizComplete} />
             </div>
           </div>
         )}
         {currentStep === 7 && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] p-4">
+          <div className="border-t border-ink-800 bg-[#0d0d18] p-4">
             <div className="mx-auto max-w-2xl text-center">
               <button
                 onClick={submitOnboarding}
-                className="rounded-lg bg-emerald-600 px-8 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                className="rounded-lg bg-signal-400 px-8 py-3 text-sm font-semibold text-white hover:bg-signal-600 transition"
               >
                 Submit Onboarding for Review
               </button>
@@ -454,7 +454,7 @@ export default function OnboardingPage() {
 
         {/* Quick action buttons */}
         {currentStep === 3 && !showUpload && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] px-4 py-3">
+          <div className="border-t border-ink-800 bg-[#0d0d18] px-4 py-3">
             <div className="mx-auto max-w-2xl">
               <button
                 onClick={() => setShowUpload(true)}
@@ -466,7 +466,7 @@ export default function OnboardingPage() {
           </div>
         )}
         {currentStep === 5 && !showSignature && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] px-4 py-3">
+          <div className="border-t border-ink-800 bg-[#0d0d18] px-4 py-3">
             <div className="mx-auto flex max-w-2xl gap-2">
               {["contract", "nda", "acceptable_use"].map((doc) => (
                 <button
@@ -478,7 +478,7 @@ export default function OnboardingPage() {
                   }}
                   className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
                     signedDocs.has(doc)
-                      ? "bg-emerald-900/30 text-emerald-400 cursor-default"
+                      ? "bg-ink-800/30 text-signal cursor-default"
                       : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
                 >
@@ -490,7 +490,7 @@ export default function OnboardingPage() {
           </div>
         )}
         {currentStep === 6 && !showQuiz && (
-          <div className="border-t border-slate-800 bg-[#0d0d18] px-4 py-3">
+          <div className="border-t border-ink-800 bg-[#0d0d18] px-4 py-3">
             <div className="mx-auto flex max-w-2xl flex-wrap gap-2">
               {["hawk_security", "target_verticals", "products", "hawk_certified", "financial_guarantee"].map(
                 (mod) => (
@@ -503,7 +503,7 @@ export default function OnboardingPage() {
                     }}
                     className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
                       completedModules.has(mod)
-                        ? "bg-emerald-900/30 text-emerald-400 cursor-default"
+                        ? "bg-ink-800/30 text-signal cursor-default"
                         : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                   >
@@ -517,7 +517,7 @@ export default function OnboardingPage() {
         )}
 
         {/* Chat input */}
-        <div className="border-t border-slate-800 bg-[#0a0a12] px-4 py-4">
+        <div className="border-t border-ink-800 bg-[#0a0a12] px-4 py-4">
           <div className="mx-auto flex max-w-2xl gap-2">
             <input
               type="text"
@@ -525,19 +525,19 @@ export default function OnboardingPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Type a message..."
-              className="flex-1 rounded-xl border border-slate-700 bg-[#161625] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20"
+              className="flex-1 rounded-xl border border-ink-700 bg-[#161625] px-4 py-3 text-sm text-white placeholder:text-ink-0 focus:border-signal focus:outline-none focus:ring-1 focus:ring-signal/20"
             />
             <button
               onClick={handleSend}
               disabled={sending || !input.trim()}
-              className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+              className="rounded-xl bg-signal-400 px-5 py-3 text-sm font-semibold text-white hover:bg-signal-600 disabled:opacity-50 transition"
             >
               Send
             </button>
             {currentStep < 7 && currentStep > 1 && (
               <button
                 onClick={() => void advanceStep(currentStep + 1)}
-                className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-slate-600 transition"
+                className="rounded-xl bg-ink-700 px-4 py-3 text-sm font-medium text-ink-100 hover:bg-ink-600 transition"
               >
                 Next Step
               </button>
@@ -571,26 +571,26 @@ function PersonalDetailsForm({
   ];
 
   return (
-    <div className="border-t border-slate-800 bg-[#0d0d18] p-4">
+    <div className="border-t border-ink-800 bg-[#0d0d18] p-4">
       <div className="mx-auto max-w-2xl">
         <p className="mb-3 text-sm font-semibold text-white">Personal Details</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {fields.map((f) => (
             <div key={f.key}>
-              <label className="mb-1 block text-xs text-slate-400">{f.label}</label>
+              <label className="mb-1 block text-xs text-ink-200">{f.label}</label>
               <input
                 type={f.type || "text"}
                 placeholder={f.placeholder}
                 value={details[f.key] || ""}
                 onChange={(e) => onChange({ ...details, [f.key]: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-[#161625] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-lg border border-ink-700 bg-[#161625] px-3 py-2 text-sm text-white placeholder:text-ink-200 focus:border-signal focus:outline-none"
               />
             </div>
           ))}
         </div>
         <button
           onClick={onSubmit}
-          className="mt-4 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+          className="mt-4 rounded-lg bg-signal-400 px-6 py-2.5 text-sm font-semibold text-white hover:bg-signal-600 transition"
         >
           Save &amp; Continue
         </button>
@@ -620,26 +620,26 @@ function BankDetailsForm({
   ];
 
   return (
-    <div className="border-t border-slate-800 bg-[#0d0d18] p-4">
+    <div className="border-t border-ink-800 bg-[#0d0d18] p-4">
       <div className="mx-auto max-w-2xl">
         <p className="mb-3 text-sm font-semibold text-white">Bank Details</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {fields.map((f) => (
             <div key={f.key}>
-              <label className="mb-1 block text-xs text-slate-400">{f.label}</label>
+              <label className="mb-1 block text-xs text-ink-200">{f.label}</label>
               <input
                 type="text"
                 placeholder={f.placeholder}
                 value={details[f.key] || ""}
                 onChange={(e) => onChange({ ...details, [f.key]: e.target.value })}
-                className="w-full rounded-lg border border-slate-700 bg-[#161625] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-lg border border-ink-700 bg-[#161625] px-3 py-2 text-sm text-white placeholder:text-ink-200 focus:border-signal focus:outline-none"
               />
             </div>
           ))}
         </div>
         <button
           onClick={onSubmit}
-          className="mt-4 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+          className="mt-4 rounded-lg bg-signal-400 px-6 py-2.5 text-sm font-semibold text-white hover:bg-signal-600 transition"
         >
           Save &amp; Continue
         </button>

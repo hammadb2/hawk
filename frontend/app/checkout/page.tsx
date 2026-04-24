@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { portal } from "@/lib/portal-ui";
 
-const ACCENT = "#00C48C";
+const ACCENT = "#FFB800";
 
 const SHIELD_FEATURES = [
   "Daily monitoring",
@@ -110,7 +110,7 @@ function CheckoutFormInner({ plan }: { plan: "shield" | "starter" }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Dr. Jane Smith"
-          className="mt-1.5 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
+          className="mt-1.5 border-white/10 bg-ink-800 text-ink-0 placeholder:text-ink-200"
         />
       </div>
       <div>
@@ -121,12 +121,12 @@ function CheckoutFormInner({ plan }: { plan: "shield" | "starter" }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@yourclinic.com"
-          className="mt-1.5 border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
+          className="mt-1.5 border-white/10 bg-ink-800 text-ink-0 placeholder:text-ink-200"
         />
       </div>
       <div>
         <Label>Card details</Label>
-        <div className="mt-1.5 rounded-lg border border-slate-200 bg-white px-3 py-3">
+        <div className="mt-1.5 rounded-lg border border-white/10 bg-ink-800 px-3 py-3">
           <CardElement
             options={{
               style: {
@@ -141,15 +141,15 @@ function CheckoutFormInner({ plan }: { plan: "shield" | "starter" }) {
           />
         </div>
       </div>
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red">{error}</p> : null}
       <Button
         type="submit"
         disabled={!stripe || loading}
-        className="w-full bg-emerald-500 font-semibold text-white hover:bg-emerald-600 disabled:opacity-60"
+        className="w-full bg-signal font-semibold text-white hover:bg-signal-400 disabled:opacity-60"
       >
         {loading ? "Processing…" : buttonLabel}
       </Button>
-      <p className="text-center text-xs text-slate-500">
+      <p className="text-center text-xs text-ink-0">
         Backed by our breach response guarantee. Cancel anytime.
       </p>
     </form>
@@ -175,26 +175,26 @@ function CheckoutPageContent() {
     <div className={`min-h-dvh ${portal.pageBg}`}>
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
         <div className="mb-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-          <Link href="/" className="inline-flex items-center rounded-lg bg-slate-900 px-2.5 py-2 ring-1 ring-slate-800/80">
+          <Link href="/" className="inline-flex items-center rounded-lg bg-ink-950 px-2.5 py-2 ring-1 ring-white/10">
             <Image src="/hawk-logo.png" alt="HAWK" width={180} height={60} className="h-11 w-auto" />
           </Link>
-          <Link href="/#pricing" className="text-sm text-slate-600 hover:text-emerald-600">
+          <Link href="/#pricing" className="text-sm text-ink-200 hover:text-signal">
             ← Back to pricing
           </Link>
         </div>
 
         {!stripePromise ? (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-center text-sm text-rose-800">
+          <p className="rounded-lg border border-red/30 bg-red/10 px-4 py-3 text-center text-sm text-red">
             Missing Stripe publishable key. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on Vercel.
           </p>
         ) : (
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+            <div className="rounded-2xl border border-white/10 bg-ink-800 p-6 shadow-sm sm:p-8">
+              <h1 className="text-2xl font-bold text-ink-0">{title}</h1>
               <p className="mt-2 text-3xl font-semibold" style={{ color: ACCENT }}>
                 {price}
               </p>
-              <ul className="mt-6 space-y-2 text-sm text-slate-600">
+              <ul className="mt-6 space-y-2 text-sm text-ink-200">
                 {features.map((f) => (
                   <li key={f} className="flex gap-2">
                     <span style={{ color: ACCENT }}>✓</span>
@@ -202,15 +202,15 @@ function CheckoutPageContent() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-8 text-sm leading-relaxed text-slate-500">
+              <p className="mt-8 text-sm leading-relaxed text-ink-0">
                 Backed by our breach response guarantee.
                 <br />
                 Cancel anytime.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <h2 className="mb-6 text-lg font-semibold text-slate-900">Payment</h2>
+            <div className="rounded-2xl border border-white/10 bg-ink-800 p-6 shadow-sm sm:p-8">
+              <h2 className="mb-6 text-lg font-semibold text-ink-0">Payment</h2>
               <Elements stripe={stripePromise}>
                 <CheckoutFormInner plan={plan} />
               </Elements>
@@ -227,7 +227,7 @@ export default function CheckoutPage() {
     <Suspense
       fallback={
         <div className={`flex min-h-dvh items-center justify-center ${portal.pageBg}`}>
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
         </div>
       }
     >

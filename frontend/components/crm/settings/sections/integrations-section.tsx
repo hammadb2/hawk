@@ -59,14 +59,14 @@ export function IntegrationsSection({ value: _value }: { value: ValueGetter }) {
           <li key={i.name} className="flex items-start justify-between gap-4 rounded-md border border-[#1e1e2e] bg-[#0d0d14] p-3">
             <div>
               <div className="text-sm font-medium text-white">{i.name}</div>
-              <p className="mt-1 text-xs text-slate-400">{i.description}</p>
+              <p className="mt-1 text-xs text-ink-200">{i.description}</p>
             </div>
             {i.href ? (
               <a
                 href={i.href}
                 target="_blank"
                 rel="noreferrer"
-                className="shrink-0 rounded-md border border-[#1e1e2e] px-3 py-1 text-xs text-slate-300 hover:bg-[#14141f]"
+                className="shrink-0 rounded-md border border-[#1e1e2e] px-3 py-1 text-xs text-ink-100 hover:bg-[#14141f]"
               >
                 Open
               </a>

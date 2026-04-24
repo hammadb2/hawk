@@ -90,7 +90,7 @@ export function OnboardingSignaturePad({ onSign, onCancel }: Props) {
         ref={canvasRef}
         width={500}
         height={200}
-        className="w-full rounded-lg border border-slate-700 cursor-crosshair touch-none"
+        className="w-full rounded-lg border border-ink-700 cursor-crosshair touch-none"
         onMouseDown={startDraw}
         onMouseMove={draw}
         onMouseUp={stopDraw}
@@ -103,19 +103,19 @@ export function OnboardingSignaturePad({ onSign, onCancel }: Props) {
         <button
           onClick={submit}
           disabled={!hasDrawn}
-          className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+          className="rounded-lg bg-signal-400 px-5 py-2 text-sm font-semibold text-white hover:bg-signal-600 disabled:opacity-50 transition"
         >
           Confirm Signature
         </button>
         <button
           onClick={clear}
-          className="rounded-lg bg-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-600 transition"
+          className="rounded-lg bg-ink-700 px-4 py-2 text-sm text-ink-100 hover:bg-ink-600 transition"
         >
           Clear
         </button>
         <button
           onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white transition"
+          className="rounded-lg px-4 py-2 text-sm text-ink-200 hover:text-white transition"
         >
           Cancel
         </button>

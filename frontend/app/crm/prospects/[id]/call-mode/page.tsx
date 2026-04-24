@@ -174,16 +174,16 @@ export default function CallModePage() {
     : "default";
   const pool = OBJECTIONS[ind] ?? OBJECTIONS.default;
 
-  if (!id) return <p className="p-6 text-slate-600">Invalid</p>;
+  if (!id) return <p className="p-6 text-ink-200">Invalid</p>;
 
   return (
-    <div className="min-h-screen bg-[#050508] text-slate-200">
+    <div className="min-h-screen bg-[#050508] text-ink-100">
       <Dialog open={briefOpen} onOpenChange={setBriefOpen}>
         <DialogContent className={crmDialogSurface}>
           <DialogHeader>
             <DialogTitle className="text-white">Pre-call brief</DialogTitle>
           </DialogHeader>
-          <p className="text-sm leading-relaxed text-slate-300">
+          <p className="text-sm leading-relaxed text-ink-100">
             Calling {p?.contact_name || "the prospect"} at {p?.company_name || p?.domain}
             <br />
             Score: {scan?.hawk_score ?? p?.hawk_score ?? "—"}/100 — Grade {(scan?.grade as string) || "—"}
@@ -191,7 +191,7 @@ export default function CallModePage() {
             Industry: {p?.industry || "—"}
           </p>
           <DialogFooter>
-            <Button className="bg-emerald-600" onClick={() => { setBriefOpen(false); setEntered(true); setStarted(Date.now()); }}>
+            <Button className="bg-signal-400" onClick={() => { setBriefOpen(false); setEntered(true); setStarted(Date.now()); }}>
               Enter call mode
             </Button>
           </DialogFooter>
@@ -203,12 +203,12 @@ export default function CallModePage() {
           <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1e1e2e] px-6 py-4">
             <div>
               <p className="text-2xl font-semibold text-white">{p?.company_name || p?.domain}</p>
-              <p className="text-sm text-slate-400">{p?.domain} · {p?.industry || "—"}</p>
+              <p className="text-sm text-ink-200">{p?.domain} · {p?.industry || "—"}</p>
             </div>
-            <div className="text-right font-mono text-lg text-emerald-400">
+            <div className="text-right font-mono text-lg text-signal">
               {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
             </div>
-            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" asChild>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" asChild>
               <Link href={`/crm/prospects/${id}`}>Exit</Link>
             </Button>
           </header>
@@ -222,9 +222,9 @@ export default function CallModePage() {
                   size={120}
                   showEmptyState={!scan}
                 />
-                <span className="text-sm text-slate-400">Grade {(scan?.grade as string) || "—"}</span>
+                <span className="text-sm text-ink-200">Grade {(scan?.grade as string) || "—"}</span>
               </div>
-              <ul className="space-y-2 text-sm text-slate-300">
+              <ul className="space-y-2 text-sm text-ink-100">
                 {topFindings.map((f, i) => (
                   <li key={i}>
                     {(f as { title?: string }).title || "Finding"}: {(f as { interpretation?: string }).interpretation || (f as { description?: string }).description || ""}
@@ -236,7 +236,7 @@ export default function CallModePage() {
             <section className={`space-y-4 p-6 ${crmSurfaceCard}`}>
               <h2 className="text-lg font-medium text-white">Live deep scan</h2>
               <Button
-                className="w-full bg-emerald-600 py-6 text-lg"
+                className="w-full bg-signal-400 py-6 text-lg"
                 disabled={scanning}
                 onClick={() => void runLiveScan()}
               >
@@ -245,7 +245,7 @@ export default function CallModePage() {
               {scanning && (
                 <div className="h-2 w-full overflow-hidden rounded bg-[#0d0d14]">
                   <div
-                    className="h-full bg-emerald-500 transition-all duration-1000"
+                    className="h-full bg-signal transition-all duration-1000"
                     style={{ width: `${((phaseIdx + 1) / PHASES.length) * 100}%` }}
                   />
                 </div>
@@ -254,13 +254,13 @@ export default function CallModePage() {
           </div>
 
           <footer className="border-t border-[#1e1e2e] px-6 py-4">
-            <p className="text-xs text-slate-500">Objections (← →). {pool[objIdx]?.q}</p>
-            <p className="text-sm text-slate-300">{pool[objIdx]?.a}</p>
+            <p className="text-xs text-ink-0">Objections (← →). {pool[objIdx]?.q}</p>
+            <p className="text-sm text-ink-100">{pool[objIdx]?.a}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" size="sm" asChild>
+              <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" size="sm" asChild>
                 <a href={`mailto:${p?.contact_email || ""}?subject=Your HAWK security report`}>Send report (email)</a>
               </Button>
-              <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" size="sm" asChild>
+              <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" size="sm" asChild>
                 <Link href="/portal">Start subscription (portal)</Link>
               </Button>
             </div>

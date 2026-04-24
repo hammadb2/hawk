@@ -48,7 +48,7 @@ import {
 } from "lucide-react";
 
 function timelineBorderForActivity(type: string): string {
-  if (type === "stage_changed") return "border-l-emerald-500";
+  if (type === "stage_changed") return "border-l-signal";
   if (type.includes("note")) return "border-l-blue-500";
   if (type.includes("call")) return "border-l-purple-500";
   if (type.includes("email")) return "border-l-amber-500";
@@ -69,7 +69,7 @@ function OverviewField({
   const raw = value?.trim() ? value : null;
   return (
     <div className="rounded-lg border border-crmBorder bg-crmSurface2 p-3">
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-0">
         {icon}
         {label}
       </div>
@@ -500,8 +500,8 @@ export function ProspectProfile({
 
   if (loading || !p) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-ink-0">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-crmBorder border-t-signal" />
       </div>
     );
   }
@@ -512,8 +512,8 @@ export function ProspectProfile({
   return (
     <div className="flex h-full flex-col">
       {hasVulnProfile && (
-        <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          <p className="font-semibold uppercase tracking-wide text-amber-400">Vulnerability found</p>
+        <div className="mb-4 rounded-xl border border-signal/40 bg-signal/10 px-4 py-3 text-sm text-amber-100">
+          <p className="font-semibold uppercase tracking-wide text-signal">Vulnerability found</p>
           <p className="mt-1 text-amber-50/95">
             {p.vulnerability_type ? `${p.vulnerability_type}: ` : ""}
             {p.vulnerability_found}
@@ -522,7 +522,7 @@ export function ProspectProfile({
       )}
 
       {(duplicateHint || p.duplicate_of) && (
-        <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+        <div className="mb-3 rounded-lg border border-signal/40 bg-signal/10 px-3 py-2 text-sm text-amber-100">
           <p>
             Possible duplicate for this domain — contact HoS if unsure.
             {privileged && (
@@ -538,17 +538,17 @@ export function ProspectProfile({
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-amber-200/90">
               <span className="text-amber-200/70">Other records on {p.domain}:</span>
               {domainPeers.map((peer) => (
-                <Link key={peer.id} href={`/crm/prospects/${peer.id}`} className="text-emerald-700 underline-offset-2 hover:underline">
+                <Link key={peer.id} href={`/crm/prospects/${peer.id}`} className="text-signal-400 underline-offset-2 hover:underline">
                   {peer.company_name ?? peer.id.slice(0, 8)}…
                 </Link>
               ))}
             </div>
           )}
           {privileged && domainPeers.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-amber-500/20 pt-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-signal/20 pt-2">
               <span className="text-xs text-amber-200/80">Mark this prospect as duplicate of:</span>
               <select
-                className="rounded border border-amber-500/40 bg-[#0d0d14] px-2 py-1 text-xs text-slate-200"
+                className="rounded border border-signal/40 bg-[#0d0d14] px-2 py-1 text-xs text-ink-100"
                 value={duplicateLinkTarget}
                 onChange={(e) => setDuplicateLinkTarget(e.target.value)}
               >
@@ -562,7 +562,7 @@ export function ProspectProfile({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 border-amber-500/40 text-xs"
+                className="h-7 border-signal/40 text-xs"
                 disabled={!duplicateLinkTarget}
                 onClick={() => void linkAsDuplicateOf()}
               >
@@ -574,18 +574,18 @@ export function ProspectProfile({
       )}
 
       {domainPeers.length > 0 && !(duplicateHint || p.duplicate_of) && (
-        <div className="mb-3 rounded-lg border border-crmBorder bg-crmSurface px-3 py-2 text-sm text-slate-200">
+        <div className="mb-3 rounded-lg border border-crmBorder bg-crmSurface px-3 py-2 text-sm text-ink-100">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className="text-slate-500">Other prospects on {p.domain}:</span>
+            <span className="text-ink-0">Other prospects on {p.domain}:</span>
             {domainPeers.map((peer) => (
-              <Link key={peer.id} href={`/crm/prospects/${peer.id}`} className="text-emerald-400 underline-offset-2 hover:underline">
+              <Link key={peer.id} href={`/crm/prospects/${peer.id}`} className="text-signal underline-offset-2 hover:underline">
                 {peer.company_name ?? peer.id.slice(0, 8)}…
               </Link>
             ))}
           </div>
           {privileged && (
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-crmBorder pt-2">
-              <span className="text-xs text-slate-500">Mark this prospect as duplicate of:</span>
+              <span className="text-xs text-ink-0">Mark this prospect as duplicate of:</span>
               <select
                 className="rounded border border-crmBorder bg-crmSurface2 px-2 py-1 text-xs text-white"
                 value={duplicateLinkTarget}
@@ -601,7 +601,7 @@ export function ProspectProfile({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 border-crmBorder bg-crmSurface2 text-xs text-slate-200"
+                className="h-7 border-crmBorder bg-crmSurface2 text-xs text-ink-100"
                 disabled={!duplicateLinkTarget}
                 onClick={() => void linkAsDuplicateOf()}
               >
@@ -625,7 +625,7 @@ export function ProspectProfile({
                 ) : (
                   <h1 className={cn(title, "font-semibold text-white")}>{p.company_name ?? p.domain}</h1>
                 )}
-                <a href={`https://${p.domain}`} target="_blank" rel="noreferrer" className="text-sm text-emerald-400 hover:underline">
+                <a href={`https://${p.domain}`} target="_blank" rel="noreferrer" className="text-sm text-signal hover:underline">
                   {p.domain}
                 </a>
               </div>
@@ -646,7 +646,7 @@ export function ProspectProfile({
                   onClick={() => void toggleHot()}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
-                    p.is_hot ? "border-rose-500/60 text-rose-400" : "border-crmBorder text-slate-400 hover:text-slate-200",
+                    p.is_hot ? "border-red/60 text-red" : "border-crmBorder text-ink-200 hover:text-ink-100",
                   )}
                 >
                   {p.is_hot ? (
@@ -671,8 +671,8 @@ export function ProspectProfile({
                 className={cn(
                   "relative overflow-hidden transition-all",
                   scanning
-                    ? "cursor-not-allowed bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-600/40 ring-2 ring-amber-300/60 ring-offset-2 ring-offset-crmSurface"
-                    : "bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-md hover:shadow-emerald-600/30",
+                    ? "cursor-not-allowed bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 text-white shadow-lg shadow-amber-600/40 ring-2 ring-signal/30 ring-offset-2 ring-offset-crmSurface"
+                    : "bg-signal-400 text-white hover:bg-signal hover:shadow-md hover:shadow-signal/30",
                 )}
                 onClick={() => void runScan()}
                 disabled={scanning}
@@ -680,7 +680,7 @@ export function ProspectProfile({
                 {scanning && (
                   <span
                     aria-hidden
-                    className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-ink-950/30 to-transparent"
                   />
                 )}
                 <span className="relative flex items-center gap-2">
@@ -709,31 +709,31 @@ export function ProspectProfile({
                 </span>
               </Button>
               {scanning && scanPhase && (
-                <span className="max-w-[220px] rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-right text-[10px] font-medium text-amber-200/90">
+                <span className="max-w-[220px] rounded-md border border-signal/50/30 bg-signal-300/10 px-2 py-0.5 text-right text-[10px] font-medium text-amber-200/90">
                   {scanPhase}
                 </span>
               )}
             </div>
-            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-slate-200" onClick={() => setLogOpen(true)}>
+            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-ink-100" onClick={() => setLogOpen(true)}>
               Log call
             </Button>
-            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-slate-200" onClick={() => setBookOpen(true)}>
+            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-ink-100" onClick={() => setBookOpen(true)}>
               Book call
             </Button>
-            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-slate-200" asChild>
+            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-ink-100" asChild>
               <Link href={`/crm/prospects/${prospectId}/call-mode`}>Call mode</Link>
             </Button>
-            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-slate-200" onClick={() => setEditOpen(true)}>
+            <Button size="sm" variant="outline" className="border-crmBorder bg-crmSurface2 text-ink-100" onClick={() => setEditOpen(true)}>
               Edit
             </Button>
             <details className="relative">
-              <summary className="cursor-pointer list-none rounded-md border border-crmBorder bg-crmSurface2 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/5">
+              <summary className="cursor-pointer list-none rounded-md border border-crmBorder bg-crmSurface2 px-3 py-1.5 text-sm text-ink-100 hover:bg-ink-800/5">
                 More
               </summary>
               <div className="absolute right-0 z-10 mt-1 w-52 rounded-lg border border-crmBorder bg-crmSurface py-1 shadow-xl">
                 <button
                   type="button"
-                  className="block w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"
+                  className="block w-full px-3 py-2 text-left text-sm text-ink-100 hover:bg-ink-800/5"
                   onClick={() => {
                     void navigator.clipboard.writeText(`${typeof window !== "undefined" ? window.location.origin : ""}/crm/prospects/${p.id}`);
                     toast.success("Link copied");
@@ -742,7 +742,7 @@ export function ProspectProfile({
                   Copy profile link
                 </button>
               {canReassign && (
-                <div className="border-t border-crmBorder px-3 py-2 text-xs text-slate-400">
+                <div className="border-t border-crmBorder px-3 py-2 text-xs text-ink-200">
                   Reassign
                   <select
                     className="mt-1 w-full rounded border border-crmBorder bg-crmSurface2 px-2 py-1 text-white"
@@ -760,18 +760,18 @@ export function ProspectProfile({
               )}
               <button
                 type="button"
-                className="block w-full px-3 py-2 text-left text-sm text-rose-400 hover:bg-white/5"
+                className="block w-full px-3 py-2 text-left text-sm text-red hover:bg-ink-800/5"
                 onClick={() => setLostOpen(true)}
               >
                 Mark lost
               </button>
-              <button type="button" className="block w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5" onClick={() => setWonOpen(true)}>
+              <button type="button" className="block w-full px-3 py-2 text-left text-sm text-ink-100 hover:bg-ink-800/5" onClick={() => setWonOpen(true)}>
                 Convert to client
               </button>
             </div>
           </details>
           {variant === "drawer" && onClose && (
-            <Button size="sm" variant="ghost" className="text-slate-400 hover:bg-white/5 hover:text-white" onClick={onClose}>
+            <Button size="sm" variant="ghost" className="text-ink-200 hover:bg-ink-800/5 hover:text-white" onClick={onClose}>
               Close
             </Button>
           )}
@@ -780,40 +780,40 @@ export function ProspectProfile({
       </div>
 
       <Tabs defaultValue="overview" className="mt-4 flex min-h-0 flex-1 flex-col">
-        <TabsList className="h-auto min-h-10 w-full shrink-0 flex-wrap justify-start gap-1 overflow-x-auto rounded-xl border border-crmBorder bg-crmSurface2 p-1 text-slate-500">
+        <TabsList className="h-auto min-h-10 w-full shrink-0 flex-wrap justify-start gap-1 overflow-x-auto rounded-xl border border-crmBorder bg-crmSurface2 p-1 text-ink-0">
           <TabsTrigger
             value="overview"
-            className="rounded-lg border border-transparent text-slate-500 data-[state=active]:border-emerald-500/30 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-400 data-[state=active]:shadow-none"
+            className="rounded-lg border border-transparent text-ink-0 data-[state=active]:border-signal/30 data-[state=active]:bg-signal/15 data-[state=active]:text-signal data-[state=active]:shadow-none"
           >
             Overview
           </TabsTrigger>
           <TabsTrigger
             value="timeline"
-            className="rounded-lg border border-transparent text-slate-500 data-[state=active]:border-emerald-500/30 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-400 data-[state=active]:shadow-none"
+            className="rounded-lg border border-transparent text-ink-0 data-[state=active]:border-signal/30 data-[state=active]:bg-signal/15 data-[state=active]:text-signal data-[state=active]:shadow-none"
           >
             Timeline
           </TabsTrigger>
           <TabsTrigger
             value="scans"
-            className="rounded-lg border border-transparent text-slate-500 data-[state=active]:border-emerald-500/30 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-400 data-[state=active]:shadow-none"
+            className="rounded-lg border border-transparent text-ink-0 data-[state=active]:border-signal/30 data-[state=active]:bg-signal/15 data-[state=active]:text-signal data-[state=active]:shadow-none"
           >
             Scan results
           </TabsTrigger>
           <TabsTrigger
             value="emails"
-            className="rounded-lg border border-transparent text-slate-500 data-[state=active]:border-emerald-500/30 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-400 data-[state=active]:shadow-none"
+            className="rounded-lg border border-transparent text-ink-0 data-[state=active]:border-signal/30 data-[state=active]:bg-signal/15 data-[state=active]:text-signal data-[state=active]:shadow-none"
           >
             Emails
           </TabsTrigger>
           <TabsTrigger
             value="notes"
-            className="rounded-lg border border-transparent text-slate-500 data-[state=active]:border-emerald-500/30 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-400 data-[state=active]:shadow-none"
+            className="rounded-lg border border-transparent text-ink-0 data-[state=active]:border-signal/30 data-[state=active]:bg-signal/15 data-[state=active]:text-signal data-[state=active]:shadow-none"
           >
             Notes
           </TabsTrigger>
           <TabsTrigger
             value="files"
-            className="rounded-lg border border-transparent text-slate-500 data-[state=active]:border-emerald-500/30 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-400 data-[state=active]:shadow-none"
+            className="rounded-lg border border-transparent text-ink-0 data-[state=active]:border-signal/30 data-[state=active]:bg-signal/15 data-[state=active]:text-signal data-[state=active]:shadow-none"
           >
             Files
           </TabsTrigger>
@@ -821,18 +821,18 @@ export function ProspectProfile({
 
         <TabsContent value="overview" className="min-h-[200px] space-y-3 text-sm">
           <div className="grid gap-3 sm:grid-cols-2">
-            <OverviewField icon={<Briefcase className="h-4 w-4 text-emerald-400" />} label="Industry" value={p.industry} />
-            <OverviewField icon={<MapPin className="h-4 w-4 text-emerald-400" />} label="City" value={p.city} />
-            <OverviewField icon={<User className="h-4 w-4 text-emerald-400" />} label="Contact" value={p.contact_name} />
-            <OverviewField icon={<Mail className="h-4 w-4 text-emerald-400" />} label="Email" value={p.contact_email} />
-            <OverviewField icon={<Phone className="h-4 w-4 text-emerald-400" />} label="Phone" value={p.phone} />
-            <OverviewField icon={<Building2 className="h-4 w-4 text-emerald-400" />} label="Source" value={p.source ? String(p.source) : null} capitalize />
+            <OverviewField icon={<Briefcase className="h-4 w-4 text-signal" />} label="Industry" value={p.industry} />
+            <OverviewField icon={<MapPin className="h-4 w-4 text-signal" />} label="City" value={p.city} />
+            <OverviewField icon={<User className="h-4 w-4 text-signal" />} label="Contact" value={p.contact_name} />
+            <OverviewField icon={<Mail className="h-4 w-4 text-signal" />} label="Email" value={p.contact_email} />
+            <OverviewField icon={<Phone className="h-4 w-4 text-signal" />} label="Phone" value={p.phone} />
+            <OverviewField icon={<Building2 className="h-4 w-4 text-signal" />} label="Source" value={p.source ? String(p.source) : null} capitalize />
           </div>
-          <p className="text-xs text-slate-500">Apollo enrichment & deal value: Phase 7+.</p>
+          <p className="text-xs text-ink-0">Apollo enrichment & deal value: Phase 7+.</p>
         </TabsContent>
 
         <TabsContent value="timeline" className="min-h-[240px] max-h-[50vh] space-y-3 overflow-y-auto pr-1 text-sm">
-          {activities.length === 0 && <p className="text-slate-500">No events yet.</p>}
+          {activities.length === 0 && <p className="text-ink-0">No events yet.</p>}
           {activities.map((a) => (
             <div
               key={a.id}
@@ -842,19 +842,19 @@ export function ProspectProfile({
               )}
             >
               <div className={cn("text-xs font-medium", activityColor(a.type))}>{activityLabel(a.type)}</div>
-              <div className="text-[11px] text-slate-500">{new Date(a.created_at).toLocaleString()}</div>
-              {a.notes && <p className="mt-1 text-slate-300">{a.notes}</p>}
+              <div className="text-[11px] text-ink-0">{new Date(a.created_at).toLocaleString()}</div>
+              {a.notes && <p className="mt-1 text-ink-100">{a.notes}</p>}
               {a.metadata != null &&
                 typeof a.metadata === "object" &&
                 Object.keys(a.metadata as Record<string, unknown>).length > 0 && (
-                  <pre className="mt-1 max-h-24 overflow-auto text-[10px] text-slate-500">{JSON.stringify(a.metadata, null, 2)}</pre>
+                  <pre className="mt-1 max-h-24 overflow-auto text-[10px] text-ink-0">{JSON.stringify(a.metadata, null, 2)}</pre>
                 )}
             </div>
           ))}
         </TabsContent>
 
         <TabsContent value="scans" className="min-h-[200px] space-y-4 text-sm">
-          {scans.length === 0 && <p className="text-slate-500">No scans yet. Run a scan from the header.</p>}
+          {scans.length === 0 && <p className="text-ink-0">No scans yet. Run a scan from the header.</p>}
           {scans.map((s) => (
             <div key={s.id} className="rounded-lg border border-crmBorder bg-crmSurface2 p-4 shadow-lg">
               <ProspectScanResultsPanel
@@ -873,44 +873,44 @@ export function ProspectProfile({
         <TabsContent value="emails" className="min-h-[120px] space-y-4 text-sm">
           {p.contact_email && (
             <form onSubmit={sendEmail} className="space-y-2 rounded-lg border border-crmBorder bg-crmSurface2 p-3 shadow-lg">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs text-ink-0">
                 <span>To:</span>
-                <span className="text-slate-200">{p.contact_email}</span>
+                <span className="text-ink-100">{p.contact_email}</span>
               </div>
               <Input
                 placeholder="Subject"
-                className="border-crmBorder bg-crmSurface text-sm text-white placeholder:text-slate-500"
+                className="border-crmBorder bg-crmSurface text-sm text-white placeholder:text-ink-0"
                 value={emailSubject}
                 onChange={(e) => setEmailSubject(e.target.value)}
               />
               <textarea
-                className="w-full rounded-md border border-crmBorder bg-crmSurface px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                className="w-full rounded-md border border-crmBorder bg-crmSurface px-3 py-2 text-sm text-white placeholder:text-ink-0"
                 rows={4}
                 placeholder="Compose your email…"
                 value={emailBody}
                 onChange={(e) => setEmailBody(e.target.value)}
               />
               <div className="flex justify-end">
-                <Button type="submit" size="sm" className="bg-emerald-600" disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}>
+                <Button type="submit" size="sm" className="bg-signal-400" disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}>
                   {sendingEmail ? "Sending…" : "Log & send"}
                 </Button>
               </div>
             </form>
           )}
           {!p.contact_email && (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <p className="rounded-lg border border-signal/30 bg-signal/10 px-3 py-2 text-xs text-amber-200">
               Add a contact email to this prospect to enable inline email composition.
             </p>
           )}
           {emailEvents.length === 0 && (
-            <p className="text-slate-500">
+            <p className="text-ink-0">
               No email events yet. ARIA will draft and dispatch the first-touch
               email via Smartlead once this prospect is enriched — see{" "}
-              <Link href="/crm/ai" className="text-emerald-400 hover:underline">
+              <Link href="/crm/ai" className="text-signal hover:underline">
                 ARIA
               </Link>
               {" "}for status, or connect Smartlead directly with{" "}
-              <code className="text-slate-500">X-CRM-Webhook-Secret</code>.
+              <code className="text-ink-0">X-CRM-Webhook-Secret</code>.
             </p>
           )}
           {emailEvents.map((ev) => {
@@ -920,10 +920,10 @@ export function ProspectProfile({
               <div key={ev.id} className="rounded-lg border border-crmBorder bg-crmSurface2 px-3 py-2 shadow-sm">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div className="font-medium text-white">{ev.subject ?? "(No subject)"}</div>
-                  <span className="rounded bg-crmSurface px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-400">{src}</span>
+                  <span className="rounded bg-crmSurface px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink-200">{src}</span>
                 </div>
-                {ev.external_id && <div className="mt-1 font-mono text-[10px] text-slate-500">id: {ev.external_id}</div>}
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                {ev.external_id && <div className="mt-1 font-mono text-[10px] text-ink-0">id: {ev.external_id}</div>}
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-200">
                   {ev.sequence_step != null && <span>Step {ev.sequence_step}</span>}
                   {ev.sent_at && (
                     <span className="inline-flex items-center gap-1.5">
@@ -933,25 +933,25 @@ export function ProspectProfile({
                   )}
                   {ev.opened_at && (
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" />
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-signal-300" />
                       Opened {new Date(ev.opened_at).toLocaleString()}
                     </span>
                   )}
                   {ev.clicked_at && (
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-ink-500" />
                       Clicked {new Date(ev.clicked_at).toLocaleString()}
                     </span>
                   )}
                   {ev.replied_at && (
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-signal" />
                       Replied {new Date(ev.replied_at).toLocaleString()}
                     </span>
                   )}
                 </div>
                 {meta && (
-                  <pre className="mt-2 max-h-28 overflow-auto text-[10px] text-slate-500">{JSON.stringify(ev.metadata, null, 2)}</pre>
+                  <pre className="mt-2 max-h-28 overflow-auto text-[10px] text-ink-0">{JSON.stringify(ev.metadata, null, 2)}</pre>
                 )}
               </div>
             );
@@ -961,13 +961,13 @@ export function ProspectProfile({
         <TabsContent value="notes" className="min-h-[200px] space-y-3">
           <div className="space-y-2">
             <textarea
-              className="w-full rounded-md border border-crmBorder bg-crmSurface2 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+              className="w-full rounded-md border border-crmBorder bg-crmSurface2 px-3 py-2 text-sm text-white placeholder:text-ink-0"
               rows={3}
               placeholder="Add a note…"
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
             />
-            <Button size="sm" className="bg-emerald-600" onClick={() => void addNote()}>
+            <Button size="sm" className="bg-signal-400" onClick={() => void addNote()}>
               Add note
             </Button>
           </div>
@@ -976,7 +976,7 @@ export function ProspectProfile({
               const isAuthor = session?.user?.id === n.author_id;
               const isEditing = editingNoteId === n.id;
               return (
-                <li key={n.id} className="rounded-lg border border-crmBorder bg-crmSurface2 px-3 py-2 text-sm text-slate-200 shadow-sm">
+                <li key={n.id} className="rounded-lg border border-crmBorder bg-crmSurface2 px-3 py-2 text-sm text-ink-100 shadow-sm">
                   {isEditing ? (
                     <div className="space-y-2">
                       <textarea
@@ -986,13 +986,13 @@ export function ProspectProfile({
                         onChange={(e) => setNoteEditDraft(e.target.value)}
                       />
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-emerald-600" onClick={() => void saveNoteEdit()}>
+                        <Button size="sm" className="bg-signal-400" onClick={() => void saveNoteEdit()}>
                           Save
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-slate-200"
+                          className="border-white/10"
                           onClick={() => {
                             setEditingNoteId(null);
                             setNoteEditDraft("");
@@ -1005,18 +1005,18 @@ export function ProspectProfile({
                   ) : (
                     <>
                       <p className="whitespace-pre-wrap">{n.body}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ink-200">
                         <span>
                           {new Date(n.created_at).toLocaleString()}
                           {n.updated_at !== n.created_at && (
-                            <span className="ml-1 text-slate-500">· edited {new Date(n.updated_at).toLocaleString()}</span>
+                            <span className="ml-1 text-ink-0">· edited {new Date(n.updated_at).toLocaleString()}</span>
                           )}
                         </span>
                         {isAuthor && (
                           <span className="flex gap-2">
                             <button
                               type="button"
-                              className="text-emerald-600 hover:underline"
+                              className="text-signal hover:underline"
                               onClick={() => {
                                 setEditingNoteId(n.id);
                                 setNoteEditDraft(n.body);
@@ -1024,7 +1024,7 @@ export function ProspectProfile({
                             >
                               Edit
                             </button>
-                            <button type="button" className="text-rose-400 hover:underline" onClick={() => void deleteNote(n.id)}>
+                            <button type="button" className="text-red hover:underline" onClick={() => void deleteNote(n.id)}>
                               Delete
                             </button>
                           </span>
@@ -1041,7 +1041,7 @@ export function ProspectProfile({
         <TabsContent value="files" className="min-h-[200px] space-y-3">
           <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={addFile}>
             <div className="flex-1">
-              <Label className="text-xs text-slate-500">Title</Label>
+              <Label className="text-xs text-ink-0">Title</Label>
               <Input
                 className="border-crmBorder bg-crmSurface2 text-white"
                 value={fileTitle}
@@ -1049,25 +1049,25 @@ export function ProspectProfile({
               />
             </div>
             <div className="flex-[2]">
-              <Label className="text-xs text-slate-500">URL</Label>
+              <Label className="text-xs text-ink-0">URL</Label>
               <Input
-                className="border-crmBorder bg-crmSurface2 text-white placeholder:text-slate-500"
+                className="border-crmBorder bg-crmSurface2 text-white placeholder:text-ink-0"
                 value={fileUrl}
                 onChange={(e) => setFileUrl(e.target.value)}
                 placeholder="https://…"
               />
             </div>
-            <Button type="submit" className="bg-emerald-600 text-white hover:bg-emerald-500">
+            <Button type="submit" className="bg-signal-400 text-white hover:bg-signal">
               Add
             </Button>
           </form>
           <ul className="space-y-2">
             {files.map((f) => (
               <li key={f.id}>
-                <a href={f.file_url} target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">
+                <a href={f.file_url} target="_blank" rel="noreferrer" className="text-signal hover:underline">
                   {f.title}
                 </a>
-                <span className="ml-2 text-xs text-slate-500">{new Date(f.created_at).toLocaleDateString()}</span>
+                <span className="ml-2 text-xs text-ink-0">{new Date(f.created_at).toLocaleDateString()}</span>
               </li>
             ))}
           </ul>
@@ -1169,7 +1169,7 @@ export function ProspectProfile({
       />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="border-crmBorder bg-crmSurface text-slate-200">
+        <DialogContent className="border-crmBorder bg-crmSurface text-ink-100">
           <DialogHeader>
             <DialogTitle className="text-white">Edit prospect</DialogTitle>
           </DialogHeader>
@@ -1181,20 +1181,20 @@ export function ProspectProfile({
             }}
           >
             <input type="hidden" name="_id" value={p.id} />
-            <Label className="text-slate-500">Company</Label>
+            <Label className="text-ink-0">Company</Label>
             <Input name="company_name" defaultValue={p.company_name ?? ""} className="border-crmBorder bg-crmSurface2 text-white" />
-            <Label className="text-slate-500">Industry</Label>
+            <Label className="text-ink-0">Industry</Label>
             <Input name="industry" defaultValue={p.industry ?? ""} className="border-crmBorder bg-crmSurface2 text-white" />
-            <Label className="text-slate-500">City</Label>
+            <Label className="text-ink-0">City</Label>
             <Input name="city" defaultValue={p.city ?? ""} className="border-crmBorder bg-crmSurface2 text-white" />
-            <Label className="text-slate-500">Contact name</Label>
+            <Label className="text-ink-0">Contact name</Label>
             <Input name="contact_name" defaultValue={p.contact_name ?? ""} className="border-crmBorder bg-crmSurface2 text-white" />
-            <Label className="text-slate-500">Contact email</Label>
+            <Label className="text-ink-0">Contact email</Label>
             <Input name="contact_email" defaultValue={p.contact_email ?? ""} className="border-crmBorder bg-crmSurface2 text-white" />
-            <Label className="text-slate-500">Phone</Label>
+            <Label className="text-ink-0">Phone</Label>
             <Input name="phone" defaultValue={p.phone ?? ""} className="border-crmBorder bg-crmSurface2 text-white" />
             <DialogFooter>
-              <Button type="submit" className="bg-emerald-600">
+              <Button type="submit" className="bg-signal-400">
                 Save
               </Button>
             </DialogFooter>

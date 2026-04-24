@@ -155,8 +155,8 @@ export default function PortalFindingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[30vh] items-center justify-center text-slate-600">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[30vh] items-center justify-center text-ink-200">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -164,23 +164,23 @@ export default function PortalFindingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Remediation tracking</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Set status per finding. When you mark <strong className="text-slate-700">Fixed</strong>, we automatically run a
-          fast verification scan; you can also tap <strong className="text-slate-700">Verify fix</strong> to re-check
+        <h1 className="text-2xl font-semibold text-ink-0">Remediation tracking</h1>
+        <p className="mt-1 text-sm text-ink-200">
+          Set status per finding. When you mark <strong className="text-ink-100">Fixed</strong>, we automatically run a
+          fast verification scan; you can also tap <strong className="text-ink-100">Verify fix</strong> to re-check
           manually. Score updates and WhatsApp streak messages fire when verification succeeds.
         </p>
-        <Link href="/portal" className="mt-2 inline-block text-sm text-emerald-600 hover:underline">
+        <Link href="/portal" className="mt-2 inline-block text-sm text-signal hover:underline">
           ← Back to overview
         </Link>
       </div>
 
       {findings.length === 0 ? (
-        <p className="text-sm text-slate-600">No findings in the latest scan.</p>
+        <p className="text-sm text-ink-200">No findings in the latest scan.</p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-600">
+            <thead className="border-b border-white/10 bg-ink-800 text-xs uppercase text-ink-200">
               <tr>
                 <th className="px-4 py-3">Severity</th>
                 <th className="px-4 py-3">Finding</th>
@@ -188,31 +188,31 @@ export default function PortalFindingsPage() {
                 <th className="px-4 py-3">Verify</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-white/10">
               {findings.filter((f) => f.id).map((f) => {
                 const fid = String(f.id);
                 const st = statusMap[fid]?.status || "open";
                 return (
-                  <tr key={fid} className="bg-slate-50/90">
-                    <td className="px-4 py-3 capitalize text-slate-700">{f.severity || "—"}</td>
-                    <td className="max-w-md px-4 py-3 text-slate-800">
+                  <tr key={fid} className="bg-ink-900/90">
+                    <td className="px-4 py-3 capitalize text-ink-100">{f.severity || "—"}</td>
+                    <td className="max-w-md px-4 py-3 text-ink-0">
                       <div className="font-medium">{f.title || "Finding"}</div>
-                      {f.description && <p className="mt-1 text-xs text-slate-600 line-clamp-3">{f.description}</p>}
+                      {f.description && <p className="mt-1 text-xs text-ink-200 line-clamp-3">{f.description}</p>}
                       {f.screenshot_data_url && f.screenshot_data_url.startsWith("data:image") && (
                         <div className="mt-3">
-                          <p className="mb-1 text-[10px] font-medium uppercase text-slate-600">Live view</p>
+                          <p className="mb-1 text-[10px] font-medium uppercase text-ink-200">Live view</p>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={f.screenshot_data_url}
                             alt=""
-                            className="max-h-48 max-w-full rounded border border-slate-200 object-contain"
+                            className="max-h-48 max-w-full rounded border border-white/10 object-contain"
                           />
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <select
-                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-800 shadow-sm"
+                        className="rounded-md border border-white/10 bg-ink-800 px-2 py-1 text-ink-0 shadow-sm"
                         value={st}
                         onChange={(e) => void setStatus(fid, e.target.value as (typeof STATUSES)[number])}
                       >
@@ -227,20 +227,20 @@ export default function PortalFindingsPage() {
                       {st === "fixed" ? (
                         <Button
                           size="sm"
-                          className="bg-emerald-500 text-white"
+                          className="bg-signal text-white"
                           disabled={verifying === fid}
                           onClick={() => void verifyNow(fid)}
                         >
                           {verifying === fid ? "Scanning…" : "Verify fix"}
                         </Button>
                       ) : (
-                        <span className="text-slate-500">—</span>
+                        <span className="text-ink-0">—</span>
                       )}
                       {statusMap[fid]?.verified_at && (
-                        <p className="mt-1 text-xs text-emerald-500/90">Verified</p>
+                        <p className="mt-1 text-xs text-signal/90">Verified</p>
                       )}
                       {statusMap[fid]?.verify_error && (
-                        <p className="mt-1 text-xs text-amber-400">{statusMap[fid]?.verify_error}</p>
+                        <p className="mt-1 text-xs text-signal">{statusMap[fid]?.verify_error}</p>
                       )}
                     </td>
                   </tr>

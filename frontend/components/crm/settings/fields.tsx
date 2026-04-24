@@ -16,7 +16,7 @@ export function SettingsCard({
     <section className={`${crmSurfaceCard} p-5`}>
       <header className="mb-4">
         <h2 className="text-sm font-semibold text-white">{title}</h2>
-        {description ? <p className="mt-1 text-xs text-slate-400">{description}</p> : null}
+        {description ? <p className="mt-1 text-xs text-ink-200">{description}</p> : null}
       </header>
       <div className="space-y-4">{children}</div>
     </section>
@@ -34,15 +34,15 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-slate-300">{label}</span>
+      <span className="block text-xs font-medium text-ink-100">{label}</span>
       {children}
-      {hint ? <span className="mt-1 block text-[11px] text-slate-500">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-[11px] text-ink-0">{hint}</span> : null}
     </label>
   );
 }
 
 const inputCls =
-  "mt-1 w-full rounded-md border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none";
+  "mt-1 w-full rounded-md border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-sm text-white placeholder:text-ink-0 focus:border-signal/50 focus:outline-none";
 
 export function TextInput({
   value,
@@ -94,18 +94,18 @@ export function Toggle({
       className="flex w-full items-center justify-between gap-4 rounded-md border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-left hover:bg-[#14141f]"
     >
       <span>
-        <span className="block text-sm text-slate-200">{label}</span>
-        {description ? <span className="mt-0.5 block text-[11px] text-slate-500">{description}</span> : null}
+        <span className="block text-sm text-ink-100">{label}</span>
+        {description ? <span className="mt-0.5 block text-[11px] text-ink-0">{description}</span> : null}
       </span>
       <span
         className={[
           "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition",
-          on ? "bg-emerald-500" : "bg-slate-700",
+          on ? "bg-signal" : "bg-ink-700",
         ].join(" ")}
       >
         <span
           className={[
-            "inline-block h-4 w-4 transform rounded-full bg-white transition",
+            "inline-block h-4 w-4 transform rounded-full bg-ink-800 transition",
             on ? "translate-x-4" : "translate-x-0.5",
           ].join(" ")}
         />

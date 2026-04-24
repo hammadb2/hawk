@@ -73,8 +73,8 @@ export default function PortalSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[40vh] items-center justify-center text-ink-200">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -82,50 +82,50 @@ export default function PortalSettingsPage() {
   return (
     <div className="mx-auto max-w-xl space-y-8">
       <div>
-        <Link href="/portal" className="text-sm text-slate-600 hover:text-emerald-600">
+        <Link href="/portal" className="text-sm text-ink-200 hover:text-signal">
           ← Back to dashboard
         </Link>
-        <h1 className="mt-4 text-2xl font-semibold text-slate-900">Settings</h1>
-        <p className="mt-1 text-sm text-slate-600">Account and monitoring domain for your HAWK subscription.</p>
+        <h1 className="mt-4 text-2xl font-semibold text-ink-0">Settings</h1>
+        <p className="mt-1 text-sm text-ink-200">Account and monitoring domain for your HAWK subscription.</p>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-600">Account</h2>
+      <section className="rounded-2xl border border-white/10 bg-ink-800 shadow-sm p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-200">Account</h2>
         <div className="mt-4 space-y-3 text-sm">
           <div>
-            <span className="text-slate-600">Sign-in email</span>
-            <p className="mt-0.5 font-mono text-slate-800">{email || "—"}</p>
+            <span className="text-ink-200">Sign-in email</span>
+            <p className="mt-0.5 font-mono text-ink-0">{email || "—"}</p>
           </div>
           {companyName ? (
             <div>
-              <span className="text-slate-600">Organization</span>
-              <p className="mt-0.5 text-slate-800">{companyName}</p>
+              <span className="text-ink-200">Organization</span>
+              <p className="mt-0.5 text-ink-0">{companyName}</p>
             </div>
           ) : null}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-600">Monitored domain</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+      <section className="rounded-2xl border border-white/10 bg-ink-800 shadow-sm p-6">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-ink-200">Monitored domain</h2>
+        <p className="mt-2 text-sm leading-relaxed text-ink-200">
           This is the primary website or app domain we use for scans and reporting. If you signed up with a generic email
           (Gmail, Outlook, etc.), set your real company domain here. You can update it anytime.
         </p>
         <div className="mt-4 space-y-2">
-          <Label className="text-slate-600">Domain</Label>
+          <Label className="text-ink-200">Domain</Label>
           <Input
             type="text"
             autoComplete="off"
             placeholder="company.com"
             value={domainInput}
             onChange={(e) => setDomainInput(e.target.value)}
-            className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
+            className="border-white/10 bg-ink-800 text-ink-0 placeholder:text-ink-0"
           />
-          <p className="text-xs text-slate-500">Omit https:// and www — e.g. acme.com</p>
+          <p className="text-xs text-ink-0">Omit https:// and www — e.g. acme.com</p>
         </div>
         <Button
           type="button"
-          className="mt-4 bg-emerald-500 font-semibold text-white hover:bg-emerald-600"
+          className="mt-4 bg-signal font-semibold text-white hover:bg-signal-400"
           disabled={saving || !domainInput.trim()}
           onClick={() => void saveDomain()}
         >

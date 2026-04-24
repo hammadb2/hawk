@@ -77,7 +77,7 @@ export function CrmSidebar() {
         >
           <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto xl:h-11" />
         </div>
-        <span className="hidden text-sm font-semibold tracking-tight text-slate-200 xl:inline">CRM</span>
+        <span className="hidden text-sm font-semibold tracking-tight text-ink-100 xl:inline">CRM</span>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {items.map((item) => {
@@ -90,16 +90,16 @@ export function CrmSidebar() {
               className={cn(
                 "flex items-center gap-3 py-2.5 text-sm font-medium transition-colors xl:px-3",
                 active
-                  ? "border-l-2 border-emerald-500 bg-emerald-500/15 pl-[calc(0.75rem-2px)] text-emerald-300 xl:rounded-r-lg"
-                  : "border-l-2 border-transparent pl-3 text-slate-500 hover:bg-white/5 hover:text-slate-300 xl:rounded-lg xl:px-3"
+                  ? "border-l-2 border-signal bg-signal/15 pl-[calc(0.75rem-2px)] text-signal-200 xl:rounded-r-lg"
+                  : "border-l-2 border-transparent pl-3 text-ink-0 hover:bg-ink-800/5 hover:text-ink-100 xl:rounded-lg xl:px-3"
               )}
               title={item.label}
             >
-              <span className={cn("relative flex shrink-0 items-center justify-center text-current", active && "text-emerald-400")}>
+              <span className={cn("relative flex shrink-0 items-center justify-center text-current", active && "text-signal")}>
                 {icons[item.label] ?? <LayoutDashboard size={18} />}
                 {isAria && (
                   <span
-                    className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse xl:hidden"
+                    className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-signal animate-pulse xl:hidden"
                     aria-hidden
                   />
                 )}
@@ -107,7 +107,7 @@ export function CrmSidebar() {
               <span className="hidden items-center gap-2 xl:inline">
                 {item.label}
                 {isAria && (
-                  <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
+                  <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-signal animate-pulse" aria-hidden />
                 )}
               </span>
             </Link>
@@ -117,7 +117,7 @@ export function CrmSidebar() {
       <div className="border-t border-[#1e1e2e] p-2">
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-0 rounded-lg py-2.5 text-sm text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-400 xl:justify-start xl:px-3 xl:gap-2"
+          className="flex w-full items-center justify-center gap-0 rounded-lg py-2.5 text-sm text-ink-200 transition-colors hover:bg-ink-800/5 hover:text-ink-200 xl:justify-start xl:px-3 xl:gap-2"
           onClick={() => void signOut()}
         >
           <LogOut size={16} />

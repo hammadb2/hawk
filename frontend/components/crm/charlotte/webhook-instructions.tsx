@@ -33,56 +33,56 @@ export function WebhookInstructions({ apiBase }: { apiBase: string }) {
   }
 
   return (
-    <div className="space-y-6 text-sm text-slate-300">
-      <p className="text-slate-400">
+    <div className="space-y-6 text-sm text-ink-100">
+      <p className="text-ink-200">
         Send outbound / engagement events into each prospect&apos;s <strong className="text-white">Emails</strong> tab. The API
-        stores rows in Supabase (<code className="text-emerald-600/90">prospect_email_events</code>) using the service role.
+        stores rows in Supabase (<code className="text-signal/90">prospect_email_events</code>) using the service role.
       </p>
 
       <section className={`p-4 ${crmSurfaceCard}`}>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Endpoint</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-200">Endpoint</h2>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <code className={`break-all px-2 py-1 text-xs text-emerald-400 ${crmFieldSurface}`}>{url || "(set NEXT_PUBLIC_API_URL)"}</code>
-          <Button type="button" size="sm" variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" disabled={!base} onClick={() => copy(url, "url")}>
+          <code className={`break-all px-2 py-1 text-xs text-signal ${crmFieldSurface}`}>{url || "(set NEXT_PUBLIC_API_URL)"}</code>
+          <Button type="button" size="sm" variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" disabled={!base} onClick={() => copy(url, "url")}>
             {copied === "url" ? "Copied" : "Copy URL"}
           </Button>
         </div>
       </section>
 
       <section className={`p-4 ${crmSurfaceCard}`}>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Headers</h2>
-        <pre className={`mt-2 overflow-x-auto p-3 text-xs text-slate-400 ${crmFieldSurface}`}>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-200">Headers</h2>
+        <pre className={`mt-2 overflow-x-auto p-3 text-xs text-ink-200 ${crmFieldSurface}`}>
           {`X-CRM-Webhook-Secret: <CRM_EMAIL_WEBHOOK_SECRET>
 Content-Type: application/json`}
         </pre>
-        <p className="mt-2 text-xs text-slate-500">
-          Set <code className="text-slate-400">CRM_EMAIL_WEBHOOK_SECRET</code> on the HAWK API server (same env as{" "}
-          <code className="text-slate-400">SUPABASE_SERVICE_ROLE_KEY</code>).
+        <p className="mt-2 text-xs text-ink-0">
+          Set <code className="text-ink-200">CRM_EMAIL_WEBHOOK_SECRET</code> on the HAWK API server (same env as{" "}
+          <code className="text-ink-200">SUPABASE_SERVICE_ROLE_KEY</code>).
         </p>
       </section>
 
       <section className={`p-4 ${crmSurfaceCard}`}>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Body</h2>
-        <p className="mt-2 text-xs text-slate-500">
-          Provide <code className="text-slate-400">prospect_id</code> (uuid) <em>or</em> <code className="text-slate-400">domain</code> (we attach
-          to the newest prospect with that domain). Optional timestamps: <code className="text-slate-400">sent_at</code>,{" "}
-          <code className="text-slate-400">opened_at</code>, <code className="text-slate-400">clicked_at</code>,{" "}
-          <code className="text-slate-400">replied_at</code>. Use <code className="text-slate-400">external_id</code> for idempotent retries.
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-200">Body</h2>
+        <p className="mt-2 text-xs text-ink-0">
+          Provide <code className="text-ink-200">prospect_id</code> (uuid) <em>or</em> <code className="text-ink-200">domain</code> (we attach
+          to the newest prospect with that domain). Optional timestamps: <code className="text-ink-200">sent_at</code>,{" "}
+          <code className="text-ink-200">opened_at</code>, <code className="text-ink-200">clicked_at</code>,{" "}
+          <code className="text-ink-200">replied_at</code>. Use <code className="text-ink-200">external_id</code> for idempotent retries.
         </p>
-        <pre className={`mt-3 overflow-x-auto p-3 text-xs text-slate-400 ${crmFieldSurface}`}>{example}</pre>
+        <pre className={`mt-3 overflow-x-auto p-3 text-xs text-ink-200 ${crmFieldSurface}`}>{example}</pre>
         <Button
           type="button"
           size="sm"
           variant="outline"
-          className="mt-2 border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]"
+          className="mt-2 border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]"
           onClick={() => copy(example, "json")}
         >
           {copied === "json" ? "Copied" : "Copy example JSON"}
         </Button>
       </section>
 
-      <p className="text-xs text-slate-500">
-        Health: <code className="text-slate-400">{base ? `${base}/api/crm/webhooks/email-events/health` : "—"}</code> (no secret; reports whether
+      <p className="text-xs text-ink-0">
+        Health: <code className="text-ink-200">{base ? `${base}/api/crm/webhooks/email-events/health` : "—"}</code> (no secret; reports whether
         webhook env is present on the API).
       </p>
     </div>

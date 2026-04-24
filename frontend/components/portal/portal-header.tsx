@@ -41,7 +41,7 @@ function PortalSignOut() {
       type="button"
       onClick={() => void handleSignOut()}
       disabled={busy}
-      className="rounded-full px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
+      className="rounded-full px-3 py-1.5 text-sm text-ink-200 transition hover:bg-ink-800 hover:text-ink-0 disabled:opacity-50"
     >
       {busy ? "Signing out…" : "Sign out"}
     </button>
@@ -62,14 +62,14 @@ export function PortalHeader() {
       <header className={portal.header}>
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link href="https://securedbyhawk.com" className="flex items-center gap-2.5" title="HAWK">
-            <span className="inline-flex items-center rounded-lg bg-slate-900 px-2 py-1.5 ring-1 ring-slate-800/80">
+            <span className="inline-flex items-center rounded-lg bg-ink-950 px-2 py-1.5 ring-1 ring-white/10">
               <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
             </span>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+            <span className="rounded-full bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-signal-400 ring-1 ring-signal/30">
               Client
             </span>
           </Link>
-          <p className="text-sm text-slate-500">Portal sign in</p>
+          <p className="text-sm text-ink-0">Portal sign in</p>
         </div>
       </header>
     );
@@ -81,17 +81,17 @@ export function PortalHeader() {
     <header className={portal.header}>
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
         <Link href="/portal" className="flex shrink-0 items-center gap-2.5" title="HAWK Client">
-          <span className="inline-flex items-center rounded-lg bg-slate-900 px-2 py-1.5 ring-1 ring-slate-800/80">
+          <span className="inline-flex items-center rounded-lg bg-ink-950 px-2 py-1.5 ring-1 ring-white/10">
             <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
           </span>
-          <span className="hidden rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 sm:inline">
+          <span className="hidden rounded-full bg-signal/10 px-2.5 py-0.5 text-xs font-semibold text-signal-400 ring-1 ring-signal/30 sm:inline">
             Client
           </span>
         </Link>
 
         <button
           type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 lg:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-ink-200 hover:bg-ink-800 lg:hidden"
           onClick={() => setMenuOpen((o) => !o)}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
@@ -116,8 +116,8 @@ export function PortalHeader() {
               href={link.href}
               className={
                 isActive(link.href)
-                  ? "rounded-full bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm"
-                  : "rounded-full px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                  ? "rounded-full bg-ink-950 px-3 py-1.5 text-sm font-medium text-white shadow-sm"
+                  : "rounded-full px-3 py-1.5 text-sm text-ink-200 transition hover:bg-ink-800 hover:text-ink-0"
               }
             >
               {link.label}
@@ -128,7 +128,7 @@ export function PortalHeader() {
       </div>
 
       {menuOpen && (
-        <nav className="border-t border-slate-200/80 px-4 pb-4 pt-3 lg:hidden">
+        <nav className="border-t border-white/10 px-4 pb-4 pt-3 lg:hidden">
           <div className="grid grid-cols-2 gap-2 text-sm">
             {NAV_LINKS.map((link) => (
               <Link
@@ -137,15 +137,15 @@ export function PortalHeader() {
                 onClick={() => setMenuOpen(false)}
                 className={
                   isActive(link.href)
-                    ? "rounded-xl bg-slate-900 px-3 py-2.5 font-medium text-white shadow-sm"
-                    : "rounded-xl px-3 py-2.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "rounded-xl bg-ink-950 px-3 py-2.5 font-medium text-white shadow-sm"
+                    : "rounded-xl px-3 py-2.5 text-ink-200 hover:bg-ink-800 hover:text-ink-0"
                 }
               >
                 {link.label}
               </Link>
             ))}
           </div>
-          <div className="mt-3 border-t border-slate-200/80 pt-3">
+          <div className="mt-3 border-t border-white/10 pt-3">
             <PortalSignOut />
           </div>
         </nav>

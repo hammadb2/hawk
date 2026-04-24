@@ -53,13 +53,13 @@ export function LostReasonModal({
       <DialogContent className={crmDialogSurface}>
         <DialogHeader>
           <DialogTitle className="text-white">Mark as lost</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-ink-200">
             A reason is required. This update is logged on the prospect timeline.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-slate-300">Reason</Label>
+            <Label className="text-ink-100">Reason</Label>
             <select
               className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
               value={reason}
@@ -73,7 +73,7 @@ export function LostReasonModal({
             </select>
           </div>
           <div>
-            <Label className="text-slate-300">Notes {needsNotes ? "(required)" : "(optional)"}</Label>
+            <Label className="text-ink-100">Notes {needsNotes ? "(required)" : "(optional)"}</Label>
             <textarea
               maxLength={500}
               className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
@@ -83,7 +83,7 @@ export function LostReasonModal({
             />
           </div>
           <div>
-            <Label className="text-slate-300">Reactivate on (optional)</Label>
+            <Label className="text-ink-100">Reactivate on (optional)</Label>
             <Input
               type="date"
               className={`mt-1 ${crmFieldSurface}`}
@@ -93,11 +93,11 @@ export function LostReasonModal({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
-            className="bg-rose-600 hover:bg-rose-500"
+            className="bg-red/15 hover:bg-red/100"
             disabled={saving || (needsNotes && !notes.trim())}
             onClick={() => void handleConfirm()}
           >

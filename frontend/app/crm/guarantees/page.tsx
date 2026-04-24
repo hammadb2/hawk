@@ -85,8 +85,8 @@ export default function GuaranteesPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[200px] items-center justify-center text-ink-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -105,10 +105,10 @@ export default function GuaranteesPage() {
         {(["all", "active", "at_risk", "breached", "pending"] as const).map((key) => {
           const colors = {
             all: "text-white",
-            active: "text-emerald-400",
-            at_risk: "text-amber-400",
-            breached: "text-rose-400",
-            pending: "text-slate-400",
+            active: "text-signal",
+            at_risk: "text-signal",
+            breached: "text-red",
+            pending: "text-ink-200",
           };
           const labels = { all: "Total", active: "Active", at_risk: "At Risk", breached: "Breached", pending: "Pending" };
           return (
@@ -116,9 +116,9 @@ export default function GuaranteesPage() {
               key={key}
               type="button"
               onClick={() => setFilter(key)}
-              className={`rounded-xl border px-4 py-3 text-left transition ${filter === key ? "border-emerald-500/40 bg-emerald-500/15" : "border-[#1e1e2e] bg-[#111118] hover:border-[#2a2a3e]"}`}
+              className={`rounded-xl border px-4 py-3 text-left transition ${filter === key ? "border-signal/40 bg-signal/15" : "border-[#1e1e2e] bg-[#111118] hover:border-[#2a2a3e]"}`}
             >
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{labels[key]}</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-200">{labels[key]}</div>
               <div className={`mt-1 text-xl font-semibold ${colors[key]}`}>{counts[key]}</div>
             </button>
           );
@@ -126,8 +126,8 @@ export default function GuaranteesPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12 text-slate-600">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+        <div className="flex justify-center py-12 text-ink-200">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
         </div>
       ) : filtered.length === 0 ? (
         <p className={crmEmptyState}>
@@ -151,33 +151,33 @@ export default function GuaranteesPage() {
               {filtered.map((c) => {
                 const v = guaranteeVariant(c.guarantee_status);
                 const badgeColors = {
-                  green: "bg-emerald-500/15 text-emerald-300 border-emerald-600/50",
-                  amber: "bg-amber-900/50 text-amber-400 border-amber-700",
-                  red: "bg-rose-900/50 text-rose-400 border-rose-700",
-                  zinc: "bg-[#1a1a24] text-slate-400 border-[#1e1e2e]",
+                  green: "bg-signal/15 text-signal-200 border-signal/50/50",
+                  amber: "bg-ink-800/50 text-signal border-signal/50",
+                  red: "bg-red/15 text-red border-red/30",
+                  zinc: "bg-[#1a1a24] text-ink-200 border-[#1e1e2e]",
                 };
                 const days = daysSince(c.close_date);
-                const daysColor = days > 90 ? "text-rose-400" : days > 60 ? "text-amber-400" : "text-slate-300";
+                const daysColor = days > 90 ? "text-red" : days > 60 ? "text-signal" : "text-ink-100";
                 return (
                   <tr key={c.id} className={crmTableRow}>
                     <td className="px-3 py-2">
-                      <Link href={`/crm/clients/${c.id}/onboarding`} className="font-medium text-emerald-600 hover:underline">
+                      <Link href={`/crm/clients/${c.id}/onboarding`} className="font-medium text-signal hover:underline">
                         {c.company_name ?? "—"}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-slate-400">{c.domain ?? "—"}</td>
-                    <td className="px-3 py-2 text-slate-200">{formatUsd(c.mrr_cents)}</td>
+                    <td className="px-3 py-2 text-ink-200">{c.domain ?? "—"}</td>
+                    <td className="px-3 py-2 text-ink-100">{formatUsd(c.mrr_cents)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${badgeColors[v]}`}>
                         {guaranteeLabel(c.guarantee_status)}
                       </span>
                     </td>
                     <td className={`px-3 py-2 font-mono ${daysColor}`}>{days}d</td>
-                    <td className="px-3 py-2 text-slate-600">
+                    <td className="px-3 py-2 text-ink-200">
                       {c.onboarded_at ? new Date(c.onboarded_at).toLocaleDateString() : "Not yet"}
                     </td>
                     <td className="px-3 py-2">
-                      <span className={c.status === "active" ? "text-emerald-600" : c.status === "churned" ? "text-rose-400" : "text-slate-600"}>
+                      <span className={c.status === "active" ? "text-signal" : c.status === "churned" ? "text-red" : "text-ink-200"}>
                         {c.status}
                       </span>
                     </td>

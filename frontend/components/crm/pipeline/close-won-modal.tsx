@@ -121,14 +121,14 @@ export function CloseWonModal({
         <DialogContent className={crmDialogSurface}>
           <DialogHeader>
             <DialogTitle className="text-white">Close won</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-ink-200">
               We verify Stripe for a successful payment in the last 24 hours before creating commission. You can still
               close the deal and defer commission until payment clears.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-slate-300">Plan</Label>
+              <Label className="text-ink-100">Plan</Label>
               <select
                 className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
                 value={planId}
@@ -143,7 +143,7 @@ export function CloseWonModal({
             </div>
             {planId === "custom" && (
               <div>
-                <Label className="text-slate-300">Monthly value (USD)</Label>
+                <Label className="text-ink-100">Monthly value (USD)</Label>
                 <Input
                   type="number"
                   className={`mt-1 ${crmFieldSurface}`}
@@ -153,14 +153,14 @@ export function CloseWonModal({
                 />
               </div>
             )}
-            <div className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-sm text-slate-300">
+            <div className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-3 py-2 text-sm text-ink-100">
               <div>Monthly value: {formatUsd(mrrCents)}</div>
-              <div className="mt-1 text-emerald-400">
+              <div className="mt-1 text-signal">
                 Closing commission preview (30%): {formatUsd(closingCommission)}
               </div>
             </div>
             <div>
-              <Label className="text-slate-300">Stripe customer ID (helps verification)</Label>
+              <Label className="text-ink-100">Stripe customer ID (helps verification)</Label>
               <Input
                 className={`mt-1 ${crmFieldSurface}`}
                 value={stripeId}
@@ -168,14 +168,14 @@ export function CloseWonModal({
                 placeholder="cus_..."
               />
             </div>
-            {verifyError && <p className="text-xs text-rose-400">{verifyError}</p>}
+            {verifyError && <p className="text-xs text-red">{verifyError}</p>}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
-              className="bg-emerald-600 hover:bg-emerald-500"
+              className="bg-signal-400 hover:bg-signal"
               disabled={saving || verifying || mrrCents <= 0}
               onClick={() => void tryClose()}
             >
@@ -189,17 +189,17 @@ export function CloseWonModal({
         <DialogContent className={crmDialogSurface}>
           <DialogHeader>
             <DialogTitle className="text-white">Payment not verified in Stripe</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-ink-200">
               Payment not yet confirmed in Stripe. Commission will be created automatically when payment clears (via Stripe
               webhook).
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => setDeferPrompt(false)}>
+            <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" onClick={() => setDeferPrompt(false)}>
               Back
             </Button>
             <Button
-              className="bg-amber-600 hover:bg-amber-500"
+              className="bg-amber-600 hover:bg-signal"
               disabled={saving}
               onClick={() => void handleConfirm(true)}
             >

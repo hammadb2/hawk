@@ -35,11 +35,11 @@ function PortalReturnInner() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-950">
+      <div className="mx-auto max-w-md rounded-xl border border-signal/30 bg-signal/10 px-6 py-8 text-center text-sm text-signal-800">
         <p>{error}</p>
         <button
           type="button"
-          className="mt-4 text-emerald-600 underline"
+          className="mt-4 text-signal underline"
           onClick={() => router.push("/portal/login")}
         >
           Go to portal login
@@ -49,10 +49,10 @@ function PortalReturnInner() {
   }
 
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-slate-600">
-      <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-ink-200">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       <p className="text-sm">Signing you in…</p>
-      <p className="max-w-sm text-center text-xs text-slate-500">
+      <p className="max-w-sm text-center text-xs text-ink-0">
         Finishing your account and redirecting to the secure portal.
       </p>
     </div>
@@ -63,8 +63,8 @@ export default function PortalReturnPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[50vh] items-center justify-center text-slate-600">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+        <div className="flex min-h-[50vh] items-center justify-center text-ink-200">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
         </div>
       }
     >

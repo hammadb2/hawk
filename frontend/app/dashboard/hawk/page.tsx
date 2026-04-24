@@ -53,7 +53,7 @@ function Bubble({ msg, index }: { msg: Message; index: number }) {
         {isUser ? (
           <span>{msg.content}</span>
         ) : (
-          <div className="prose prose-slate prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:font-semibold prose-headings:text-sm prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-code:text-emerald-700">
+          <div className="prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:font-semibold prose-headings:text-sm prose-headings:text-ink-0 prose-p:text-ink-100 prose-li:text-ink-100 prose-code:text-signal-400">
             <ReactMarkdown>{msg.content}</ReactMarkdown>
           </div>
         )}
@@ -228,7 +228,7 @@ export default function AskHawkPage() {
               "w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0",
               message.trim() && !loading
                 ? "bg-accent text-white hover:bg-accent/90"
-                : "cursor-not-allowed bg-slate-200 text-slate-500"
+                : "cursor-not-allowed bg-ink-700 text-ink-0"
             )}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">

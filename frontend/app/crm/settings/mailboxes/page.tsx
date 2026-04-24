@@ -270,13 +270,13 @@ export default function MailboxesPage() {
         </div>
         <div className="flex gap-2">
           <button
-            className="rounded-lg border border-slate-700 bg-[#1a1a24] px-4 py-2 text-sm text-slate-200 hover:bg-[#222230]"
+            className="rounded-lg border border-ink-700 bg-[#1a1a24] px-4 py-2 text-sm text-ink-100 hover:bg-[#222230]"
             onClick={() => setShowBulk(true)}
           >
             Bulk import CSV
           </button>
           <button
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+            className="rounded-lg bg-signal-400 px-4 py-2 text-sm font-medium text-white hover:bg-signal"
             onClick={() => {
               resetForm();
               setShowForm(true);
@@ -288,11 +288,11 @@ export default function MailboxesPage() {
       </div>
 
       {health && !health.crypto_configured && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-950/20 p-4 text-amber-200">
+        <div className="rounded-xl border border-signal/40 bg-ink-800/20 p-4 text-amber-200">
           <div className="font-semibold">MAILBOX_ENCRYPTION_KEY is not set</div>
           <div className="mt-1 text-sm">
             Mailbox credentials cannot be stored until this is configured on Railway. Generate a key with
-            <code className="mx-1 rounded bg-black/40 px-1 py-0.5">python -c &quot;from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())&quot;</code>
+            <code className="mx-1 rounded bg-ink-950/60 px-1 py-0.5">python -c &quot;from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())&quot;</code>
             and set it as <code>MAILBOX_ENCRYPTION_KEY</code>.
           </div>
         </div>
@@ -310,15 +310,15 @@ export default function MailboxesPage() {
 
       <section className={crmSurfaceCard}>
         {loading ? (
-          <div className="p-8 text-center text-slate-400">Loading…</div>
+          <div className="p-8 text-center text-ink-200">Loading…</div>
         ) : mailboxes.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">
+          <div className="p-8 text-center text-ink-200">
             No mailboxes configured. Add one or bulk-import a CSV to start sending cold emails.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#11111a] text-xs uppercase tracking-wide text-slate-400">
+              <thead className="bg-[#11111a] text-xs uppercase tracking-wide text-ink-200">
                 <tr>
                   <th className="px-3 py-2">Email</th>
                   <th className="px-3 py-2">Vertical</th>
@@ -332,10 +332,10 @@ export default function MailboxesPage() {
               </thead>
               <tbody>
                 {mailboxes.map((mbx) => (
-                  <tr key={mbx.id} className="border-t border-[#1e1e2e] text-slate-200">
+                  <tr key={mbx.id} className="border-t border-[#1e1e2e] text-ink-100">
                     <td className="px-3 py-2">
                       <div className="font-medium">{mbx.email_address}</div>
-                      <div className="text-xs text-slate-500">{mbx.domain}</div>
+                      <div className="text-xs text-ink-0">{mbx.domain}</div>
                     </td>
                     <td className="px-3 py-2">{mbx.vertical || "any"}</td>
                     <td className="px-3 py-2">
@@ -346,7 +346,7 @@ export default function MailboxesPage() {
                     <td className="px-3 py-2">
                       {mbx.bounce_rate_7d != null ? `${(mbx.bounce_rate_7d * 100).toFixed(1)}%` : "—"}
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-400">
+                    <td className="px-3 py-2 text-xs text-ink-200">
                       {mbx.last_send_at ? new Date(mbx.last_send_at).toLocaleString() : "—"}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -375,12 +375,12 @@ export default function MailboxesPage() {
         <section className={crmSurfaceCard}>
           <div className="p-4">
             <div className="mb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-200">Last test result</div>
-              <button className="text-xs text-slate-500 hover:text-slate-300" onClick={() => setTestResult(null)}>
+              <div className="text-sm font-semibold text-ink-100">Last test result</div>
+              <button className="text-xs text-ink-0 hover:text-ink-100" onClick={() => setTestResult(null)}>
                 Dismiss
               </button>
             </div>
-            <pre className="overflow-auto rounded bg-black/40 p-3 text-xs text-slate-300">
+            <pre className="overflow-auto rounded bg-ink-950/60 p-3 text-xs text-ink-100">
               {JSON.stringify(testResult, null, 2)}
             </pre>
           </div>
@@ -402,25 +402,25 @@ export default function MailboxesPage() {
 
       {showBulk && (
         <Modal title="Bulk import mailboxes" onClose={() => setShowBulk(false)}>
-          <div className="space-y-3 p-4 text-sm text-slate-200">
-            <p className="text-slate-400">
+          <div className="space-y-3 p-4 text-sm text-ink-100">
+            <p className="text-ink-200">
               Paste a CSV with header row. Required columns:
             </p>
-            <code className="block whitespace-pre-wrap rounded bg-black/40 p-2 text-xs text-slate-300">
+            <code className="block whitespace-pre-wrap rounded bg-ink-950/60 p-2 text-xs text-ink-100">
               email_address,display_name,domain,smtp_host,smtp_port,smtp_username,smtp_password,smtp_use_tls,smtp_use_ssl,imap_host,imap_port,imap_username,imap_password,imap_use_ssl,daily_cap,vertical,notes
             </code>
             <textarea
-              className="h-56 w-full rounded border border-slate-700 bg-[#0b0b12] p-3 font-mono text-xs text-slate-200"
+              className="h-56 w-full rounded border border-ink-700 bg-[#0b0b12] p-3 font-mono text-xs text-ink-100"
               value={bulkCsv}
               onChange={(e) => setBulkCsv(e.target.value)}
               placeholder="email_address,domain,smtp_host,smtp_port,smtp_username,smtp_password,imap_host,imap_port,imap_username,imap_password,daily_cap,vertical\n..."
             />
             <div className="flex justify-end gap-2">
-              <button className="rounded border border-slate-700 px-3 py-1.5 text-sm" onClick={() => setShowBulk(false)}>
+              <button className="rounded border border-ink-700 px-3 py-1.5 text-sm" onClick={() => setShowBulk(false)}>
                 Cancel
               </button>
               <button
-                className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded bg-signal-400 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                 onClick={bulkImport}
                 disabled={saving || !bulkCsv.trim()}
               >
@@ -436,14 +436,14 @@ export default function MailboxesPage() {
 
 function KPICard({ label, value, color }: { label: string; value: string | number; color: string }) {
   const map: Record<string, string> = {
-    emerald: "border-emerald-500/30",
+    emerald: "border-signal/30",
     blue: "border-sky-500/30",
-    amber: "border-amber-500/30",
+    amber: "border-signal/30",
     slate: "border-[#1e1e2e]",
   };
   return (
     <div className={`rounded-xl border bg-[#111118] p-4 ${map[color] ?? map.slate}`}>
-      <p className="text-xs font-medium text-slate-400">{label}</p>
+      <p className="text-xs font-medium text-ink-200">{label}</p>
       <p className="mt-1 text-2xl font-bold text-white">{value}</p>
     </div>
   );
@@ -451,9 +451,9 @@ function KPICard({ label, value, color }: { label: string; value: string | numbe
 
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-    paused: "bg-amber-500/20 text-amber-200 border-amber-500/30",
-    disabled: "bg-slate-600/30 text-slate-400 border-slate-600/30",
+    active: "bg-signal/20 text-signal-200 border-signal/30",
+    paused: "bg-signal/20 text-amber-200 border-signal/30",
+    disabled: "bg-ink-600/30 text-ink-200 border-ink-600/30",
   };
   return (
     <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${styles[status] ?? styles.disabled}`}>
@@ -477,8 +477,8 @@ function ActionButton({
       onClick={onClick}
       className={`rounded border px-2 py-1 text-xs ${
         danger
-          ? "border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
-          : "border-slate-700 text-slate-200 hover:bg-[#1e1e2e]"
+          ? "border-red/40 text-red hover:bg-red/100/10"
+          : "border-ink-700 text-ink-100 hover:bg-[#1e1e2e]"
       }`}
     >
       {children}
@@ -496,14 +496,14 @@ function Modal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-slate-700 bg-[#0f0f18]"
+        className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-ink-700 bg-[#0f0f18]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-100">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+        <div className="flex items-center justify-between border-b border-ink-800 px-4 py-3">
+          <h2 className="text-base font-semibold text-ink-0">{title}</h2>
+          <button onClick={onClose} className="text-ink-200 hover:text-ink-100">
             ✕
           </button>
         </div>
@@ -530,7 +530,7 @@ function MailboxForm({
 }) {
   const upd = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm({ ...form, [k]: v });
   return (
-    <div className="grid gap-3 p-4 text-sm text-slate-200 sm:grid-cols-2">
+    <div className="grid gap-3 p-4 text-sm text-ink-100 sm:grid-cols-2">
       <Field label="Email address *" value={form.email_address} onChange={(v) => upd("email_address", v)} />
       <Field label="Display name" value={form.display_name} onChange={(v) => upd("display_name", v)} />
       <Field label="Sending domain *" value={form.domain} onChange={(v) => upd("domain", v)} />
@@ -541,7 +541,7 @@ function MailboxForm({
         options={["", "dental", "legal", "accounting"]}
       />
 
-      <div className="sm:col-span-2 pt-2 text-xs uppercase tracking-wide text-slate-400">SMTP</div>
+      <div className="sm:col-span-2 pt-2 text-xs uppercase tracking-wide text-ink-200">SMTP</div>
       <Field label="SMTP host *" value={form.smtp_host} onChange={(v) => upd("smtp_host", v)} />
       <Field
         label="SMTP port *"
@@ -558,7 +558,7 @@ function MailboxForm({
       <Checkbox label="STARTTLS" value={form.smtp_use_tls} onChange={(v) => upd("smtp_use_tls", v)} />
       <Checkbox label="Implicit TLS (465)" value={form.smtp_use_ssl} onChange={(v) => upd("smtp_use_ssl", v)} />
 
-      <div className="sm:col-span-2 pt-2 text-xs uppercase tracking-wide text-slate-400">IMAP (reply poller)</div>
+      <div className="sm:col-span-2 pt-2 text-xs uppercase tracking-wide text-ink-200">IMAP (reply poller)</div>
       <Field label="IMAP host *" value={form.imap_host} onChange={(v) => upd("imap_host", v)} />
       <Field
         label="IMAP port *"
@@ -574,7 +574,7 @@ function MailboxForm({
       />
       <Checkbox label="IMAP SSL (993)" value={form.imap_use_ssl} onChange={(v) => upd("imap_use_ssl", v)} />
 
-      <div className="sm:col-span-2 pt-2 text-xs uppercase tracking-wide text-slate-400">Limits</div>
+      <div className="sm:col-span-2 pt-2 text-xs uppercase tracking-wide text-ink-200">Limits</div>
       <Field
         label="Daily cap"
         value={String(form.daily_cap)}
@@ -582,14 +582,14 @@ function MailboxForm({
       />
       <Field label="Notes" value={form.notes} onChange={(v) => upd("notes", v)} />
 
-      <div className="sm:col-span-2 mt-3 flex justify-end gap-2 border-t border-slate-800 pt-3">
-        <button className="rounded border border-slate-700 px-3 py-1.5 text-sm" onClick={onCancel}>
+      <div className="sm:col-span-2 mt-3 flex justify-end gap-2 border-t border-ink-800 pt-3">
+        <button className="rounded border border-ink-700 px-3 py-1.5 text-sm" onClick={onCancel}>
           Cancel
         </button>
         <button
           onClick={onSave}
           disabled={saving}
-          className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded bg-signal-400 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {saving ? "Saving…" : editing ? "Save changes" : "Add mailbox"}
         </button>
@@ -610,13 +610,13 @@ function Field({
   type?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs text-slate-400">
+    <label className="flex flex-col gap-1 text-xs text-ink-200">
       {label}
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded border border-slate-700 bg-[#0b0b12] px-3 py-2 text-sm text-slate-200"
+        className="rounded border border-ink-700 bg-[#0b0b12] px-3 py-2 text-sm text-ink-100"
       />
     </label>
   );
@@ -634,12 +634,12 @@ function SelectField({
   options: string[];
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs text-slate-400">
+    <label className="flex flex-col gap-1 text-xs text-ink-200">
       {label}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded border border-slate-700 bg-[#0b0b12] px-3 py-2 text-sm text-slate-200"
+        className="rounded border border-ink-700 bg-[#0b0b12] px-3 py-2 text-sm text-ink-100"
       >
         {options.map((o) => (
           <option key={o || "__any"} value={o}>
@@ -661,12 +661,12 @@ function Checkbox({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-200">
+    <label className="flex items-center gap-2 text-sm text-ink-100">
       <input
         type="checkbox"
         checked={value}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-slate-600 bg-[#0b0b12]"
+        className="h-4 w-4 rounded border-ink-600 bg-[#0b0b12]"
       />
       {label}
     </label>

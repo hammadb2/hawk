@@ -60,7 +60,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 function activityBorderClass(type: string): string {
-  if (type === "stage_changed") return "border-l-emerald-500";
+  if (type === "stage_changed") return "border-l-signal";
   if (type.includes("note")) return "border-l-blue-500";
   if (type.includes("call")) return "border-l-purple-500";
   if (type.includes("email")) return "border-l-amber-500";
@@ -69,9 +69,9 @@ function activityBorderClass(type: string): string {
 
 function rankTextClass(i: number): string {
   if (i === 0) return "text-yellow-400";
-  if (i === 1) return "text-slate-400";
-  if (i === 2) return "text-amber-600";
-  return "text-emerald-400";
+  if (i === 1) return "text-ink-200";
+  if (i === 2) return "text-signal-400";
+  return "text-signal";
 }
 
 export function CeoLiveDashboard({
@@ -257,31 +257,31 @@ export function CeoLiveDashboard({
 
   return (
     <div className="space-y-6">
-      <div className="w-full rounded-xl border border-crmBorder border-l-[4px] border-l-emerald-500 bg-crmSurface p-5 shadow-lg">
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Active MRR</p>
+      <div className="w-full rounded-xl border border-crmBorder border-l-[4px] border-l-signal bg-crmSurface p-5 shadow-lg">
+        <p className="text-xs font-medium uppercase tracking-wider text-ink-0">Active MRR</p>
         <p className="mt-1 text-4xl font-bold text-white">{mrrFormatted}</p>
-        <p className="mt-2 text-xs text-slate-400">
-          Live ops ({roleNote}) — KPIs from <code className="text-emerald-400/90">/api/crm/dashboard/kpis</code> (60s cache).
+        <p className="mt-2 text-xs text-ink-200">
+          Live ops ({roleNote}) — KPIs from <code className="text-signal/90">/api/crm/dashboard/kpis</code> (60s cache).
           Activity updates in real time.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={<Mail className="h-5 w-5 text-emerald-400" strokeWidth={2} />} label="Emails sent today" value={kpis.emailsSentToday} />
+        <KpiCard icon={<Mail className="h-5 w-5 text-signal" strokeWidth={2} />} label="Emails sent today" value={kpis.emailsSentToday} />
         <KpiCard
-          icon={<MessageSquareReply className="h-5 w-5 text-emerald-400" strokeWidth={2} />}
+          icon={<MessageSquareReply className="h-5 w-5 text-signal" strokeWidth={2} />}
           label="Replies today"
           value={kpis.emailRepliesToday}
         />
-        <KpiCard icon={<Phone className="h-5 w-5 text-emerald-400" strokeWidth={2} />} label="Calls booked today" value={kpis.callsBookedToday} />
-        <KpiCard icon={<Trophy className="h-5 w-5 text-emerald-400" strokeWidth={2} />} label="Closes (MTD)" value={kpis.closesMtd} />
+        <KpiCard icon={<Phone className="h-5 w-5 text-signal" strokeWidth={2} />} label="Calls booked today" value={kpis.callsBookedToday} />
+        <KpiCard icon={<Trophy className="h-5 w-5 text-signal" strokeWidth={2} />} label="Closes (MTD)" value={kpis.closesMtd} />
       </div>
 
       <div className="rounded-xl border border-crmBorder bg-crmSurface p-4 shadow-lg">
         <h3 className="text-sm font-medium text-white">Calls booked</h3>
-        <p className="text-xs text-slate-500">Prospects in call_booked — next step is show rate.</p>
+        <p className="text-xs text-ink-0">Prospects in call_booked — next step is show rate.</p>
         <ul className="mt-3 max-h-[280px] space-y-2 overflow-y-auto text-sm">
-          {callsBooked.length === 0 && <li className="text-slate-500">No calls booked in pipeline right now.</li>}
+          {callsBooked.length === 0 && <li className="text-ink-0">No calls booked in pipeline right now.</li>}
           {callsBooked.map((p) => {
             const when = p.call_booked_at
               ? new Date(p.call_booked_at).toLocaleString(undefined, {
@@ -296,18 +296,18 @@ export function CeoLiveDashboard({
             return (
               <li
                 key={p.id}
-                className="flex flex-col gap-1 rounded-lg border border-crmBorder bg-[#111118] px-3 py-2 text-slate-300 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-1 rounded-lg border border-crmBorder bg-[#111118] px-3 py-2 text-ink-100 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <Link href={`/crm/prospects/${p.id}`} className="font-medium text-emerald-400 hover:underline">
+                  <Link href={`/crm/prospects/${p.id}`} className="font-medium text-signal hover:underline">
                     {p.company_name || p.domain || p.id.slice(0, 8)}
                   </Link>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink-0">
                     {contact} · Hawk {p.hawk_score ?? "—"}
                   </p>
                 </div>
-                <div className="text-right text-xs text-slate-400">
-                  <span className="block text-slate-500">Scheduled</span>
+                <div className="text-right text-xs text-ink-200">
+                  <span className="block text-ink-0">Scheduled</span>
                   {when}
                 </div>
               </li>
@@ -318,18 +318,18 @@ export function CeoLiveDashboard({
 
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard
-          icon={<TrendingUp className="h-5 w-5 text-emerald-400" strokeWidth={2} />}
+          icon={<TrendingUp className="h-5 w-5 text-signal" strokeWidth={2} />}
           label="Open pipeline ($ est.)"
           value={`$${kpis.pipelineOpenDollars.toLocaleString()}`}
         />
         <KpiCard
-          icon={<AlertTriangle className="h-5 w-5 text-amber-400" strokeWidth={2} />}
+          icon={<AlertTriangle className="h-5 w-5 text-signal" strokeWidth={2} />}
           label="Stale 48h+ (open)"
           value={kpis.stale48h}
           hint="Any open stage, no activity 48h+"
         />
         <KpiCard
-          icon={<DollarSign className="h-5 w-5 text-emerald-400" strokeWidth={2} />}
+          icon={<DollarSign className="h-5 w-5 text-signal" strokeWidth={2} />}
           label="Active client MRR"
           value={`$${(kpis.activeMrrCents / 100).toLocaleString()}`}
         />
@@ -338,16 +338,16 @@ export function CeoLiveDashboard({
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-crmBorder bg-crmSurface p-4 shadow-lg">
           <h3 className="text-sm font-medium text-white">Rep leaderboard (MTD)</h3>
-          <p className="text-xs text-slate-500">By revenue closed this month</p>
+          <p className="text-xs text-ink-0">By revenue closed this month</p>
           <ul className="mt-3 space-y-2 text-sm">
-            {leaderboard.length === 0 && <li className="text-slate-500">No closes recorded this month yet.</li>}
+            {leaderboard.length === 0 && <li className="text-ink-0">No closes recorded this month yet.</li>}
             {leaderboard.map((row, i) => (
-              <li key={row.repId} className="flex justify-between gap-2 text-slate-300">
+              <li key={row.repId} className="flex justify-between gap-2 text-ink-100">
                 <span>
                   <span className={cn("mr-1.5 font-semibold tabular-nums", rankTextClass(i))}>{i + 1}.</span>
                   {row.name}
                 </span>
-                <span className="text-slate-400">
+                <span className="text-ink-200">
                   {row.closes} deal{row.closes === 1 ? "" : "s"} · ${(row.mrrCents / 100).toLocaleString()} MRR
                 </span>
               </li>
@@ -357,15 +357,15 @@ export function CeoLiveDashboard({
 
         <div className="rounded-xl border border-crmBorder bg-crmSurface p-4 shadow-lg">
           <h3 className="text-sm font-medium text-white">Rep health (0–100)</h3>
-          <p className="text-xs text-slate-500">Daily score from pipeline hygiene; under 50 stands out.</p>
+          <p className="text-xs text-ink-0">Daily score from pipeline hygiene; under 50 stands out.</p>
           <ul className="mt-3 max-h-[220px] space-y-2 overflow-y-auto text-sm">
-            {repHealth.length === 0 && <li className="text-slate-500">No sales roles loaded.</li>}
+            {repHealth.length === 0 && <li className="text-ink-0">No sales roles loaded.</li>}
             {repHealth.map((row) => (
-              <li key={row.repId} className="flex justify-between gap-2 text-slate-300">
+              <li key={row.repId} className="flex justify-between gap-2 text-ink-100">
                 <span>{row.name}</span>
                 <span
                   className={
-                    row.healthScore !== null && row.healthScore < 50 ? "font-medium text-rose-400" : "text-slate-400"
+                    row.healthScore !== null && row.healthScore < 50 ? "font-medium text-red" : "text-ink-200"
                   }
                 >
                   {row.healthScore ?? "—"}
@@ -379,12 +379,12 @@ export function CeoLiveDashboard({
           <h3 className="text-sm font-medium text-white">Quick links</h3>
           <ul className="mt-3 space-y-2 text-sm">
             <li>
-              <Link href="/crm/pipeline" className="text-emerald-400 hover:underline">
+              <Link href="/crm/pipeline" className="text-signal hover:underline">
                 Pipeline
               </Link>
             </li>
             <li>
-              <Link href="/crm/settings" className="text-emerald-400 hover:underline">
+              <Link href="/crm/settings" className="text-signal hover:underline">
                 Settings &amp; monitor history
               </Link>
             </li>
@@ -398,7 +398,7 @@ export function CeoLiveDashboard({
           <select
             value={activityFilter}
             onChange={(e) => setActivityFilter(e.target.value)}
-            className="rounded-lg border border-crmBorder bg-crmSurface2 px-2 py-1 text-xs text-slate-200"
+            className="rounded-lg border border-crmBorder bg-crmSurface2 px-2 py-1 text-xs text-ink-100"
           >
             <option value="all">All types</option>
             <option value="stage_changed">Stage changes</option>
@@ -415,13 +415,13 @@ export function CeoLiveDashboard({
                 activityBorderClass(a.type),
               )}
             >
-              <div className="flex flex-wrap justify-between gap-2 text-slate-400">
-                <span className="font-medium text-slate-300">{a.type.replace(/_/g, " ")}</span>
-                <span className="text-xs text-slate-500">{formatRelativeTime(a.created_at)}</span>
+              <div className="flex flex-wrap justify-between gap-2 text-ink-200">
+                <span className="font-medium text-ink-100">{a.type.replace(/_/g, " ")}</span>
+                <span className="text-xs text-ink-0">{formatRelativeTime(a.created_at)}</span>
               </div>
-              <div className="mt-1 text-slate-200">
+              <div className="mt-1 text-ink-100">
                 {a.prospect_id ? (
-                  <Link href={`/crm/prospects/${a.prospect_id}`} className="hover:text-emerald-400 hover:underline">
+                  <Link href={`/crm/prospects/${a.prospect_id}`} className="hover:text-signal hover:underline">
                     {prospectLabel(a.prospect_id)}
                   </Link>
                 ) : (
@@ -429,11 +429,11 @@ export function CeoLiveDashboard({
                 )}
               </div>
               {a.type === "stage_changed" && a.metadata && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-0">
                   {(a.metadata as { from?: string; to?: string }).from} → {(a.metadata as { to?: string }).to}
                 </p>
               )}
-              {a.notes && <p className="mt-1 text-xs text-slate-400">{a.notes}</p>}
+              {a.notes && <p className="mt-1 text-xs text-ink-200">{a.notes}</p>}
             </li>
           ))}
         </ul>
@@ -459,8 +459,8 @@ function KpiCard({
         {icon}
       </div>
       <div className="mt-3 text-3xl font-bold text-white">{value}</div>
-      <div className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-500">{label}</div>
-      {hint && <p className="mt-2 text-xs text-slate-500">{hint}</p>}
+      <div className="mt-1 text-xs font-medium uppercase tracking-wider text-ink-0">{label}</div>
+      {hint && <p className="mt-2 text-xs text-ink-0">{hint}</p>}
     </div>
   );
 }

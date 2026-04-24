@@ -61,7 +61,7 @@ const tooltipStyle = {
 function PipelineFunnel({ chart }: { chart: ChartData }) {
   const stageColors = [
     "#94a3b8", "#6366f1", "#8b5cf6", "#3b82f6",
-    "#10b981", "#f59e0b", "#22c55e", "#ef4444",
+    "#10b981", "#f59e0b", "#FFB800", "#ef4444",
   ];
   return (
     <ResponsiveContainer width="100%" height={240}>
@@ -126,9 +126,9 @@ function ComparePeriods({ chart }: { chart: ChartData }) {
         </BarChart>
       </ResponsiveContainer>
       {chart.change_pct !== undefined && (
-        <p className="mt-1 text-center text-xs text-slate-500">
+        <p className="mt-1 text-center text-xs text-ink-0">
           Change:{" "}
-          <span className={chart.change_pct >= 0 ? "text-emerald-600 font-medium" : "text-rose-600 font-medium"}>
+          <span className={chart.change_pct >= 0 ? "text-signal font-medium" : "text-red font-medium"}>
             {chart.change_pct >= 0 ? "+" : ""}
             {chart.change_pct}%
           </span>
@@ -157,7 +157,7 @@ function CampaignHealth({ chart }: { chart: ChartData }) {
         </BarChart>
       </ResponsiveContainer>
       {Object.keys(rates).length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600">
+        <div className="mt-2 flex flex-wrap gap-3 text-xs text-ink-200">
           {Object.entries(rates).map(([k, v]) => (
             <span key={k}>
               <span className="font-medium capitalize">{k.replace("_", " ")}:</span> {v}%
@@ -207,7 +207,7 @@ function HealthDistribution({ chart }: { chart: ChartData }) {
         </BarChart>
       </ResponsiveContainer>
       {chart.at_risk_count !== undefined && (
-        <p className="mt-1 text-center text-xs text-slate-500">
+        <p className="mt-1 text-center text-xs text-ink-0">
           {chart.at_risk_count} of {chart.total} clients at risk (score &lt; 50)
         </p>
       )}
@@ -255,7 +255,7 @@ export function InlineChart({ data }: { data: ChartData }) {
 
   return (
     <div className={`mt-3 p-3 ${crmSurfaceCard}`}>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-200">
         {data.title}
       </p>
       <ChartComponent chart={data} />

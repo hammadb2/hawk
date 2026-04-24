@@ -61,11 +61,11 @@ export function LogCallModal({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-slate-400">Duration (min)</Label>
+              <Label className="text-ink-200">Duration (min)</Label>
               <Input className={crmFieldSurface} value={duration} onChange={(e) => setDuration(e.target.value)} type="number" min={0} />
             </div>
             <div>
-              <Label className="text-slate-400">Outcome</Label>
+              <Label className="text-ink-200">Outcome</Label>
               <select
                 className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`}
                 value={outcome}
@@ -80,19 +80,19 @@ export function LogCallModal({
             </div>
           </div>
           <div>
-            <Label className="text-slate-400">Summary</Label>
+            <Label className="text-ink-200">Summary</Label>
             <textarea className={`mt-1 w-full rounded-lg px-3 py-2 text-sm ${crmFieldSurface}`} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
           </div>
           <div>
-            <Label className="text-slate-400">Next action</Label>
+            <Label className="text-ink-200">Next action</Label>
             <Input className={crmFieldSurface} value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="Follow-up in 3 days…" />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-slate-200 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="border-[#1e1e2e] bg-[#0d0d14] text-ink-100 hover:bg-[#1a1a24]" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-500" disabled={saving} onClick={() => void submit()}>
+          <Button className="bg-signal-400 hover:bg-signal" disabled={saving} onClick={() => void submit()}>
             Save to timeline
           </Button>
         </DialogFooter>

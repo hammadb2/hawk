@@ -48,10 +48,10 @@ function severityChip(sev: string) {
   const s = (sev || "").toLowerCase();
   const cls =
     s === "critical" || s === "high"
-      ? "bg-rose-500/15 text-rose-300 ring-rose-500/40"
+      ? "bg-red/100/15 text-red ring-red/30"
       : s === "medium"
-        ? "bg-amber-500/15 text-amber-200 ring-amber-500/35"
-        : "bg-slate-500/15 text-slate-300 ring-slate-500/30";
+        ? "bg-signal/15 text-amber-200 ring-signal/30"
+        : "bg-ink-9000/15 text-ink-100 ring-slate-500/30";
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${cls}`}>{sev || "—"}</span>
   );
@@ -147,23 +147,23 @@ export default function CrmGuardianPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-24 md:pb-8">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Guardian</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-ink-0">Guardian</h1>
+        <p className="mt-1 text-sm text-ink-200">
           Extension-fed signals, client risk profiles, and BEC / lookalike context for executive review.
         </p>
       </div>
 
-      {err && <p className="text-sm text-rose-400">{err}</p>}
+      {err && <p className="text-sm text-red">{err}</p>}
 
       {loading ? (
-        <div className="flex justify-center py-16 text-slate-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-crmBorder border-t-emerald-500" />
+        <div className="flex justify-center py-16 text-ink-0">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-crmBorder border-t-signal" />
         </div>
       ) : privileged ? (
         <>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-crmBorder bg-crmSurface p-4">
-              <h2 className="text-sm font-semibold text-slate-200">Events (14 days)</h2>
+              <h2 className="text-sm font-semibold text-ink-100">Events (14 days)</h2>
               <div className="mt-3 h-56 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={lineData}>
@@ -180,7 +180,7 @@ export default function CrmGuardianPage() {
               </div>
             </div>
             <div className="rounded-xl border border-crmBorder bg-crmSurface p-4">
-              <h2 className="text-sm font-semibold text-slate-200">Top event types</h2>
+              <h2 className="text-sm font-semibold text-ink-100">Top event types</h2>
               <div className="mt-3 h-56 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 8 }}>
@@ -199,11 +199,11 @@ export default function CrmGuardianPage() {
           </div>
 
           <div className="rounded-xl border border-crmBorder bg-crmSurface2 p-4">
-            <h2 className="text-sm font-semibold text-slate-200">BEC risk snapshot (profiled clients)</h2>
-            <p className="mt-1 text-xs text-slate-500">Higher scores surface urgency keywords and domain heuristics from the server profiler.</p>
+            <h2 className="text-sm font-semibold text-ink-100">BEC risk snapshot (profiled clients)</h2>
+            <p className="mt-1 text-xs text-ink-0">Higher scores surface urgency keywords and domain heuristics from the server profiler.</p>
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm text-slate-200">
-                <thead className="border-b border-crmBorder text-xs uppercase tracking-wide text-slate-500">
+              <table className="w-full min-w-[640px] text-left text-sm text-ink-100">
+                <thead className="border-b border-crmBorder text-xs uppercase tracking-wide text-ink-0">
                   <tr>
                     <th className="py-2 pr-3">Domain</th>
                     <th className="py-2 pr-3">BEC score</th>
@@ -214,17 +214,17 @@ export default function CrmGuardianPage() {
                 <tbody>
                   {profiles.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center text-slate-500">
+                      <td colSpan={4} className="py-6 text-center text-ink-0">
                         No profiles yet — they appear after API profiling or extension activity.
                       </td>
                     </tr>
                   ) : (
                     profiles.slice(0, 25).map((p) => (
                       <tr key={p.client_id} className="border-b border-crmBorder/80">
-                        <td className="py-2 pr-3 font-mono text-xs text-slate-300">{p.domain || p.client_id}</td>
+                        <td className="py-2 pr-3 font-mono text-xs text-ink-100">{p.domain || p.client_id}</td>
                         <td className="py-2 pr-3">{p.bec_risk_score}</td>
                         <td className="py-2 pr-3">{p.safe_browsing_status}</td>
-                        <td className="py-2 text-xs text-slate-500">
+                        <td className="py-2 text-xs text-ink-0">
                           {p.last_profiled_at ? new Date(p.last_profiled_at).toLocaleString() : "—"}
                         </td>
                       </tr>
@@ -236,10 +236,10 @@ export default function CrmGuardianPage() {
           </div>
 
           <div className="rounded-xl border border-crmBorder bg-crmSurface p-4">
-            <h2 className="text-sm font-semibold text-slate-200">Recent events</h2>
+            <h2 className="text-sm font-semibold text-ink-100">Recent events</h2>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b border-crmBorder text-xs uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-crmBorder text-xs uppercase tracking-wide text-ink-0">
                   <tr>
                     <th className="py-2 pr-3">When</th>
                     <th className="py-2 pr-3">Client</th>
@@ -248,21 +248,21 @@ export default function CrmGuardianPage() {
                     <th className="py-2">Page</th>
                   </tr>
                 </thead>
-                <tbody className="text-slate-300">
+                <tbody className="text-ink-100">
                   {events.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                      <td colSpan={5} className="py-8 text-center text-ink-0">
                         No Guardian events logged yet.
                       </td>
                     </tr>
                   ) : (
                     events.map((e) => (
                       <tr key={e.id} className="border-b border-crmBorder/70">
-                        <td className="py-2 pr-3 text-xs text-slate-500">{new Date(e.created_at).toLocaleString()}</td>
+                        <td className="py-2 pr-3 text-xs text-ink-0">{new Date(e.created_at).toLocaleString()}</td>
                         <td className="py-2 pr-3">{clientLabel(e)}</td>
                         <td className="py-2 pr-3 font-mono text-xs">{e.event_type}</td>
                         <td className="py-2 pr-3">{severityChip(e.severity)}</td>
-                        <td className="max-w-[240px] truncate py-2 text-xs text-slate-500" title={e.page_url || ""}>
+                        <td className="max-w-[240px] truncate py-2 text-xs text-ink-0" title={e.page_url || ""}>
                           {e.page_url || "—"}
                         </td>
                       </tr>

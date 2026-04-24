@@ -33,7 +33,7 @@ export function EnterpriseBookingLink({ href }: { href: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-6 block w-full rounded-lg border border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+      className="mt-6 block w-full rounded-lg border border-white/10 bg-ink-800 py-3 text-center text-sm font-semibold text-ink-0 shadow-sm hover:bg-ink-900"
     >
       Book a Sentinel intro
     </a>

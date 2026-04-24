@@ -81,16 +81,16 @@ export default function ClientEnterpriseDomainsPage() {
 
   if (!authReady || !session || !profile) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-slate-600">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="flex min-h-[40vh] items-center justify-center text-ink-200">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center text-slate-600">
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+      <div className="mx-auto max-w-lg py-16 text-center text-ink-200">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-signal" />
       </div>
     );
   }
@@ -101,19 +101,19 @@ export default function ClientEnterpriseDomainsPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-sm text-slate-400 hover:text-emerald-400"
+          className="text-sm text-ink-200 hover:text-signal"
         >
           ← Back
         </button>
         <h1 className={`mt-2 ${crmPageTitle}`}>Enterprise domains</h1>
         <p className={crmPageSubtitle}>
-          Primary domain stays <span className="text-slate-300">{primary || "—"}</span>. Add up to four extra apex
+          Primary domain stays <span className="text-ink-100">{primary || "—"}</span>. Add up to four extra apex
           domains for monitoring and portal rollup.
         </p>
       </div>
 
       <div className={`space-y-3 p-4 ${crmSurfaceCard}`}>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Additional apex domains</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-200">Additional apex domains</p>
         {lines.map((v, i) => (
           <input
             key={i}
@@ -125,7 +125,7 @@ export default function ClientEnterpriseDomainsPage() {
               setLines(next);
             }}
             placeholder={`example${i + 1}.com`}
-            className={`w-full px-3 py-2 text-sm placeholder:text-slate-500 ${crmFieldSurface}`}
+            className={`w-full px-3 py-2 text-sm placeholder:text-ink-0 ${crmFieldSurface}`}
           />
         ))}
       </div>
@@ -135,11 +135,11 @@ export default function ClientEnterpriseDomainsPage() {
           type="button"
           disabled={saving}
           onClick={() => void save()}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="rounded-lg bg-signal-400 px-4 py-2 text-sm font-medium text-white hover:bg-signal disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        <Link href="/crm/clients" className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-4 py-2 text-sm text-slate-300 hover:bg-[#1a1a24]">
+        <Link href="/crm/clients" className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] px-4 py-2 text-sm text-ink-100 hover:bg-[#1a1a24]">
           All clients
         </Link>
       </div>
