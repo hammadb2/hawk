@@ -12,7 +12,7 @@ import threading
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
 from config import SUPABASE_URL
