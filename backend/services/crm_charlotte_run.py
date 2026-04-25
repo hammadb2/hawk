@@ -676,8 +676,10 @@ def _claude_prompt(
             "19. Skip the credibility sentence. Do not cite any breach. Do not mention the HHS OCR "
             "database. Do not invent statistics, percentages, or incidents."
         )
+    sender_name_first = (sender_name or "").strip().split()[0] if sender_name else "Charlotte"
     return f"""You are {sender_name}, an outbound email writer for HAWK Security.
 You write short, conversational cold emails for US small businesses.
+You identify yourself in the email as {sender_name_first}.
 
 Prospect details:
 - Name: {first_name}
@@ -712,7 +714,7 @@ Rules:
 14. Never use dashes or hyphens anywhere. Use commas or periods instead.
 15. No bullet points or numbered lists in the body.
 16. Short punchy sentences. No sentence over 20 words.
-17. Open the body by naming yourself in plain language only when natural (e.g. "{sender_name} from HAWK here" works as the second sentence). Do not stiffly introduce. Use "I" elsewhere.
+17. MANDATORY: write your first name '{sender_name_first}' verbatim in the body exactly once, in a natural place (e.g. "{sender_name_first} from HAWK here" as the second sentence, or "This is {sender_name_first} from HAWK"). Do not stiffly introduce. Use 'I' elsewhere. The email is rejected if the first name is missing.
 18. {reg_rule}
 {cite_rule}
 20. Tone: calm, observational, expert. Never alarmist. Never breathless. Never hedging.
@@ -834,6 +836,7 @@ async def _openai_email_one(
             subj_l = parsed["subject"].lower()
             body_l = parsed["body"].lower()
             ok = True
+            sender_first = (sender_name or "").strip().split()[0].lower() if sender_name else ""
             if reg_required and reg_token and reg_token not in body_l:
                 ok = False
             for w in ("urgent", "critical", "alert", "breach", "immediate", "action required", "attention"):
@@ -843,6 +846,8 @@ async def _openai_email_one(
             if "!" in parsed["subject"]:
                 ok = False
             if hhs_citation and "hhs ocr" not in body_l:
+                ok = False
+            if sender_first and sender_first not in body_l:
                 ok = False
             if ok:
                 return parsed
@@ -854,17 +859,27 @@ async def _openai_email_one(
                 continue
             logger.warning("OpenAI email generation failed: %s", e)
             return None
-    # Fallback: return the last attempt with the subject force-scrubbed and
-    # regulation auto-injected if the LLM still wouldn't comply.
+    # Fallback: return the last attempt with the subject force-scrubbed,
+    # regulation auto-injected, and sender name auto-injected if the LLM
+    # still wouldn't comply.
     if last_parsed:
         last_parsed["subject"] = _scrub_subject(
             last_parsed["subject"], domain=row["domain"], force=True
         )
-        if reg_required and regulation and regulation.split("(")[0].strip().lower() not in last_parsed["body"].lower():
-            last_parsed["body"] = (
-                last_parsed["body"].rstrip()
-                + f" Under {regulation}, this is worth a quick review."
-            )
+        body = last_parsed["body"]
+        body_l = body.lower()
+        sender_first = (sender_name or "").strip().split()[0] if sender_name else ""
+        if sender_first and sender_first.lower() not in body_l:
+            # Inject after the first sentence so it reads naturally.
+            m = re.search(r"([\.!?]\s+)", body)
+            insert = f"{sender_first} from HAWK here. "
+            if m:
+                body = body[: m.end()] + insert + body[m.end():]
+            else:
+                body = insert + body
+        if reg_required and regulation and regulation.split("(")[0].strip().lower() not in body.lower():
+            body = body.rstrip() + f" Under {regulation}, this is worth a quick review."
+        last_parsed["body"] = body
         return last_parsed
     return None
 
