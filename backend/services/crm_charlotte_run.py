@@ -20,6 +20,8 @@ import httpx
 
 from config import OPENAI_MODEL
 
+from services.hhs_breach_lookup import format_citation as _format_hhs_citation
+from services.hhs_breach_lookup import lookup_relevant_breach as _lookup_hhs_breach
 from services.openai_chat import chat_text_async
 
 logger = logging.getLogger(__name__)
@@ -351,6 +353,37 @@ def _sanitize_no_hyphens(text: str) -> str:
     return t.strip()
 
 
+_BANNED_SUBJECT_REPLACEMENTS = {
+    "urgent": "security",
+    "critical": "security",
+    "alert": "finding",
+    "breach": "exposure",
+    "immediate": "security",
+    "action required": "security finding",
+    "attention": "security finding",
+}
+
+
+def _scrub_subject(subject: str, *, domain: str = "", force: bool = False) -> str:
+    """Replace banned alarmist/breach words in subjects.
+
+    Soft pass (force=False) only swaps obvious word matches; in non-force mode
+    the caller still rejects and retries the LLM if any banned word is left.
+    Hard pass (force=True) is the post-retry fallback that guarantees a clean
+    subject before dispatch.
+    """
+    if not subject:
+        return f"security finding on {domain}" if domain else "security finding"
+    s = subject.strip()
+    for bad, good in _BANNED_SUBJECT_REPLACEMENTS.items():
+        s = re.sub(rf"\b{re.escape(bad)}\b", good, s, flags=re.IGNORECASE)
+    s = s.replace("!", "")
+    s = re.sub(r"\s+", " ", s).strip()
+    if force and not s:
+        s = f"security finding on {domain}" if domain else "security finding"
+    return s
+
+
 def _parse_claude_json(text: str) -> dict[str, str] | None:
     raw = text.strip()
     if "```" in raw:
@@ -618,16 +651,33 @@ def _claude_prompt(
     top_severity: str,
     breach_detected: bool,
     breach_detail: str,
+    sender_name: str,
+    hhs_breach_citation: str | None = None,
 ) -> str:
     regulation = _regulation_for(industry)
     reg_line = f"- Applicable regulation: {regulation}" if regulation else "- Applicable regulation: (none — skip regulatory framing)"
     reg_rule = (
-        f"17. Frame the finding against {regulation}. Reference the regulation by name at least once in the body."
+        f"17. MANDATORY: write the literal string '{regulation}' verbatim somewhere in the body. "
+        f"This is non-negotiable. The email is rejected if it is missing."
         if regulation
         else "17. Do not invent a regulation. If no regulation applies, skip regulatory framing entirely."
     )
-    return f"""You are Charlotte, an outbound email writer for HAWK Security.
-You write short, high-converting cold emails for US small businesses.
+    if hhs_breach_citation:
+        cite_line = f"- Real public HHS OCR breach to cite: {hhs_breach_citation}"
+        cite_rule = (
+            "19. Include exactly one credibility sentence that cites the HHS OCR breach above. "
+            "Quote the entity name and year from the citation verbatim. Begin the sentence with the "
+            "phrase 'per the HHS OCR public breach database'. Do not invent any details beyond what "
+            "is provided in the citation. Do not include this sentence if the citation is empty."
+        )
+    else:
+        cite_line = "- Real public HHS OCR breach to cite: (none available — skip the credibility sentence entirely)"
+        cite_rule = (
+            "19. Skip the credibility sentence. Do not cite any breach. Do not mention the HHS OCR "
+            "database. Do not invent statistics, percentages, or incidents."
+        )
+    return f"""You are {sender_name}, an outbound email writer for HAWK Security.
+You write short, conversational cold emails for US small businesses.
 
 Prospect details:
 - Name: {first_name}
@@ -642,25 +692,30 @@ Prospect details:
 - Breach detected: {str(breach_detected).lower()}
 - Breach detail: {breach_detail}
 {reg_line}
+{cite_line}
+- Sender name (for body identity, not signoff): {sender_name}
 
 Rules:
-1. Open with the most alarming finding. Never open with "I hope this finds you well" or "My name is"
-2. Use their actual domain name in the first sentence
-3. Explain the finding in plain English for their specific business type
-4. Include their score and grade
-5. End with one low-friction ask: offer to send the full report
-6. Under 100 words for the body
-7. Subject line must mention their domain or a specific finding
-8. Subject line must be lowercase
-9. Never use: leverage, synergy, touch base, circle back, reach out, game-changer
-10. Sound like a real person who actually ran a scan
-11. If breach_detected is true, lead with the breach
-12. If severity is Critical, use words like urgent, immediately, right now
-13. Vary your opening line every time
-14. Never use dashes or hyphens anywhere. Use commas or periods instead
-15. No bullet points or numbered lists in the body
+1. Open with the most specific observation about their setup. Never open with "I hope this finds you well" or "My name is".
+2. Use their actual domain name in the first sentence.
+3. Explain the finding in plain English for their specific business type.
+4. Include their score and grade somewhere in the body.
+5. End with one low-friction ask. Default phrasing: "happy to send the full report if it'd be useful." Vary slightly per email but keep the friction low. Never use "would you like" or "are you interested".
+6. Under 110 words for the body.
+7. Subject line must mention their domain or a specific finding category (SPF, DMARC, HIPAA exposure, security finding, exposure check, etc.).
+8. Subject line must be lowercase.
+9. ABSOLUTE BAN — these words must never appear in the subject line under any circumstance, even when breach_detected=true: urgent, critical, alert, breach, immediate, action required, attention. The body can describe what was found in plain language; the subject must remain observational. Use "security finding", "exposure check", "finding on", "observation on", or "something on" in place of breach/alert/etc. Examples: "spf check on cascadedental.com", "hipaa exposure on stjohnsmiles.com", "security finding on salmoncreekdental.com", "dmarc gap on heardfamilydentistry.com". Never use exclamation points.
+10. Never use these words anywhere: leverage, synergy, touch base, circle back, reach out, game-changer, just wanted to, hope this finds.
+11. Sound like a real person named {sender_name} who actually ran a scan.
+12. If breach_detected is true, lead with the breach in plain language. Never embellish severity.
+13. Vary the opening line every time. Cycle between observation, question, finding statement.
+14. Never use dashes or hyphens anywhere. Use commas or periods instead.
+15. No bullet points or numbered lists in the body.
 16. Short punchy sentences. No sentence over 20 words.
-{reg_rule}
+17. Open the body by naming yourself in plain language only when natural (e.g. "{sender_name} from HAWK here" works as the second sentence). Do not stiffly introduce. Use "I" elsewhere.
+18. {reg_rule}
+{cite_rule}
+20. Tone: calm, observational, expert. Never alarmist. Never breathless. Never hedging.
 
 Return ONLY this JSON:
 {{
@@ -707,7 +762,11 @@ async def _scan_one(
 
 
 async def _openai_email_one(
-    openai_key: str, row: dict[str, Any], scan: dict[str, Any], vertical_label: str
+    openai_key: str,
+    row: dict[str, Any],
+    scan: dict[str, Any],
+    vertical_label: str,
+    sender_name: str = "Charlotte",
 ) -> dict[str, str] | None:
     findings_raw = scan.get("findings") or []
     findings = [dict(f) for f in findings_raw if isinstance(f, dict)]
@@ -716,19 +775,35 @@ async def _openai_email_one(
     top_plain = _finding_plain(top) if top else "No major issues flagged."
     top_sev = str(top.get("severity") or "unknown") if top else "unknown"
     breach_detected, breach_detail = _breach_info(findings)
+    top_layer = str(top.get("layer") or "").lower() if top else ""
     if breach_detected and findings:
         for f in findings[:5]:
             layer = str(f.get("layer") or "").lower()
             if any(x in layer for x in ("breach", "hibp", "stealer")):
                 top_plain = _finding_plain(f)
                 top_sev = str(f.get("severity") or top_sev)
+                top_layer = layer
                 break
     score = int(scan.get("score") or 0)
     grade = str(scan.get("grade") or "")
+    industry = row.get("industry") or vertical_label
+    state = (row.get("state") or row.get("region") or "").strip()
+    hhs_citation: str | None = None
+    try:
+        breach_match = _lookup_hhs_breach(
+            industry, state, top_layer, rotation_key=row.get("domain")
+        )
+        if breach_match:
+            hhs_citation = _format_hhs_citation(breach_match)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.debug("hhs lookup failed: %s", e)
+    regulation = _regulation_for(industry)
+    reg_required = bool(regulation)
+    reg_token = regulation.split("(")[0].strip().lower() if regulation else ""
     prompt = _claude_prompt(
         first_name=row.get("first_name") or "there",
         company=row.get("company") or row.get("domain", "your company"),
-        industry=row.get("industry") or vertical_label,
+        industry=industry,
         city=row.get("city") or "United States",
         domain=row["domain"],
         score=score,
@@ -737,8 +812,11 @@ async def _openai_email_one(
         top_severity=top_sev,
         breach_detected=breach_detected,
         breach_detail=breach_detail or "none noted",
+        sender_name=sender_name,
+        hhs_breach_citation=hhs_citation,
     )
-    for attempt in range(2):
+    last_parsed: dict[str, str] | None = None
+    for attempt in range(3):
         try:
             text = await chat_text_async(
                 api_key=openai_key,
@@ -748,17 +826,46 @@ async def _openai_email_one(
                 model=CHARLOTTE_OPENAI_MODEL,
             )
             parsed = _parse_claude_json(text)
-            if parsed:
-                parsed["subject"] = _sanitize_no_hyphens(parsed["subject"])
-                parsed["body"] = _sanitize_no_hyphens(parsed["body"])
+            if not parsed:
+                continue
+            parsed["subject"] = _sanitize_no_hyphens(parsed["subject"])
+            parsed["body"] = _sanitize_no_hyphens(parsed["body"])
+            last_parsed = parsed
+            subj_l = parsed["subject"].lower()
+            body_l = parsed["body"].lower()
+            ok = True
+            if reg_required and reg_token and reg_token not in body_l:
+                ok = False
+            for w in ("urgent", "critical", "alert", "breach", "immediate", "action required", "attention"):
+                if w in subj_l:
+                    ok = False
+                    break
+            if "!" in parsed["subject"]:
+                ok = False
+            if hhs_citation and "hhs ocr" not in body_l:
+                ok = False
+            if ok:
                 return parsed
-            if attempt == 0:
+            # retry with stronger directive
+            if attempt < 2:
                 continue
         except Exception as e:
-            if attempt == 0:
+            if attempt < 2:
                 continue
             logger.warning("OpenAI email generation failed: %s", e)
             return None
+    # Fallback: return the last attempt with the subject force-scrubbed and
+    # regulation auto-injected if the LLM still wouldn't comply.
+    if last_parsed:
+        last_parsed["subject"] = _scrub_subject(
+            last_parsed["subject"], domain=row["domain"], force=True
+        )
+        if reg_required and regulation and regulation.split("(")[0].strip().lower() not in last_parsed["body"].lower():
+            last_parsed["body"] = (
+                last_parsed["body"].rstrip()
+                + f" Under {regulation}, this is worth a quick review."
+            )
+        return last_parsed
     return None
 
 
@@ -859,6 +966,7 @@ async def _process_pipeline_async(
 
         scan_results = await asyncio.gather(*[scan_row(row) for row in leads])
 
+        block_breach = os.environ.get("CHARLOTTE_BLOCK_BREACH_CLAIMS", "1").strip() in ("1", "true", "yes")
         for row, scan in scan_results:
             if not scan:
                 counts["scan_failures"] += 1
@@ -867,17 +975,54 @@ async def _process_pipeline_async(
                 counts["scan_skipped"] += 1
                 continue
             counts["domains_scanned"] += 1
-            ce = await _openai_email_one(openai_key, row, scan, vertical_label)
+            # Pre-pick a mailbox per prospect so the email body is written
+            # in that sender's voice (display_name from crm_mailboxes).
+            # Falls back to CHARLOTTE_SENDER_NAME when registry is empty
+            # or all mailboxes are quota-exhausted for the day.
+            sender_name = os.environ.get("CHARLOTTE_SENDER_NAME", "Charlotte").strip() or "Charlotte"
+            mailbox_id: str | None = None
+            try:
+                from services.mailbox_registry import pick_next_for_vertical
+                mb = pick_next_for_vertical(vertical_label.lower())
+                if mb and mb.get("display_name"):
+                    sender_name = mb["display_name"].strip()
+                    mailbox_id = mb.get("id")
+            except Exception as e:  # pragma: no cover - defensive
+                logger.debug("mailbox pick failed: %s", e)
+            ce = await _openai_email_one(openai_key, row, scan, vertical_label, sender_name)
             if not ce:
                 counts["email_failed"] += 1
                 continue
             if not _validate_email_content(ce, row, scan):
                 counts["email_failed"] += 1
                 continue
+            findings_for_breach = scan.get("findings") or []
+            findings_for_breach = [dict(f) for f in findings_for_breach if isinstance(f, dict)]
+            breach_detected, _ = _breach_info(findings_for_breach)
+            legal_review_required = bool(breach_detected)
+            if legal_review_required and block_breach:
+                # Per legal review process: do not auto-dispatch breach-claim
+                # emails. Generate them for human review but skip dispatch by
+                # not appending to out_rows. Counted separately so the cron's
+                # response surfaces them.
+                counts.setdefault("breach_claims_blocked", 0)
+                counts["breach_claims_blocked"] += 1
+                logger.info(
+                    "charlotte: blocked breach-claim email for %s pending legal review",
+                    row.get("domain"),
+                )
+                continue
             counts["emails_written"] += 1
-            sender = os.environ.get("CHARLOTTE_SENDER_NAME", "Charlotte").strip()
-            payload = _smartlead_lead_payload(row, scan, ce, sender)
-            out_rows.append({"row": row, "scan": scan, "smartlead": payload, "email_body": ce})
+            payload = _smartlead_lead_payload(row, scan, ce, sender_name)
+            out_rows.append({
+                "row": row,
+                "scan": scan,
+                "smartlead": payload,
+                "email_body": ce,
+                "mailbox_id": mailbox_id,
+                "sender_name": sender_name,
+                "legal_review_required": legal_review_required,
+            })
 
     return out_rows, counts
 
