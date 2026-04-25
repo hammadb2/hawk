@@ -13,7 +13,7 @@ import logging
 import os
 import re
 import zoneinfo
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 import httpx
@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 MST = zoneinfo.ZoneInfo("America/Edmonton")
 SCANNER_URL = os.environ.get("SCANNER_URL", "https://intelligent-rejoicing-production.up.railway.app").rstrip("/")
 APOLLO_BASE = os.environ.get("APOLLO_API_BASE", "https://api.apollo.io/api/v1").rstrip("/")
-SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.ai/api/v1").rstrip("/")
+# Smartlead is no longer used by Charlotte — dispatch is now via native HAWK
+# SMTP through ``crm_mailboxes``. Other services (ARIA pipelines) still
+# reference SMARTLEAD_BASE locally.
 ZEROBOUNCE_VALIDATE = "https://api.zerobounce.net/v2/validate"
 
 CHARLOTTE_OPENAI_MODEL = (
@@ -265,7 +267,13 @@ def _insert_charlotte_email_row(
     row: dict[str, Any],
     scan: dict[str, Any],
     email_body: dict[str, str],
-    smartlead_lead_id: str | None,
+    mailbox_id: str | None = None,
+    message_id: str | None = None,
+    sent_at: str | None = None,
+    sent_via: str = "hawk_smtp",
+    send_status: str = "sent",
+    send_error: str | None = None,
+    smartlead_lead_id: str | None = None,
 ) -> None:
     findings_raw = scan.get("findings") or []
     findings = [dict(f) for f in findings_raw if isinstance(f, dict)]
@@ -293,6 +301,12 @@ def _insert_charlotte_email_row(
         "contains_domain": dom.lower() in body.lower() or dom.lower() in subj.lower(),
         "contains_score": (str(score_v) in body or str(score_v) in subj) if score_v is not None else False,
         "smartlead_lead_id": smartlead_lead_id,
+        "mailbox_id": mailbox_id,
+        "message_id": message_id,
+        "sent_at": sent_at,
+        "sent_via": sent_via,
+        "send_status": send_status,
+        "send_error": send_error,
     }
     try:
         httpx.post(
@@ -1028,11 +1042,9 @@ async def _process_pipeline_async(
                 )
                 continue
             counts["emails_written"] += 1
-            payload = _smartlead_lead_payload(row, scan, ce, sender_name)
             out_rows.append({
                 "row": row,
                 "scan": scan,
-                "smartlead": payload,
                 "email_body": ce,
                 "mailbox_id": mailbox_id,
                 "sender_name": sender_name,
@@ -1047,8 +1059,6 @@ def run_charlotte_daily() -> dict[str, Any]:
     supabase_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     apollo_key = os.environ.get("APOLLO_API_KEY", "").strip()
     zb_key = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
-    sl_key = os.environ.get("SMARTLEAD_API_KEY", "").strip()
-    sl_cid = os.environ.get("SMARTLEAD_CAMPAIGN_ID", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
     stats = {
@@ -1062,9 +1072,11 @@ def run_charlotte_daily() -> dict[str, Any]:
         "scan_failures": 0,
         "scan_skipped": 0,
         "email_failed": 0,
-        "upload_failed": 0,
+        "send_failed": 0,
         "emails_written": 0,
-        "leads_uploaded": 0,
+        "emails_sent": 0,
+        "breach_claims_blocked": 0,
+        "no_mailbox_capacity": 0,
     }
     run_row_id: str | None = None
 
@@ -1083,17 +1095,12 @@ def run_charlotte_daily() -> dict[str, Any]:
         _ceo_sms_summary(stats)
         return stats
 
-    if not apollo_key or not zb_key or not sl_key or not openai_key:
+    if not apollo_key or not zb_key or not openai_key:
         return {
             **stats,
             "ok": False,
-            "error": "Missing APOLLO_API_KEY, ZEROBOUNCE_API_KEY, SMARTLEAD_API_KEY, or OPENAI_API_KEY",
+            "error": "Missing APOLLO_API_KEY, ZEROBOUNCE_API_KEY, or OPENAI_API_KEY",
         }
-
-    if not sl_cid:
-        sl_cid = _get_setting(supabase_url, "smartlead_campaign_id", "").strip()
-    if not sl_cid:
-        return {**stats, "ok": False, "error": "SMARTLEAD_CAMPAIGN_ID or crm_settings smartlead_campaign_id required"}
 
     run_row_id = _begin_charlotte_run_row(supabase_url, industry_cfg["label"])
 
@@ -1163,61 +1170,90 @@ def run_charlotte_daily() -> dict[str, Any]:
     stats["scan_skipped"] = counts["scan_skipped"]
     stats["email_failed"] = counts["email_failed"]
     stats["emails_written"] = counts["emails_written"]
+    stats["breach_claims_blocked"] = counts.get("breach_claims_blocked", 0)
 
-    # Smartlead (retry once per batch; per-lead charlotte_emails on success)
-    uploaded = 0
-    upload_fail = 0
+    # Native HAWK SMTP dispatch via crm_mailboxes round-robin pool.
+    sent_count = 0
+    send_fail = 0
+    no_capacity = 0
     if enriched:
-        with httpx.Client(timeout=120.0) as client:
+        from services.mailbox_smtp_sender import send_via_mailbox_async
+        from services.mailbox_registry import pick_next_for_vertical
+
+        unsubscribe_mailto = os.environ.get(
+            "CHARLOTTE_UNSUBSCRIBE_MAILTO", "unsubscribe@securedbyhawk.com"
+        ).strip() or None
+
+        async def _dispatch_all() -> None:
+            nonlocal sent_count, send_fail, no_capacity
             for item in enriched:
-                payload = item["smartlead"]
-                chunk = [payload]
-                ok_chunk = False
-                lead_id = None
-                for attempt in range(2):
-                    try:
-                        r = client.post(
-                            f"{SMARTLEAD_BASE}/campaigns/{sl_cid}/leads",
-                            params={"api_key": sl_key},
-                            json={
-                                "lead_list": chunk,
-                                "settings": {
-                                    "ignore_duplicate_leads_in_other_campaign": True,
-                                    "return_lead_ids": True,
-                                },
-                            },
-                            timeout=120.0,
+                row = item["row"]
+                ce = item["email_body"]
+                mailbox_id = item.get("mailbox_id")
+                # If the pre-pick mailbox burned through its cap between
+                # generation and send, re-pick at dispatch time so we never
+                # over-send from a single mailbox.
+                if not mailbox_id:
+                    mb = pick_next_for_vertical(industry_cfg["label"].lower())
+                    if not mb:
+                        no_capacity += 1
+                        _insert_charlotte_email_row(
+                            supabase_url,
+                            run_id=run_row_id,
+                            row=row,
+                            scan=item["scan"],
+                            email_body=ce,
+                            send_status="deferred",
+                            send_error="no mailbox capacity",
+                            sent_via="hawk_smtp",
                         )
-                        if r.status_code >= 400:
-                            logger.error("Smartlead error: %s %s", r.status_code, r.text[:800])
-                            if attempt == 1:
-                                upload_fail += 1
-                            continue
-                        data = r.json()
-                        uploaded += int(data.get("added_count") or data.get("upload_count") or 1)
-                        ok_chunk = True
-                        lids = data.get("lead_ids") or data.get("ids") or []
-                        if isinstance(lids, list) and lids:
-                            lead_id = str(lids[0])
-                        break
-                    except Exception as e:
-                        logger.warning("Smartlead post attempt %s: %s", attempt + 1, e)
-                        if attempt == 1:
-                            upload_fail += 1
-                if ok_chunk:
+                        continue
+                    mailbox_id = mb.get("id")
+                result = await send_via_mailbox_async(
+                    mailbox_id,
+                    to_email=row["email"],
+                    to_name=(row.get("first_name") or "") + (
+                        " " + row.get("last_name", "") if row.get("last_name") else ""
+                    ),
+                    subject=ce["subject"],
+                    body_text=ce["body"],
+                    unsubscribe_mailto=unsubscribe_mailto,
+                )
+                if result.ok:
+                    sent_count += 1
                     _insert_charlotte_email_row(
                         supabase_url,
                         run_id=run_row_id,
-                        row=item["row"],
+                        row=row,
                         scan=item["scan"],
-                        email_body=item["email_body"],
-                        smartlead_lead_id=lead_id,
+                        email_body=ce,
+                        mailbox_id=mailbox_id,
+                        message_id=result.message_id,
+                        sent_at=datetime.now(timezone.utc).isoformat(),
+                        sent_via="hawk_smtp",
+                        send_status="sent",
                     )
                 else:
-                    _smartlead_upload_failed_ceo_alert(item["row"])
+                    send_fail += 1
+                    _insert_charlotte_email_row(
+                        supabase_url,
+                        run_id=run_row_id,
+                        row=row,
+                        scan=item["scan"],
+                        email_body=ce,
+                        mailbox_id=mailbox_id,
+                        sent_via="hawk_smtp",
+                        send_status="failed",
+                        send_error=(result.error or "")[:1000],
+                    )
+                    if result.was_auth_failure:
+                        _send_failed_ceo_alert(row, mailbox_id, result.error)
 
-    stats["leads_uploaded"] = uploaded
-    stats["upload_failed"] = upload_fail
+        asyncio.run(_dispatch_all())
+
+    stats["emails_sent"] = sent_count
+    stats["send_failed"] = send_fail
+    stats["no_mailbox_capacity"] = no_capacity
 
     _finalize_charlotte_run(supabase_url, run_row_id, stats)
     _ceo_sms_summary(stats, supabase_url)
@@ -1228,20 +1264,21 @@ def run_charlotte_daily() -> dict[str, Any]:
     return stats
 
 
-def _smartlead_upload_failed_ceo_alert(row: dict[str, Any]) -> None:
+def _send_failed_ceo_alert(row: dict[str, Any], mailbox_id: str | None, err: str | None) -> None:
     from services.crm_openphone import send_sms
 
     num = os.environ.get("CRM_CEO_PHONE_E164", "").strip() or "+18259458282"
     msg = (
-        "Charlotte Smartlead upload failed after retry.\n"
+        "Charlotte SMTP send failed (auth error).\n"
         f"Domain: {row.get('domain')}\n"
         f"Email: {row.get('email')}\n"
-        "Check logs and re-push lead manually."
+        f"Mailbox: {mailbox_id}\n"
+        f"Error: {(err or '')[:200]}"
     )
     try:
         send_sms(num, msg)
     except Exception:
-        logger.exception("CEO SMS Smartlead failure alert")
+        logger.exception("CEO SMS Charlotte SMTP failure alert")
 
 
 def _ceo_sms_summary(stats: dict[str, Any], supabase_url: str = "") -> None:
@@ -1254,8 +1291,8 @@ def _ceo_sms_summary(stats: dict[str, Any], supabase_url: str = "") -> None:
             rate = float(_get_setting(supabase_url, "charlotte_estimated_reply_rate", "0.02"))
         except ValueError:
             rate = 0.02
-    uploaded = int(stats.get("leads_uploaded", 0))
-    est = int(round(uploaded * rate))
+    sent = int(stats.get("emails_sent", 0))
+    est = int(round(sent * rate))
     msg = (
         "Charlotte daily run complete.\n"
         f"Industry: {stats.get('industry') or '—'}\n"
@@ -1263,8 +1300,10 @@ def _ceo_sms_summary(stats: dict[str, Any], supabase_url: str = "") -> None:
         f"Emails verified: {stats.get('emails_verified', 0)}\n"
         f"Scans completed: {stats.get('domains_scanned', 0)}\n"
         f"Emails written: {stats.get('emails_written', 0)}\n"
-        f"Uploaded to Smartlead: {uploaded}\n"
-        f"Failures: {stats.get('scan_failures', 0) + stats.get('scan_skipped', 0) + stats.get('email_failed', 0) + stats.get('upload_failed', 0)}\n"
+        f"Sent via HAWK SMTP: {sent}\n"
+        f"Failures: {stats.get('scan_failures', 0) + stats.get('scan_skipped', 0) + stats.get('email_failed', 0) + stats.get('send_failed', 0)}\n"
+        f"Breach-claims blocked (legal review): {stats.get('breach_claims_blocked', 0)}\n"
+        f"Deferred (no mailbox capacity): {stats.get('no_mailbox_capacity', 0)}\n"
         f"Estimated replies today: {est}"
     )
     try:
