@@ -66,7 +66,10 @@ def _decode_supabase_bearer(authorization: str | None) -> dict:
                     options={"verify_aud": False, **_JWT_OPTIONS},
                 )
             except JWTError as e:
-                logger.warning("jwt decode failed (will try Supabase Auth API): %s", e)
+                # Newer Supabase projects sign with ES256 (asymmetric); we don't
+                # carry the JWKS yet so we fall through to the Auth REST API.
+                # That path works fine, so this is benign — log at debug.
+                logger.debug("jwt decode failed (falling back to Supabase Auth API): %s", e)
 
     if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
         return _verify_supabase_user_via_rest(token)
