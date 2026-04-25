@@ -353,6 +353,37 @@ def _sanitize_no_hyphens(text: str) -> str:
     return t.strip()
 
 
+_BANNED_SUBJECT_REPLACEMENTS = {
+    "urgent": "security",
+    "critical": "security",
+    "alert": "finding",
+    "breach": "exposure",
+    "immediate": "security",
+    "action required": "security finding",
+    "attention": "security finding",
+}
+
+
+def _scrub_subject(subject: str, *, domain: str = "", force: bool = False) -> str:
+    """Replace banned alarmist/breach words in subjects.
+
+    Soft pass (force=False) only swaps obvious word matches; in non-force mode
+    the caller still rejects and retries the LLM if any banned word is left.
+    Hard pass (force=True) is the post-retry fallback that guarantees a clean
+    subject before dispatch.
+    """
+    if not subject:
+        return f"security finding on {domain}" if domain else "security finding"
+    s = subject.strip()
+    for bad, good in _BANNED_SUBJECT_REPLACEMENTS.items():
+        s = re.sub(rf"\b{re.escape(bad)}\b", good, s, flags=re.IGNORECASE)
+    s = s.replace("!", "")
+    s = re.sub(r"\s+", " ", s).strip()
+    if force and not s:
+        s = f"security finding on {domain}" if domain else "security finding"
+    return s
+
+
 def _parse_claude_json(text: str) -> dict[str, str] | None:
     raw = text.strip()
     if "```" in raw:
@@ -626,7 +657,8 @@ def _claude_prompt(
     regulation = _regulation_for(industry)
     reg_line = f"- Applicable regulation: {regulation}" if regulation else "- Applicable regulation: (none — skip regulatory framing)"
     reg_rule = (
-        f"17. Frame the finding against {regulation}. Reference the regulation by name at least once in the body."
+        f"17. MANDATORY: write the literal string '{regulation}' verbatim somewhere in the body. "
+        f"This is non-negotiable. The email is rejected if it is missing."
         if regulation
         else "17. Do not invent a regulation. If no regulation applies, skip regulatory framing entirely."
     )
@@ -670,9 +702,9 @@ Rules:
 4. Include their score and grade somewhere in the body.
 5. End with one low-friction ask. Default phrasing: "happy to send the full report if it'd be useful." Vary slightly per email but keep the friction low. Never use "would you like" or "are you interested".
 6. Under 110 words for the body.
-7. Subject line must mention their domain or a specific finding category (SPF, DMARC, HIPAA exposure, breach exposure, etc.).
+7. Subject line must mention their domain or a specific finding category (SPF, DMARC, HIPAA exposure, security finding, exposure check, etc.).
 8. Subject line must be lowercase.
-9. NEVER use these words anywhere in the subject line: urgent, critical, alert, breach, immediate, action required, attention. Subject lines should sound observational, not alarming. Examples of good subjects: "spf check on cascadedental.com", "hipaa exposure on stjohnsmiles.com", "noticed something on hamiltondental.com", "dmarc gap on heardfamilydentistry.com". Never use exclamation points.
+9. ABSOLUTE BAN — these words must never appear in the subject line under any circumstance, even when breach_detected=true: urgent, critical, alert, breach, immediate, action required, attention. The body can describe what was found in plain language; the subject must remain observational. Use "security finding", "exposure check", "finding on", "observation on", or "something on" in place of breach/alert/etc. Examples: "spf check on cascadedental.com", "hipaa exposure on stjohnsmiles.com", "security finding on salmoncreekdental.com", "dmarc gap on heardfamilydentistry.com". Never use exclamation points.
 10. Never use these words anywhere: leverage, synergy, touch base, circle back, reach out, game-changer, just wanted to, hope this finds.
 11. Sound like a real person named {sender_name} who actually ran a scan.
 12. If breach_detected is true, lead with the breach in plain language. Never embellish severity.
@@ -758,11 +790,16 @@ async def _openai_email_one(
     state = (row.get("state") or row.get("region") or "").strip()
     hhs_citation: str | None = None
     try:
-        breach_match = _lookup_hhs_breach(industry, state, top_layer)
+        breach_match = _lookup_hhs_breach(
+            industry, state, top_layer, rotation_key=row.get("domain")
+        )
         if breach_match:
             hhs_citation = _format_hhs_citation(breach_match)
     except Exception as e:  # pragma: no cover - defensive
         logger.debug("hhs lookup failed: %s", e)
+    regulation = _regulation_for(industry)
+    reg_required = bool(regulation)
+    reg_token = regulation.split("(")[0].strip().lower() if regulation else ""
     prompt = _claude_prompt(
         first_name=row.get("first_name") or "there",
         company=row.get("company") or row.get("domain", "your company"),
@@ -778,7 +815,8 @@ async def _openai_email_one(
         sender_name=sender_name,
         hhs_breach_citation=hhs_citation,
     )
-    for attempt in range(2):
+    last_parsed: dict[str, str] | None = None
+    for attempt in range(3):
         try:
             text = await chat_text_async(
                 api_key=openai_key,
@@ -788,17 +826,46 @@ async def _openai_email_one(
                 model=CHARLOTTE_OPENAI_MODEL,
             )
             parsed = _parse_claude_json(text)
-            if parsed:
-                parsed["subject"] = _sanitize_no_hyphens(parsed["subject"])
-                parsed["body"] = _sanitize_no_hyphens(parsed["body"])
+            if not parsed:
+                continue
+            parsed["subject"] = _sanitize_no_hyphens(parsed["subject"])
+            parsed["body"] = _sanitize_no_hyphens(parsed["body"])
+            last_parsed = parsed
+            subj_l = parsed["subject"].lower()
+            body_l = parsed["body"].lower()
+            ok = True
+            if reg_required and reg_token and reg_token not in body_l:
+                ok = False
+            for w in ("urgent", "critical", "alert", "breach", "immediate", "action required", "attention"):
+                if w in subj_l:
+                    ok = False
+                    break
+            if "!" in parsed["subject"]:
+                ok = False
+            if hhs_citation and "hhs ocr" not in body_l:
+                ok = False
+            if ok:
                 return parsed
-            if attempt == 0:
+            # retry with stronger directive
+            if attempt < 2:
                 continue
         except Exception as e:
-            if attempt == 0:
+            if attempt < 2:
                 continue
             logger.warning("OpenAI email generation failed: %s", e)
             return None
+    # Fallback: return the last attempt with the subject force-scrubbed and
+    # regulation auto-injected if the LLM still wouldn't comply.
+    if last_parsed:
+        last_parsed["subject"] = _scrub_subject(
+            last_parsed["subject"], domain=row["domain"], force=True
+        )
+        if reg_required and regulation and regulation.split("(")[0].strip().lower() not in last_parsed["body"].lower():
+            last_parsed["body"] = (
+                last_parsed["body"].rstrip()
+                + f" Under {regulation}, this is worth a quick review."
+            )
+        return last_parsed
     return None
 
 

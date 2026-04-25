@@ -41,13 +41,19 @@ HIPAA_INDUSTRIES = {
 # Map a Charlotte scan finding's "layer" (or top-finding category) onto
 # the HHS "Location of Breached Information" enum.
 FINDING_LOCATION_MAP: dict[str, list[str]] = {
-    "email_security": ["Email", "Email, Network Server", "Electronic Medical Record, Email"],
-    "dns": ["Email", "Network Server"],
+    "email_security": [
+        "Email",
+        "Network Server",
+        "Email, Network Server",
+        "Electronic Medical Record, Email",
+        "Email, Laptop",
+    ],
+    "dns": ["Email", "Network Server", "Email, Network Server"],
     "tls": ["Network Server"],
-    "infra": ["Network Server"],
+    "infra": ["Network Server", "Desktop Computer"],
     "credentials": ["Network Server", "Email"],
     "breach": ["Network Server", "Email"],
-    "leak": ["Network Server"],
+    "leak": ["Network Server", "Email"],
 }
 
 # BEA-style regional groupings — used when no same-state match exists.
@@ -151,11 +157,17 @@ def lookup_relevant_breach(
     finding_layer: str | None,
     *,
     min_individuals: int = 500,
+    rotation_key: str | None = None,
 ) -> dict[str, Any] | None:
-    """Return the most relevant HHS breach incident for a prospect, or None.
+    """Return a relevant HHS breach incident for a prospect, or None.
 
     Charlotte's prompt only injects a citation when this returns a row;
     otherwise the LLM is instructed to skip the trust-signal sentence.
+
+    ``rotation_key`` (typically the prospect's domain) deterministically
+    selects one row out of the top-N candidates per tier so multiple
+    prospects in the same state get different real breaches cited
+    instead of all sharing the most-recent one.
     """
     if not _is_hipaa(industry):
         return None
@@ -170,38 +182,60 @@ def lookup_relevant_breach(
         "entity_type": "eq.Healthcare Provider",
         "individuals_affected": f"gte.{min_individuals}",
         "order": "breach_submission_date.desc",
-        "limit": "1",
+        "limit": "25",
     }
+
+    def _pick(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+        if not rows:
+            return None
+        if not rotation_key:
+            return rows[0]
+        import hashlib
+
+        def _score(row: dict[str, Any]) -> int:
+            seed = f"{rotation_key}::{row.get('id','')}"
+            return int(hashlib.sha1(seed.encode("utf-8")).hexdigest(), 16)
+
+        return sorted(rows, key=_score)[0]
 
     def _try(extra: dict[str, str]) -> dict[str, Any] | None:
         rows = _sb_get({**base, **extra})
-        return rows[0] if rows else None
+        return _pick(rows)
 
-    # 1. same state + matching location
+    def _loc_in() -> str:
+        # Build a PostgREST in.() filter for any candidate location.
+        # Wrap each in double quotes since some HHS values contain commas.
+        quoted = [f'"{loc}"' for loc in locations]
+        return f"in.({','.join(quoted)})"
+
+    # 1. same state + any matching location
     if state and locations:
-        for loc in locations:
-            row = _try({"state": f"eq.{state}", "breach_location": f"eq.{loc}"})
-            if row:
-                return row
+        row = _try({"state": f"eq.{state}", "breach_location": _loc_in()})
+        if row:
+            return row
     # 2. same state, any location
     if state:
         row = _try({"state": f"eq.{state}"})
         if row:
             return row
-    # 3. adjacent state + matching location
+    # 3. adjacent state + any matching location
     if state and locations and state in ADJACENT_STATES:
         adj = ",".join(ADJACENT_STATES[state])
-        for loc in locations:
-            row = _try({"state": f"in.({adj})", "breach_location": f"eq.{loc}"})
-            if row:
-                return row
-    # 4. national + matching location
+        row = _try({"state": f"in.({adj})", "breach_location": _loc_in()})
+        if row:
+            return row
+    # 4. adjacent state, any location
+    if state and state in ADJACENT_STATES:
+        adj = ",".join(ADJACENT_STATES[state])
+        row = _try({"state": f"in.({adj})"})
+        if row:
+            return row
+    # 5. national + any matching location
     if locations:
-        for loc in locations:
-            row = _try({"breach_location": f"eq.{loc}"})
-            if row:
-                return row
-    # 5. national any
+        row = _try({"breach_location": _loc_in()})
+        if row:
+            return row
+    # 6. national any
     return _try({})
 
 
