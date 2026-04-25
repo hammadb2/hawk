@@ -465,7 +465,7 @@ def _apollo_search_page(
         "page": page,
         "per_page": per_page,
         "person_titles": industry["titles"],
-        "person_locations": ["Canada"],
+        "person_locations": ["United States"],
         "organization_num_employees_ranges": ["1,50"],
         "contact_email_status": ["verified", "unverified"],
         "organization_industry_tag_ids": [],
@@ -576,6 +576,35 @@ def _suppression_hit(supabase_url: str, email: str, domain: str) -> bool:
     return r2.status_code == 200 and bool(r2.json())
 
 
+# Maps a vertical's label (see INDUSTRY_DAYS) to the applicable US regulatory
+# anchor Charlotte should cite in the email body. Keep wording short and
+# recognizable to practice owners — the LLM pulls straight from this string.
+INDUSTRY_REGULATION: dict[str, str] = {
+    "Dental Clinics": "HIPAA (45 CFR 164)",
+    "Medical Clinics": "HIPAA (45 CFR 164)",
+    "Physiotherapy": "HIPAA (45 CFR 164)",
+    "Optometry": "HIPAA (45 CFR 164)",
+    "Law Firms": "ABA Formal Opinion 2024-3 (cyber ethics)",
+    "Accounting Firms": "FTC Safeguards Rule (16 CFR 314)",
+    "Financial Advisors": "FTC Safeguards Rule (16 CFR 314)",
+}
+
+
+def _regulation_for(industry: str) -> str:
+    """Return the US regulatory anchor for a given industry/vertical label."""
+    key = (industry or "").strip()
+    if key in INDUSTRY_REGULATION:
+        return INDUSTRY_REGULATION[key]
+    lowered = key.lower()
+    if any(w in lowered for w in ("dental", "medical", "clinic", "physio", "optomet", "health")):
+        return "HIPAA (45 CFR 164)"
+    if any(w in lowered for w in ("law", "legal", "attorney", "lawyer")):
+        return "ABA Formal Opinion 2024-3 (cyber ethics)"
+    if any(w in lowered for w in ("accoun", "cpa", "bookkeep", "tax", "financial", "wealth")):
+        return "FTC Safeguards Rule (16 CFR 314)"
+    return ""
+
+
 def _claude_prompt(
     *,
     first_name: str,
@@ -590,8 +619,15 @@ def _claude_prompt(
     breach_detected: bool,
     breach_detail: str,
 ) -> str:
+    regulation = _regulation_for(industry)
+    reg_line = f"- Applicable regulation: {regulation}" if regulation else "- Applicable regulation: (none — skip regulatory framing)"
+    reg_rule = (
+        f"17. Frame the finding against {regulation}. Reference the regulation by name at least once in the body."
+        if regulation
+        else "17. Do not invent a regulation. If no regulation applies, skip regulatory framing entirely."
+    )
     return f"""You are Charlotte, an outbound email writer for HAWK Security.
-You write short, high-converting cold emails for Canadian small businesses.
+You write short, high-converting cold emails for US small businesses.
 
 Prospect details:
 - Name: {first_name}
@@ -605,6 +641,7 @@ Prospect details:
 - Finding severity: {top_severity}
 - Breach detected: {str(breach_detected).lower()}
 - Breach detail: {breach_detail}
+{reg_line}
 
 Rules:
 1. Open with the most alarming finding. Never open with "I hope this finds you well" or "My name is"
@@ -623,6 +660,7 @@ Rules:
 14. Never use dashes or hyphens anywhere. Use commas or periods instead
 15. No bullet points or numbered lists in the body
 16. Short punchy sentences. No sentence over 20 words.
+{reg_rule}
 
 Return ONLY this JSON:
 {{
@@ -691,7 +729,7 @@ async def _openai_email_one(
         first_name=row.get("first_name") or "there",
         company=row.get("company") or row.get("domain", "your company"),
         industry=row.get("industry") or vertical_label,
-        city=row.get("city") or "Canada",
+        city=row.get("city") or "United States",
         domain=row["domain"],
         score=score,
         grade=grade,
@@ -772,7 +810,7 @@ def _sequence_bodies(
         "email_2_body": (
             f"Hi {first_name},\n\n"
             f"Wanted to follow up on the scan I ran on {domain}.\n\n"
-            f"We recently helped a {ind} in Canada with a similar score avoid what their insurer estimated would have been a six-figure breach.\n\n"
+            f"We recently helped a {ind} in the US with a similar score avoid what their insurer estimated would have been a six-figure breach.\n\n"
             f"Still happy to send you the full report if useful.\n\n"
             f"{sender_name}\n"
             "HAWK Security"
@@ -780,7 +818,7 @@ def _sequence_bodies(
         "email_3_subject": _sanitize_no_hyphens(f"{ind} security scores this week"),
         "email_3_body": (
             f"Hi {first_name},\n\n"
-            f"I have been scanning {ind} businesses across Canada this week. The average score in your sector is 68/100. {domain} scored {score}/100.\n\n"
+            f"I have been scanning {ind} businesses across the US this week. The average score in your sector is 68/100. {domain} scored {score}/100.\n\n"
             "Attackers target the weakest businesses first. That gap matters.\n\n"
             "Full report is ready if you want it.\n\n"
             f"{sender_name}\n"
