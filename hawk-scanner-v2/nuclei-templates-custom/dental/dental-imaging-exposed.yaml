@@ -1,0 +1,61 @@
+id: dental-imaging-system-exposed
+
+info:
+  name: Dental Imaging System Exposed Interface
+  author: hawk-scanner
+  severity: critical
+  description: |
+    Detects exposed dental imaging system interfaces (DICOM viewers,
+    Carestream, Dexis, Schick, etc.). These systems contain patient
+    radiographs (PHI) and should never be directly internet-accessible.
+    DICOM services on ports 104 or 11112 are especially dangerous.
+  tags: dental,healthcare,hipaa,dicom,imaging,phi
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/viewer"
+      - "{{BaseURL}}/dicom"
+      - "{{BaseURL}}/imaging"
+      - "{{BaseURL}}/pacs"
+      - "{{BaseURL}}/wado"
+      - "{{BaseURL}}/studies"
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - "DICOM"
+          - "PACS"
+          - "radiology"
+          - "imaging viewer"
+          - "dental image"
+          - "radiograph"
+          - "X-ray"
+          - "panoramic"
+          - "periapical"
+          - "bitewing"
+        condition: or
+        case-insensitive: true
+
+      - type: word
+        words:
+          - "Carestream"
+          - "Dexis"
+          - "Schick"
+          - "Planmeca"
+          - "Vatech"
+          - "Sirona"
+          - "ORTHOPHOS"
+          - "CS Imaging"
+        condition: or
+        case-insensitive: true
+
+      - type: word
+        words:
+          - "application/dicom"
+          - "wadouri"
+          - "wadors"
+        condition: or
+        part: header

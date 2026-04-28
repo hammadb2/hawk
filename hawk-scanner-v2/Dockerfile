@@ -41,9 +41,11 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && python -m playwright install chromium
 COPY app ./app
 COPY scripts ./scripts
+COPY nuclei-templates-custom ./nuclei-templates-custom
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV NUCLEI_CUSTOM_TEMPLATES_DIR=/app/nuclei-templates-custom
 
 EXPOSE 8080
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -7,9 +7,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from app.analysis import email_security, ssl_deep
+from app.analysis import email_security, mfa_detection, ssl_deep
 from app.breach_cost import build_estimate
-from app.integrations import attack_paths, breach_monitoring, exposure_screenshot, github_search, internetdb, nvd_cves, openai_interpret
+from app.compliance.hipaa_2026 import tag_all_findings
+from app.insurance_readiness import compute_insurance_readiness
+from app.integrations import attack_paths, breach_monitoring, exposure_screenshot, github_search, internetdb, nvd_cves, openai_interpret, ransomware_intel, vertical_fingerprint
 from app.models import Finding, ScanResponse
 from app.pipeline.layers import dnstwist, httpx_whatweb, naabu, nuclei, subfinder
 from app.scoring import compute_score
@@ -215,6 +217,7 @@ async def run_scan(
     *,
     scan_id: str | None = None,
     industry: str | None = None,
+    state: str | None = None,
     company_name: str | None = None,
     settings: Settings | None = None,
     trust_level: str = "public",
@@ -344,7 +347,31 @@ async def run_scan(
     raw_layers["nuclei"] = l4_meta
     all_findings.extend(nuc_findings)
 
-    interpreted, paths = await asyncio.gather(
+    # --- Vertical software fingerprinting (dental / legal) ---
+    vert_fs = vertical_fingerprint.fingerprint_from_httpx_whatweb(
+        l3a.get("jsonl") or [], l3b.get("lines") or [], domain
+    )
+    if vert_fs:
+        all_findings.extend(vert_fs)
+    raw_layers["vertical_fingerprint_count"] = len(vert_fs)
+
+    # --- MFA detection on exposed portals ---
+    mfa_fs = mfa_detection.detect_mfa_gaps(l3a.get("jsonl") or [], domain)
+    if mfa_fs:
+        all_findings.extend(mfa_fs)
+    raw_layers["mfa_detection_count"] = len(mfa_fs)
+
+    # --- Ransomware targeting intelligence ---
+    async def _ransomware_block() -> list[dict[str, Any]]:
+        try:
+            return await ransomware_intel.ransomware_targeting_findings(
+                domain, industry, state, all_findings
+            )
+        except Exception:
+            logger.exception("Ransomware intel layer failed")
+            return []
+
+    interpreted, paths, ransom_fs = await asyncio.gather(
         openai_interpret.interpret_findings(all_findings, settings),
         attack_paths.compute_attack_paths(
             domain=domain,
@@ -353,14 +380,24 @@ async def run_scan(
             findings=all_findings,
             settings=settings,
         ),
+        _ransomware_block(),
     )
+    if ransom_fs:
+        all_findings.extend(ransom_fs)
+    raw_layers["ransomware_intel_count"] = len(ransom_fs)
     raw_layers["interpreted_count"] = len(interpreted)
     _merge_interpretations(all_findings, interpreted)
     raw_layers["attack_paths_count"] = len(paths)
 
+    # --- HIPAA 2026 control mapping on all findings ---
+    tag_all_findings(all_findings)
+
     score, grade, mult = compute_score(all_findings, industry, trust_level=trust_level, settings=settings)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)
+
+    # --- Cyber insurance readiness score ---
+    ins_readiness = compute_insurance_readiness(all_findings)
 
     completed = _iso_now()
     findings_models = [Finding.model_validate(f) for f in all_findings]
@@ -381,6 +418,7 @@ async def run_scan(
         interpreted_findings=interpreted,
         breach_cost_estimate=breach_est,
         attack_paths=paths,
+        insurance_readiness=ins_readiness,
     )
 
 
@@ -389,6 +427,7 @@ async def run_scan_fast(
     *,
     scan_id: str | None = None,
     industry: str | None = None,
+    state: str | None = None,
     company_name: str | None = None,
     settings: Settings | None = None,
     trust_level: str = "public",
@@ -490,9 +529,22 @@ async def run_scan_fast(
             }
         )
 
+    # --- MFA detection on exposed portals ---
+    mfa_fs = mfa_detection.detect_mfa_gaps(l3a.get("jsonl") or [], domain)
+    if mfa_fs:
+        all_findings.extend(mfa_fs)
+    raw_layers["mfa_detection_count"] = len(mfa_fs)
+
+    # --- HIPAA 2026 control mapping ---
+    tag_all_findings(all_findings)
+
     score, grade, mult = compute_score(all_findings, industry, trust_level=trust_level, settings=settings)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)
+
+    # --- Cyber insurance readiness score ---
+    ins_readiness = compute_insurance_readiness(all_findings)
+
     completed = _iso_now()
     findings_models = [Finding.model_validate(f) for f in all_findings]
 
@@ -512,6 +564,7 @@ async def run_scan_fast(
         interpreted_findings=[],
         breach_cost_estimate=breach_est,
         attack_paths=[],
+        insurance_readiness=ins_readiness,
     )
 
 
@@ -531,6 +584,7 @@ async def run_dnstwist_only(
     l5 = await dnstwist.run(domain, settings)
     raw_layers: dict[str, Any] = {"dnstwist": l5, "scoring_trust_level": trust_level}
     all_findings = _dnstwist_findings(domain, l5)
+    tag_all_findings(all_findings)
     score, grade, mult = compute_score(all_findings, industry, trust_level=trust_level, settings=settings)
     crit = sum(1 for f in all_findings if (f.get("severity") or "").lower() == "critical")
     breach_est = build_estimate(industry, len(all_findings), crit)

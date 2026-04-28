@@ -1,0 +1,47 @@
+id: legal-document-management-login
+
+info:
+  name: Legal Document Management System Login
+  author: hawk-scanner
+  severity: medium
+  description: |
+    Detects exposed login pages for legal document management systems
+    (NetDocuments, iManage, Worldox, etc.). These systems contain
+    attorney-client privileged documents and confidential case files.
+    Exposure without MFA increases risk of unauthorized access.
+  tags: legal,dms,attorney-client,privilege,login
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/auth"
+      - "{{BaseURL}}/portal"
+      - "{{BaseURL}}/vault"
+      - "{{BaseURL}}/documents"
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - "NetDocuments"
+          - "iManage"
+          - "Worldox"
+          - "document management"
+          - "matter management"
+          - "case management"
+          - "legal document"
+          - "attorney"
+          - "law firm"
+        condition: or
+        case-insensitive: true
+
+      - type: word
+        words:
+          - "netvoyage"
+          - "imanage.com"
+          - "netdocuments.com"
+          - "worldox"
+        condition: or
+        case-insensitive: true
