@@ -1,0 +1,47 @@
+id: dental-patient-portal-login
+
+info:
+  name: Dental Patient Portal Login Page
+  author: hawk-scanner
+  severity: medium
+  description: |
+    Detects exposed dental patient portal login pages. These portals
+    typically handle PHI (Protected Health Information) and should be
+    restricted or monitored for unauthorized access attempts.
+  tags: dental,hipaa,phi,login,healthcare
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/patient-portal"
+      - "{{BaseURL}}/patientportal"
+      - "{{BaseURL}}/patient-login"
+      - "{{BaseURL}}/patient"
+      - "{{BaseURL}}/portal/login"
+      - "{{BaseURL}}/myportal"
+      - "{{BaseURL}}/secure/login"
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - "patient portal"
+          - "patient login"
+          - "patient access"
+          - "my health record"
+          - "medical record"
+          - "dental record"
+          - "appointment"
+          - "health portal"
+        condition: or
+        case-insensitive: true
+
+      - type: word
+        words:
+          - "Dentrix"
+          - "Eaglesoft"
+          - "Open Dental"
+          - "Curve Dental"
+          - "Carestream"
+        condition: or
+        case-insensitive: true

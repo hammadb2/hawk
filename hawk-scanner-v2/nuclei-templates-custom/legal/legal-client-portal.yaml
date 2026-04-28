@@ -1,0 +1,48 @@
+id: legal-client-portal-login
+
+info:
+  name: Legal Client Portal Login Page
+  author: hawk-scanner
+  severity: medium
+  description: |
+    Detects exposed legal practice management client portals (Clio,
+    MyCase, PracticePanther, Smokeball, etc.). Client portals expose
+    case information, billing records, and attorney-client privileged
+    communications.
+  tags: legal,client-portal,attorney-client,privilege,login
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+      - "{{BaseURL}}/client"
+      - "{{BaseURL}}/client-portal"
+      - "{{BaseURL}}/portal"
+      - "{{BaseURL}}/login"
+      - "{{BaseURL}}/secure"
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - "client portal"
+          - "Clio"
+          - "MyCase"
+          - "PracticePanther"
+          - "Smokeball"
+          - "CosmoLex"
+          - "Rocket Matter"
+          - "case status"
+          - "billing portal"
+          - "trust account"
+        condition: or
+        case-insensitive: true
+
+      - type: word
+        words:
+          - "app.clio.com"
+          - "mycase.com"
+          - "practicepanther.com"
+          - "smokeball.com"
+        condition: or
+        case-insensitive: true

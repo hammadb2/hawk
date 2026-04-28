@@ -79,6 +79,7 @@ async def _maybe_supabase_insert(prospect_id: str | None, payload: dict[str, Any
         "interpreted_findings": payload.get("interpreted_findings"),
         "breach_cost_estimate": payload.get("breach_cost_estimate"),
         "attack_paths": payload.get("attack_paths") or [],
+        "insurance_readiness": payload.get("insurance_readiness") or {},
         "external_job_id": payload.get("job_id"),
     }
     async with httpx.AsyncClient(timeout=30.0) as client:

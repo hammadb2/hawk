@@ -55,4 +55,28 @@ async def run(target_urls: list[str], domain: str, settings: Settings) -> tuple[
     rows = tools.parse_jsonl_lines(out)
     findings = _findings_from_jsonl(rows, domain)
     meta = {"tool": "nuclei", "exit_code": code, "raw_count": len(rows), "stderr_tail": err[-800:]}
+
+    # Run custom vertical templates (dental/legal) as second pass
+    custom_dir = (settings.nuclei_custom_templates_dir or "").strip()
+    if custom_dir:
+        custom_argv = [
+            bin_path,
+            "-u",
+            ",".join(target_urls[:nuc_cap]),
+            "-jsonl",
+            "-silent",
+            "-timeout",
+            "6",
+            "-rate-limit",
+            "80",
+            "-templates",
+            custom_dir,
+        ]
+        c2, o2, e2 = await tools.run_tool(custom_argv, timeout=float(settings.layer_timeout_sec) * 1.5)
+        custom_rows = tools.parse_jsonl_lines(o2)
+        findings.extend(_findings_from_jsonl(custom_rows, domain))
+        meta["custom_exit_code"] = c2
+        meta["custom_raw_count"] = len(custom_rows)
+        meta["custom_stderr_tail"] = e2[-400:]
+
     return meta, findings

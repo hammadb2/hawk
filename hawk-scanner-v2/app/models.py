@@ -48,12 +48,14 @@ class ScanResponse(BaseModel):
     interpreted_findings: list[dict] = Field(default_factory=list)
     breach_cost_estimate: dict = Field(default_factory=dict)
     attack_paths: list[dict] = Field(default_factory=list)
+    insurance_readiness: dict = Field(default_factory=dict)
 
 
 class ScanRequest(BaseModel):
     domain: str = Field(..., min_length=1)
     scan_id: str | None = None
     industry: str | None = Field(None, description="Prospect industry for risk multiplier")
+    state: str | None = Field(None, description="Prospect state/province for ransomware targeting intel")
     company_name: str | None = Field(None, description="Display name for narrative features (attack paths)")
     scan_depth: str = Field(
         default="full",

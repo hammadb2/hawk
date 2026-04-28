@@ -53,6 +53,7 @@ class Settings(BaseSettings):
 
     # Nuclei
     nuclei_templates_dir: str = ""  # empty = default template path in image
+    nuclei_custom_templates_dir: str = ""  # additional vertical-specific templates (dental/legal)
 
     # Scoring trust tiers (see app.scoring.compute_score)
     strict_score_floor_public: float = 28.0  # min deduction × mult for anonymous / non-trusted scans

@@ -81,6 +81,7 @@ async def scan_dnstwist_only(req: ScanRequest) -> dict[str, Any]:
 class AsyncScanBody(BaseModel):
     domain: str = Field(..., min_length=1)
     industry: str | None = None
+    state: str | None = None
     company_name: str | None = None
     prospect_id: str | None = Field(None, description="If set + Supabase env, worker inserts crm_prospect_scans")
     scan_id: str | None = None
@@ -144,6 +145,7 @@ async def _sync_scan_body(req: ScanRequest) -> dict[str, Any]:
             req.domain,
             scan_id=req.scan_id,
             industry=req.industry,
+            state=req.state,
             company_name=req.company_name,
             trust_level=trust,
         )
@@ -152,6 +154,7 @@ async def _sync_scan_body(req: ScanRequest) -> dict[str, Any]:
             req.domain,
             scan_id=req.scan_id,
             industry=req.industry,
+            state=req.state,
             company_name=req.company_name,
             trust_level=trust,
         )

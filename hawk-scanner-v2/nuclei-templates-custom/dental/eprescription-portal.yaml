@@ -1,0 +1,47 @@
+id: dental-eprescription-portal
+
+info:
+  name: E-Prescription Portal Exposure
+  author: hawk-scanner
+  severity: high
+  description: |
+    Detects exposed e-prescription or electronic prescribing portals.
+    These systems handle controlled substance prescriptions and are
+    regulated under EPCS (Electronic Prescriptions for Controlled
+    Substances) and HIPAA. Unauthorized access is a federal offense.
+  tags: dental,healthcare,hipaa,epcs,prescription
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/eprescribe"
+      - "{{BaseURL}}/e-prescribe"
+      - "{{BaseURL}}/erx"
+      - "{{BaseURL}}/rx"
+      - "{{BaseURL}}/prescriptions"
+      - "{{BaseURL}}/prescribe"
+      - "{{BaseURL}}/epcs"
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - "e-prescri"
+          - "electronic prescri"
+          - "controlled substance"
+          - "EPCS"
+          - "prescription"
+          - "prescriber"
+          - "DEA number"
+        condition: or
+        case-insensitive: true
+
+      - type: word
+        words:
+          - "DoseSpot"
+          - "NewCrop"
+          - "DrFirst"
+          - "iPrescribe"
+          - "Surescripts"
+        condition: or
+        case-insensitive: true
