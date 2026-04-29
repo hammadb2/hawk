@@ -266,7 +266,7 @@ export function HeroScan() {
             <ul className="divide-y divide-white/5">
               {previewRows.map((row, i) => {
                 const { label, tone } = severityLabel(row.severity);
-                const controls = hipaaControlsFor(row, i);
+                const controls = hipaaControlsFor(row);
                 return (
                   <motion.li
                     key={i}
@@ -505,11 +505,44 @@ function InsuranceReadiness({ value }: { value: number | null }) {
   );
 }
 
-const DEFAULT_HIPAA_CONTROL = "HIPAA §164.312(d) — 2026 Security Rule";
+/**
+ * HIPAA 2026 Security Rule citation mapping.
+ *
+ * Prefers the backend's `hipaa_controls` array when present. When absent, we
+ * derive a citation from the finding text so the "Violates HIPAA §… — 2026
+ * Security Rule" tag always matches what the finding actually describes
+ * (rather than slapping the same citation on every first finding).
+ *
+ * Returns [] when no mapping is confident, so the widget silently omits the
+ * tag instead of making a false compliance claim.
+ */
+const HIPAA_2026_MAP: Array<{ match: RegExp; citation: string }> = [
+  {
+    match: /\b(tls|ssl|cipher|https|cert(?:ificate)?|hsts)\b/i,
+    citation: "HIPAA §164.312(e)(1) — 2026 Security Rule",
+  },
+  {
+    match: /\b(spf|dkim|dmarc|email spoof|mail server)\b/i,
+    citation: "HIPAA §164.312(e)(2)(ii) — 2026 Security Rule",
+  },
+  {
+    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|auth(?:entication)?)\b/i,
+    citation: "HIPAA §164.312(d) — 2026 Security Rule",
+  },
+  {
+    match: /\b(open port|listening|exposed (?:service|admin|rdp|ssh)|unauthoriz(?:ed|ed access))\b/i,
+    citation: "HIPAA §164.312(a)(1) — 2026 Security Rule",
+  },
+  {
+    match: /\b(log|audit|monitoring)\b/i,
+    citation: "HIPAA §164.312(b) — 2026 Security Rule",
+  },
+];
 
-function hipaaControlsFor(row: PublicScanFindingPreview, index: number): string[] {
+function hipaaControlsFor(row: PublicScanFindingPreview): string[] {
   if (row.hipaa_controls && row.hipaa_controls.length > 0) return row.hipaa_controls;
-  return index === 0 ? [DEFAULT_HIPAA_CONTROL] : [];
+  const hit = HIPAA_2026_MAP.find((m) => m.match.test(row.text));
+  return hit ? [hit.citation] : [];
 }
 
 function ScanProgressBar() {
