@@ -12,7 +12,7 @@ Certificate of Protection
 
 Guarantee Reference: HAWK-BRG-2026     Version: 1.0
 
-Issued by: HAWK Security, a division of AKB Company Ltd
+Issued by: HAWK Security
 
 Governing Jurisdiction: The jurisdiction in which the Subscriber operates, as further described in Part VII
 
@@ -26,7 +26,7 @@ Effective Date: Upon execution of HAWK Shield Subscription Agreement
 
 1.1 Recitals
 
-This Breach Response Guarantee (the "Guarantee") is issued by HAWK Security, a division of AKB Company Ltd ("HAWK", "we", "us", or "our") to the subscribing entity ("Subscriber", "you", or "your") upon execution of a valid HAWK Shield Subscription Agreement and payment of all applicable subscription fees.
+This Breach Response Guarantee (the "Guarantee") is issued by HAWK Security ("HAWK", "we", "us", or "our") to the subscribing entity ("Subscriber", "you", or "your") upon execution of a valid HAWK Shield Subscription Agreement and payment of all applicable subscription fees.
 
 This Guarantee is not an insurance policy. HAWK is not a licensed insurer and this Guarantee does not constitute insurance under the insurance laws or regulations of any US state, US federal agency, or any other jurisdiction.
 
@@ -399,7 +399,7 @@ They accept all terms herein as a binding contractual commitment
 
 Subscriber acceptance is recorded electronically via the HAWK portal at the time of onboarding. The acceptance timestamp and IP address are stored permanently in HAWK's systems and constitute a binding electronic signature under the US Electronic Signatures in Global and National Commerce Act (ESIGN, 15 U.S.C. ch. 96) and the Uniform Electronic Transactions Act (UETA) as adopted by the Subscriber's state of operation.
 
-HAWK Security  ·  AKB Studios
+HAWK Security
 
 hello@securedbyhawk.com  ·  securedbyhawk.com  ·  +1 (825) 945-8282
 
