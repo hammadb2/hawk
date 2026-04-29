@@ -497,7 +497,9 @@ function InsuranceReadiness({ value }: { value: number | null }) {
         />
       </div>
       <p className="mt-2 text-xs leading-relaxed text-ink-100">
-        Your current posture will likely increase your cyber insurance premium.
+        {pct >= 80
+          ? "Your posture is strong \u2014 maintain it to keep cyber insurance premiums in check."
+          : "Your current posture will likely increase your cyber insurance premium."}
       </p>
     </div>
   );
