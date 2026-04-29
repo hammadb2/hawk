@@ -26,7 +26,7 @@ from services.openai_chat import chat_text_async
 
 logger = logging.getLogger(__name__)
 
-MST = zoneinfo.ZoneInfo("America/New_York")
+MST = zoneinfo.ZoneInfo("America/Denver")
 SCANNER_URL = os.environ.get("SCANNER_URL", "https://intelligent-rejoicing-production.up.railway.app").rstrip("/")
 APOLLO_BASE = os.environ.get("APOLLO_API_BASE", "https://api.apollo.io/api/v1").rstrip("/")
 # Smartlead is no longer used by Charlotte — dispatch is now via native HAWK

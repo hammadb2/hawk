@@ -30,7 +30,7 @@ from services.mailbox_crypto import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
 
-MST = ZoneInfo("America/New_York")
+MST = ZoneInfo("America/Denver")
 
 DEFAULT_BOUNCE_THRESHOLD = float(os.environ.get("MAILBOX_BOUNCE_THRESHOLD", "0.05"))
 

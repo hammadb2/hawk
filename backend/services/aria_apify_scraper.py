@@ -803,7 +803,7 @@ def _merge_emails(
                 contact_title = str(ap.get("title") or "").strip()
                 phone = str(ap.get("phone") or "").strip()
                 linkedin_url = str(ap.get("linkedin_url") or "").strip()
-                email_finder = "apollo"
+                email_finder = ap.get("source") or "apollo"
 
         if email and "@" in email:
             lead["contact_email"] = email

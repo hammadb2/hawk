@@ -815,7 +815,7 @@ def inbox_health_run(
         # Weekly blacklist check on Mondays
         import zoneinfo
         from datetime import datetime
-        mst = zoneinfo.ZoneInfo("America/New_York")
+        mst = zoneinfo.ZoneInfo("America/Denver")
         include_blacklist = datetime.now(mst).weekday() == 0  # Monday
         return run_inbox_health_check(include_blacklist=include_blacklist)
     except Exception as e:
@@ -847,7 +847,7 @@ def weekly_threat_digest(
 ):
     """
     Phase 2 — Weekly AI threat briefing (OpenAI) per portal client; email + portal.
-    Schedule: Mondays ~12:00 UTC (~7am America/New_York ET). Same secret as other CRM crons.
+    Schedule: Mondays ~14:00 UTC (~7am America/Denver MT). Same secret as other CRM crons.
     """
     _require_secret(x_cron_secret)
     try:

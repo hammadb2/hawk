@@ -85,7 +85,7 @@ if os.environ.get("SENTRY_DSN"):
         pass
 
 
-MST = ZoneInfo("America/New_York")
+MST = ZoneInfo("America/Denver")
 # Dispatch-critical jobs run on US Eastern Time so outbound email lands in
 # prospect business hours. Internal / rep-facing jobs stay on MST (Jamie's TZ).
 ET = ZoneInfo("America/New_York")

@@ -33,7 +33,7 @@ from services.openai_chat import chat_text_async
 
 logger = logging.getLogger(__name__)
 
-MST = zoneinfo.ZoneInfo("America/New_York")
+MST = zoneinfo.ZoneInfo("America/Denver")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 SCANNER_URL = os.environ.get("SCANNER_URL", "https://intelligent-rejoicing-production.up.railway.app").rstrip("/")
 SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.ai/api/v1").rstrip("/")
