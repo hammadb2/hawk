@@ -518,23 +518,23 @@ function InsuranceReadiness({ value }: { value: number | null }) {
  */
 const HIPAA_2026_MAP: Array<{ match: RegExp; citation: string }> = [
   {
-    match: /\b(tls|ssl|cipher|https|cert(?:ificate)?|hsts)\b/i,
+    match: /\b(tls|ssl|cipher|https|cert(?:ificate)?|hsts)/i,
     citation: "HIPAA §164.312(e)(1) — 2026 Security Rule",
   },
   {
-    match: /\b(spf|dkim|dmarc|email spoof|mail server)\b/i,
+    match: /\b(spf|dkim|dmarc|email spoof|mail server)/i,
     citation: "HIPAA §164.312(e)(2)(ii) — 2026 Security Rule",
   },
   {
-    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|auth(?:entication)?)\b/i,
+    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|auth(?:entication)?)/i,
     citation: "HIPAA §164.312(d) — 2026 Security Rule",
   },
   {
-    match: /\b(open port|listening|exposed (?:service|admin|rdp|ssh)|unauthoriz(?:ed|ed access))\b/i,
+    match: /\b(open port|listening|exposed (?:service|admin|rdp|ssh)|unauthoriz(?:ed|ed access))/i,
     citation: "HIPAA §164.312(a)(1) — 2026 Security Rule",
   },
   {
-    match: /\b(log|audit|monitoring)\b/i,
+    match: /\b(log|audit|monitoring)/i,
     citation: "HIPAA §164.312(b) — 2026 Security Rule",
   },
 ];
