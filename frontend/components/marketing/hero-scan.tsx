@@ -526,7 +526,7 @@ const HIPAA_2026_MAP: Array<{ match: RegExp; citation: string }> = [
     citation: "HIPAA §164.312(e)(2)(ii) — 2026 Security Rule",
   },
   {
-    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|auth(?:entication)?)/i,
+    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|authentication|auth\b)/i,
     citation: "HIPAA §164.312(d) — 2026 Security Rule",
   },
   {
