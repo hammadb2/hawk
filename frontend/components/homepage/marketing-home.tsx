@@ -606,7 +606,7 @@ function MarketingFooter() {
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-10 lg:flex-row lg:items-center">
         <div className="flex items-center gap-3">
           <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
-          <p className="text-xs text-ink-200">Built by AKB Studios.</p>
+          <p className="text-xs text-ink-200">Built by Hawk Security.</p>
         </div>
         <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-100">
           <Link href="/privacy" className="transition-colors hover:text-ink-0">

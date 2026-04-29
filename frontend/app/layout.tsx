@@ -41,8 +41,8 @@ export const metadata: Metadata = {
     "breach response guarantee",
     "attack surface management",
   ],
-  authors: [{ name: "AKB Studios" }],
-  creator: "AKB Studios",
+  authors: [{ name: "Hawk Security" }],
+  creator: "Hawk Security",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },

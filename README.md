@@ -2,7 +2,7 @@
 
 B2B cybersecurity SaaS for US SMBs. External attack-surface scans, findings dashboard, Ask HAWK (AI), compliance mapping, and billing.
 
-**Domain:** securedbyhawk.com · **Company:** [AKB Studios](https://akbstudios.com)
+**Domain:** securedbyhawk.com · **Company:** [Hawk Security](https://securedbyhawk.com)
 
 ---
 
@@ -87,7 +87,7 @@ See **backend/.env.example**. Main ones:
 
 - `HAWK_SECRET_KEY` — JWT
 - `DATABASE_URL` — SQLite or PostgreSQL
-- `HAWK_SCANNER_RELAY_URL` — Ghost relay (default 178.104.27.211:8002)
+- `HAWK_SCANNER_RELAY_URL` — Scanner v2 relay URL (Railway deployment)
 - `STRIPE_*` — Billing
 - `OPENAI_API_KEY`, `OPENAI_MODEL` — Ask HAWK, portal AI, ARIA drafts, scanner interpretation (when API hosts those features)
 - `TRANSACTIONAL_EMAIL_WEBHOOK_URL`, `TRANSACTIONAL_EMAIL_API_KEY` — optional relay for welcome / password-reset / digest emails

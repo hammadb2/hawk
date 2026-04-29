@@ -16,4 +16,4 @@ Plans start at $99/month. Built for small and medium businesses.
 US small businesses, accountants, law firms, dental offices, and any SMB handling sensitive customer data under HIPAA, FTC Safeguards Rule, or ABA cyber ethics requirements.
 
 ## Company
-Built by Hawk Security (securedbyhawk.com). Contact: hello@akbstudios.com
+Built by Hawk Security (securedbyhawk.com). Contact: hello@securedbyhawk.com
