@@ -231,7 +231,7 @@ async def _charlotte_email(
     breach_detail: str,
 ) -> dict[str, str] | None:
     prompt = f"""You are Charlotte, an outbound email writer for HAWK Security.
-You write short, high-converting cold emails for Canadian small businesses.
+You write short, high-converting cold emails for US small businesses.
 
 Prospect details:
 - Name: {first_name}
@@ -299,7 +299,7 @@ def _sequence_templates(
         "seq2_body": (
             f"Hi {first_name},\n\n"
             f"Wanted to follow up on the scan I ran on {domain}.\n\n"
-            f"We recently helped a {ind} in Canada with a similar score avoid what their insurer estimated would have been a six-figure breach.\n\n"
+            f"We recently helped a {ind} in the US with a similar score avoid what their insurer estimated would have been a six-figure breach.\n\n"
             f"Still happy to send you the full report if useful.\n\n"
             f"{sender_name}\n"
             "HAWK Security"
@@ -307,7 +307,7 @@ def _sequence_templates(
         "seq3_subject": _sanitize_no_hyphens(f"{ind} security scores this week"),
         "seq3_body": (
             f"Hi {first_name},\n\n"
-            f"I have been scanning {ind} businesses across Canada this week. The average score in your sector is 68/100. {domain} scored {score}/100.\n\n"
+            f"I have been scanning {ind} businesses across the US this week. The average score in your sector is 68/100. {domain} scored {score}/100.\n\n"
             "Attackers target the weakest businesses first. That gap matters.\n\n"
             "Full report is ready if you want it.\n\n"
             f"{sender_name}\n"
@@ -417,7 +417,7 @@ async def _process_row(
                     first_name=first or "there",
                     company=company or domain,
                     industry=industry or "business services",
-                    city=city or "Canada",
+                    city=city or "United States",
                     domain=domain,
                     score=score,
                     grade=grade,

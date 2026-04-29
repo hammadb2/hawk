@@ -96,42 +96,31 @@ def build_playbook_from_deals() -> dict[str, Any]:
     }
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a sales strategist for Hawk Security, a US cybersecurity company "
-                        "serving small US professional practices — dental clinics, law firms, and accounting / CPA firms. "
-                        "Products (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo. "
-                        "Differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), "
-                        "vertical-specific US compliance artifacts (HIPAA risk analysis, FTC Safeguards WISP, ABA Opinion 24-514 workbook). "
-                        "Build a comprehensive sales playbook from the deal data. "
-                        "Return JSON: {\"playbook\": {\"title\": \"...\", \"updated_at\": \"...\", "
-                        "\"ideal_customer_profile\": {\"verticals\": [...], \"company_size\": \"...\", "
-                        "\"decision_maker\": \"...\", \"pain_points\": [...]}, "
-                        "\"winning_patterns\": [{\"pattern\": \"...\", \"frequency\": \"...\"}], "
-                        "\"objection_handlers\": [{\"objection\": \"...\", \"response\": \"...\"}], "
-                        "\"email_templates\": [{\"name\": \"...\", \"subject\": \"...\", \"body\": \"...\"}], "
-                        "\"call_scripts\": [{\"stage\": \"...\", \"script\": \"...\"}], "
-                        "\"kpis\": [{\"metric\": \"...\", \"target\": \"...\"}]}}"
-                    ),
-                },
-                {"role": "user", "content": json.dumps(analysis_data)},
-            ],
-            max_tokens=3000,
-            temperature=0.4,
-        )
-
+        from services.openai_chat import chat_text_sync
         import re
 
-        text = (response.choices[0].message.content or "").strip()
+        text = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a sales strategist for Hawk Security, a US cybersecurity company "
+                "serving small US professional practices — dental clinics, law firms, and accounting / CPA firms. "
+                "Products (USD): HAWK Core $249/mo, HAWK Guard $449/mo, HAWK Sentinel $799/mo. "
+                "Differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), "
+                "vertical-specific US compliance artifacts (HIPAA risk analysis, FTC Safeguards WISP, ABA Opinion 24-514 workbook). "
+                "Build a comprehensive sales playbook from the deal data. "
+                "Return JSON: {\"playbook\": {\"title\": \"...\", \"updated_at\": \"...\", "
+                "\"ideal_customer_profile\": {\"verticals\": [...], \"company_size\": \"...\", "
+                "\"decision_maker\": \"...\", \"pain_points\": [...]}, "
+                "\"winning_patterns\": [{\"pattern\": \"...\", \"frequency\": \"...\"}], "
+                "\"objection_handlers\": [{\"objection\": \"...\", \"response\": \"...\"}], "
+                "\"email_templates\": [{\"name\": \"...\", \"subject\": \"...\", \"body\": \"...\"}], "
+                "\"call_scripts\": [{\"stage\": \"...\", \"script\": \"...\"}], "
+                "\"kpis\": [{\"metric\": \"...\", \"target\": \"...\"}]}}"
+            ),
+            user_messages=[{"role": "user", "content": json.dumps(analysis_data)}],
+            max_tokens=3000,
+        )
+
         m = re.search(r"\{[\s\S]*\}", text)
         if m:
             playbook = json.loads(m.group(0))
@@ -195,29 +184,20 @@ def get_objection_handler(objection: str) -> dict[str, Any]:
             playbook_context = "Known objection handlers:\n" + json.dumps(handlers[:10])
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a sales coach for Hawk Security. "
-                        "Help handle this prospect objection using the playbook context. "
-                        "Be direct and provide a ready-to-use response. "
-                        f"{playbook_context}"
-                    ),
-                },
-                {"role": "user", "content": f"Prospect objection: {objection}"},
-            ],
+        reply = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a sales coach for Hawk Security. "
+                "Help handle this prospect objection using the playbook context. "
+                "Be direct and provide a ready-to-use response. "
+                f"{playbook_context}"
+            ),
+            user_messages=[{"role": "user", "content": f"Prospect objection: {objection}"}],
             max_tokens=500,
-            temperature=0.4,
         )
 
-        return {"response": (response.choices[0].message.content or "").strip()}
+        return {"response": reply}
     except Exception as exc:
         return {"error": str(exc)}

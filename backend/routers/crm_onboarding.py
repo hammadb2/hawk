@@ -832,22 +832,19 @@ def onboarding_chat(body: ChatBody, uid: str = Depends(require_supabase_uid)):
 
     system_prompt = _build_onboarding_system_prompt(name, role, role_type, body.step, body.context or {})
 
-    from openai import OpenAI
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    from services.openai_chat import chat_text_sync
 
-    messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(body.messages)
+    user_messages = list(body.messages)
 
-    model = (OPENAI_MODEL or "gpt-4o").strip() or "gpt-4o"
-    r = client.chat.completions.create(
-        model=model,
-        messages=messages,
+    reply = chat_text_sync(
+        api_key=OPENAI_API_KEY,
+        system=system_prompt,
+        user_messages=user_messages,
         max_tokens=1500,
-        temperature=0.7,
     )
 
     return {
-        "reply": (r.choices[0].message.content or "").strip(),
+        "reply": reply,
     }
 
 

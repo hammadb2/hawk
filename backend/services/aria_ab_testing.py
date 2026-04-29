@@ -118,30 +118,21 @@ def analyze_experiment(experiment_id: str) -> dict[str, Any]:
     # Use AI to analyze results
     if OPENAI_API_KEY:
         try:
-            from openai import OpenAI
-
-            client = OpenAI(api_key=OPENAI_API_KEY)
-            model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an email marketing analyst. Analyze the A/B test data and determine "
-                            "the winner. Return JSON: {\"winner\": \"A\" or \"B\" or \"inconclusive\", "
-                            "\"confidence\": 0.0-1.0, \"reasoning\": \"...\", \"recommendation\": \"...\"}"
-                        ),
-                    },
-                    {"role": "user", "content": json.dumps(experiment)},
-                ],
-                max_tokens=500,
-                temperature=0.2,
-            )
+            from services.openai_chat import chat_text_sync
             import re
 
-            text = (response.choices[0].message.content or "").strip()
+            text = chat_text_sync(
+                api_key=OPENAI_API_KEY,
+                system=(
+                    "You are an email marketing analyst. Analyze the A/B test data and determine "
+                    "the winner. Return JSON: {\"winner\": \"A\" or \"B\" or \"inconclusive\", "
+                    "\"confidence\": 0.0-1.0, \"reasoning\": \"...\", \"recommendation\": \"...\"}"
+                ),
+                user_messages=[{"role": "user", "content": json.dumps(experiment)}],
+                max_tokens=500,
+                task="classify",
+            )
+
             m = re.search(r"\{[\s\S]*\}", text)
             if m:
                 return json.loads(m.group(0))
@@ -177,39 +168,30 @@ def generate_variants(
         return {"error": "OpenAI API key not configured"}
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a cold email optimization expert for Hawk Security, a US cybersecurity company "
-                        "targeting dental clinics, law firms, and accounting practices. "
-                        "Generate an A/B test variant. Return JSON: "
-                        "{\"variant_subject\": \"...\", \"variant_body\": \"...\", \"hypothesis\": \"...\"}"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Original subject: {original_subject}\n"
-                        f"Original body: {original_body}\n"
-                        f"Element to test: {test_element}\n"
-                        "Generate a variant that tests a different approach for this element."
-                    ),
-                },
-            ],
-            max_tokens=800,
-            temperature=0.7,
-        )
+        from services.openai_chat import chat_text_sync
         import re
 
-        text = (response.choices[0].message.content or "").strip()
+        text = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a cold email optimization expert for Hawk Security, a US cybersecurity company "
+                "targeting dental clinics, law firms, and accounting practices. "
+                "Generate an A/B test variant. Return JSON: "
+                "{\"variant_subject\": \"...\", \"variant_body\": \"...\", \"hypothesis\": \"...\"}"
+            ),
+            user_messages=[{
+                "role": "user",
+                "content": (
+                    f"Original subject: {original_subject}\n"
+                    f"Original body: {original_body}\n"
+                    f"Element to test: {test_element}\n"
+                    "Generate a variant that tests a different approach for this element."
+                ),
+            }],
+            max_tokens=800,
+            task="email",
+        )
+
         m = re.search(r"\{[\s\S]*\}", text)
         if m:
             return json.loads(m.group(0))

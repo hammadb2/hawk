@@ -364,8 +364,55 @@ def _reason(exc: Exception | None) -> str:
     return "error"
 
 
+def _openai_fallback_client() -> tuple[OpenAI, str]:
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    return OpenAI(api_key=api_key), default_openai_model()
+
+
+def get_chat_client() -> tuple[OpenAI, str]:
+    """Return an OpenAI-compatible client + model name routed through Ollama.
+
+    For callers that need the full OpenAI client interface (e.g. tool/function
+    calling), this returns a client pointed at the Ollama OpenAI-compatible
+    endpoint when the router is in ``auto`` or ``ollama`` mode.  Falls back
+    to OpenAI when the mode is ``openai`` or when Ollama is unreachable.
+    """
+    mode = _router_mode()
+    if mode == "openai":
+        return _openai_fallback_client()
+
+    # Probe Ollama availability before handing out the client
+    base = _ollama_base_url()
+    auth = _ollama_auth()
+    try:
+        probe = httpx.get(
+            f"{base}/api/tags",
+            auth=auth,
+            timeout=5.0,
+        )
+        if probe.status_code >= 500:
+            raise ConnectionError(f"Ollama returned {probe.status_code}")
+    except Exception as exc:
+        logger.warning("Ollama unreachable (%s), falling back to OpenAI for get_chat_client", exc)
+        return _openai_fallback_client()
+
+    http_client = None
+    if auth:
+        http_client = httpx.Client(auth=auth, timeout=_timeout_s())
+    return (
+        OpenAI(
+            base_url=f"{base}/v1",
+            api_key="ollama",  # Ollama ignores the key but OpenAI client requires one
+            http_client=http_client,
+            timeout=_timeout_s(),
+        ),
+        _primary_model(),
+    )
+
+
 __all__ = [
     "chat_text_sync",
     "chat_text_async",
     "default_openai_model",
+    "get_chat_client",
 ]

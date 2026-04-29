@@ -39,7 +39,7 @@ async def compute_attack_paths(
     ind = (industry or "small business").strip()
 
     prompt = (
-        f"You are a penetration tester analyzing a {ind} business called {org} in Canada. "
+        f"You are a penetration tester analyzing a {ind} business called {org} in the United States. "
         f"Their domain is {domain}. Their security findings are:\n"
         f"{json.dumps(slim, indent=2)}\n\n"
         "Describe the top 3 attack paths an attacker would use to breach this business. "

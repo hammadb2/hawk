@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
-MST = ZoneInfo("America/Edmonton")
+MST = ZoneInfo("America/Denver")
 
 
 async def run_nightly_pipeline_job() -> None:

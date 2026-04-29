@@ -26,7 +26,7 @@ from config import SMARTLEAD_API_KEY, SUPABASE_URL
 
 logger = logging.getLogger(__name__)
 
-MST = zoneinfo.ZoneInfo("America/Edmonton")
+MST = zoneinfo.ZoneInfo("America/Denver")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.ai/api/v1").rstrip("/")
 

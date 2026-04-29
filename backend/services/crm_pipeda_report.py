@@ -1,7 +1,7 @@
-"""2D — PIPEDA-oriented compliance PDF for client portal (WeasyPrint).
+"""Compliance overview PDF for client portal (WeasyPrint).
 
-Phase 4 — Deeper OPC / enforcement framing: complaint pathway, safeguards, breach notification context.
-Not legal advice — educational summary for SMBs.
+Maps HAWK scan findings to US regulatory themes (HIPAA, FTC Safeguards Rule,
+ABA cyber ethics).  Not legal advice — educational summary for SMBs.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ def _findings_list(findings: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _pipeda_risk_for_finding(f: dict[str, Any]) -> tuple[str, str, str]:
-    """Return (principle_label, section_note, regulatory_note)."""
+def _compliance_risk_for_finding(f: dict[str, Any]) -> tuple[str, str, str]:
+    """Return (regulation_label, section_note, enforcement_note)."""
     sev = str(f.get("severity") or "").lower()
     cat = str(f.get("category") or "").lower()
     title = str(f.get("title") or "").lower()
@@ -39,110 +39,110 @@ def _pipeda_risk_for_finding(f: dict[str, Any]) -> tuple[str, str, str]:
 
     if "breach" in blob or "pwn" in blob or "stealer" in blob or "credential" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "Poor safeguards increase the risk of a privacy breach affecting personal information; "
-            "mandatory breach reporting to the OPC and affected individuals may apply under PIPEDA (s. 10.1) when "
-            "a real risk of significant harm exists.",
-            "The OPC investigates complaints; it may recommend compliance steps. Serious or repeated issues can lead "
-            "to Federal Court orders. This document does not assess whether a specific incident is reportable.",
+            "HIPAA §164.312 — Technical Safeguards",
+            "Compromised credentials indicate insufficient access controls; breach notification "
+            "to HHS OCR and affected individuals is required within 60 days for unsecured PHI.",
+            "OCR may impose civil monetary penalties ($100–$50,000+ per violation). "
+            "FTC Safeguards Rule requires similar breach notification within 30 days for financial institutions.",
         )
     if "email" in blob or "dmarc" in blob or "spf" in blob or "phish" in blob or "dkim" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "Email authentication and anti-abuse controls protect personal information in transit and reduce "
-            "impersonation that could expose personal data.",
-            "Weak email controls increase complaint risk if personal information is mishandled; OPC investigations "
-            "often focus on whether safeguards were reasonable in the circumstances.",
+            "HIPAA §164.312(e) — Transmission Security",
+            "Email authentication controls (SPF, DKIM, DMARC) protect data in transit and reduce "
+            "phishing risk that could expose protected health information or client data.",
+            "Weak email security may be cited in OCR investigations or FTC enforcement actions "
+            "as evidence of inadequate technical safeguards.",
         )
     if "ssl" in blob or "tls" in blob or "certificate" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "Encryption in transit is a baseline safeguard when personal information is collected or displayed over the web.",
-            "If interception or disclosure occurs, breach notification and OPC scrutiny may follow depending on facts.",
+            "HIPAA §164.312(e) — Transmission Security",
+            "Encryption in transit is a baseline technical safeguard when collecting or displaying "
+            "sensitive information over the web.",
+            "Missing TLS is a common finding in OCR audits and FTC consent decrees.",
         )
     if "lookalike" in blob or "dnstwist" in blob or "typosquat" in blob:
         return (
-            "Principle 4.3 — Consent & openness",
+            "FTC Act §5 — Unfair/Deceptive Practices",
             "Lookalike domains can be used to trick individuals into disclosing personal information; "
-            "undermines consent and openness expectations.",
-            "Fraud-related complaints may involve law enforcement; OPC may still examine privacy practices if "
-            "personal information is involved.",
+            "brand impersonation undermines consumer trust.",
+            "FTC may pursue enforcement if consumers are harmed; organizations should monitor and "
+            "take down infringing domains promptly.",
         )
     if "internetdb" in blob or "shodan" in blob or "internet-wide" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "Internet-wide exposure signals (e.g. open services, CVE references) suggest attack surface that could "
-            "lead to unauthorized access to systems holding personal information.",
-            "OPC looks at whether security safeguards were proportionate; public exposure increases incident likelihood.",
+            "HIPAA §164.308(a)(1) — Risk Analysis",
+            "Internet-wide exposure signals (open services, CVE references) indicate attack surface "
+            "that could lead to unauthorized access to systems holding sensitive data.",
+            "Regular risk analysis is required; public exposure increases likelihood of OCR scrutiny.",
         )
     if "nvd" in blob or "cve" in blob or "supply" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "Known-vulnerable components or supply-chain signals may indicate delayed patching of systems that "
-            "process personal data.",
-            "Unresolved critical/high technical debt can support an OPC finding of inadequate safeguards if a breach occurs.",
+            "FTC Safeguards Rule §314.4(c) — Safeguards",
+            "Known-vulnerable components or supply-chain signals indicate delayed patching of systems "
+            "that may process customer financial data or PHI.",
+            "Unresolved critical vulnerabilities can support enforcement findings of inadequate safeguards.",
         )
     if "subdomain" in blob or "footprint" in blob or "subfinder" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "A broad external footprint can expand paths to systems that store or transmit personal information.",
-            "Larger attack surfaces raise the bar for monitoring, access control, and vendor oversight.",
+            "HIPAA §164.308(a)(1) — Risk Analysis",
+            "A broad external footprint expands paths to systems storing or transmitting sensitive data.",
+            "Larger attack surfaces raise the bar for access controls, monitoring, and vendor oversight.",
         )
     if "github" in blob or "secret" in blob or "leak" in blob:
         return (
-            "Principle 4.7 — Safeguards",
-            "Secrets or credentials exposed in public repositories can lead to unauthorized access to personal data.",
-            "OPC may examine whether the organization had reasonable policies and technical controls for development.",
+            "FTC Safeguards Rule §314.4(c) — Safeguards",
+            "Secrets or credentials exposed in public repositories can lead to unauthorized access.",
+            "FTC has taken enforcement action against companies that failed to protect credentials.",
         )
     if sev in ("critical", "high"):
         return (
-            "Principle 4.7 — Safeguards",
-            "High-severity technical exposures may indicate that security safeguards for personal information are not "
-            "reasonably strong in the circumstances (PIPEDA s. 10.1 context for breaches is separate).",
-            "Serious incidents can trigger mandatory breach notification; OPC investigations can recommend compliance "
-            "measures and, in some cases, Federal Court enforcement.",
+            "HIPAA §164.312 — Technical Safeguards",
+            "High-severity technical exposures may indicate that security safeguards are not "
+            "reasonably strong for the data being processed.",
+            "Serious incidents can trigger mandatory breach notification; OCR investigations may "
+            "result in corrective action plans or civil monetary penalties.",
         )
     return (
-        "Principles 4.1 & 4.1.2 — Accountability",
-        "Ongoing diligence, documentation, and a clear privacy management program support accountability under PIPEDA.",
-        "PIPEDA is largely complaint-driven; the OPC does not impose GDPR-style administrative fines, but Federal Court "
-        "orders and reputational harm from OPC findings remain material risks.",
+        "General — Security Best Practices",
+        "Ongoing diligence, documentation, and a clear security program support compliance "
+        "across HIPAA, FTC Safeguards Rule, and state breach notification laws.",
+        "All 50 US states have breach notification laws; enforcement varies by state AG office.",
     )
 
 
-def _opc_context_html() -> str:
-    """Static educational block — Office of the Privacy Commissioner of Canada (OPC)."""
+def _regulatory_context_html() -> str:
+    """Static educational block — US regulatory landscape."""
     return """
-<h2>How PIPEDA fits with the Office of the Privacy Commissioner (OPC)</h2>
+<h2>US regulatory landscape for SMBs</h2>
 <p>
-Under Canada’s <em>Personal Information Protection and Electronic Documents Act</em> (PIPEDA), organizations that collect,
-use, or disclose personal information in the course of commercial activities must follow the ten fair information
-principles (Schedule 1), including <strong>accountability</strong> and <strong>safeguards</strong>.
+US businesses that handle sensitive data are subject to multiple federal and state regulations depending on
+their industry:
 </p>
+<ul>
+<li><strong>Healthcare (dental, medical):</strong> The <strong>HIPAA Security Rule</strong> (45 CFR 164)
+requires administrative, physical, and technical safeguards for protected health information (PHI).
+The OCR enforces breach notification within 60 days for unsecured PHI.</li>
+<li><strong>Financial services (accounting, tax):</strong> The <strong>FTC Safeguards Rule</strong>
+(16 CFR 314) requires a written information security program. The May 2024 amendment added 30-day
+breach notification requirements.</li>
+<li><strong>Legal:</strong> <strong>ABA Formal Opinion 2024-3</strong> establishes cyber ethics duties
+under Model Rules 1.1, 1.4, and 1.6 — attorneys must make reasonable efforts to prevent unauthorized
+access to client information.</li>
+</ul>
 <p>
-The <strong>OPC</strong> receives individual complaints, may conduct investigations, publish findings, and seek
-<strong>compliance agreements</strong> or refer matters to the <strong>Federal Court</strong> where appropriate.
-PIPEDA is <strong>not</strong> structured like some foreign regimes with fixed “GDPR-style” administrative fines for
-every breach; outcomes depend on facts, cooperation, and whether the Court is invoked.
+<strong>Breach notification:</strong> All 50 US states have data breach notification laws with varying
+requirements for timing, scope, and reporting. This PDF does not determine whether any finding amounts
+to a reportable breach — that requires a factual incident assessment with qualified counsel.
 </p>
-<p>
-<strong>Breach notification:</strong> Organizations must notify the OPC and affected individuals when a breach of
-security safeguards creates a <strong>real risk of significant harm</strong> (PIPEDA s. 10.1). This PDF does not
-determine whether any finding amounts to a reportable breach — that requires a factual incident assessment.
-</p>
-<p class="smallprint">
-If you operate mainly within a province with substantially similar private-sector legislation (e.g. Alberta, B.C.,
-Quebec), provincial rules may apply instead of or alongside PIPEDA. Confirm with counsel.
-</p>
-<h2>Complaint pathway (simplified)</h2>
+<h2>Enforcement landscape</h2>
 <ol>
-<li>An individual files a complaint with the OPC (or in some cases with the organization first).</li>
-<li>The OPC may investigate, request records, and issue a report with recommendations.</li>
-<li>Unresolved cases may proceed to the Federal Court for orders and, in limited circumstances, penalties under PIPEDA.</li>
+<li>HHS OCR investigates HIPAA complaints and conducts audits; penalties range from $100 to $50,000+ per violation.</li>
+<li>FTC pursues enforcement under Section 5 (unfair/deceptive practices) and the Safeguards Rule; consent decrees are common.</li>
+<li>State attorneys general enforce state breach notification and data protection laws independently.</li>
 </ol>
 <p class="smallprint">
-This summary is for orientation only. For breach notification, contracts, or cross-border transfers, obtain advice
-from a qualified Canadian privacy lawyer.
+This summary is for orientation only. For breach notification, regulatory compliance, or incident response,
+obtain advice from qualified US legal counsel.
 </p>
 """
 
@@ -170,12 +170,13 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
 .footer { margin-top: 20px; font-size: 9px; color: #666; }
 .smallprint { font-size: 9px; color: #444; line-height: 1.35; }
 </style></head><body>""",
-        "<h1>PIPEDA exposure overview</h1>",
+        "<h1>Compliance exposure overview</h1>",
         f'<p><strong>{_escape(company_name)}</strong> · {_escape(domain)}</p>',
         "<div class=\"box\">This document is an <strong>educational summary</strong> based on your latest HAWK external "
-        "scan. It maps technical findings to <em>themes</em> under PIPEDA’s fair information principles. "
-        "<strong>It is not legal advice.</strong> Consult qualified Canadian privacy counsel for compliance, "
-        "breach notification, and OPC or provincial regulator matters.</div>",
+        "scan. It maps technical findings to <em>themes</em> under US regulatory frameworks (HIPAA, FTC Safeguards Rule, "
+        "state breach notification laws). "
+        "<strong>It is not legal advice.</strong> Consult qualified US legal counsel for compliance, "
+        "breach notification, and regulatory matters.</div>",
     ]
 
     if scan:
@@ -186,16 +187,16 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
     else:
         parts.append("<p>No scan on file.</p>")
 
-    parts.append(_opc_context_html())
+    parts.append(_regulatory_context_html())
 
-    parts.append("<h2>Findings mapped to PIPEDA themes</h2>")
+    parts.append("<h2>Findings mapped to regulatory themes</h2>")
     parts.append(
-        "<p class=\"smallprint\">The table links each finding to illustrative PIPEDA principles and regulatory risk "
-        "themes. Severity reflects HAWK’s technical rating, not an OPC or court determination.</p>"
+        "<p class=\"smallprint\">The table links each finding to illustrative regulatory themes and enforcement risk "
+        "context. Severity reflects HAWK's technical rating, not a regulatory determination.</p>"
     )
     parts.append(
-        "<table><thead><tr><th>Finding</th><th>Severity</th><th>PIPEDA principle</th>"
-        "<th>Section / note</th><th>OPC / incident note</th></tr></thead><tbody>"
+        "<table><thead><tr><th>Finding</th><th>Severity</th><th>Regulation</th>"
+        "<th>Section / note</th><th>Enforcement note</th></tr></thead><tbody>"
     )
     crit_high = sum(1 for x in findings if str(x.get("severity") or "").lower() in ("critical", "high"))
     fine_exposure = (
@@ -204,14 +205,14 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
         else f"Elevated — {crit_high} critical/high item(s) in this export; prioritize remediation and document decisions."
     )
     for f in findings[:40]:
-        principle, section, fine = _pipeda_risk_for_finding(f)
+        regulation, section, enforcement = _compliance_risk_for_finding(f)
         parts.append(
             "<tr>"
             f"<td>{_escape(str(f.get('title', '')))}</td>"
             f"<td>{_escape(str(f.get('severity', '')))}</td>"
-            f"<td>{_escape(principle)}</td>"
+            f"<td>{_escape(regulation)}</td>"
             f"<td>{_escape(section)}</td>"
-            f"<td>{_escape(fine)}</td>"
+            f"<td>{_escape(enforcement)}</td>"
             "</tr>"
         )
     if not findings:
@@ -220,24 +221,24 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
         )
     parts.append("</tbody></table>")
 
-    parts.append("<h2>Estimated regulatory / incident exposure</h2>")
+    parts.append("<h2>Estimated regulatory exposure</h2>")
     parts.append(f"<p>{_escape(fine_exposure)}</p>")
     parts.append(
-        "<div class=\"box-warn\"><strong>Note:</strong> PIPEDA enforcement is typically triggered by complaints or "
-        "serious incidents, not by scan scores. Technical risk scores help prioritize fixes; they do not replace "
-        "privacy impact assessments or legal counsel.</div>"
+        "<div class=\"box-warn\"><strong>Note:</strong> Enforcement is typically triggered by breaches, complaints, or "
+        "audits — not by scan scores. Technical risk scores help prioritize fixes; they do not replace "
+        "risk assessments or legal counsel.</div>"
     )
 
     parts.append(
-        "<h2>Remediation priorities (OPC-aligned themes)</h2><ol>"
-        "<li><strong>Safeguards:</strong> Resolve critical and high findings on systems that process personal "
-        "information; document timelines and owners.</li>"
-        "<li><strong>Accountability:</strong> Maintain a simple record of what personal data you hold, where it flows, "
-        "and who is responsible (privacy accountability principle).</li>"
+        "<h2>Remediation priorities</h2><ol>"
+        "<li><strong>Technical safeguards:</strong> Resolve critical and high findings on systems that process "
+        "sensitive data; document timelines and owners.</li>"
+        "<li><strong>Risk analysis:</strong> Maintain a record of what sensitive data you hold, where it flows, "
+        "and who is responsible (required by HIPAA and FTC Safeguards Rule).</li>"
         "<li><strong>Breach readiness:</strong> Keep a short playbook: detect, contain, assess whether notification "
-        "to the OPC and individuals is required (s. 10.1), and preserve evidence.</li>"
-        "<li><strong>Vendor / email:</strong> Review DMARC/SPF/DKIM and email flows where personal data is collected "
-        "from customers or patients.</li>"
+        "is required under applicable federal and state laws, and preserve evidence.</li>"
+        "<li><strong>Email security:</strong> Review DMARC/SPF/DKIM and email flows where sensitive data is collected "
+        "from customers, patients, or clients.</li>"
         "</ol>"
     )
 
@@ -245,15 +246,15 @@ th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eee; vert
         "<h2>What this assessment does not cover</h2>"
         "<ul class=\"smallprint\">"
         "<li>Internal networks, employee devices, or on-prem systems not visible from an external scan.</li>"
-        "<li>Provincial health information laws (e.g. HIA) or sector-specific rules beyond PIPEDA themes.</li>"
-        "<li>Lawfulness of processing, consent wording, or contracts — legal review required.</li>"
+        "<li>State-specific privacy laws (e.g. CCPA, SHIELD Act) beyond general themes.</li>"
+        "<li>Contractual obligations, BAAs, or vendor agreements — legal review required.</li>"
         "</ul>"
     )
 
     parts.append(
-        '<p class="footer">HAWK Security — PIPEDA overview generated from scan data. '
-        "Figures and themes are illustrative; they are not predictions of OPC outcomes, fines, or court penalties. "
-        "For official guidance see the Office of the Privacy Commissioner of Canada (priv.gc.ca).</p></body></html>"
+        '<p class="footer">HAWK Security — compliance overview generated from scan data. '
+        "Figures and themes are illustrative; they are not predictions of regulatory outcomes or penalties. "
+        "For official guidance see HHS.gov (HIPAA), FTC.gov (Safeguards Rule), and your state AG website.</p></body></html>"
     )
     return "\n".join(parts)
 
@@ -262,7 +263,7 @@ def html_to_pdf_bytes(html: str) -> bytes | None:
     try:
         from weasyprint import HTML
     except ImportError:
-        logger.warning("weasyprint not installed — PIPEDA PDF unavailable")
+        logger.warning("weasyprint not installed — compliance PDF unavailable")
         return None
     buf = BytesIO()
     HTML(string=html).write_pdf(buf)

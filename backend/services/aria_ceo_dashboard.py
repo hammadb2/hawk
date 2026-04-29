@@ -170,31 +170,21 @@ def generate_narration(dashboard_data: dict[str, Any]) -> str:
         return _fallback_narration(dashboard_data)
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are ARIA, the CEO's chief of staff at Hawk Security. "
-                        "Narrate the current state of the business in 3-4 concise paragraphs. "
-                        "Lead with the most important metric or trend. "
-                        "Highlight anything that needs immediate attention. "
-                        "Be direct, no fluff. Use numbers. "
-                        "Target: 24 calls/day, healthy clients score > 50."
-                    ),
-                },
-                {"role": "user", "content": json.dumps(dashboard_data)},
-            ],
+        return chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are ARIA, the CEO's chief of staff at Hawk Security. "
+                "Narrate the current state of the business in 3-4 concise paragraphs. "
+                "Lead with the most important metric or trend. "
+                "Highlight anything that needs immediate attention. "
+                "Be direct, no fluff. Use numbers. "
+                "Target: 24 calls/day, healthy clients score > 50."
+            ),
+            user_messages=[{"role": "user", "content": json.dumps(dashboard_data)}],
             max_tokens=800,
-            temperature=0.4,
         )
-        return (response.choices[0].message.content or "").strip()
     except Exception as exc:
         logger.exception("Dashboard narration failed: %s", exc)
         return _fallback_narration(dashboard_data)

@@ -29,21 +29,23 @@ VERTICAL_QUERIES: dict[str, list[str]] = {
     "accounting": ["accounting firm", "CPA firm", "accountant office"],
 }
 
-# Province mapping from Google Places address components
-PROVINCE_MAP: dict[str, str] = {
-    "alberta": "AB",
-    "british columbia": "BC",
-    "manitoba": "MB",
-    "new brunswick": "NB",
-    "newfoundland and labrador": "NL",
-    "nova scotia": "NS",
-    "ontario": "ON",
-    "prince edward island": "PE",
-    "quebec": "QC",
-    "saskatchewan": "SK",
-    "northwest territories": "NT",
-    "nunavut": "NU",
-    "yukon": "YT",
+# US state mapping from Google Places address components (long name → abbreviation).
+# Google Places typically returns 2-letter codes in ``shortText`` but the
+# long-name fallback is needed when the API returns the full state name only.
+STATE_MAP: dict[str, str] = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+    "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
+    "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
+    "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
+    "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
+    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+    "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
+    "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
+    "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV",
+    "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC",
 }
 
 
@@ -59,8 +61,8 @@ def _normalize_domain(raw: str) -> str:
     return d
 
 
-def _extract_province(address_components: list[dict[str, Any]]) -> str:
-    """Extract province abbreviation from Google Places address components."""
+def _extract_state(address_components: list[dict[str, Any]]) -> str:
+    """Extract US state abbreviation from Google Places address components."""
     for comp in address_components:
         types = comp.get("types") or []
         if "administrative_area_level_1" in types:
@@ -68,7 +70,7 @@ def _extract_province(address_components: list[dict[str, Any]]) -> str:
             short_name = comp.get("shortText") or ""
             if short_name and len(short_name) == 2:
                 return short_name.upper()
-            return PROVINCE_MAP.get(long_name, short_name.upper())
+            return STATE_MAP.get(long_name, short_name.upper())
     return ""
 
 
@@ -96,7 +98,7 @@ def _map_place_to_lead(place: dict[str, Any], vertical: str) -> dict[str, Any] |
             city = comp.get("longText") or ""
             break
 
-    province = _extract_province(address_components)
+    province = _extract_state(address_components)
 
     rating = place.get("rating")
     review_count = place.get("userRatingCount")

@@ -115,7 +115,7 @@ def _can_access_prospect(uid: str, prospect_id: str) -> bool:
 
 @router.get("/api/portal/pipeda-report.pdf")
 def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
-    """2D — One-click PIPEDA overview PDF for authenticated portal user."""
+    """2D — One-click compliance overview PDF for authenticated portal user."""
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
@@ -168,7 +168,7 @@ def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="hawk-pipeda-overview.pdf"'},
+        headers={"Content-Disposition": 'attachment; filename="hawk-compliance-overview.pdf"'},
     )
 
 

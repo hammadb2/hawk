@@ -47,12 +47,12 @@ const OBJECTIONS: Record<string, { q: string; a: string }[]> = {
     { q: "Tax season is too busy for this.", a: "That's actually when you're most vulnerable — staff are rushing, phishing emails spike. A quick scan now prevents a crisis during crunch time." },
   ],
   financial: [
-    { q: "We're regulated by IIROC/MFDA.", a: "Regulation requires you to protect client data, but doesn't tell you what's exposed externally. This scan fills that gap." },
+    { q: "We're regulated by the SEC/FINRA.", a: "Regulation requires you to protect client data, but doesn't tell you what's exposed externally. This scan fills that gap." },
     { q: "Our compliance team handles this.", a: "Compliance ensures policy — this scan shows technical reality. We often find gaps between what policy says and what's actually exposed." },
     { q: "Our clients trust us already.", a: "Trust is built on protection. If a breach hits the news, clients leave. This scan helps you verify the trust is warranted." },
   ],
   medical: [
-    { q: "We're PHIPA/PIPEDA compliant.", a: "Compliance is about process. This scan shows technical exposure — open ports, vulnerable services, leaked credentials. Compliance doesn't catch those." },
+    { q: "We're HIPAA compliant.", a: "Compliance is about process. This scan shows technical exposure — open ports, vulnerable services, leaked credentials. Compliance doesn't catch those." },
     { q: "Our EMR vendor handles security.", a: "They secure their platform, but your clinic's domain, email, and network are your responsibility. That's what we check." },
     { q: "We don't store data on our servers.", a: "Your email, patient portal login, and DNS records are still on your domain. If those are compromised, attackers can intercept or redirect patient data." },
   ],

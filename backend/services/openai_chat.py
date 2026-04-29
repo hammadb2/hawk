@@ -8,6 +8,6 @@ module. They keep working unchanged; the router transparently picks Ollama
 
 from __future__ import annotations
 
-from services.llm_router import chat_text_async, chat_text_sync, default_openai_model
+from services.llm_router import chat_text_async, chat_text_sync, default_openai_model, get_chat_client
 
-__all__ = ["chat_text_async", "chat_text_sync", "default_openai_model"]
+__all__ = ["chat_text_async", "chat_text_sync", "default_openai_model", "get_chat_client"]
