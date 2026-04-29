@@ -13,4 +13,4 @@ Allow: /
 User-agent: GoogleOther
 Allow: /
 
-Sitemap: https://hawk.akbstudios.com/sitemap.xml
+Sitemap: https://securedbyhawk.com/sitemap.xml
