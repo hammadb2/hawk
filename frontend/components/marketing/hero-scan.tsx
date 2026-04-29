@@ -120,12 +120,15 @@ export function HeroScan() {
     [email, nd, reportStatus],
   );
 
-  const previewRows: PublicScanFindingPreview[] =
+  const allRows: PublicScanFindingPreview[] =
     result?.findings_preview?.length && result.findings_preview.length > 0
-      ? result.findings_preview.slice(0, 3)
-      : (result?.findings_plain || [])
-          .slice(0, 3)
-          .map((text) => ({ text, severity: "medium" } as PublicScanFindingPreview));
+      ? result.findings_preview
+      : (result?.findings_plain || []).map(
+          (text) => ({ text, severity: "medium" } as PublicScanFindingPreview),
+        );
+  const previewRows = allRows.slice(0, 2);
+  const totalFindings = result?.issues_count ?? result?.findings_count ?? allRows.length;
+  const remainingFindings = Math.max(0, totalFindings - previewRows.length);
 
   const insuranceReadiness =
     typeof result?.insurance_readiness === "number"
@@ -233,26 +236,26 @@ export function HeroScan() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-5 overflow-hidden rounded-2xl border border-white/5 bg-ink-800/55 backdrop-blur-xl"
+            className="mt-5 rounded-2xl border border-white/5 bg-ink-800/55 backdrop-blur-xl"
           >
-            <div className="border-b border-white/5 px-5 py-4">
+            <div className="border-b border-white/5 px-5 py-3.5">
               <div className="flex items-center gap-3">
                 <GradeChip grade={result.grade || "C"} />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-0">{nd}</p>
                   <p className="text-xs text-ink-200">
-                    HAWK score {result.score ?? "n/a"}. {result.issues_count ?? result.findings_count ?? previewRows.length} findings surfaced.
+                    HAWK score {result.score ?? "n/a"}. {totalFindings} findings surfaced.
                   </p>
                 </div>
               </div>
               {(result.score ?? 100) < 80 && (
-                <p className="mt-3 text-xs leading-relaxed text-red">
+                <p className="mt-2 text-xs leading-relaxed text-red">
                   A score below 80 puts your practice at elevated risk of HIPAA enforcement action.
                 </p>
               )}
               <InsuranceReadiness value={insuranceReadiness} />
               {result.ransomware_intel && (
-                <div className="mt-4 rounded-lg border border-red/20 bg-red/5 px-3 py-2.5">
+                <div className="mt-3 rounded-lg border border-red/20 bg-red/5 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-red">
                     Ransomware intel
                   </p>
@@ -273,13 +276,13 @@ export function HeroScan() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: 0.12 * i, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex items-start gap-3 px-5 py-4"
+                    className="flex items-start gap-3 px-4 py-2.5"
                   >
                     <SeverityChip tone={tone} label={label} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm leading-relaxed text-ink-0">{row.text}</p>
+                      <p className="text-sm leading-snug text-ink-0">{row.text}</p>
                       {controls.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {controls.map((c) => (
                             <span
                               key={c}
@@ -295,8 +298,13 @@ export function HeroScan() {
                 );
               })}
             </ul>
+            {remainingFindings > 0 && (
+              <p className="border-t border-white/5 px-5 py-2.5 text-xs text-ink-200">
+                + {remainingFindings} more {remainingFindings === 1 ? "finding" : "findings"} in your full report
+              </p>
+            )}
 
-            <div className="border-t border-white/5 bg-ink-900/60 px-5 py-5">
+            <div className="sticky bottom-0 z-10 rounded-b-2xl border-t border-white/5 bg-ink-900/85 px-5 py-3.5 backdrop-blur-xl">
               {reportStatus === "sent" ? (
                 <div className="flex items-start gap-3">
                   <CheckDot />
@@ -307,7 +315,7 @@ export function HeroScan() {
                 </div>
               ) : (
                 <>
-                  <p className="mb-3 text-xs text-ink-200">
+                  <p className="mb-2 text-xs text-ink-200">
                     No credit card. No sales call. Report in your inbox within 24 hours.
                   </p>
                   <form className="flex flex-col gap-2 sm:flex-row" onSubmit={sendReport}>
@@ -518,23 +526,31 @@ function InsuranceReadiness({ value }: { value: number | null }) {
  */
 const HIPAA_2026_MAP: Array<{ match: RegExp; citation: string }> = [
   {
-    match: /\b(tls|ssl|cipher|https|cert(?:ificate)?|hsts)/i,
+    match: /\bdmarc\b/i,
     citation: "HIPAA §164.312(e)(1) — 2026 Security Rule",
   },
   {
-    match: /\b(spf|dkim|dmarc|email spoof|mail server)/i,
+    match: /\b(spf|dkim)\b/i,
     citation: "HIPAA §164.312(e)(2)(ii) — 2026 Security Rule",
   },
   {
-    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|authentication|auth\b)/i,
+    match: /\b(mfa|multi[- ]?factor|two[- ]?factor|2fa|authentication|auth\b)/i,
     citation: "HIPAA §164.312(d) — 2026 Security Rule",
+  },
+  {
+    match: /\b(credential|password|leaked|stealer|breach|exposed login)/i,
+    citation: "HIPAA §164.312(d) — 2026 Security Rule",
+  },
+  {
+    match: /\b(tls|ssl|cipher|https|cert(?:ificate)?|hsts|http\b)/i,
+    citation: "HIPAA §164.312(e)(1) — 2026 Security Rule",
   },
   {
     match: /\b(open port|listening|exposed (?:service|admin|rdp|ssh)|unauthoriz(?:ed|ed access))/i,
     citation: "HIPAA §164.312(a)(1) — 2026 Security Rule",
   },
   {
-    match: /\b(log(?:s|ged|ging)?|audit(?:s|ed|ing)?|monitoring)\b/i,
+    match: /\b(log(?:s|ged|ging)?|audit(?:s|ed|ing)?|monitoring|siem)\b/i,
     citation: "HIPAA §164.312(b) — 2026 Security Rule",
   },
 ];
