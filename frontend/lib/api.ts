@@ -335,6 +335,8 @@ export interface ScanListItem {
 export interface PublicScanFindingPreview {
   text: string;
   severity: string;
+  /** HIPAA 2026 Security Rule control tags, e.g. ["§164.312(d) — 2026 Security Rule"]. */
+  hipaa_controls?: string[];
 }
 
 export interface PublicScanResult {
@@ -353,6 +355,10 @@ export interface PublicScanResult {
   breach_cost_summary?: string;
   /** Scanner build id e.g. 2.1-fast (from hawk-scanner-v2) */
   scan_version?: string | null;
+  /** Insurance readiness posture, 0–100. Falls back to HAWK score when absent. */
+  insurance_readiness?: number;
+  /** Ransomware threat intel blurb shown in the scan widget when present. */
+  ransomware_intel?: string;
 }
 
 export interface Finding {

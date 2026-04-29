@@ -2,7 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HttpError, marketingApi, scansApi, type PublicScanResult } from "@/lib/api";
+import {
+  HttpError,
+  marketingApi,
+  scansApi,
+  type PublicScanFindingPreview,
+  type PublicScanResult,
+} from "@/lib/api";
 
 type Phase = "idle" | "scanning" | "revealed" | "failed";
 
@@ -114,10 +120,19 @@ export function HeroScan() {
     [email, nd, reportStatus],
   );
 
-  const previewRows =
+  const previewRows: PublicScanFindingPreview[] =
     result?.findings_preview?.length && result.findings_preview.length > 0
       ? result.findings_preview.slice(0, 3)
-      : (result?.findings_plain || []).slice(0, 3).map((text) => ({ text, severity: "medium" }));
+      : (result?.findings_plain || [])
+          .slice(0, 3)
+          .map((text) => ({ text, severity: "medium" } as PublicScanFindingPreview));
+
+  const insuranceReadiness =
+    typeof result?.insurance_readiness === "number"
+      ? result.insurance_readiness
+      : typeof result?.score === "number"
+      ? result.score
+      : null;
 
   return (
     <div className="relative w-full max-w-xl">
@@ -175,7 +190,7 @@ export function HeroScan() {
         </form>
 
         <p className="mt-3 px-2 pb-1 text-xs text-ink-200">
-          Real external probe. No credit card. No sales call. 24 hour report to your inbox on request.
+          In 2025, OCR issued over $6.6M in HIPAA fines — mostly for failures a scan would have caught.
         </p>
       </div>
 
@@ -220,7 +235,7 @@ export function HeroScan() {
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
             className="mt-5 overflow-hidden rounded-2xl border border-white/5 bg-ink-800/55 backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-white/5 px-5 py-4">
+            <div className="border-b border-white/5 px-5 py-4">
               <div className="flex items-center gap-3">
                 <GradeChip grade={result.grade || "C"} />
                 <div className="min-w-0">
@@ -230,14 +245,28 @@ export function HeroScan() {
                   </p>
                 </div>
               </div>
-              <span className="hidden rounded-full bg-ink-700 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-ink-100 sm:inline-flex">
-                Preview
-              </span>
+              {(result.score ?? 100) < 80 && (
+                <p className="mt-3 text-xs leading-relaxed text-red">
+                  A score below 80 puts your practice at elevated risk of HIPAA enforcement action.
+                </p>
+              )}
+              <InsuranceReadiness value={insuranceReadiness} />
+              {result.ransomware_intel && (
+                <div className="mt-4 rounded-lg border border-red/20 bg-red/5 px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-red">
+                    Ransomware intel
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-ink-100">
+                    {result.ransomware_intel}
+                  </p>
+                </div>
+              )}
             </div>
 
             <ul className="divide-y divide-white/5">
               {previewRows.map((row, i) => {
                 const { label, tone } = severityLabel(row.severity);
+                const controls = hipaaControlsFor(row);
                 return (
                   <motion.li
                     key={i}
@@ -247,7 +276,21 @@ export function HeroScan() {
                     className="flex items-start gap-3 px-5 py-4"
                   >
                     <SeverityChip tone={tone} label={label} />
-                    <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink-0">{row.text}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-relaxed text-ink-0">{row.text}</p>
+                      {controls.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {controls.map((c) => (
+                            <span
+                              key={c}
+                              className="inline-flex items-center rounded-md border border-signal/30 bg-signal/10 px-2 py-0.5 text-[10px] font-medium text-signal"
+                            >
+                              Violates {c}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </motion.li>
                 );
               })}
@@ -263,29 +306,34 @@ export function HeroScan() {
                   </p>
                 </div>
               ) : (
-                <form className="flex flex-col gap-2 sm:flex-row" onSubmit={sendReport}>
-                  <label htmlFor="hero-report-email" className="sr-only">
-                    Email address
-                  </label>
-                  <input
-                    id="hero-report-email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    disabled={reportStatus === "sending"}
-                    placeholder="you@yourpractice.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="flex-1 rounded-xl bg-ink-700/80 px-4 py-3 text-sm font-medium text-ink-0 ring-1 ring-inset ring-white/5 placeholder:text-ink-300 focus:outline-none focus:ring-signal/60 disabled:opacity-60"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!email.trim() || reportStatus === "sending"}
-                    className="inline-flex items-center justify-center rounded-xl bg-ink-0 px-5 py-3 text-sm font-semibold text-ink-950 transition-colors hover:bg-ink-50 disabled:opacity-40"
-                  >
-                    {reportStatus === "sending" ? "Queuing" : "Email me the full report"}
-                  </button>
-                </form>
+                <>
+                  <p className="mb-3 text-xs text-ink-200">
+                    No credit card. No sales call. Report in your inbox within 24 hours.
+                  </p>
+                  <form className="flex flex-col gap-2 sm:flex-row" onSubmit={sendReport}>
+                    <label htmlFor="hero-report-email" className="sr-only">
+                      Email address
+                    </label>
+                    <input
+                      id="hero-report-email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      disabled={reportStatus === "sending"}
+                      placeholder="you@yourpractice.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="flex-1 rounded-xl bg-ink-700/80 px-4 py-3 text-sm font-medium text-ink-0 ring-1 ring-inset ring-white/5 placeholder:text-ink-300 focus:outline-none focus:ring-signal/60 disabled:opacity-60"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!email.trim() || reportStatus === "sending"}
+                      className="inline-flex items-center justify-center rounded-xl bg-signal px-5 py-3 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400 disabled:opacity-40"
+                    >
+                      {reportStatus === "sending" ? "Queuing" : "Get my full report \u2014 free"}
+                    </button>
+                  </form>
+                </>
               )}
               {reportStatus === "error" && reportError && (
                 <p className="mt-2 text-xs text-red">{reportError}</p>
@@ -422,6 +470,79 @@ function SeverityChip({ tone, label }: { tone: "hot" | "warm" | "cool"; label: s
       {label}
     </span>
   );
+}
+
+function InsuranceReadiness({ value }: { value: number | null }) {
+  if (value == null) return null;
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-200">
+          Insurance Readiness Score
+        </p>
+        <span className="font-display text-sm font-semibold text-ink-0">{pct}%</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Insurance readiness score"
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-700"
+      >
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-signal-600 via-signal to-signal-200 transition-[width] duration-700"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-ink-100">
+        {pct >= 80
+          ? "Your posture is strong \u2014 maintain it to keep cyber insurance premiums in check."
+          : "Your current posture will likely increase your cyber insurance premium."}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * HIPAA 2026 Security Rule citation mapping.
+ *
+ * Prefers the backend's `hipaa_controls` array when present. When absent, we
+ * derive a citation from the finding text so the "Violates HIPAA §… — 2026
+ * Security Rule" tag always matches what the finding actually describes
+ * (rather than slapping the same citation on every first finding).
+ *
+ * Returns [] when no mapping is confident, so the widget silently omits the
+ * tag instead of making a false compliance claim.
+ */
+const HIPAA_2026_MAP: Array<{ match: RegExp; citation: string }> = [
+  {
+    match: /\b(tls|ssl|cipher|https|cert(?:ificate)?|hsts)/i,
+    citation: "HIPAA §164.312(e)(1) — 2026 Security Rule",
+  },
+  {
+    match: /\b(spf|dkim|dmarc|email spoof|mail server)/i,
+    citation: "HIPAA §164.312(e)(2)(ii) — 2026 Security Rule",
+  },
+  {
+    match: /\b(credential|password|leaked|stealer|breach|mfa|multi[- ]?factor|authentication|auth\b)/i,
+    citation: "HIPAA §164.312(d) — 2026 Security Rule",
+  },
+  {
+    match: /\b(open port|listening|exposed (?:service|admin|rdp|ssh)|unauthoriz(?:ed|ed access))/i,
+    citation: "HIPAA §164.312(a)(1) — 2026 Security Rule",
+  },
+  {
+    match: /\b(log(?:s|ged|ging)?|audit(?:s|ed|ing)?|monitoring)\b/i,
+    citation: "HIPAA §164.312(b) — 2026 Security Rule",
+  },
+];
+
+function hipaaControlsFor(row: PublicScanFindingPreview): string[] {
+  if (row.hipaa_controls && row.hipaa_controls.length > 0) return row.hipaa_controls;
+  const hit = HIPAA_2026_MAP.find((m) => m.match.test(row.text));
+  return hit ? [hit.citation] : [];
 }
 
 function ScanProgressBar() {
