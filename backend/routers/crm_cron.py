@@ -581,7 +581,7 @@ def apollo_miss_to_va_queue(
     Finds prospects at ``stage=scanned, pipeline_status=scanned`` with
     ``contact_email IS NULL`` and flips them to ``pipeline_status=va_queue``
     (stage stays ``scanned``). These are the leads Apollo can't source —
-    typically Canadian SMB long-tail (dental / tax / law shops Apollo doesn't
+    typically SMB long-tail (dental / tax / law shops Apollo doesn't
     index) — so the rolling dispatcher will never send them, but a human VA
     can LinkedIn / phone / website-scrape the contact and dispatch manually.
 
@@ -735,7 +735,7 @@ def nightly_pipeline_run(
     ARIA Unified Nightly Pipeline — runs at 11pm MST:
     Apify 4-actor discovery (Google Maps + LinkedIn + Leads Finder + Website Crawler)
     → Deduplicate → Bulk ZeroBounce → Domain Scan (30 concurrent) →
-    Batched OpenAI (20 per call) → CASL footer + timezone scheduling →
+    Batched OpenAI (20 per call) → CAN-SPAM footer + timezone scheduling →
     Store in aria_lead_inventory as 'ready'.
 
     Replaces the legacy nightly agent run.
@@ -815,7 +815,7 @@ def inbox_health_run(
         # Weekly blacklist check on Mondays
         import zoneinfo
         from datetime import datetime
-        mst = zoneinfo.ZoneInfo("America/Edmonton")
+        mst = zoneinfo.ZoneInfo("America/New_York")
         include_blacklist = datetime.now(mst).weekday() == 0  # Monday
         return run_inbox_health_check(include_blacklist=include_blacklist)
     except Exception as e:
@@ -847,7 +847,7 @@ def weekly_threat_digest(
 ):
     """
     Phase 2 — Weekly AI threat briefing (OpenAI) per portal client; email + portal.
-    Schedule: Mondays ~14:00 UTC (~7am America/Edmonton MST in winter). Same secret as other CRM crons.
+    Schedule: Mondays ~12:00 UTC (~7am America/New_York ET). Same secret as other CRM crons.
     """
     _require_secret(x_cron_secret)
     try:
@@ -989,7 +989,7 @@ def _execute_scheduled_pipeline(action: dict, headers: dict) -> None:
 
     payload = action.get("action_payload", {})
     vertical = payload.get("vertical", "dental")
-    location = payload.get("location", "Canada")
+    location = payload.get("location", "United States")
     batch_size = payload.get("batch_size", 50)
     uid = action.get("triggered_by", "")
 

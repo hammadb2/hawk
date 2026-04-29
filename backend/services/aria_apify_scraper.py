@@ -894,11 +894,25 @@ async def run_full_discovery(
         if actor1_emails.get(lead["domain"]):
             lead["_email_found"] = True
 
-    # Step 4: Apollo contact enrichment for every lead without a website email
+    # Step 4a: Prospeo contact enrichment (primary — faster + cheaper verified emails)
+    from services.prospeo_enrichment import enrich_bulk_domains as prospeo_enrich_leads
+
+    prospeo_results = await prospeo_enrich_leads(all_leads)
+
+    # Mark leads enriched by Prospeo so Apollo skips them
+    for lead in all_leads:
+        domain = (lead.get("domain") or "").strip().lower()
+        if domain in prospeo_results:
+            lead["_email_found"] = True
+
+    # Step 4b: Apollo contact enrichment (fallback for leads Prospeo missed)
     apollo_results = await apollo_enrich_leads(all_leads)
 
+    # Merge Prospeo + Apollo results (Prospeo takes priority)
+    combined_enrichment = {**apollo_results, **prospeo_results}
+
     # Step 5: Merge + sync
-    with_email, without_email = _merge_emails(all_leads, actor1_emails, apollo_results)
+    with_email, without_email = _merge_emails(all_leads, actor1_emails, combined_enrichment)
     for ld in with_email + without_email:
         ld.pop("_email_found", None)
         ld.pop("emails_from_website", None)

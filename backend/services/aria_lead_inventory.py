@@ -33,7 +33,7 @@ from services.openai_chat import chat_text_async
 
 logger = logging.getLogger(__name__)
 
-MST = zoneinfo.ZoneInfo("America/Edmonton")
+MST = zoneinfo.ZoneInfo("America/New_York")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 SCANNER_URL = os.environ.get("SCANNER_URL", "https://intelligent-rejoicing-production.up.railway.app").rstrip("/")
 SMARTLEAD_BASE = os.environ.get("SMARTLEAD_API_BASE", "https://server.smartlead.ai/api/v1").rstrip("/")
@@ -850,12 +850,12 @@ async def run_nightly_pipeline() -> dict[str, Any]:
     # Get cities list
     cities_json = _get_setting(
         "google_places_cities",
-        '["Toronto","Vancouver","Calgary","Edmonton","Ottawa","Montreal","Winnipeg","Halifax","Quebec City","Saskatoon","Regina","Victoria","Kelowna","London","Hamilton","Waterloo","Mississauga","Brampton"]',
+        '["New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Antonio","San Diego","Dallas","Austin","Jacksonville","San Jose","Columbus","Charlotte","Indianapolis","Denver","Seattle","Nashville","Miami","Atlanta"]',
     )
     try:
         cities = json.loads(cities_json)
     except (json.JSONDecodeError, TypeError):
-        cities = ["Toronto", "Vancouver", "Calgary", "Edmonton", "Ottawa"]
+        cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix"]
 
     try:
         # Step 1: Discover leads from Google Places

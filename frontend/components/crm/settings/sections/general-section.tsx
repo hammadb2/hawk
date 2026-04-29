@@ -18,8 +18,8 @@ export function GeneralSection({ value, onChange }: { value: ValueGetter; onChan
       </SettingsCard>
 
       <SettingsCard title="Defaults" description="Used wherever the app needs a location or time.">
-        <Field label="Timezone" hint="IANA tz used by every scheduler (e.g. America/Edmonton).">
-          <TextInput value={value("timezone")} onChange={(v) => onChange("timezone", v)} placeholder="America/Edmonton" />
+        <Field label="Timezone" hint="IANA tz used by every scheduler (e.g. America/New_York).">
+          <TextInput value={value("timezone")} onChange={(v) => onChange("timezone", v)} placeholder="America/New_York" />
         </Field>
       </SettingsCard>
     </>

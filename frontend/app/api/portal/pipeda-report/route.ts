@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/** Proxy PIPEDA PDF from API (portal session cookie → Bearer). */
+/** Proxy compliance PDF from API (portal session cookie → Bearer). */
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -28,7 +28,7 @@ export async function GET() {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="hawk-pipeda-overview.pdf"',
+      "Content-Disposition": 'attachment; filename="hawk-compliance-overview.pdf"',
     },
   });
 }

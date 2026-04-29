@@ -100,34 +100,22 @@ def detect_patterns() -> list[dict[str, Any]]:
     }
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a business intelligence analyst for Hawk Security, a US cybersecurity company serving small US professional practices (dental, legal, accounting / CPA). "
-                        "Analyze the CRM data and identify actionable business patterns. "
-                        "Return valid JSON only: {\"patterns\": [{\"type\": \"...\", \"title\": \"...\", "
-                        "\"description\": \"...\", \"confidence\": 0.0-1.0, \"action\": \"...\"}]}. "
-                        "Types: conversion_trend, churn_risk, engagement_spike, pipeline_bottleneck, "
-                        "vertical_opportunity, seasonal_pattern. Max 5 patterns."
-                    ),
-                },
-                {"role": "user", "content": json.dumps(data_summary)},
-            ],
-            max_tokens=1500,
-            temperature=0.3,
-        )
-
-        text = (response.choices[0].message.content or "").strip()
-        # Parse JSON from response
+        from services.openai_chat import chat_text_sync
         import re
+
+        text = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a business intelligence analyst for Hawk Security, a US cybersecurity company serving small US professional practices (dental, legal, accounting / CPA). "
+                "Analyze the CRM data and identify actionable business patterns. "
+                "Return valid JSON only: {\"patterns\": [{\"type\": \"...\", \"title\": \"...\", "
+                "\"description\": \"...\", \"confidence\": 0.0-1.0, \"action\": \"...\"}]}. "
+                "Types: conversion_trend, churn_risk, engagement_spike, pipeline_bottleneck, "
+                "vertical_opportunity, seasonal_pattern. Max 5 patterns."
+            ),
+            user_messages=[{"role": "user", "content": json.dumps(data_summary)}],
+            max_tokens=1500,
+        )
 
         m = re.search(r"\{[\s\S]*\}", text)
         if m:

@@ -1109,9 +1109,8 @@ Available permissions for this user: {json.dumps(permissions)}"""
 
     available_fns = _filter_functions_for_role(permissions)
 
-    from openai import OpenAI
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    model = (OPENAI_MODEL or "gpt-4o").strip() or "gpt-4o"
+    from services.openai_chat import get_chat_client
+    client, model = get_chat_client()
 
     # First call — may include function calls
     call_kwargs: dict[str, Any] = {

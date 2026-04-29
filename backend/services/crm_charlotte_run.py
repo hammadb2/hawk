@@ -26,7 +26,7 @@ from services.openai_chat import chat_text_async
 
 logger = logging.getLogger(__name__)
 
-MST = zoneinfo.ZoneInfo("America/Edmonton")
+MST = zoneinfo.ZoneInfo("America/New_York")
 SCANNER_URL = os.environ.get("SCANNER_URL", "https://intelligent-rejoicing-production.up.railway.app").rstrip("/")
 APOLLO_BASE = os.environ.get("APOLLO_API_BASE", "https://api.apollo.io/api/v1").rstrip("/")
 # Smartlead is no longer used by Charlotte — dispatch is now via native HAWK
@@ -1113,6 +1113,35 @@ def run_charlotte_daily() -> dict[str, Any]:
         _apollo_bulk_match_emails(client, pulled)
 
     stats["leads_pulled"] = len(pulled)
+
+    # --- Prospeo enrichment for leads Apollo didn't return emails for
+    prospeo_key = os.environ.get("PROSPEO_API_KEY", "").strip()
+    if prospeo_key:
+        no_email = [p for p in pulled if not (p.get("email") or "").strip()]
+        if no_email:
+            from services.prospeo_enrichment import enrich_bulk_domains as _prospeo_bulk
+
+            prospeo_leads = [
+                {
+                    "domain": _normalize_domain(p.get("website") or ""),
+                    "business_name": p.get("company") or "",
+                    "contact_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                }
+                for p in no_email
+                if _normalize_domain(p.get("website") or "")
+            ]
+            prospeo_results = asyncio.run(_prospeo_bulk(prospeo_leads))
+            for p in no_email:
+                dom = _normalize_domain(p.get("website") or "")
+                hit = prospeo_results.get(dom)
+                if hit and hit.get("email"):
+                    p["email"] = hit["email"]
+                    if not p.get("first_name") and hit.get("first_name"):
+                        p["first_name"] = hit["first_name"]
+                    if not p.get("last_name") and hit.get("last_name"):
+                        p["last_name"] = hit["last_name"]
+            logger.info("Charlotte Prospeo enrichment: %d/%d leads got emails",
+                        len(prospeo_results), len(no_email))
 
     # Dedupe by email
     seen: set[str] = set()

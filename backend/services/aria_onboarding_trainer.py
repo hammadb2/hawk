@@ -34,7 +34,7 @@ SCENARIO_TYPES = {
         "title": "Cold Call Simulation",
         "description": "Practice cold calling a dental clinic owner about cybersecurity.",
         "persona": (
-            "You are Dr. Sarah Chen, owner of Bright Smile Dental Clinic in Toronto. "
+            "You are Dr. Sarah Chen, owner of Bright Smile Dental Clinic in Austin, TX. "
             "You have 12 employees and no IT staff. You've heard about cybersecurity "
             "but think it's only for big companies. You're busy and skeptical. "
             "Respond naturally as this persona would."
@@ -160,44 +160,33 @@ def end_training_session(
         return {"error": "OpenAI not configured"}
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
+        from services.openai_chat import chat_text_sync
+        import re
 
         history_text = "\n".join(
             f"{'Trainee' if m.get('role') == 'user' else 'Prospect'}: {m.get('content', '')}"
             for m in conversation_history
         )
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a senior sales coach at Hawk Security. "
-                        "Score the trainee's performance in this roleplay on a scale of 1-100. "
-                        "Return JSON: {\"score\": 0, \"grade\": \"A/B/C/D/F\", "
-                        "\"strengths\": [\"...\"], \"improvements\": [\"...\"], "
-                        "\"overall_feedback\": \"...\"}"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Scenario: {SCENARIO_TYPES.get(scenario_type, {}).get('title', scenario_type)}\n\n"
-                        f"Conversation:\n{history_text}"
-                    ),
-                },
-            ],
+        text = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a senior sales coach at Hawk Security. "
+                "Score the trainee's performance in this roleplay on a scale of 1-100. "
+                "Return JSON: {\"score\": 0, \"grade\": \"A/B/C/D/F\", "
+                "\"strengths\": [\"...\"], \"improvements\": [\"...\"], "
+                "\"overall_feedback\": \"...\"}"
+            ),
+            user_messages=[{
+                "role": "user",
+                "content": (
+                    f"Scenario: {SCENARIO_TYPES.get(scenario_type, {}).get('title', scenario_type)}\n\n"
+                    f"Conversation:\n{history_text}"
+                ),
+            }],
             max_tokens=800,
-            temperature=0.3,
         )
 
-        import re
-
-        text = (response.choices[0].message.content or "").strip()
         m = re.search(r"\{[\s\S]*\}", text)
         if m:
             feedback = json.loads(m.group(0))
@@ -229,38 +218,28 @@ def _generate_response(
     scenario = SCENARIO_TYPES.get(scenario_type, SCENARIO_TYPES["cold_call"])
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        messages: list[dict[str, str]] = [
-            {
-                "role": "system",
-                "content": (
-                    f"{scenario['persona']}\n\n"
-                    "Stay in character at all times. Keep responses natural and conversational. "
-                    "Do not break character or acknowledge you are an AI."
-                ),
-            },
-        ]
+        user_msgs: list[dict[str, str]] = []
 
         for m in conversation_history[-20:]:
             role = m.get("role", "user")
             if role not in ("user", "assistant"):
                 continue
-            messages.append({"role": role, "content": m.get("content", "")})
+            user_msgs.append({"role": role, "content": m.get("content", "")})
 
-        messages.append({"role": "user", "content": user_message})
+        user_msgs.append({"role": "user", "content": user_message})
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
+        return chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                f"{scenario['persona']}\n\n"
+                "Stay in character at all times. Keep responses natural and conversational. "
+                "Do not break character or acknowledge you are an AI."
+            ),
+            user_messages=user_msgs,
             max_tokens=500,
-            temperature=0.7,
         )
-
-        return (response.choices[0].message.content or "").strip()
     except Exception as exc:
         logger.exception("Training response generation failed: %s", exc)
         return "I'm having trouble responding right now. Let's continue in a moment."

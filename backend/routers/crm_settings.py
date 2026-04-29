@@ -77,9 +77,9 @@ DEFAULT_KEYS: dict[str, str] = {
     "sla_scan_concurrency": "3",
     # Pipeline — discovery
     "google_places_cities": (
-        '["Toronto","Vancouver","Calgary","Edmonton","Ottawa","Montreal",'
-        '"Winnipeg","Halifax","Quebec City","Saskatoon","Regina","Victoria",'
-        '"Kelowna","London","Hamilton","Waterloo","Mississauga","Brampton"]'
+        '["New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia",'
+        '"San Antonio","San Diego","Dallas","Austin","Jacksonville","San Jose",'
+        '"Columbus","Charlotte","Indianapolis","Denver","Seattle","Nashville","Miami","Atlanta"]'
     ),
     "google_places_max_per_search": "40",
     "discovery_verticals_enabled": '["dental","legal","accounting"]',
@@ -110,7 +110,7 @@ DEFAULT_KEYS: dict[str, str] = {
     # Branding / general
     "company_name": "HAWK Security",
     "support_email": "support@securedbyhawk.com",
-    "timezone": "America/Edmonton",
+    "timezone": "America/New_York",
 }
 
 

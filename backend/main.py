@@ -85,7 +85,7 @@ if os.environ.get("SENTRY_DSN"):
         pass
 
 
-MST = ZoneInfo("America/Edmonton")
+MST = ZoneInfo("America/New_York")
 # Dispatch-critical jobs run on US Eastern Time so outbound email lands in
 # prospect business hours. Internal / rep-facing jobs stay on MST (Jamie's TZ).
 ET = ZoneInfo("America/New_York")
@@ -151,7 +151,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="HAWK API",
-    description="B2B cybersecurity SaaS for Canadian SMBs — attack surface scans, dashboard, Ask HAWK, billing.",
+    description="B2B cybersecurity SaaS for US SMBs — attack surface scans, dashboard, Ask HAWK, billing.",
     version="1.0.0",
     lifespan=lifespan,
 )

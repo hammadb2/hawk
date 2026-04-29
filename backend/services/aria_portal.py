@@ -173,28 +173,23 @@ def portal_aria_chat(
                     system_prompt += f"\n\n**Current findings on {client_data['domain']}**:\n" + "\n".join(finding_lines)
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        user_messages: list[dict[str, str]] = []
 
         for h in (conversation_history or [])[-10:]:
             role = h.get("role", "user")
             if role in ("user", "assistant"):
-                messages.append({"role": role, "content": h.get("content", "")})
+                user_messages.append({"role": role, "content": h.get("content", "")})
 
-        messages.append({"role": "user", "content": message})
+        user_messages.append({"role": "user", "content": message})
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
+        reply = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=system_prompt,
+            user_messages=user_messages,
             max_tokens=1500,
-            temperature=0.5,
         )
-
-        reply = (response.choices[0].message.content or "").strip()
         return {"reply": reply, "client_id": client_data["client_id"]}
     except Exception as exc:
         logger.exception("Portal ARIA chat failed: %s", exc)

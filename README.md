@@ -1,6 +1,6 @@
 # HAWK
 
-B2B cybersecurity SaaS for Canadian SMBs. External attack-surface scans, findings dashboard, Ask HAWK (AI), compliance mapping, and billing.
+B2B cybersecurity SaaS for US SMBs. External attack-surface scans, findings dashboard, Ask HAWK (AI), compliance mapping, and billing.
 
 **Domain:** securedbyhawk.com · **Company:** [AKB Studios](https://akbstudios.com)
 
@@ -102,7 +102,7 @@ See **backend/.env.example**. Main ones:
 | Plan | Domains | Ask HAWK | PDFs | Notes |
 |------|---------|----------|------|--------|
 | Starter | 1 | unlimited | 1/mo | Weekly scans |
-| Pro | 3 | unlimited | unlimited | Daily, PIPEDA/C-26 |
+| Pro | 3 | unlimited | unlimited | Daily, HIPAA/FTC compliance |
 | Agency | 10 | unlimited | unlimited | White-label, client report, API |
 
 ---

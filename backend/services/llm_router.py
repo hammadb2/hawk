@@ -364,8 +364,39 @@ def _reason(exc: Exception | None) -> str:
     return "error"
 
 
+def get_chat_client() -> tuple[OpenAI, str]:
+    """Return an OpenAI-compatible client + model name routed through Ollama.
+
+    For callers that need the full OpenAI client interface (e.g. tool/function
+    calling), this returns a client pointed at the Ollama OpenAI-compatible
+    endpoint when the router is in ``auto`` or ``ollama`` mode.  Falls back
+    to OpenAI when the mode is ``openai``.
+    """
+    mode = _router_mode()
+    if mode == "openai":
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        return OpenAI(api_key=api_key), default_openai_model()
+
+    # Ollama exposes an OpenAI-compatible API at /v1
+    base = _ollama_base_url()
+    auth = _ollama_auth()
+    http_client = None
+    if auth:
+        http_client = httpx.Client(auth=auth, timeout=_timeout_s())
+    return (
+        OpenAI(
+            base_url=f"{base}/v1",
+            api_key="ollama",  # Ollama ignores the key but OpenAI client requires one
+            http_client=http_client,
+            timeout=_timeout_s(),
+        ),
+        _primary_model(),
+    )
+
+
 __all__ = [
     "chat_text_sync",
     "chat_text_async",
     "default_openai_model",
+    "get_chat_client",
 ]

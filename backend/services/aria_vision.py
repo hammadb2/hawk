@@ -89,34 +89,24 @@ def analyze_document_text(
     }
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are ARIA, the AI operations assistant for Hawk Security. "
-                        "You are analyzing a document. Be concise, professional, and actionable."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"{prompt or type_prompts.get(doc_type, type_prompts['general'])}\n\n"
-                        f"Document content:\n{text_content[:15000]}"
-                    ),
-                },
-            ],
+        analysis = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are ARIA, the AI operations assistant for Hawk Security. "
+                "You are analyzing a document. Be concise, professional, and actionable."
+            ),
+            user_messages=[{
+                "role": "user",
+                "content": (
+                    f"{prompt or type_prompts.get(doc_type, type_prompts['general'])}\n\n"
+                    f"Document content:\n{text_content[:15000]}"
+                ),
+            }],
             max_tokens=2000,
-            temperature=0.3,
+            task="reasoning",
         )
-
-        analysis = (response.choices[0].message.content or "").strip()
         return {"analysis": analysis, "doc_type": doc_type}
     except Exception as exc:
         logger.exception("Document analysis failed: %s", exc)

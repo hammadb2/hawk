@@ -172,28 +172,19 @@ def api_chat(
         raise HTTPException(status_code=503, detail="OpenAI not configured")
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=openai_key)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are ARIA, the AI assistant for Hawk Security accessed via external API. "
-                        "Be concise and helpful. This is an API integration, not the internal CRM chat."
-                    ),
-                },
-                {"role": "user", "content": body.message},
-            ],
+        reply = chat_text_sync(
+            api_key=openai_key,
+            system=(
+                "You are ARIA, the AI assistant for Hawk Security accessed via external API. "
+                "Be concise and helpful. This is an API integration, not the internal CRM chat."
+            ),
+            user_messages=[{"role": "user", "content": body.message}],
             max_tokens=1000,
-            temperature=0.5,
         )
 
-        return {"reply": (response.choices[0].message.content or "").strip()}
+        return {"reply": reply}
     except Exception as exc:
         logger.exception("API chat failed: %s", exc)
         raise HTTPException(status_code=500, detail="Chat request failed")

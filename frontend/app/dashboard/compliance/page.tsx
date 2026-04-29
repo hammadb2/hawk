@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-const PIPEDA_ITEMS = [
-  { section: "4.7", title: "Safeguards", summary: "Security safeguards to protect personal information. HAWK findings (e.g. SSL, headers, DNS) help show technical safeguards." },
-  { section: "4.1.3", title: "Accuracy", summary: "Reasonable steps to ensure accuracy. Secure channels (HTTPS, valid certs) support data integrity." },
+const HIPAA_ITEMS = [
+  { section: "164.312", title: "Technical Safeguards", summary: "Access controls, audit controls, integrity controls, and transmission security. HAWK findings (SSL/TLS, open ports, headers) map directly to technical safeguards." },
+  { section: "164.308", title: "Administrative Safeguards", summary: "Security management, risk analysis, contingency planning. HAWK score helps document your risk posture." },
 ];
 
-const BILL_C26_ITEMS = [
-  { section: "S.7", title: "Cybersecurity obligations", summary: "Operators of critical systems must protect and report. HAWK surfaces external exposure (ports, TLS, headers) relevant to baseline security." },
+const FTC_ITEMS = [
+  { section: "314.4(c)", title: "Information Security Program", summary: "Encryption of customer data in transit and at rest. HAWK validates TLS, HTTPS enforcement, and HSTS." },
+  { section: "314.4(d)", title: "Monitoring & Testing", summary: "Regularly test your safeguards. HAWK provides continuous external attack surface monitoring." },
 ];
 
 const NIST_MAP = [
@@ -29,13 +30,13 @@ export default function DashboardCompliancePage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Compliance</h1>
-          <p className="text-text-secondary mt-1">PIPEDA, Bill C-26, and NIST mapping (Pro & Agency).</p>
+          <p className="text-text-secondary mt-1">HIPAA, FTC Safeguards Rule, and NIST mapping (Pro & Agency).</p>
         </div>
         <Card>
           <CardHeader>
             <CardTitle>Upgrade to Pro</CardTitle>
             <CardDescription>
-              Compliance mapping (PIPEDA 4.7, Bill C-26 S.7, NIST) is included in Pro and Agency plans.
+              Compliance mapping (HIPAA, FTC Safeguards Rule, NIST) is included in Pro and Agency plans.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -52,16 +53,16 @@ export default function DashboardCompliancePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Compliance</h1>
-        <p className="text-text-secondary mt-1">How HAWK findings map to PIPEDA, Bill C-26, and NIST.</p>
+        <p className="text-text-secondary mt-1">How HAWK findings map to HIPAA, FTC Safeguards Rule, and NIST.</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>PIPEDA (Personal Information Protection)</CardTitle>
-          <CardDescription>Relevant principles and how HAWK helps.</CardDescription>
+          <CardTitle>HIPAA Security Rule (Healthcare)</CardTitle>
+          <CardDescription>Technical and administrative safeguards for protected health information.</CardDescription>
         </CardHeader>
         <CardContent className="pt-0 space-y-4">
-          {PIPEDA_ITEMS.map((item) => (
+          {HIPAA_ITEMS.map((item) => (
             <div key={item.section} className="border-b border-surface-3 pb-4 last:border-0 last:pb-0">
               <p className="font-semibold text-text-primary">§{item.section} — {item.title}</p>
               <p className="text-sm text-text-secondary mt-1">{item.summary}</p>
@@ -72,11 +73,11 @@ export default function DashboardCompliancePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Bill C-26 (Critical Cyber Systems)</CardTitle>
-          <CardDescription>Cybersecurity obligations for designated operators.</CardDescription>
+          <CardTitle>FTC Safeguards Rule (Financial Services)</CardTitle>
+          <CardDescription>Information security requirements for financial institutions.</CardDescription>
         </CardHeader>
         <CardContent className="pt-0 space-y-4">
-          {BILL_C26_ITEMS.map((item) => (
+          {FTC_ITEMS.map((item) => (
             <div key={item.section} className="border-b border-surface-3 pb-4 last:border-0 last:pb-0">
               <p className="font-semibold text-text-primary">{item.section} — {item.title}</p>
               <p className="text-sm text-text-secondary mt-1">{item.summary}</p>

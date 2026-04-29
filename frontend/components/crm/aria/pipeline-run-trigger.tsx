@@ -17,7 +17,7 @@ const VERTICALS = [
 
 export function PipelineRunTrigger({ accessToken, onRunStarted }: Props) {
   const [vertical, setVertical] = useState("dental");
-  const [location, setLocation] = useState("Canada");
+  const [location, setLocation] = useState("United States");
   const [batchSize, setBatchSize] = useState(50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export function PipelineRunTrigger({ accessToken, onRunStarted }: Props) {
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Ontario, Canada"
+            placeholder="e.g. Texas, United States"
             className={`w-full px-3 py-2 text-sm focus:border-signal/50 focus:outline-none ${crmFieldSurface}`}
           />
         </div>

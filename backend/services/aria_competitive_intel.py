@@ -44,38 +44,27 @@ def research_competitors(query: str | None = None) -> dict[str, Any]:
     )
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a competitive intelligence analyst for Hawk Security, a US cybersecurity company. "
-                        "Hawk targets US dental clinics, law firms, and accounting / CPA practices with three tiers (USD): "
-                        "HAWK Core ($249/mo), HAWK Guard ($449/mo), HAWK Sentinel ($799/mo). "
-                        "Key differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), "
-                        "US compliance artifacts (HIPAA / FTC Safeguards WISP / ABA Opinion 24-514 workbook). "
-                        "Analyze the competitive landscape and provide actionable intelligence. "
-                        "Return JSON: {\"competitors\": [{\"name\": \"...\", \"url\": \"...\", \"pricing\": \"...\", "
-                        "\"strengths\": [\"...\"], \"weaknesses\": [\"...\"]}], "
-                        "\"market_trends\": [\"...\"], \"opportunities\": [\"...\"], \"threats\": [\"...\"], "
-                        "\"recommendation\": \"...\"}"
-                    ),
-                },
-                {"role": "user", "content": query or default_query},
-            ],
-            max_tokens=2000,
-            temperature=0.3,
-        )
-
+        from services.openai_chat import chat_text_sync
         import re
 
-        text = (response.choices[0].message.content or "").strip()
+        text = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a competitive intelligence analyst for Hawk Security, a US cybersecurity company. "
+                "Hawk targets US dental clinics, law firms, and accounting / CPA practices with three tiers (USD): "
+                "HAWK Core ($249/mo), HAWK Guard ($449/mo), HAWK Sentinel ($799/mo). "
+                "Key differentiators: HAWK Certified badge, Breach Response Guarantee ($250k / $1M / $2.5M by tier), "
+                "US compliance artifacts (HIPAA / FTC Safeguards WISP / ABA Opinion 24-514 workbook). "
+                "Analyze the competitive landscape and provide actionable intelligence. "
+                "Return JSON: {\"competitors\": [{\"name\": \"...\", \"url\": \"...\", \"pricing\": \"...\", "
+                "\"strengths\": [\"...\"], \"weaknesses\": [\"...\"]}], "
+                "\"market_trends\": [\"...\"], \"opportunities\": [\"...\"], \"threats\": [\"...\"], "
+                "\"recommendation\": \"...\"}"
+            ),
+            user_messages=[{"role": "user", "content": query or default_query}],
+            max_tokens=2000,
+        )
+
         m = re.search(r"\{[\s\S]*\}", text)
         if m:
             return json.loads(m.group(0))
@@ -91,23 +80,18 @@ def analyze_competitor_pricing(vertical: str = "dental") -> dict[str, Any]:
         return {"error": "OpenAI API key not configured"}
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
+        import re
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a pricing strategy analyst for Hawk Security. "
-                        "Return JSON: {\"vertical\": \"...\", \"hawk_position\": \"...\", "
-                        "\"competitor_range\": {\"low\": 0, \"mid\": 0, \"high\": 0}, "
-                        "\"recommendation\": \"...\", \"talking_points\": [\"...\"]}"
-                    ),
-                },
+        pricing_text = chat_text_sync(
+            api_key=OPENAI_API_KEY,
+            system=(
+                "You are a pricing strategy analyst for Hawk Security. "
+                "Return JSON: {\"vertical\": \"...\", \"hawk_position\": \"...\", "
+                "\"competitor_range\": {\"low\": 0, \"mid\": 0, \"high\": 0}, "
+                "\"recommendation\": \"...\", \"talking_points\": [\"...\"]}"
+            ),
+            user_messages=[
                 {
                     "role": "user",
                     "content": (
@@ -118,16 +102,12 @@ def analyze_competitor_pricing(vertical: str = "dental") -> dict[str, Any]:
                 },
             ],
             max_tokens=1000,
-            temperature=0.3,
         )
 
-        import re
-
-        text = (response.choices[0].message.content or "").strip()
-        m = re.search(r"\{[\s\S]*\}", text)
+        m = re.search(r"\{[\s\S]*\}", pricing_text)
         if m:
             return json.loads(m.group(0))
-        return {"raw_analysis": text}
+        return {"raw_analysis": pricing_text}
     except Exception as exc:
         logger.exception("Pricing analysis failed: %s", exc)
         return {"error": str(exc)}

@@ -536,7 +536,7 @@ function PortalHomeContent() {
           { href: "/portal/attack-paths", label: "Attack paths", sub: "Breach scenarios" },
           { href: "/portal/enterprise", label: "Enterprise", sub: "Multi-domain rollup" },
           { href: "/portal/attacker-simulation", label: "Attacker sim", sub: "Weekly narrative" },
-          { href: "/portal/compliance", label: "C-27 primer", sub: "Canada privacy reform" },
+          { href: "/portal/compliance", label: "Compliance primer", sub: "US privacy regulations" },
           { href: "/portal/billing", label: "Billing", sub: "Subscription & invoices" },
           { href: "/portal/settings", label: "Settings", sub: "Account & domain" },
         ].map((x) => (
@@ -596,8 +596,8 @@ function PortalHomeContent() {
         <div className="rounded-xl border border-white/10 bg-ink-900 p-4">
           <h2 className="text-sm font-semibold text-ink-0">Reports</h2>
           <p className="mt-2 text-sm text-ink-200">
-            PIPEDA-oriented overview from your latest scan: which issues map to privacy duties, rough risk framing, and
-            remediation themes.
+            Compliance overview from your latest scan: which issues map to regulatory duties (HIPAA, FTC Safeguards Rule),
+            risk framing, and remediation themes.
           </p>
           <Button
             type="button"
@@ -605,7 +605,7 @@ function PortalHomeContent() {
             disabled={pipedaBusy || !scan}
             onClick={() => void downloadPipedaPdf()}
           >
-            {pipedaBusy ? "Preparing PDF…" : "Download PIPEDA overview (PDF)"}
+            {pipedaBusy ? "Preparing PDF…" : "Download compliance overview (PDF)"}
           </Button>
           {!scan && (
             <p className="mt-2 text-xs text-ink-0">Run or complete a scan first — then this button enables.</p>

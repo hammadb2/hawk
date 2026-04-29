@@ -152,33 +152,23 @@ def _draft_reply(from_phone: str, text: str) -> None:
         return
 
     try:
-        from openai import OpenAI
+        from services.openai_chat import chat_text_sync
 
-        client = OpenAI(api_key=openai_key)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are ARIA, the WhatsApp assistant for Hawk Security. "
-                        "Keep responses concise (under 300 characters when possible). "
-                        "Be helpful, professional, and direct. "
-                        "If the message is about security services, mention our tiers: "
-                        "Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo. "
-                        "For booking calls, share the Cal.com link. "
-                        "For urgent security issues, recommend calling directly."
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
+        reply = chat_text_sync(
+            api_key=openai_key,
+            system=(
+                "You are ARIA, the WhatsApp assistant for Hawk Security. "
+                "Keep responses concise (under 300 characters when possible). "
+                "Be helpful, professional, and direct. "
+                "If the message is about security services, mention our tiers: "
+                "Starter $199/mo, Shield $997/mo, Enterprise $2,500/mo. "
+                "For booking calls, share the Cal.com link. "
+                "For urgent security issues, recommend calling directly."
+            ),
+            user_messages=[{"role": "user", "content": text}],
             max_tokens=300,
-            temperature=0.5,
+            task="short",
         )
-
-        reply = (response.choices[0].message.content or "").strip()
         if reply:
             # Store drafted reply for approval
             if SUPABASE_URL and SERVICE_KEY:

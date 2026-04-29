@@ -86,6 +86,7 @@ SMARTLEAD_API_KEY = os.environ.get("SMARTLEAD_API_KEY", "")
 
 # ARIA Pipeline — outbound automation API keys
 APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "").strip()
+PROSPEO_API_KEY = os.environ.get("PROSPEO_API_KEY", "").strip()
 CLAY_API_KEY = os.environ.get("CLAY_API_KEY", "").strip()
 ZEROBOUNCE_API_KEY = os.environ.get("ZEROBOUNCE_API_KEY", "").strip()
 
