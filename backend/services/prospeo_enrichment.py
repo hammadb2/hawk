@@ -98,7 +98,7 @@ def _upsert_setting(key: str, value: str) -> None:
         logger.warning("prospeo upsert setting %s failed: %s", key, exc)
 
 
-def _increment_credits(n: int) -> None:
+def _increment_credits_sync(n: int) -> None:
     if n <= 0:
         return
     today = date.today().isoformat()
@@ -109,6 +109,11 @@ def _increment_credits(n: int) -> None:
     else:
         current = int(_fetch_setting("prospeo_credits_used_today", "0") or 0)
         _upsert_setting("prospeo_credits_used_today", str(current + n))
+
+
+async def _increment_credits(n: int) -> None:
+    """Run credit tracking off the event loop to avoid blocking async callers."""
+    await asyncio.to_thread(_increment_credits_sync, n)
 
 
 # ── Search Person by domain ──────────────────────────────────────────────
@@ -167,7 +172,7 @@ async def _search_persons_by_domain(
                     return []
                 continue
 
-            _increment_credits(1)
+            await _increment_credits(1)
             results = body.get("results") or []
             persons = [
                 r.get("person", {})
@@ -272,7 +277,7 @@ async def _enrich_by_name(
     body = r.json()
     if body.get("error"):
         return None
-    _increment_credits(body.get("total_cost", 1))
+    await _increment_credits(body.get("total_cost", 1))
     return _extract_contact(body)
 
 
@@ -295,7 +300,7 @@ async def _enrich_by_person_id(
     body = r.json()
     if body.get("error"):
         return None
-    _increment_credits(body.get("total_cost", 1))
+    await _increment_credits(body.get("total_cost", 1))
     return _extract_contact(body)
 
 
