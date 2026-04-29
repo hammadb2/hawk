@@ -78,7 +78,10 @@ function MarketingNav() {
     <header className="sticky top-0 z-40 border-b border-white/5 bg-ink-950/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8">
         <Link href="/" className="group inline-flex items-center" title="HAWK">
-          <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
+          <picture>
+            <source srcSet="/hawk-logo.webp" type="image/webp" />
+            <img src="/hawk-logo-400.png" alt="HAWK" width={80} height={40} className="h-10 w-auto" />
+          </picture>
         </Link>
         <div className="flex items-center gap-2">
           <a
@@ -676,7 +679,10 @@ function MarketingFooter() {
     <footer className="relative border-t border-white/5 bg-ink-950 px-6 py-14 sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-10 lg:flex-row lg:items-center">
         <div className="flex items-center gap-3">
-          <img src="/hawk-logo.png" alt="HAWK" className="h-10 w-auto" />
+          <picture>
+            <source srcSet="/hawk-logo.webp" type="image/webp" />
+            <img src="/hawk-logo-400.png" alt="HAWK" width={80} height={40} className="h-10 w-auto" />
+          </picture>
           <p className="text-xs text-ink-200">HAWK Security</p>
         </div>
         <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-100">
