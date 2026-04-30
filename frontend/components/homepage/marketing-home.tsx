@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { HeroScan } from "@/components/marketing/hero-scan";
 import { SmoothScroll } from "@/components/marketing/smooth-scroll";
@@ -45,35 +44,7 @@ export function MarketingHome() {
 
 /* ============================== NAV ============================== */
 
-const NAV_LINKS: Array<{ href: string; label: string; external?: boolean }> = [
-  { href: "#regulatory", label: "Regulatory" },
-  { href: "#how", label: "How it works" },
-  { href: "#guarantee", label: "Guarantee" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#certified", label: "Certification" },
-  { href: "/portal/login", label: "Log in", external: true },
-];
-
 function MarketingNav() {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onClick);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onClick);
-    };
-  }, [open]);
-
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-ink-950/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8">
@@ -83,79 +54,12 @@ function MarketingNav() {
             <img src="/hawk-logo-400.png" alt="HAWK" width={80} height={40} className="h-10 w-auto" />
           </picture>
         </Link>
-        <div className="flex items-center gap-2">
-          <a
-            href="#scan"
-            className="inline-flex items-center gap-1.5 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
-          >
-            Free scan
-          </a>
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              aria-label="Open menu"
-              aria-haspopup="true"
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-ink-900/60 text-ink-0 transition-colors hover:border-white/25"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                {open ? (
-                  <>
-                    <path d="M18 6L6 18" />
-                    <path d="M6 6l12 12" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M4 7h16" />
-                    <path d="M4 12h16" />
-                    <path d="M4 17h16" />
-                  </>
-                )}
-              </svg>
-            </button>
-            {open && (
-              <div
-                role="menu"
-                className="absolute right-0 top-12 w-56 overflow-hidden rounded-xl border border-white/10 bg-ink-900/95 shadow-ink backdrop-blur"
-              >
-                <nav className="flex flex-col py-2">
-                  {NAV_LINKS.map((l) =>
-                    l.external ? (
-                      <Link
-                        key={l.href}
-                        href={l.href}
-                        onClick={() => setOpen(false)}
-                        className="px-4 py-2.5 text-sm text-ink-100 transition-colors hover:bg-white/5 hover:text-ink-0"
-                      >
-                        {l.label}
-                      </Link>
-                    ) : (
-                      <a
-                        key={l.href}
-                        href={l.href}
-                        onClick={() => setOpen(false)}
-                        className="px-4 py-2.5 text-sm text-ink-100 transition-colors hover:bg-white/5 hover:text-ink-0"
-                      >
-                        {l.label}
-                      </a>
-                    ),
-                  )}
-                </nav>
-              </div>
-            )}
-          </div>
-        </div>
+        <a
+          href="#scan"
+          className="inline-flex items-center gap-1.5 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
+        >
+          Free scan
+        </a>
       </div>
     </header>
   );
