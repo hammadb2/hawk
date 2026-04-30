@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { portalApi } from "@/lib/api";
 import { needsCompanyDomainForMonitoring } from "@/lib/portal-domain";
 import { Button } from "@/components/ui/button";
+import { IncidentReportCard } from "@/components/portal/incident-report-card";
 import { Input } from "@/components/ui/input";
 
 type Finding = {
@@ -470,6 +471,10 @@ export default function PortalWelcomePage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="border-t border-white/10 pt-8">
+        <IncidentReportCard />
       </section>
 
       <section className="flex flex-col items-center gap-3 border-t border-white/10 pt-8 text-center">

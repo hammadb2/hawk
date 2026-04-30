@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from routers.crm_auth import require_supabase_uid_and_email
 from services.portal_bootstrap import bootstrap_portal_account
 from services.portal_first_login import mark_first_portal_login
+from services.portal_incident_report import report_incident
 from services.portal_primary_domain import set_portal_primary_domain
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -15,6 +16,10 @@ router = APIRouter(prefix="/api/portal", tags=["portal"])
 
 class PrimaryDomainBody(BaseModel):
     domain: str = Field(..., min_length=3, max_length=253)
+
+
+class IncidentReportBody(BaseModel):
+    description: str = Field(default="", max_length=4000)
 
 
 @router.post("/bootstrap")
@@ -45,3 +50,20 @@ def post_mark_first_login_seen(auth: tuple[str, str] = Depends(require_supabase_
     """
     uid, _email = auth
     return mark_first_portal_login(uid)
+
+
+@router.post("/incident-report")
+def post_incident_report(
+    body: IncidentReportBody,
+    auth: tuple[str, str] = Depends(require_supabase_uid_and_email),
+):
+    """Client-initiated incident / breach report (priority list #34).
+
+    Logs a row in ``client_incident_reports`` with an SLA clock,
+    SMS-pages the CEO via OpenPhone, emails the client a confirmation
+    via Resend, and mirrors the event into ``crm_support_tickets`` for
+    internal ops. Each fan-out step is best-effort — the incident is
+    still persisted if any of them fail.
+    """
+    uid, email = auth
+    return report_incident(uid=uid, user_email=email, description=body.description or "")

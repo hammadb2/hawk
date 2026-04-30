@@ -57,4 +57,5 @@ jobs:
             tests/test_pick_worst_dental.py \
             tests/test_homepage_preset_scan_endpoint.py \
             tests/test_portal_first_login.py \
+            tests/test_portal_incident_report.py \
             -v
