@@ -258,10 +258,12 @@ def _classify_vertical(prospect: dict[str, Any]) -> str:
     # Deliberately exclude vulnerability_found — scan findings regularly contain
     # words like "audit" / "law" / "legal hold" which would cross-classify a
     # dental practice into the wrong campaign.
-    haystack = " ".join(
+    # Pad with surrounding spaces so word-boundary hints (e.g. ' ria ',
+    # ' peo ') match tokens at the start or end of the haystack.
+    haystack = " " + " ".join(
         str(prospect.get(k) or "").lower()
         for k in ("company_name", "domain")
-    )
+    ) + " "
     for hints, bucket in _VERTICAL_HINTS:
         if any(h in haystack for h in hints):
             return bucket

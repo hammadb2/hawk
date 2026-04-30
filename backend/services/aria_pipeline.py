@@ -61,6 +61,8 @@ SCAN_CONCURRENCY = 10
 # ``{city}`` placeholder, plus a couple of static synonyms for verticals
 # whose query phrasing isn't a great keyword in Apollo's index.
 _KEYWORD_OVERRIDES: dict[str, list[str]] = {
+    "dental": ["dental", "dentistry", "dental clinic"],
+    "legal": ["law firm", "legal services", "lawyer"],
     "accounting": ["accounting", "CPA", "bookkeeping"],
     "hr_payroll": ["HR", "payroll", "PEO"],
 }
