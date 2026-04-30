@@ -206,6 +206,71 @@ async def test_versioned_search_filters_by_cpe_range() -> None:
 
 
 @pytest.mark.asyncio
+async def test_per_cve_fix_version_takes_max_of_overlapping_ranges() -> None:
+    """Per-CVE fix must escape every matching affected range.
+
+    Regression guard for the Devin Review flag on PR #75: when one CVE
+    has two overlapping vulnerable ranges that both cover the detected
+    version (e.g. ``[6.0, 6.5.3)`` AND ``[6.0, 6.8.0)`` both cover 6.4.1),
+    upgrading to 6.5.3 would still leave the second range triggered.
+    Only max(versionEndExcluding) escapes every matching range.
+    """
+    payload = {
+        "vulnerabilities": [
+            {
+                "cve": {
+                    "id": "CVE-2024-OVERLAP",
+                    "metrics": {
+                        "cvssMetricV31": [
+                            {"cvssData": {"baseScore": 9.0, "vectorString": ""}}
+                        ]
+                    },
+                    "configurations": [
+                        {
+                            "nodes": [
+                                {
+                                    "cpeMatch": [
+                                        {
+                                            "vulnerable": True,
+                                            "criteria": (
+                                                "cpe:2.3:a:wordpress:wordpress:"
+                                                "-:*:*:*:*:*:*:*"
+                                            ),
+                                            "versionStartIncluding": "6.0",
+                                            "versionEndExcluding": "6.5.3",
+                                        },
+                                        {
+                                            "vulnerable": True,
+                                            "criteria": (
+                                                "cpe:2.3:a:wordpress:wordpress:"
+                                                "-:*:*:*:*:*:*:*"
+                                            ),
+                                            "versionStartIncluding": "6.0",
+                                            "versionEndExcluding": "6.8.0",
+                                        },
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+    with patch.object(nvd_cves.httpx, "AsyncClient",
+                      return_value=_FakeClient(_FakeResp(payload))):
+        from app.settings import Settings
+        matches = await nvd_cves._nvd_versioned_search(
+            "wordpress", "6.4.1", "WordPress", Settings(),
+        )
+    assert matches, "overlapping ranges should still produce a match"
+    assert matches[0]["fix_version"] == "6.8.0", (
+        "per-CVE fix must escape every matching range; picking 6.5.3 would "
+        "leave [6.0, 6.8.0) still vulnerable"
+    )
+
+
+@pytest.mark.asyncio
 async def test_end_to_end_emits_spec_format_finding() -> None:
     """Full pipeline from WhatWeb lines → mocked NVD → spec-format finding."""
     payload = _fake_nvd_response([

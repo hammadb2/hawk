@@ -282,9 +282,15 @@ async def _nvd_versioned_search(
                         if _version_in_range(version, si, se, ei, ee):
                             version_hit = True
                             if ee:
-                                # Take the lowest versionEndExcluding we see
-                                # within this CVE — that's the earliest fix.
-                                if not fix_ver or _parse_version_tuple(ee) < _parse_version_tuple(fix_ver):
+                                # Take the highest versionEndExcluding across
+                                # matching ranges in this CVE. Multiple CPE
+                                # match rows can cover the same detected
+                                # version (e.g. ranges [6.0,6.5.3) and
+                                # [6.0,6.8.0) both cover 6.4.1); upgrading
+                                # to 6.5.3 would still leave the second range
+                                # triggered. Only the max escapes every
+                                # matching range for this CVE.
+                                if not fix_ver or _parse_version_tuple(ee) > _parse_version_tuple(fix_ver):
                                     fix_ver = ee
                     elif version in cpe_uri:
                         version_hit = True
