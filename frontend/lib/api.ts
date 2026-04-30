@@ -230,6 +230,28 @@ export const portalApi = {
       "/api/portal/mark-first-login-seen",
       { method: "POST", token },
     ),
+  /**
+   * One-click incident report (priority list #34). Logs the incident,
+   * starts an SLA clock, SMSes the CEO, emails the client a confirmation,
+   * and mirrors the event into the internal support-ticket queue. Returns
+   * the new case id + SLA deadline so the UI can show an acknowledgment.
+   */
+  reportIncident: (body: { description?: string }, token: string) =>
+    portalRequest<{
+      ok: boolean;
+      incident_id: string;
+      case_id: string;
+      reported_at: string;
+      sla_deadline: string;
+      sla_minutes: number;
+      ceo_sms_status: string;
+      client_email_status: string;
+      support_ticket_id: string | null;
+    }>("/api/portal/incident-report", {
+      method: "POST",
+      body: JSON.stringify(body),
+      token,
+    }),
 };
 
 // Ask HAWK

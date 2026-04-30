@@ -13,6 +13,7 @@ import {
   summarizeSeverity,
   topFindingsPlainEnglish,
 } from "@/lib/portal/findings-parse";
+import { IncidentReportCard } from "@/components/portal/incident-report-card";
 import { ReadinessSparkline } from "@/components/portal/readiness-sparkline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -573,6 +574,10 @@ function PortalHomeContent() {
             <li>Onboarding: {client.onboarding_sequence_status ?? "—"}</li>
           </ul>
         </div>
+      </section>
+
+      <section>
+        <IncidentReportCard />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
