@@ -4,16 +4,50 @@ from __future__ import annotations
 import os
 
 # App
-SECRET_KEY = os.environ.get("HAWK_SECRET_KEY", "")
+#
+# HAWK_SECRET_KEY signs every JWT we issue. In production it MUST be set to a
+# stable, high-entropy value — otherwise tokens issued before a process restart
+# stop validating, and a process-local random key is trivially recoverable.
+#
+# Hard rule: production refuses to start without it. Dev / test / CI fall back
+# to a process-local random key (with a warning) so the app still imports.
+SECRET_KEY = os.environ.get("HAWK_SECRET_KEY", "").strip()
+_HAWK_ENV = (
+    os.environ.get("HAWK_ENV")
+    or os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("ENVIRONMENT")
+    or "development"
+).strip().lower()
+_IS_PRODUCTION = _HAWK_ENV in {"production", "prod"}
 if not SECRET_KEY:
+    if _IS_PRODUCTION:
+        raise RuntimeError(
+            "HAWK_SECRET_KEY is not set. Refusing to start in production "
+            "with an insecure random key. Set HAWK_SECRET_KEY to a stable "
+            "64+ character secret (e.g. `python -c 'import secrets; "
+            "print(secrets.token_urlsafe(64))'`) in the Railway / host env."
+        )
     import warnings
     warnings.warn(
-        "HAWK_SECRET_KEY is not set — using an insecure random key. "
-        "Set HAWK_SECRET_KEY in your environment for production.",
+        f"HAWK_SECRET_KEY is not set (HAWK_ENV={_HAWK_ENV!r}) — using an "
+        "insecure random key for this process only. JWTs will not survive "
+        "restarts. Set HAWK_SECRET_KEY for any non-dev environment.",
         stacklevel=1,
     )
     import secrets as _secrets
     SECRET_KEY = _secrets.token_urlsafe(64)
+elif len(SECRET_KEY) < 32:
+    if _IS_PRODUCTION:
+        raise RuntimeError(
+            f"HAWK_SECRET_KEY is too short ({len(SECRET_KEY)} chars). "
+            "Production requires at least 32 characters of entropy; aim for 64."
+        )
+    import warnings
+    warnings.warn(
+        f"HAWK_SECRET_KEY is only {len(SECRET_KEY)} characters — set at "
+        "least 32 (64 recommended) before deploying to production.",
+        stacklevel=1,
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
