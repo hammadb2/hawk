@@ -10,19 +10,22 @@ Rule update (NPRM published Jan 2025, effective 2026).
 
 Never-fabricate guarantee
 -------------------------
-A finding receives a citation only when one of two conditions holds:
+This mapper appends a HIPAA citation to a finding only when one of two
+conditions holds:
   1. its ``layer`` field matches a layer in ``_LAYER_CONTROLS`` (the
      scanner already wrote the layer when it produced the finding), or
   2. one of the keyword regexes in ``_CONTROLS`` matches the finding's
      ``title + category + description + layer`` blob.
 
-If neither holds, **no citation is added** — the ``compliance`` list is
-left as the caller passed it. There is no else branch, no default
-citation, and no LLM-derived inference. ``_KNOWN_CITATIONS`` is the
-whitelist of every citation string the mapper is allowed to emit; the
-``tag_finding`` post-filter drops anything not in this set so a stray
-typo or a bad merge can't slip a hallucinated 164.xxx subsection into a
-client-facing report. ``test_no_fabrication`` covers this in CI.
+If neither holds, **this mapper adds nothing**. There is no else branch,
+no default citation, and no LLM-derived inference. ``_KNOWN_CITATIONS``
+is the whitelist of every citation string this mapper is allowed to
+emit; the post-filter in ``tag_finding`` only validates **citations this
+mapper contributed in the current call** — pre-existing entries on the
+finding (e.g. ``"Vendor patch management"`` written by ``nvd_cves`` or
+``vertical_fingerprint``) are preserved verbatim. A typo or
+hallucination inside the static map itself is still caught at module
+load time by the CI test ``test_known_citations_all_use_45cfr_format``.
 """
 from __future__ import annotations
 
@@ -272,14 +275,18 @@ _KNOWN_CITATIONS: frozenset[str] = _build_known_citations()
 def tag_finding(finding: dict[str, Any]) -> None:
     """Append HIPAA 2026 citations to a single finding dict (mutates in place).
 
-    Never-fabricate guarantee: a citation is appended only when an explicit
-    layer match (``_LAYER_CONTROLS``) or keyword regex match (``_COMPILED``)
-    fires. There is no default / fallback / inferred citation. The final
-    list is intersected with ``_KNOWN_CITATIONS`` so a citation that didn't
-    come from the static map (e.g. a stray entry on the input dict) is
-    dropped before the finding leaves the mapper.
+    Never-fabricate guarantee: a citation is appended **by this mapper**
+    only when an explicit layer match (``_LAYER_CONTROLS``) or keyword
+    regex match (``_COMPILED``) fires. There is no default / fallback /
+    inferred citation. Sibling modules (e.g. ``nvd_cves``,
+    ``vertical_fingerprint``) may attach non-HIPAA tags like
+    ``"Vendor patch management"`` to ``compliance`` before this mapper
+    runs; those caller-supplied entries are preserved verbatim. The
+    never-fabricate post-filter only validates the citations this mapper
+    contributes against ``_KNOWN_CITATIONS``.
     """
-    compliance: list[str] = list(finding.get("compliance") or [])
+    pre_existing: list[str] = list(finding.get("compliance") or [])
+    seen: set[str] = set(pre_existing)
 
     blob = " ".join([
         finding.get("title") or "",
@@ -288,29 +295,31 @@ def tag_finding(finding: dict[str, Any]) -> None:
         finding.get("layer") or "",
     ]).lower()
 
-    added: set[str] = set(compliance)
+    mapper_added: list[str] = []
 
     # Layer-based citations
     layer = (finding.get("layer") or "").strip()
     for cite in _LAYER_CONTROLS.get(layer, []):
-        if cite not in added:
-            compliance.append(cite)
-            added.add(cite)
+        if cite not in seen:
+            mapper_added.append(cite)
+            seen.add(cite)
 
     # Keyword-based citations
     for pattern, citations in _COMPILED:
         if pattern.search(blob):
             for cite in citations:
-                if cite not in added:
-                    compliance.append(cite)
-                    added.add(cite)
+                if cite not in seen:
+                    mapper_added.append(cite)
+                    seen.add(cite)
 
-    # Never-fabricate post-filter: drop anything that wasn't in the static
-    # whitelist. ``compliance`` may have arrived with caller-supplied
-    # citations from a previous tagger or a malformed scanner output;
-    # those are dropped here unless they exist verbatim in _CONTROLS /
-    # _LAYER_CONTROLS.
-    finding["compliance"] = [c for c in compliance if c in _KNOWN_CITATIONS]
+    # Never-fabricate post-filter: only the citations *this mapper* added
+    # are validated against the static whitelist. Pre-existing entries
+    # from sibling modules (e.g. ``nvd_cves`` setting "Vendor patch
+    # management") pass through untouched. A typo or hallucination
+    # introduced inside this module's own static map is still caught at
+    # module load by ``test_known_citations_all_use_45cfr_format``.
+    validated_new = [c for c in mapper_added if c in _KNOWN_CITATIONS]
+    finding["compliance"] = pre_existing + validated_new
 
 
 def tag_all_findings(findings: list[dict[str, Any]]) -> None:

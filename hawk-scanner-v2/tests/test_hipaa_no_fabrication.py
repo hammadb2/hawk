@@ -69,46 +69,64 @@ def test_no_pattern_match_emits_no_citation() -> None:
     )
 
 
-def test_caller_supplied_unknown_citation_is_dropped() -> None:
-    """If the caller passes a citation that isn't in _KNOWN_CITATIONS
-    (e.g. a typo or a hallucinated subsection), the post-filter drops it
-    rather than letting it leak to a client report."""
+def test_caller_supplied_non_hipaa_tags_are_preserved() -> None:
+    """Sibling modules (nvd_cves, vertical_fingerprint) attach non-HIPAA
+    compliance tags like 'Vendor patch management' before the mapper
+    runs. The mapper's post-filter must NOT drop those — only the
+    citations *the mapper itself* added in this call are validated
+    against _KNOWN_CITATIONS."""
     finding: dict = {
         "title": "DMARC missing",
         "category": "",
         "description": "",
         "layer": "",
         "compliance": [
-            "45 CFR §164.312(zz)(99) — Made-up Subsection",  # fabricated
+            "Vendor patch management",
+            "Some other ops tag",
         ],
     }
     tag_finding(finding)
     out = finding["compliance"]
-    assert "45 CFR §164.312(zz)(99) — Made-up Subsection" not in out
-    # The real DMARC citation is still present.
+    # Pre-existing tags survive verbatim.
+    assert "Vendor patch management" in out
+    assert "Some other ops tag" in out
+    # Mapper-added DMARC citation is still present.
     assert any("164.312(e)(1)" in c for c in out)
 
 
-def test_every_emitted_citation_is_in_whitelist() -> None:
+def test_mapper_added_citations_are_in_whitelist() -> None:
     """Run the mapper across a representative finding corpus and assert
-    every emitted citation is in _KNOWN_CITATIONS."""
+    every citation **the mapper added** is in _KNOWN_CITATIONS. (Caller-
+    supplied entries from sibling modules are preserved separately.)"""
     findings = [
         {"title": t, "category": "", "description": "", "layer": ""}
         for t, _ in SPEC_PRIMARY
     ]
     findings += [
-        {"title": "CVE-2024-1234 in nginx 1.18", "layer": "nvd_supply_chain"},
+        {"title": "CVE-2024-1234 in nginx 1.18", "layer": "nvd_supply_chain",
+         "compliance": ["Vendor patch management"]},
         {"title": "Subdomain takeover risk", "layer": "subfinder"},
         {"title": "Ransomware group Lockbit recently active", "layer": "ransomware_intel"},
         {"title": "Lookalike domain detected", "layer": "dnstwist"},
         {"title": "GitHub repo has hardcoded API key", "layer": "github"},
     ]
+    pre_existing_per_finding = [list(f.get("compliance") or []) for f in findings]
     tag_all_findings(findings)
-    for f in findings:
-        for c in f.get("compliance", []):
+    for original, f in zip(pre_existing_per_finding, findings):
+        out = f.get("compliance", [])
+        # Pre-existing entries are preserved (regression guard for the
+        # nvd_cves / vertical_fingerprint silent-drop bug).
+        for tag in original:
+            assert tag in out, (
+                f"caller-supplied tag {tag!r} on {f['title']!r} was "
+                "silently dropped by the mapper"
+            )
+        # Anything the mapper added must be in the whitelist.
+        added = [c for c in out if c not in original]
+        for c in added:
             assert c in _KNOWN_CITATIONS, (
-                f"finding {f['title']!r} emitted citation {c!r} that is "
-                "not in _KNOWN_CITATIONS — fabrication regression!"
+                f"finding {f['title']!r} mapper-emitted citation {c!r} "
+                "is not in _KNOWN_CITATIONS — fabrication regression!"
             )
 
 
