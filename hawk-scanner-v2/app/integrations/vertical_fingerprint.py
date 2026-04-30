@@ -187,7 +187,7 @@ def fingerprint_from_httpx_whatweb(
             "remediation": remediation,
             "layer": "vertical_fingerprint",
             "compliance": [
-                "HIPAA §164.312(a)(1) — Access Control",
+                "45 CFR §164.312(a)(1) — Access Control",
                 "Vendor patch management",
             ],
         })
