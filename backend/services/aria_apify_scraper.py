@@ -91,11 +91,27 @@ CITY_STATE: dict[str, tuple[str, str]] = {
     "kansas city": ("Missouri", "MO"),
 }
 
-# Vertical search queries
+# Vertical → Apify Google-Maps single-query search string. {city} is filled in
+# by the caller; one query per vertical (Apify charges per result, not per
+# query, so we keep these tight). Add new verticals here, in
+# ``apollo_enrichment.VERTICAL_TITLES``, ``aria_places_scraper.VERTICAL_QUERIES``,
+# ``aria_rolling_dispatch.VERTICALS``, and ``crm_free_scan._ALLOWED_VERTICALS``
+# in lockstep.
 VERTICAL_QUERIES: dict[str, str] = {
     "dental": "dental clinics {city}",
     "legal": "law firms {city}",
     "accounting": "accounting practices {city}",
+    "medical": "medical practices {city}",
+    "optometry": "optometrists {city}",
+    "chiropractic": "chiropractors {city}",
+    "physical_therapy": "physical therapy clinics {city}",
+    "mental_health": "mental health practices {city}",
+    "pharmacy": "pharmacies {city}",
+    "real_estate": "real estate agencies {city}",
+    "financial_advisor": "financial advisors {city}",
+    "insurance": "insurance agencies {city}",
+    "mortgage": "mortgage brokers {city}",
+    "hr_payroll": "HR and payroll firms {city}",
 }
 
 VERTICALS = list(VERTICAL_QUERIES.keys())
@@ -107,21 +123,91 @@ def canonical_vertical(vertical: str) -> str:
     if v in VERTICAL_QUERIES:
         return v
     aliases: dict[str, str] = {
+        # dental
         "dentist": "dental",
         "dentists": "dental",
         "dentistry": "dental",
         "dental clinic": "dental",
         "dental_clinic": "dental",
+        # legal
         "law": "legal",
         "lawyer": "legal",
         "lawyers": "legal",
         "attorney": "legal",
         "law firm": "legal",
         "law_firm": "legal",
+        # accounting
         "cpa": "accounting",
         "bookkeeping": "accounting",
         "accountant": "accounting",
         "accountants": "accounting",
+        # medical
+        "doctor": "medical",
+        "physician": "medical",
+        "physicians": "medical",
+        "medical practice": "medical",
+        "medical_practice": "medical",
+        "family practice": "medical",
+        "primary care": "medical",
+        "internal medicine": "medical",
+        # optometry
+        "optometrist": "optometry",
+        "optometrists": "optometry",
+        "eye doctor": "optometry",
+        "eye care": "optometry",
+        "vision care": "optometry",
+        # chiropractic
+        "chiropractor": "chiropractic",
+        "chiropractors": "chiropractic",
+        # physical therapy
+        "pt": "physical_therapy",
+        "physical therapy": "physical_therapy",
+        "physiotherapy": "physical_therapy",
+        "physiotherapist": "physical_therapy",
+        # mental health
+        "therapist": "mental_health",
+        "psychologist": "mental_health",
+        "psychiatrist": "mental_health",
+        "counseling": "mental_health",
+        "counselor": "mental_health",
+        "behavioral health": "mental_health",
+        # pharmacy
+        "pharmacist": "pharmacy",
+        "pharmacies": "pharmacy",
+        "drugstore": "pharmacy",
+        "compounding pharmacy": "pharmacy",
+        # real estate
+        "realtor": "real_estate",
+        "realty": "real_estate",
+        "real estate": "real_estate",
+        "real estate agent": "real_estate",
+        "real estate agency": "real_estate",
+        "broker": "real_estate",
+        # financial advisor
+        "wealth advisor": "financial_advisor",
+        "wealth management": "financial_advisor",
+        "ria": "financial_advisor",
+        "investment advisor": "financial_advisor",
+        "financial planner": "financial_advisor",
+        "financial planning": "financial_advisor",
+        # insurance
+        "insurance agency": "insurance",
+        "insurance agent": "insurance",
+        "insurance broker": "insurance",
+        "independent insurance": "insurance",
+        # mortgage
+        "mortgage broker": "mortgage",
+        "loan officer": "mortgage",
+        "mortgage lender": "mortgage",
+        "mortgage company": "mortgage",
+        # hr / payroll
+        "hr": "hr_payroll",
+        "payroll": "hr_payroll",
+        "peo": "hr_payroll",
+        "professional employer organization": "hr_payroll",
+        "hr firm": "hr_payroll",
+        "payroll firm": "hr_payroll",
+        "hr and payroll": "hr_payroll",
     }
     if v in aliases:
         return aliases[v]

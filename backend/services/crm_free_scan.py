@@ -47,7 +47,23 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 FREE_SCAN_SOURCE = "free_scan_landing"
 
-_ALLOWED_VERTICALS = {"dental", "legal", "accounting", "other"}
+_ALLOWED_VERTICALS = {
+    "dental",
+    "legal",
+    "accounting",
+    "medical",
+    "optometry",
+    "chiropractic",
+    "physical_therapy",
+    "mental_health",
+    "pharmacy",
+    "real_estate",
+    "financial_advisor",
+    "insurance",
+    "mortgage",
+    "hr_payroll",
+    "other",
+}
 
 
 def _sb_headers() -> dict[str, str]:

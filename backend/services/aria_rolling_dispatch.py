@@ -1,10 +1,22 @@
-"""ARIA Rolling Dispatcher — sends up to 200 emails/day per campaign (600/day total).
+"""ARIA Rolling Dispatcher — throttled email send.
+
+Two caps stack on top of the per-mailbox daily cap from ``crm_mailboxes``:
+
+  * ``DAILY_CAP_PER_VERTICAL`` (env ``ARIA_DAILY_CAP_PER_VERTICAL``,
+    default 200): the most this dispatcher will send for a single
+    vertical in a single calendar day, regardless of mailbox capacity.
+  * ``DAILY_CAP_TOTAL`` (env ``ARIA_DAILY_CAP_TOTAL``, default 600): the
+    aggregate daily ceiling across **all** verticals. Decoupled from the
+    per-vertical cap so adding a new vertical doesn't silently raise the
+    total send budget. The previous design implicitly tied the total to
+    ``len(VERTICALS) * DAILY_CAP_PER_VERTICAL`` which silently 5x'd the
+    ceiling when verticals expanded from 3 to 14.
 
 Runs every hour 9am-4pm ET (8 ticks), each tick dispatches the per-vertical
-catch-up quota so the 600/day target is spread across US business hours
-rather than blasted at 6:30am. Primary source is ``prospects`` rows where
-``pipeline_status=ready`` (set by ``aria_post_scan_pipeline``), ordered by
-``hawk_score desc`` so higher-signal leads go out first.
+catch-up quota so the daily total target is spread across US business
+hours rather than blasted at 6:30am. Primary source is ``prospects``
+rows where ``pipeline_status=ready`` (set by ``aria_post_scan_pipeline``),
+ordered by ``hawk_score desc`` so higher-signal leads go out first.
 
 v2 (Mailforge / native-SMTP) — Smartlead removed:
 - Each send goes out via one of the rows in ``crm_mailboxes`` (round-robin by
@@ -48,8 +60,26 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 # Per-vertical daily cap and the canonical tick schedule (9am–4pm ET inclusive = 8 ticks).
 # Keep in sync with backend/main.py scheduler registration.
 DAILY_CAP_PER_VERTICAL = int(os.environ.get("ARIA_DAILY_CAP_PER_VERTICAL", "200"))
+# Aggregate ceiling across all verticals. Independent of vertical count so
+# the dispatcher's total daily volume doesn't grow when verticals are added.
+DAILY_CAP_TOTAL = int(os.environ.get("ARIA_DAILY_CAP_TOTAL", "600"))
 DISPATCH_TICK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16]
-VERTICALS = ("dental", "legal", "accounting")
+VERTICALS = (
+    "dental",
+    "legal",
+    "accounting",
+    "medical",
+    "optometry",
+    "chiropractic",
+    "physical_therapy",
+    "mental_health",
+    "pharmacy",
+    "real_estate",
+    "financial_advisor",
+    "insurance",
+    "mortgage",
+    "hr_payroll",
+)
 
 
 def _sb_headers() -> dict[str, str]:
@@ -264,14 +294,29 @@ def run_rolling_dispatch() -> dict[str, Any]:
             "fix": "add mailboxes at /crm/settings/mailboxes",
         }
 
+    # Global daily cap: pre-compute the budget left across all verticals so
+    # adding a vertical doesn't silently raise the total send ceiling.
+    sent_total_today = sum(_count_sent_today(v) for v in VERTICALS)
+    global_remaining = max(0, DAILY_CAP_TOTAL - sent_total_today)
+    stats["global"] = {
+        "daily_cap_total": DAILY_CAP_TOTAL,
+        "sent_total_today": sent_total_today,
+        "remaining_total": global_remaining,
+    }
+
     for vertical in VERTICALS:
         sent_today, remaining_today, quota = _quota_for_tick(vertical)
+        # Clamp the per-vertical tick quota by what's left of the global
+        # daily budget. Once the global budget is spent, all remaining
+        # verticals get quota=0 for this tick.
+        quota = min(quota, global_remaining)
         if quota <= 0:
             stats["by_vertical"][vertical] = {
                 "sent_today": sent_today,
                 "remaining_today": remaining_today,
                 "quota": 0,
                 "sent": 0,
+                "reason": "global_cap_reached" if global_remaining <= 0 else None,
             }
             continue
 
@@ -296,6 +341,7 @@ def run_rolling_dispatch() -> dict[str, Any]:
             outcome = _dispatch_prospect(prospect, vertical)
             if outcome.get("ok"):
                 sent += 1
+                global_remaining -= 1
                 continue
             failed += 1
             if outcome.get("reason") == "no_active_mailbox":
