@@ -27,6 +27,12 @@ if str(_BACKEND) not in sys.path:
 # ---------- detection helpers ----------------------------------------------
 
 
+# Description strings here mirror the real scanner output verbatim
+# (see hawk-scanner-v2/app/analysis/email_security.py:46-69) so we
+# catch substring-matching false positives like
+# "DMARC p=none ... increase to quarantine/reject."
+
+
 @pytest.fixture
 def dmarc_finding_strict() -> dict:
     return {
@@ -49,11 +55,23 @@ def dmarc_finding_quarantine() -> dict:
 
 @pytest.fixture
 def dmarc_finding_none() -> dict:
+    """Real ``p=none`` description mentions both stricter policies as advice."""
     return {
         "title": "DMARC policy",
         "severity": "medium",
         "description": "DMARC p=none — monitoring only; increase to quarantine/reject.",
         "technical_detail": "v=DMARC1; p=none; rua=mailto:dmarc@example.com",
+    }
+
+
+@pytest.fixture
+def dmarc_finding_missing() -> dict:
+    """When no DMARC record exists, technical_detail is empty per the analyzer."""
+    return {
+        "title": "DMARC policy",
+        "severity": "high",
+        "description": "No DMARC record — phishing and spoofing harder to detect.",
+        "technical_detail": "",
     }
 
 
@@ -85,6 +103,15 @@ def test_is_dmarc_strict_returns_false_when_finding_absent() -> None:
     assert is_dmarc_strict(_scan_with([])) is False
 
 
+def test_is_dmarc_strict_returns_false_when_record_missing(
+    dmarc_finding_missing: dict,
+) -> None:
+    """No DMARC record → analyzer leaves technical_detail empty → not strict."""
+    from services.portal_milestones import is_dmarc_strict
+
+    assert is_dmarc_strict(_scan_with([dmarc_finding_missing])) is False
+
+
 def test_is_spf_strict_accepts_dash_all() -> None:
     from services.portal_milestones import is_spf_strict
 
@@ -97,14 +124,35 @@ def test_is_spf_strict_accepts_dash_all() -> None:
     assert is_spf_strict(_scan_with([finding])) is True
 
 
-def test_is_spf_strict_rejects_tilde_all() -> None:
+def test_is_spf_strict_rejects_tilde_all_with_real_description() -> None:
+    """Real scanner advice for ~all says "consider -all"; must not match.
+
+    Regression test for the false positive when the description was scanned
+    alongside technical_detail. Description string is verbatim from
+    hawk-scanner-v2/app/analysis/email_security.py:48.
+    """
     from services.portal_milestones import is_spf_strict
 
     finding = {
         "title": "SPF policy",
         "severity": "low",
-        "description": "SPF uses softfail (~all) — acceptable.",
+        "description": (
+            "SPF uses softfail (~all) — acceptable; consider -all when every sender is known."
+        ),
         "technical_detail": "v=spf1 include:_spf.google.com ~all",
+    }
+    assert is_spf_strict(_scan_with([finding])) is False
+
+
+def test_is_spf_strict_rejects_permissive_all_with_real_description() -> None:
+    """Real scanner advice for +all/permissive mentions "-all or ~all"; must not match."""
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "medium",
+        "description": "SPF may be permissive; verify ends with -all or ~all.",
+        "technical_detail": "v=spf1 include:_spf.google.com +all",
     }
     assert is_spf_strict(_scan_with([finding])) is False
 

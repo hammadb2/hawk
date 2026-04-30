@@ -77,31 +77,38 @@ def _find_finding(scan: dict[str, Any], title_substr: str) -> dict[str, Any] | N
 
 
 def is_dmarc_strict(scan: dict[str, Any]) -> bool:
-    """DMARC policy is ``quarantine`` or ``reject`` (the two strict policies)."""
+    """DMARC policy is ``quarantine`` or ``reject`` (the two strict policies).
+
+    Only inspects ``technical_detail`` (which holds the literal DNS TXT record
+    per :mod:`hawk-scanner-v2.app.analysis.email_security`); the human-readable
+    ``description`` mentions both policies as recommendations even when the
+    actual policy is ``none`` and would produce false positives.
+    """
     f = _find_finding(scan, "dmarc")
     if not f:
         return False
-    haystack = " ".join(
-        str(f.get(k) or "")
-        for k in ("technical_detail", "description")
-    ).lower()
-    if re.search(r"\bp\s*=\s*reject\b", haystack):
+    record = str(f.get("technical_detail") or "").lower()
+    if not record:
+        return False
+    if re.search(r"\bp\s*=\s*reject\b", record):
         return True
-    if re.search(r"\bp\s*=\s*quarantine\b", haystack):
+    if re.search(r"\bp\s*=\s*quarantine\b", record):
         return True
     return False
 
 
 def is_spf_strict(scan: dict[str, Any]) -> bool:
-    """SPF record ends in ``-all`` (strict fail). ``~all`` does not count."""
+    """SPF record ends in ``-all`` (strict fail). ``~all`` does not count.
+
+    Only inspects ``technical_detail`` (the literal SPF DNS record) — the
+    ``description`` for a ``~all`` softfail explicitly recommends ``-all`` so
+    substring-matching it would always falsely award the milestone.
+    """
     f = _find_finding(scan, "spf")
     if not f:
         return False
-    haystack = " ".join(
-        str(f.get(k) or "")
-        for k in ("technical_detail", "description")
-    ).lower()
-    return "-all" in haystack
+    record = str(f.get("technical_detail") or "").lower()
+    return "-all" in record
 
 
 def _insurance_readiness_pct(scan: dict[str, Any]) -> int | None:
