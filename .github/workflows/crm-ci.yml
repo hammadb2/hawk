@@ -44,5 +44,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pytest
-      - run: cd hawk-scanner-v2 && python -m pytest tests/test_hipaa_no_fabrication.py -v
+      - run: pip install pytest pytest-asyncio httpx fastapi pydantic pydantic-settings
+      - run: cd hawk-scanner-v2 && python -m pytest tests/test_hipaa_no_fabrication.py tests/test_nvd_cves.py -v
