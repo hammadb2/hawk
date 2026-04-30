@@ -219,6 +219,17 @@ export const portalApi = {
       body: JSON.stringify(body),
       token,
     }),
+  /**
+   * Stamp clients.last_portal_login_at so PortalGate stops redirecting
+   * subsequent visits to /portal/welcome (priority list #32). Fire-and-forget
+   * from the welcome page mount — we don't want UI to hang on a slow Supabase
+   * round-trip.
+   */
+  markFirstLoginSeen: (token: string) =>
+    portalRequest<{ ok: string; last_portal_login_at: string }>(
+      "/api/portal/mark-first-login-seen",
+      { method: "POST", token },
+    ),
 };
 
 // Ask HAWK

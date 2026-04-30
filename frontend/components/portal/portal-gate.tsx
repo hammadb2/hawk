@@ -20,6 +20,12 @@ function isPortalBillingPath(pathname: string | null): boolean {
   return pathname.startsWith("/portal/billing") || pathname.startsWith("/portal/return");
 }
 
+/** Priority list #32: first-login welcome page. PortalGate must not loop-
+ *  redirect once the user is already on it. */
+function isPortalWelcomePath(pathname: string | null): boolean {
+  return Boolean(pathname && pathname.startsWith("/portal/welcome"));
+}
+
 function buildNextForLogin(pathname: string, searchParams: URLSearchParams): string {
   const q = searchParams.toString();
   return pathname + (q ? `?${q}` : "");
@@ -87,7 +93,7 @@ export function PortalGate({ children }: { children: React.ReactNode }) {
 
       const { data: client } = await supabase
         .from("clients")
-        .select("billing_status,mrr_cents")
+        .select("billing_status,mrr_cents,last_portal_login_at")
         .eq("id", cpp.client_id)
         .maybeSingle();
 
@@ -95,6 +101,19 @@ export function PortalGate({ children }: { children: React.ReactNode }) {
 
       if (!isPaidClient(client)) {
         router.replace("/portal/billing");
+        return;
+      }
+
+      // Priority list #32: first-auth users land on /portal/welcome (full
+      // scan report + scores) before the dashboard. One-shot — once the
+      // backend stamps last_portal_login_at, subsequent visits skip the
+      // welcome detour.
+      const isFirstLogin =
+        client !== null &&
+        typeof client === "object" &&
+        !(client as { last_portal_login_at?: string | null }).last_portal_login_at;
+      if (isFirstLogin && !isPortalWelcomePath(pathname)) {
+        router.replace("/portal/welcome");
         return;
       }
 
