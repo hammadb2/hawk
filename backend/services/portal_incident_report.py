@@ -178,6 +178,7 @@ def _confirmation_html(
     *,
     company: str,
     case_id: str,
+    reported_at_iso: str,
     sla_deadline_iso: str,
     sla_minutes: int,
 ) -> str:
@@ -188,7 +189,7 @@ def _confirmation_html(
   <p style="margin:0 0 12px;">We have logged your incident report and our response team has been paged.</p>
   <table style="border-collapse:collapse; width:100%; max-width:520px; margin:16px 0;">
     <tr><td style="padding:8px 0; color:#9090A8;">Case id</td><td style="padding:8px 0; font-weight:600;">{_esc(case_id)}</td></tr>
-    <tr><td style="padding:8px 0; color:#9090A8;">Reported at</td><td style="padding:8px 0;">{_esc(datetime.now(timezone.utc).isoformat())}</td></tr>
+    <tr><td style="padding:8px 0; color:#9090A8;">Reported at</td><td style="padding:8px 0;">{_esc(reported_at_iso)}</td></tr>
     <tr><td style="padding:8px 0; color:#9090A8;">First-response SLA</td><td style="padding:8px 0;">{sla_minutes} minutes — by {_esc(sla_deadline_iso)}</td></tr>
   </table>
   <p style="margin:0 0 12px;">You do not need to do anything else right now. If you have more context (timeline, affected systems, suspicious emails), reply to this thread and we'll attach it to the case.</p>
@@ -253,6 +254,7 @@ def report_incident(
                 html=_confirmation_html(
                     company=company,
                     case_id=case_id,
+                    reported_at_iso=now.isoformat(),
                     sla_deadline_iso=sla_deadline.isoformat(),
                     sla_minutes=sla_minutes,
                 ),
