@@ -1,0 +1,52 @@
+{
+  "_note": "SYNTHETIC fixture — fabricated worst-case scan for the homepage widget (priority list #45). Uses the reserved .example TLD so no real business is referenced. Regenerate against a real consented seed list by running: `python scripts/pick_worst_dental.py --api-base <prod>`. The script overwrites this file.",
+  "attack_paths_count": 3,
+  "breach_baseline_usd": 4880000,
+  "breach_cost_summary": "Sector baseline (~$4,880,000) from IBM-style averages; multiple critical-class exposures materially increase the likelihood and cost of an incident.",
+  "domain": "riverside-dental-studio.example",
+  "findings_count": 11,
+  "findings_plain": [
+    "Hudson Rock infostealer intelligence reports 2,147 stealer-related record(s) tied to your domain. That usually means malware on a device exfiltrated passwords or session data.",
+    "Patient intake PDF directory is publicly indexable — documents containing names and DOBs reachable without login.",
+    "WordPress 6.4.1 — CVE-2024-4439, CVSS 8.8, patch to 6.5.3.",
+    "Admin login page reachable over plain HTTP (no HSTS preload, no redirect).",
+    "DMARC p=none — monitoring only; increase to quarantine/reject.",
+    "SPF uses softfail (~all) — acceptable; consider -all when every sender is known.",
+    "Quick pass found 284 hostnames for this domain. A wider footprint usually means more surface area — review anything you do not recognize.",
+    "Exposed phpMyAdmin at /phpmyadmin responds 200 without IP allow-list.",
+    "jQuery 3.3.1 in use — below current LTS, multiple known XSS issues.",
+    "TLS version: TLSv1.3",
+    "DKIM key found for a common selector."
+  ],
+  "findings_preview": [
+    {
+      "severity": "critical",
+      "text": "Hudson Rock infostealer intelligence reports 2,147 stealer-related record(s) tied to your domain. That usually means malware on a device exfiltrated passwords or session data."
+    },
+    {
+      "severity": "critical",
+      "text": "Patient intake PDF directory is publicly indexable — documents containing names and DOBs reachable without login."
+    },
+    {
+      "severity": "high",
+      "text": "WordPress 6.4.1 \u2014 CVE-2024-4439, CVSS 8.8, patch to 6.5.3."
+    },
+    {
+      "severity": "high",
+      "text": "Admin login page reachable over plain HTTP (no HSTS preload, no redirect)."
+    },
+    {
+      "severity": "medium",
+      "text": "DMARC p=none — monitoring only; increase to quarantine/reject."
+    },
+    {
+      "severity": "medium",
+      "text": "Exposed phpMyAdmin at /phpmyadmin responds 200 without IP allow-list."
+    }
+  ],
+  "grade": "F",
+  "issues_count": 9,
+  "scan_version": "2.1-fast",
+  "score": 32,
+  "status": "completed"
+}

@@ -284,6 +284,24 @@ export const marketingApi = {
       body: JSON.stringify(body),
     });
   },
+  /**
+   * Pre-populated homepage scan result (priority list #45). Returns the
+   * cached worst-of-N scan picked offline by `scripts/pick_worst_dental.py`
+   * so visitors see findings the moment the page loads. Resolves to `null`
+   * on 404 (cache not yet populated) so the widget falls back to its idle
+   * "type your domain" state.
+   */
+  getHomepagePresetScan: async (): Promise<PublicScanResult | null> => {
+    try {
+      return await request<PublicScanResult>("/api/marketing/homepage-preset-scan");
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 404) {
+        return null;
+      }
+      console.error("marketing homepage-preset-scan", e);
+      return null;
+    }
+  },
 };
 
 // Notifications

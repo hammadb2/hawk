@@ -44,5 +44,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pytest
-      - run: cd hawk-scanner-v2 && python -m pytest tests/test_hipaa_no_fabrication.py -v
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      # Backend requirements let the endpoint smoke test import the full
+      # FastAPI app. pytest/async extras cover scanner_compliance + preset
+      # scan ranking + NVD CVE matching tests.
+      - run: pip install -r backend/requirements.txt pytest pytest-asyncio
+      - run: |
+          cd hawk-scanner-v2 && python -m pytest \
+            tests/test_hipaa_no_fabrication.py \
+            tests/test_pick_worst_dental.py \
+            tests/test_homepage_preset_scan_endpoint.py \
+            -v
