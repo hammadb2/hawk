@@ -7,6 +7,22 @@ existing ``compliance`` list on each finding dict.
 
 References use the 45 CFR 164.3xx numbering from the 2026 HIPAA Security
 Rule update (NPRM published Jan 2025, effective 2026).
+
+Never-fabricate guarantee
+-------------------------
+A finding receives a citation only when one of two conditions holds:
+  1. its ``layer`` field matches a layer in ``_LAYER_CONTROLS`` (the
+     scanner already wrote the layer when it produced the finding), or
+  2. one of the keyword regexes in ``_CONTROLS`` matches the finding's
+     ``title + category + description + layer`` blob.
+
+If neither holds, **no citation is added** — the ``compliance`` list is
+left as the caller passed it. There is no else branch, no default
+citation, and no LLM-derived inference. ``_KNOWN_CITATIONS`` is the
+whitelist of every citation string the mapper is allowed to emit; the
+``tag_finding`` post-filter drops anything not in this set so a stray
+typo or a bad merge can't slip a hallucinated 164.xxx subsection into a
+client-facing report. ``test_no_fabrication`` covers this in CI.
 """
 from __future__ import annotations
 
@@ -20,11 +36,15 @@ from typing import Any
 
 _CONTROLS: list[tuple[str, list[str]]] = [
     # -- Email security / spoofing ----------------------------------------
+    # Spec: SPF and DKIM map to 164.312(e)(2)(ii) Encryption.
+    # DMARC maps to 164.312(e)(1) Transmission Security.
     ("spf", [
+        "45 CFR §164.312(e)(2)(ii) — Encryption",
         "45 CFR §164.312(e)(1) — Transmission Security",
         "45 CFR §164.312(e)(2)(i) — Integrity Controls",
     ]),
     ("dkim", [
+        "45 CFR §164.312(e)(2)(ii) — Encryption",
         "45 CFR §164.312(e)(1) — Transmission Security",
         "45 CFR §164.312(e)(2)(i) — Integrity Controls",
     ]),
@@ -100,11 +120,14 @@ _CONTROLS: list[tuple[str, list[str]]] = [
         "45 CFR §164.314(a)(1) — Business Associate Contracts",
     ]),
     # -- Breach / stealer -------------------------------------------------
+    # Spec: Credentials and breach map to 164.312(d) Person Authentication.
     ("breach", [
+        "45 CFR §164.312(d) — Person or Entity Authentication",
         "45 CFR §164.308(a)(6)(ii) — Response and Reporting",
         "45 CFR §164.308(a)(1)(ii)(D) — Information System Activity Review",
     ]),
     ("stealer", [
+        "45 CFR §164.312(d) — Person or Entity Authentication",
         "45 CFR §164.308(a)(6)(ii) — Response and Reporting",
         "45 CFR §164.308(a)(5)(ii)(B) — Protection from Malicious Software",
     ]),
@@ -114,7 +137,9 @@ _CONTROLS: list[tuple[str, list[str]]] = [
         "45 CFR §164.308(a)(7)(ii)(A) — Data Backup Plan",
     ]),
     # -- Network / port exposure ------------------------------------------
+    # Spec: Open ports and RDP map to 164.312(a)(1) Access Control.
     ("port", [
+        "45 CFR §164.312(a)(1) — Access Control",
         "45 CFR §164.312(e)(1) — Transmission Security",
         "45 CFR §164.310(a)(1) — Facility Access Controls",
     ]),
@@ -153,6 +178,21 @@ _CONTROLS: list[tuple[str, list[str]]] = [
     ("code leak", [
         "45 CFR §164.312(c)(1) — Integrity",
         "45 CFR §164.308(a)(4)(i) — Information Access Management",
+    ]),
+    # -- Audit / logging --------------------------------------------------
+    # Spec: Audit and logs map to 164.312(b) Audit Controls.
+    ("audit", [
+        "45 CFR §164.312(b) — Audit Controls",
+    ]),
+    ("logging", [
+        "45 CFR §164.312(b) — Audit Controls",
+    ]),
+    ("log review", [
+        "45 CFR §164.312(b) — Audit Controls",
+        "45 CFR §164.308(a)(1)(ii)(D) — Information System Activity Review",
+    ]),
+    ("siem", [
+        "45 CFR §164.312(b) — Audit Controls",
     ]),
     # -- Insurance / compliance -------------------------------------------
     ("insurance", [
@@ -210,9 +250,36 @@ _LAYER_CONTROLS: dict[str, list[str]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Never-fabricate whitelist
+# ---------------------------------------------------------------------------
+# Every citation the mapper is allowed to emit, derived from _CONTROLS and
+# _LAYER_CONTROLS. The post-filter on tag_finding drops anything not in
+# this set; that protects clients from a typo or a bad merge silently
+# putting an invalid 164.xxx subsection on a compliance report.
+def _build_known_citations() -> frozenset[str]:
+    seen: set[str] = set()
+    for _, cites in _CONTROLS:
+        seen.update(cites)
+    for cites in _LAYER_CONTROLS.values():
+        seen.update(cites)
+    return frozenset(seen)
+
+
+_KNOWN_CITATIONS: frozenset[str] = _build_known_citations()
+
+
 def tag_finding(finding: dict[str, Any]) -> None:
-    """Append HIPAA 2026 citations to a single finding dict (mutates in place)."""
-    compliance: list[str] = finding.get("compliance") or []
+    """Append HIPAA 2026 citations to a single finding dict (mutates in place).
+
+    Never-fabricate guarantee: a citation is appended only when an explicit
+    layer match (``_LAYER_CONTROLS``) or keyword regex match (``_COMPILED``)
+    fires. There is no default / fallback / inferred citation. The final
+    list is intersected with ``_KNOWN_CITATIONS`` so a citation that didn't
+    come from the static map (e.g. a stray entry on the input dict) is
+    dropped before the finding leaves the mapper.
+    """
+    compliance: list[str] = list(finding.get("compliance") or [])
 
     blob = " ".join([
         finding.get("title") or "",
@@ -238,7 +305,12 @@ def tag_finding(finding: dict[str, Any]) -> None:
                     compliance.append(cite)
                     added.add(cite)
 
-    finding["compliance"] = compliance
+    # Never-fabricate post-filter: drop anything that wasn't in the static
+    # whitelist. ``compliance`` may have arrived with caller-supplied
+    # citations from a previous tagger or a malformed scanner output;
+    # those are dropped here unless they exist verbatim in _CONTROLS /
+    # _LAYER_CONTROLS.
+    finding["compliance"] = [c for c in compliance if c in _KNOWN_CITATIONS]
 
 
 def tag_all_findings(findings: list[dict[str, Any]]) -> None:

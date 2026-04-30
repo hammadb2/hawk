@@ -36,3 +36,13 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
       - run: cd backend && python -c "from main import app; print('ok', app.title)"
+
+  scanner_compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      - run: cd hawk-scanner-v2 && python -m pytest tests/test_hipaa_no_fabrication.py -v
