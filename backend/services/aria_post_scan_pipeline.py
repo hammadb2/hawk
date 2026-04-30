@@ -233,7 +233,7 @@ _VERTICAL_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("optometr", "eye care", "vision center"), "optometry"),
     (("chiropract",), "chiropractic"),
     (("physical therap", "physiotherap", "rehab"), "physical_therapy"),
-    (("psycholog", "psychiatr", "counsel", "therapy", "behavioral health"), "mental_health"),
+    (("psycholog", "psychiatr", "counseling", "psychotherapy", "behavioral health"), "mental_health"),
     (("pharmac", "drugstore", "rx "), "pharmacy"),
     (("realty", "realtor", "real estate"), "real_estate"),
     (("wealth", "investment advis", "financial advis", "financial planner", " ria "), "financial_advisor"),
@@ -241,7 +241,7 @@ _VERTICAL_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("mortgage", "home loan"), "mortgage"),
     (("payroll", " peo ", "professional employer"), "hr_payroll"),
     (("dental", "dentist", "orthodont", "endodont", "periodont"), "dental"),
-    (("law ", " law", "legal", "attorney", "lawyer", "barrister", "solicitor"), "legal"),
+    (("law ", " law", "legal", "attorney", "lawyer", "barrister", "solicitor", "counsel "), "legal"),
     (("account", "cpa", "bookkeep", "tax ", " tax", "audit"), "accounting"),
     # generic medical comes last so it doesn't swallow dental / optometry / chiropractic
     (("medical", "physician", "clinic", "family practice", "primary care"), "medical"),
