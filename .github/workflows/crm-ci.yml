@@ -59,4 +59,5 @@ jobs:
             tests/test_portal_first_login.py \
             tests/test_portal_incident_report.py \
             tests/test_aria_generic_email_filter.py \
+            tests/test_portal_certified_seven_step.py \
             -v

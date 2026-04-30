@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from routers.crm_auth import require_supabase_uid
@@ -23,7 +24,10 @@ from services.portal_ai import (
     monday_week_start,
     advisor_chat,
 )
-from services.portal_milestones import ensure_portal_milestones
+from services.portal_milestones import (
+    ensure_portal_milestones,
+    hawk_certified_progress,
+)
 from services.scanner import run_scan
 
 logger = logging.getLogger(__name__)
@@ -344,13 +348,116 @@ def portal_journey(uid: str = Depends(require_supabase_uid)):
 
     events.sort(key=_sort_key)
 
+    milestone_rows = ms.json() or []
     return {
-        "milestones": ms.json() or [],
+        "milestones": milestone_rows,
         "scans": scans,
         "certified_at": client.get("certified_at"),
         "readiness": client.get("hawk_readiness_score"),
         "events": events,
+        "hawk_certified": hawk_certified_progress(
+            milestone_rows,
+            certified_at=client.get("certified_at"),
+        ),
     }
+
+
+def _render_certified_badge_svg(company_name: str, certified_on: str) -> str:
+    """SVG badge — embeds company name and certification date.
+
+    Pure-function so it stays testable without httpx/Supabase. Both inputs are
+    XML-escaped before interpolation.
+    """
+    safe_company = html_mod.escape((company_name or "Your business")[:64])
+    safe_date = html_mod.escape((certified_on or "")[:32])
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" '
+        'role="img" aria-label="HAWK Certified badge">'
+        '<defs>'
+        '<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0" stop-color="#0b1117"/><stop offset="1" stop-color="#11161d"/>'
+        '</linearGradient>'
+        '</defs>'
+        '<rect width="600" height="380" rx="24" fill="url(#bg)"/>'
+        '<rect x="10" y="10" width="580" height="360" rx="20" fill="none" '
+        'stroke="#f5b62b" stroke-width="2"/>'
+        '<text x="300" y="78" text-anchor="middle" '
+        'font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif" '
+        'font-size="14" letter-spacing="6" fill="#f5b62b" font-weight="700">'
+        'HAWK · CYBERSECURITY GUARANTEE'
+        '</text>'
+        '<text x="300" y="160" text-anchor="middle" '
+        'font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif" '
+        'font-size="48" fill="#ffffff" font-weight="800">'
+        'CERTIFIED'
+        '</text>'
+        '<text x="300" y="210" text-anchor="middle" '
+        'font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif" '
+        'font-size="20" fill="#cbd5e1" font-weight="500">'
+        f'{safe_company}'
+        '</text>'
+        '<text x="300" y="266" text-anchor="middle" '
+        'font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif" '
+        'font-size="13" letter-spacing="3" fill="#94a3b8">'
+        'CERTIFIED ON'
+        '</text>'
+        '<text x="300" y="294" text-anchor="middle" '
+        'font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif" '
+        'font-size="20" fill="#ffffff" font-weight="600">'
+        f'{safe_date}'
+        '</text>'
+        '<text x="300" y="346" text-anchor="middle" '
+        'font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif" '
+        'font-size="11" fill="#64748b">'
+        'securedbyhawk.com'
+        '</text>'
+        '</svg>'
+    )
+
+
+@router.get("/journey/badge.svg")
+def portal_journey_badge(uid: str = Depends(require_supabase_uid)):
+    """Return the HAWK Certified badge as SVG. 404 until ``clients.certified_at`` is set."""
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+    cpp_r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/client_portal_profiles",
+        headers=_sb(),
+        params={"user_id": f"eq.{uid}", "select": "client_id,company_name", "limit": "1"},
+        timeout=20.0,
+    )
+    cpp_r.raise_for_status()
+    cpp = (cpp_r.json() or [None])[0]
+    if not cpp:
+        raise HTTPException(status_code=404, detail="No portal profile")
+    cid = cpp["client_id"]
+
+    cl = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/clients",
+        headers=_sb(),
+        params={"id": f"eq.{cid}", "select": "company_name,domain,certified_at", "limit": "1"},
+        timeout=20.0,
+    )
+    cl.raise_for_status()
+    client = (cl.json() or [None])[0] or {}
+    certified_at = client.get("certified_at")
+    if not certified_at:
+        raise HTTPException(status_code=404, detail="Not yet HAWK Certified")
+
+    company = (
+        cpp.get("company_name")
+        or client.get("company_name")
+        or client.get("domain")
+        or "Your business"
+    )
+    on = str(certified_at)[:10]
+    svg = _render_certified_badge_svg(str(company), on)
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": 'inline; filename="hawk-certified-badge.svg"'},
+    )
 
 
 def run_weekly_threat_briefings_for_all_clients() -> dict[str, Any]:

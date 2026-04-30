@@ -1,9 +1,16 @@
-"""Award portal gamification milestones (hawk_certified, thirty_days_clean)."""
+"""Award portal gamification milestones (hawk_certified, thirty_days_clean, …).
+
+The portal renders these as the 7-step "HAWK Certified" tracker. Each key here
+maps to an entry in :data:`HAWK_CERTIFIED_STEPS` (declared at module bottom).
+Detection helpers are pure functions of a scan row and stay exported so tests
+can call them without hitting Supabase.
+"""
 
 from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -54,6 +61,68 @@ def _scan_has_critical_or_high(scan: dict[str, Any]) -> bool:
     return False
 
 
+def _scan_has_critical(scan: dict[str, Any]) -> bool:
+    for f in _findings_list(scan):
+        if _severity_rank(str(f.get("severity") or "")) == 0:
+            return True
+    return False
+
+
+def _find_finding(scan: dict[str, Any], title_substr: str) -> dict[str, Any] | None:
+    needle = title_substr.lower()
+    for f in _findings_list(scan):
+        if needle in str(f.get("title") or "").lower():
+            return f
+    return None
+
+
+def is_dmarc_strict(scan: dict[str, Any]) -> bool:
+    """DMARC policy is ``quarantine`` or ``reject`` (the two strict policies)."""
+    f = _find_finding(scan, "dmarc")
+    if not f:
+        return False
+    haystack = " ".join(
+        str(f.get(k) or "")
+        for k in ("technical_detail", "description")
+    ).lower()
+    if re.search(r"\bp\s*=\s*reject\b", haystack):
+        return True
+    if re.search(r"\bp\s*=\s*quarantine\b", haystack):
+        return True
+    return False
+
+
+def is_spf_strict(scan: dict[str, Any]) -> bool:
+    """SPF record ends in ``-all`` (strict fail). ``~all`` does not count."""
+    f = _find_finding(scan, "spf")
+    if not f:
+        return False
+    haystack = " ".join(
+        str(f.get(k) or "")
+        for k in ("technical_detail", "description")
+    ).lower()
+    return "-all" in haystack
+
+
+def _insurance_readiness_pct(scan: dict[str, Any]) -> int | None:
+    raw = scan.get("findings")
+    findings_obj = raw if isinstance(raw, dict) else {}
+    for src in (findings_obj, scan):
+        ins = src.get("insurance_readiness") if isinstance(src, dict) else None
+        if isinstance(ins, dict):
+            score = ins.get("score") or ins.get("overall") or ins.get("pct")
+            if isinstance(score, (int, float)):
+                return int(score)
+        elif isinstance(ins, (int, float)):
+            return int(ins)
+    return None
+
+
+def is_insurance_readiness_above_80(scan: dict[str, Any]) -> bool:
+    pct = _insurance_readiness_pct(scan)
+    return pct is not None and pct >= 80
+
+
 def _milestone_exists(client_id: str, key: str) -> bool:
     r = httpx.get(
         f"{SUPABASE_URL}/rest/v1/client_security_milestones",
@@ -84,7 +153,18 @@ def _insert_milestone(client_id: str, key: str, metadata: dict[str, Any]) -> Non
 
 def ensure_portal_milestones(client_id: str, prospect_id: str | None) -> None:
     """
-    Insert hawk_certified / thirty_days_clean when criteria are met (idempotent via unique constraint).
+    Insert HAWK Certified tracker milestones when criteria are met (idempotent via unique constraint).
+
+    Milestones awarded here:
+      - ``hawk_certified``                 — read off ``clients.certified_at``.
+      - ``dmarc_strict``                   — latest scan shows DMARC ``p=quarantine`` or ``p=reject``.
+      - ``spf_strict``                     — latest scan shows SPF ending in ``-all``.
+      - ``insurance_readiness_above_80``   — latest scan emits readiness ≥ 80%.
+      - ``fourteen_days_zero_critical``    — ≥ 14 days since first scan and latest scan has no critical.
+      - ``thirty_days_clean``              — ≥ 30 days since first scan and latest scan has no critical/high.
+
+    ``first_critical_fix`` and ``score_above_70`` are emitted from
+    ``crm_portal_api`` when a fix is verified, not here.
     """
     if not SUPABASE_URL or not SERVICE_KEY or not client_id:
         return
@@ -118,24 +198,129 @@ def ensure_portal_milestones(client_id: str, prospect_id: str | None) -> None:
     if sc.status_code != 200:
         return
     scans = sc.json() or []
-    if len(scans) < 1:
+    if not scans:
         return
-
-    now = datetime.now(timezone.utc)
-    first_at = _parse_ts(scans[0].get("created_at"))
-    if first_at:
-        if first_at.tzinfo is None:
-            first_at = first_at.replace(tzinfo=timezone.utc)
-        if now - first_at < timedelta(days=30):
-            return
 
     latest = scans[-1]
-    if _scan_has_critical_or_high(latest):
-        return
 
-    if not _milestone_exists(client_id, "thirty_days_clean"):
+    # Per-scan posture milestones (no tenure requirement).
+    if is_dmarc_strict(latest) and not _milestone_exists(client_id, "dmarc_strict"):
+        _insert_milestone(client_id, "dmarc_strict", {"scan_id": latest.get("id")})
+    if is_spf_strict(latest) and not _milestone_exists(client_id, "spf_strict"):
+        _insert_milestone(client_id, "spf_strict", {"scan_id": latest.get("id")})
+    if is_insurance_readiness_above_80(latest) and not _milestone_exists(
+        client_id, "insurance_readiness_above_80"
+    ):
         _insert_milestone(
             client_id,
-            "thirty_days_clean",
-            {"latest_scan_id": latest.get("id"), "rule": "30d_tenure_no_ch_on_latest"},
+            "insurance_readiness_above_80",
+            {"scan_id": latest.get("id"), "pct": _insurance_readiness_pct(latest)},
         )
+
+    # Tenure-gated milestones.
+    now = datetime.now(timezone.utc)
+    first_at = _parse_ts(scans[0].get("created_at"))
+    if not first_at:
+        return
+    if first_at.tzinfo is None:
+        first_at = first_at.replace(tzinfo=timezone.utc)
+    age = now - first_at
+
+    if age >= timedelta(days=14) and not _scan_has_critical(latest):
+        if not _milestone_exists(client_id, "fourteen_days_zero_critical"):
+            _insert_milestone(
+                client_id,
+                "fourteen_days_zero_critical",
+                {"latest_scan_id": latest.get("id"), "rule": "14d_tenure_no_critical_on_latest"},
+            )
+
+    if age >= timedelta(days=30) and not _scan_has_critical_or_high(latest):
+        if not _milestone_exists(client_id, "thirty_days_clean"):
+            _insert_milestone(
+                client_id,
+                "thirty_days_clean",
+                {"latest_scan_id": latest.get("id"), "rule": "30d_tenure_no_ch_on_latest"},
+            )
+
+
+# ---------------------------------------------------------------------------
+# 7-step "HAWK Certified" tracker registry. Order matters — frontend renders
+# top-to-bottom. Add/edit ``HAWK_CERTIFIED_STEPS`` when the spec changes.
+# ---------------------------------------------------------------------------
+
+HAWK_CERTIFIED_STEPS: list[dict[str, str]] = [
+    {
+        "key": "first_critical_fix",
+        "title": "Verify your first critical fix",
+        "blurb": "Resolve and rescan one Critical finding from your scan.",
+    },
+    {
+        "key": "spf_strict",
+        "title": "Lock down SPF (-all)",
+        "blurb": "Tighten SPF to a hard-fail policy so spoofers can't impersonate you.",
+    },
+    {
+        "key": "dmarc_strict",
+        "title": "Move DMARC to quarantine or reject",
+        "blurb": "Stop spoofed mail at the recipient. p=none doesn't protect anyone.",
+    },
+    {
+        "key": "insurance_readiness_above_80",
+        "title": "Reach 80% insurance readiness",
+        "blurb": "Hit the threshold most cyber-liability underwriters look for.",
+    },
+    {
+        "key": "score_above_70",
+        "title": "Reach a HAWK score of 70+",
+        "blurb": "70+ means you've cleared the major exposure categories.",
+    },
+    {
+        "key": "fourteen_days_zero_critical",
+        "title": "14 days with zero criticals",
+        "blurb": "Two clean weeks. Drift hasn't pulled new criticals back into scope.",
+    },
+    {
+        "key": "thirty_days_clean",
+        "title": "30 days clean (no critical or high)",
+        "blurb": "A full month of clean scans. You qualify for HAWK Certified.",
+    },
+]
+
+
+def hawk_certified_progress(
+    milestones: list[dict[str, Any]] | None,
+    *,
+    certified_at: str | None = None,
+) -> dict[str, Any]:
+    """Project a list of milestone rows into the 7-step tracker shape.
+
+    Returns ``{"steps": [...], "completed": int, "total": int, "certified_at": str|None}``
+    where each step has ``key``, ``title``, ``blurb``, ``done`` (bool), and ``achieved_at``
+    (ISO string or None). Designed to be safe to call with an empty/None list.
+    """
+    by_key: dict[str, str] = {}
+    for m in milestones or []:
+        if not isinstance(m, dict):
+            continue
+        k = m.get("milestone_key")
+        ts = m.get("achieved_at")
+        if isinstance(k, str) and isinstance(ts, str) and k not in by_key:
+            by_key[k] = ts
+
+    steps: list[dict[str, Any]] = []
+    for entry in HAWK_CERTIFIED_STEPS:
+        achieved = by_key.get(entry["key"])
+        steps.append({
+            "key": entry["key"],
+            "title": entry["title"],
+            "blurb": entry["blurb"],
+            "done": achieved is not None,
+            "achieved_at": achieved,
+        })
+    completed = sum(1 for s in steps if s["done"])
+    return {
+        "steps": steps,
+        "completed": completed,
+        "total": len(steps),
+        "certified_at": certified_at,
+    }
