@@ -34,8 +34,12 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 SLA_SCAN_AGE_MIN = int(os.environ.get("SLA_SCAN_AGE_MIN", "10"))
 SLA_SCAN_WATCHDOG_MIN = int(os.environ.get("SLA_SCAN_WATCHDOG_MIN", "15"))
-SLA_SCAN_BATCH = int(os.environ.get("SLA_SCAN_BATCH", "10"))
-SLA_SCAN_CONCURRENCY = int(os.environ.get("SLA_SCAN_CONCURRENCY", "3"))
+# Defaults sized for production scanner pool: 40 domains per tick, 20 concurrent
+# Charlotte scans. Override via env on Railway / Hetzner if a smaller
+# environment can't keep up. The previous 10/3 defaults were dev-tier and
+# couldn't keep up with the post-scan filter feeding Charlotte at peak.
+SLA_SCAN_BATCH = int(os.environ.get("SLA_SCAN_BATCH", "40"))
+SLA_SCAN_CONCURRENCY = int(os.environ.get("SLA_SCAN_CONCURRENCY", "20"))
 # Stuck-post-scan sweep is cheap (Apollo + OpenAI per prospect, no Apify)
 # compared with fresh scans, so it runs on a bigger batch/concurrency budget
 # to chew through backlogs like the 800-prospect incident without waiting a
