@@ -120,18 +120,18 @@ def _insurance_readiness_pct(scan: dict[str, Any]) -> int | None:
             continue
         ins = container.get("insurance_readiness")
         if isinstance(ins, dict):
-            pct = (
-                ins.get("readiness_pct")
-                or ins.get("score")
-                or ins.get("overall")
-                or ins.get("pct")
-            )
-            if isinstance(pct, (int, float)):
-                return int(pct)
-            try:
-                return int(pct) if pct is not None else None
-            except (TypeError, ValueError):
-                continue
+            # Check keys in priority order with explicit ``is None`` so a real
+            # ``readiness_pct: 0`` doesn't fall through to a stale alias.
+            for key in ("readiness_pct", "score", "overall", "pct"):
+                pct = ins.get(key)
+                if pct is None:
+                    continue
+                if isinstance(pct, (int, float)):
+                    return int(pct)
+                try:
+                    return int(pct)
+                except (TypeError, ValueError):
+                    break
         elif isinstance(ins, (int, float)):
             return int(ins)
     return None

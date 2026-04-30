@@ -157,6 +157,28 @@ def test_is_insurance_readiness_above_80_missing_returns_false() -> None:
     assert is_insurance_readiness_above_80({"findings": {"findings": []}}) is False
 
 
+def test_is_insurance_readiness_zero_does_not_fall_through_to_alias() -> None:
+    """A real ``readiness_pct: 0`` must not be treated as missing.
+
+    Regression: if the lookup uses an ``or`` chain, ``readiness_pct: 0`` would
+    fall through to the legacy ``score`` alias and could yield a stale
+    non-zero value, falsely awarding the milestone.
+    """
+    from services.portal_milestones import (
+        _insurance_readiness_pct,
+        is_insurance_readiness_above_80,
+    )
+
+    scan = {
+        "findings": {
+            "insurance_readiness": {"readiness_pct": 0, "score": 95},
+            "findings": [],
+        }
+    }
+    assert _insurance_readiness_pct(scan) == 0
+    assert is_insurance_readiness_above_80(scan) is False
+
+
 # ---------- hawk_certified_progress ----------------------------------------
 
 
