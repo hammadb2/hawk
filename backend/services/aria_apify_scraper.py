@@ -32,6 +32,37 @@ APIFY_BASE = "https://api.apify.com/v2"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
+# Generic mailbox prefixes we will not send cold outreach to. Unaddressed
+# emails (info@, contact@, etc.) burn sender-domain reputation and tank reply
+# rates, so we drop them at extraction time and let the lead fall through to
+# Prospeo → Apollo → suppression instead.
+GENERIC_EMAIL_PREFIXES: frozenset[str] = frozenset({
+    "info", "contact", "hello", "hi", "support", "help", "office", "team",
+    "admin", "administrator", "mail", "email", "enquiries", "enquiry",
+    "inquiries", "inquiry", "sales", "marketing", "hr", "careers", "jobs",
+    "billing", "accounts", "accounting", "finance", "legal", "press",
+    "media", "webmaster", "postmaster", "noreply", "no-reply", "donotreply",
+    "do-not-reply", "general", "frontdesk", "front-desk", "reception",
+    "receptionist", "appointments", "scheduling", "booking", "service",
+})
+
+
+def _is_generic_email(email: str) -> bool:
+    """True when an email's local-part is a role-based / unaddressed mailbox.
+
+    Matches case-insensitively and ignores ``+suffix`` aliases. Used to filter
+    Google-Places-extracted website emails before they win the priority race
+    over Prospeo / Apollo decision-maker contacts.
+    """
+    if not email or "@" not in email:
+        return False
+    local = email.split("@", 1)[0].strip().lower()
+    if not local:
+        return False
+    # Strip "+plus-addressing" alias.
+    base = local.split("+", 1)[0]
+    return base in GENERIC_EMAIL_PREFIXES
+
 # Actor IDs — only Actor 1 (Google Maps) is still used. Actors 2/3/4 have
 # been retired in favour of Apollo contact enrichment (cheaper + verified).
 ACTOR_GOOGLE_MAPS = "compass/crawler-google-places"
@@ -622,17 +653,29 @@ def _map_gmaps_result(item: dict[str, Any], vertical: str, city: str) -> dict[st
         if prov_match:
             province = prov_match.group(1)
 
-    # Extract emails from result
+    # Extract emails from result. Skip role-based / generic mailboxes
+    # (info@, contact@, etc.) so they don't beat Prospeo + Apollo
+    # decision-maker contacts in the priority race downstream — we never
+    # cold-email unaddressed mailboxes.
     emails_found: list[str] = []
-    # compass/crawler-google-places returns emails in various fields
     for field in ("email", "emails", "contactEmail", "emailAddress"):
         val = item.get(field)
+        candidates: list[str] = []
         if isinstance(val, str) and "@" in val:
-            emails_found.append(val.lower().strip())
+            candidates.append(val)
         elif isinstance(val, list):
             for e in val:
                 if isinstance(e, str) and "@" in e:
-                    emails_found.append(e.lower().strip())
+                    candidates.append(e)
+        for raw in candidates:
+            normalized = raw.lower().strip()
+            if _is_generic_email(normalized):
+                logger.debug(
+                    "places: dropped generic-prefix email %s for %s",
+                    normalized, domain,
+                )
+                continue
+            emails_found.append(normalized)
 
     return {
         "business_name": name.strip(),
@@ -874,7 +917,7 @@ def _merge_emails(
         linkedin_url = ""
         email_finder = ""
 
-        a1 = actor1_emails.get(domain) or []
+        a1 = [e for e in (actor1_emails.get(domain) or []) if not _is_generic_email(e)]
         if a1:
             email = a1[0]
             email_finder = "google_maps_website"

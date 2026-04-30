@@ -58,5 +58,6 @@ jobs:
             tests/test_homepage_preset_scan_endpoint.py \
             tests/test_portal_first_login.py \
             tests/test_portal_incident_report.py \
+            tests/test_aria_generic_email_filter.py \
             tests/test_check_railway_env.py \
             -v
