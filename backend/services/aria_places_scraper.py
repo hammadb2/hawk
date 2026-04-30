@@ -22,11 +22,28 @@ logger = logging.getLogger(__name__)
 # Google Places API (New) endpoints
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 
-# Vertical → Google Places search queries
+# Vertical → Google Places search queries. The Google Places (New) text-search
+# endpoint returns ~20 results per query, so we issue 3 phrasings per vertical
+# and dedupe downstream by ``placeId`` / domain. Keep these in lockstep with
+# ``aria_apify_scraper.VERTICAL_QUERIES``,
+# ``apollo_enrichment.VERTICAL_TITLES``,
+# ``aria_rolling_dispatch.VERTICALS``,
+# ``crm_free_scan._ALLOWED_VERTICALS``.
 VERTICAL_QUERIES: dict[str, list[str]] = {
     "dental": ["dental clinic", "dentist office", "dental practice"],
     "legal": ["law firm", "lawyer office", "legal practice"],
     "accounting": ["accounting firm", "CPA firm", "accountant office"],
+    "medical": ["medical practice", "family practice", "primary care clinic"],
+    "optometry": ["optometrist", "eye care clinic", "vision center"],
+    "chiropractic": ["chiropractor", "chiropractic clinic", "spinal care clinic"],
+    "physical_therapy": ["physical therapy clinic", "physiotherapy clinic", "sports rehab clinic"],
+    "mental_health": ["mental health clinic", "therapist office", "psychology practice"],
+    "pharmacy": ["independent pharmacy", "compounding pharmacy", "community pharmacy"],
+    "real_estate": ["real estate agency", "realty office", "real estate brokerage"],
+    "financial_advisor": ["financial advisor", "wealth management firm", "investment advisor"],
+    "insurance": ["insurance agency", "independent insurance agent", "insurance brokerage"],
+    "mortgage": ["mortgage broker", "mortgage lender", "home loan office"],
+    "hr_payroll": ["HR firm", "payroll service", "professional employer organization"],
 }
 
 # US state mapping from Google Places address components (long name → abbreviation).

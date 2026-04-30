@@ -147,7 +147,7 @@ obtain advice from qualified US legal counsel.
 """
 
 
-def build_pipeda_html(
+def build_compliance_html(
     *,
     company_name: str,
     domain: str,

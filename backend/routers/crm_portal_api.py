@@ -19,7 +19,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from routers.crm_auth import require_supabase_uid
-from services.crm_pipeda_report import build_pipeda_html, html_to_pdf_bytes
+from services.crm_compliance_report import build_compliance_html, html_to_pdf_bytes
 from services.crm_openphone import send_sms
 from services.portal_milestones import ensure_portal_milestones
 from services.scanner import run_scan
@@ -113,9 +113,14 @@ def _can_access_prospect(uid: str, prospect_id: str) -> bool:
     return False
 
 
-@router.get("/api/portal/pipeda-report.pdf")
-def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
-    """2D — One-click compliance overview PDF for authenticated portal user."""
+@router.get("/api/portal/compliance-report.pdf")
+def compliance_report_pdf(uid: str = Depends(require_supabase_uid)):
+    """2D — One-click compliance overview PDF for authenticated portal user.
+
+    Maps the latest scan findings to US regulatory themes (HIPAA Security Rule,
+    FTC Safeguards Rule, ABA Formal Opinion 24-514). No Canadian regulators
+    referenced — the previous PIPEDA naming was legacy.
+    """
     if not SUPABASE_URL or not SERVICE_KEY:
         raise HTTPException(status_code=503, detail="Supabase not configured")
 
@@ -156,7 +161,7 @@ def pipeda_report_pdf(uid: str = Depends(require_supabase_uid)):
         if sc_r.status_code == 200 and sc_r.json():
             scan = sc_r.json()[0]
 
-    html = build_pipeda_html(
+    html = build_compliance_html(
         company_name=str(cpp.get("company_name") or cpp.get("domain") or "Client"),
         domain=str(cpp.get("domain") or ""),
         scan=scan,

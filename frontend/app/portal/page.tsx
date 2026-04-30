@@ -86,7 +86,7 @@ function PortalHomeContent() {
   const [portal, setPortal] = useState<PortalProfile | null>(null);
   const [client, setClient] = useState<ClientRow | null>(null);
   const [scan, setScan] = useState<ScanRow | null>(null);
-  const [pipedaBusy, setPipedaBusy] = useState(false);
+  const [complianceReportBusy, setComplianceReportBusy] = useState(false);
   const [remediation, setRemediation] = useState<{
     fixedThisMonth: number;
     inProgress: number;
@@ -320,10 +320,10 @@ function PortalHomeContent() {
     Boolean(portal.guarantee_terms_accepted_at) &&
     needsCompanyDomainForMonitoring(userEmail, portal.domain);
 
-  async function downloadPipedaPdf() {
-    setPipedaBusy(true);
+  async function downloadComplianceReport() {
+    setComplianceReportBusy(true);
     try {
-      const res = await fetch("/api/portal/pipeda-report");
+      const res = await fetch("/api/portal/compliance-report");
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         toast.error(j.error || "Could not generate the report. Try again later.");
@@ -333,13 +333,13 @@ function PortalHomeContent() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "hawk-pipeda-overview.pdf";
+      a.download = "hawk-compliance-overview.pdf";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
       toast.error("Download failed. Check your connection and try again.");
     } finally {
-      setPipedaBusy(false);
+      setComplianceReportBusy(false);
     }
   }
 
@@ -602,10 +602,10 @@ function PortalHomeContent() {
           <Button
             type="button"
             className="mt-3 border border-white/10 bg-ink-800 text-ink-0 shadow-sm hover:bg-ink-900"
-            disabled={pipedaBusy || !scan}
-            onClick={() => void downloadPipedaPdf()}
+            disabled={complianceReportBusy || !scan}
+            onClick={() => void downloadComplianceReport()}
           >
-            {pipedaBusy ? "Preparing PDF…" : "Download compliance overview (PDF)"}
+            {complianceReportBusy ? "Preparing PDF…" : "Download compliance overview (PDF)"}
           </Button>
           {!scan && (
             <p className="mt-2 text-xs text-ink-0">Run or complete a scan first — then this button enables.</p>
