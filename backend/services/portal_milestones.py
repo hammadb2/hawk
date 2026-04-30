@@ -105,14 +105,33 @@ def is_spf_strict(scan: dict[str, Any]) -> bool:
 
 
 def _insurance_readiness_pct(scan: dict[str, Any]) -> int | None:
-    raw = scan.get("findings")
-    findings_obj = raw if isinstance(raw, dict) else {}
-    for src in (findings_obj, scan):
-        ins = src.get("insurance_readiness") if isinstance(src, dict) else None
+    """Return the integer readiness percentage if present.
+
+    Mirrors :func:`services.aria_post_scan_filter._insurance_readiness_pct` —
+    ``compute_insurance_readiness`` (in hawk-scanner-v2) emits
+    ``{"readiness_pct": int, ...}`` and ``aria_sla_auto_scan`` stashes it
+    inside the ``findings`` JSON blob so we can read it without a schema
+    migration. Older scan rows kept it on ``raw_layers`` instead, hence
+    the fallback.
+    """
+    for container_key in ("findings", "raw_layers"):
+        container = scan.get(container_key)
+        if not isinstance(container, dict):
+            continue
+        ins = container.get("insurance_readiness")
         if isinstance(ins, dict):
-            score = ins.get("score") or ins.get("overall") or ins.get("pct")
-            if isinstance(score, (int, float)):
-                return int(score)
+            pct = (
+                ins.get("readiness_pct")
+                or ins.get("score")
+                or ins.get("overall")
+                or ins.get("pct")
+            )
+            if isinstance(pct, (int, float)):
+                return int(pct)
+            try:
+                return int(pct) if pct is not None else None
+            except (TypeError, ValueError):
+                continue
         elif isinstance(ins, (int, float)):
             return int(ins)
     return None

@@ -109,25 +109,46 @@ def test_is_spf_strict_rejects_tilde_all() -> None:
     assert is_spf_strict(_scan_with([finding])) is False
 
 
-def test_is_insurance_readiness_above_80_dict_form() -> None:
+def test_is_insurance_readiness_above_80_uses_real_readiness_pct_key() -> None:
+    """Matches the real shape compute_insurance_readiness emits in hawk-scanner-v2.
+
+    The scanner returns ``{"readiness_pct": int, "tier": str, ...}`` and
+    aria_sla_auto_scan stashes it under ``findings.insurance_readiness``.
+    """
     from services.portal_milestones import is_insurance_readiness_above_80
 
-    scan = {"findings": {"insurance_readiness": {"score": 82}, "findings": []}}
+    scan = {
+        "findings": {
+            "insurance_readiness": {"readiness_pct": 82, "tier": "ready", "summary": "..."},
+            "findings": [],
+        }
+    }
     assert is_insurance_readiness_above_80(scan) is True
 
 
-def test_is_insurance_readiness_above_80_int_form() -> None:
+def test_is_insurance_readiness_above_80_at_threshold() -> None:
     from services.portal_milestones import is_insurance_readiness_above_80
 
-    scan = {"findings": {"insurance_readiness": 80, "findings": []}}
+    scan = {"findings": {"insurance_readiness": {"readiness_pct": 80}, "findings": []}}
     assert is_insurance_readiness_above_80(scan) is True
 
 
 def test_is_insurance_readiness_below_80_returns_false() -> None:
     from services.portal_milestones import is_insurance_readiness_above_80
 
-    scan = {"findings": {"insurance_readiness": {"score": 79}, "findings": []}}
+    scan = {"findings": {"insurance_readiness": {"readiness_pct": 79}, "findings": []}}
     assert is_insurance_readiness_above_80(scan) is False
+
+
+def test_is_insurance_readiness_falls_back_to_raw_layers() -> None:
+    """Older scan rows kept readiness on raw_layers instead of findings."""
+    from services.portal_milestones import is_insurance_readiness_above_80
+
+    scan = {
+        "findings": {"findings": []},
+        "raw_layers": {"insurance_readiness": {"readiness_pct": 90}},
+    }
+    assert is_insurance_readiness_above_80(scan) is True
 
 
 def test_is_insurance_readiness_above_80_missing_returns_false() -> None:
