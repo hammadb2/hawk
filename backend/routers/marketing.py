@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -250,3 +252,42 @@ def free_scan_submit(body: FreeScanBody, request: Request) -> dict[str, Any]:
         reason = result.get("reason") or "invalid_input"
         raise HTTPException(status_code=400, detail=reason)
     return {"ok": True}
+
+
+# ── Homepage preset scan (priority list #45) ────────────────────────────
+#
+# The marketing homepage scanner widget lands far better when visitors land
+# on a pre-populated scan — one that already shows the kind of ugly findings
+# most US SMB sites sit on, even before they type their own domain. We ran
+# 20–30 dental practice sites through the scanner and cached the worst
+# result under ``backend/content/homepage_preset_scan.json`` so the widget
+# hydrates on mount with no extra scan latency.
+#
+# Refresh the cache by running :file:`scripts/pick_worst_dental.py`. The
+# script re-scans the seeds in :file:`scripts/seeds_dental.txt`, picks the
+# worst-scoring one, and overwrites the JSON. The endpoint simply returns
+# whatever is on disk — when the file is missing it returns 404 so the
+# frontend falls back to its original empty "type your domain" idle state.
+
+_PRESET_SCAN_PATH = Path(__file__).resolve().parents[1] / "content" / "homepage_preset_scan.json"
+
+
+@router.get("/api/marketing/homepage-preset-scan")
+def homepage_preset_scan() -> dict[str, Any]:
+    """Return the cached worst-of-N homepage preset scan.
+
+    Raises 404 when the cache file is absent (fresh deploy before the
+    operator has run :file:`scripts/pick_worst_dental.py`) or malformed.
+    The shape matches :class:`PublicScanResult` on the frontend so
+    ``home-scanner.tsx`` can hydrate the widget directly on mount.
+    """
+    if not _PRESET_SCAN_PATH.exists():
+        raise HTTPException(status_code=404, detail="preset-scan cache not populated")
+    try:
+        payload = json.loads(_PRESET_SCAN_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.exception("homepage-preset-scan: cache read failed: %s", exc)
+        raise HTTPException(status_code=500, detail="preset-scan cache unreadable") from exc
+    if not isinstance(payload, dict) or not payload.get("domain"):
+        raise HTTPException(status_code=500, detail="preset-scan cache malformed")
+    return payload

@@ -1,0 +1,51 @@
+# Seed list for scripts/pick_worst_dental.py (priority list #45).
+#
+# ⚠️  PLACEHOLDER CONTENT. The entries below use the IANA-reserved
+# ".example" TLD on purpose — they are NOT real websites and will fail
+# to scan. The shipped cache file
+# (backend/content/homepage_preset_scan.json) is a hand-fabricated
+# worst-case fixture using the same reserved TLD so the marketing
+# homepage does not display findings attributed to a real business.
+#
+# When you are ready to run a real picker round, replace these lines
+# with a list of 20–30 domains you have explicit consent to scan
+# (prospects who opted in, your own domains, or public-by-design
+# targets). Then run:
+#
+#     HAWK_API_BASE=https://<your-api> \
+#         python scripts/pick_worst_dental.py
+#
+# The script will overwrite backend/content/homepage_preset_scan.json
+# with the live worst-of-N result. Lines starting with "#" and blank
+# lines are ignored.
+
+riverside-dental-studio.example
+oakwood-family-dental.example
+mountain-view-orthodontics.example
+lakeside-smile-center.example
+harbor-point-dentistry.example
+bluegrass-dental-group.example
+sunset-cove-dental.example
+ironwood-dental-care.example
+silver-creek-dental.example
+copperline-smiles.example
+meadowbrook-dental.example
+pinegrove-dentistry.example
+cascadia-dental-arts.example
+maplewood-family-smiles.example
+cedar-hollow-dental.example
+riverbend-dental-associates.example
+springhill-dental.example
+summerfield-dental-studio.example
+forestglen-orthodontics.example
+highpoint-dental-care.example
+southshore-smile-clinic.example
+willow-ridge-dentistry.example
+brightwater-dental.example
+ashford-dental-group.example
+stonehaven-family-dental.example
+northstar-orthodontics.example
+valleyview-dental.example
+greenfield-dental-studio.example
+clearlake-dental-center.example
+twinpeaks-family-dentistry.example

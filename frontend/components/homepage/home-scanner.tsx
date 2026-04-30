@@ -1,14 +1,42 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { scansApi, marketingApi, type PublicScanResult } from "@/lib/api";
+import { scansApi, marketingApi, type PublicScanFindingPreview, type PublicScanResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const BRAND = "#FFB800";
+
+/** Severity rank used for the "CRITICAL first" sort (priority list #45).
+ *  Lower rank = worse. Backend `routers/scans._public_scan_findings_preview`
+ *  already orders the payload this way; the defensive client-side sort
+ *  here keeps the UI honest against future shape changes and against the
+ *  `findings_plain` fallback (plain strings don't carry severity — those
+ *  rows all collapse to the same rank and preserve their backend order). */
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  warning: 2,
+  low: 3,
+  info: 4,
+  ok: 5,
+};
+
+function severityRank(s: string | undefined): number {
+  return SEVERITY_RANK[(s || "").toLowerCase()] ?? 6;
+}
+
+function sortPreviewBySeverity(rows: PublicScanFindingPreview[]): PublicScanFindingPreview[] {
+  // Stable sort — preserves backend order within a severity bucket.
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => severityRank(a.row.severity) - severityRank(b.row.severity) || a.i - b.i)
+    .map(({ row }) => row);
+}
 
 function normalizeDomain(raw: string): string {
   let d = raw.trim().toLowerCase();
@@ -114,6 +142,11 @@ function GlobeIcon({ className }: { className?: string }) {
 export function HomeScanner() {
   const [domain, setDomain] = useState("");
   const [phase, setPhase] = useState<"idle" | "scanning" | "done">("idle");
+  /** Priority list #45: homepage widget lands pre-populated with the
+   *  worst-scoring dental domain picked offline by
+   *  `scripts/pick_worst_dental.py`. We keep a ref so the user's own typing
+   *  / scan doesn't get clobbered by a racing hydrate response. */
+  const userInteractedRef = useRef(false);
   const [tickSlot, setTickSlot] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [result, setResult] = useState<PublicScanResult | null>(null);
@@ -161,6 +194,7 @@ export function HomeScanner() {
   }, [phase]);
 
   const onScan = async () => {
+    userInteractedRef.current = true;
     const d = normalizeDomain(domain);
     if (!d || !d.includes(".")) return;
     setPhase("scanning");
@@ -204,11 +238,44 @@ export function HomeScanner() {
     return () => clearSlowTimer();
   }, []);
 
-  const plain = result?.findings_plain || [];
-  const previewRows =
-    result?.findings_preview?.length && result.findings_preview.length > 0
-      ? result.findings_preview
-      : plain.map((text) => ({ text, severity: "medium" }));
+  // Priority list #45: hydrate the widget from the cached worst-of-N dental
+  // preset scan on mount. 404 (cache not populated) → fall back to idle
+  // state. If the user has already typed or clicked Scan, we bail out so
+  // their interaction wins over the preset.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const preset = await marketingApi.getHomepagePresetScan();
+        if (cancelled || userInteractedRef.current || !preset) return;
+        const presetDomain = (preset.domain || "").trim();
+        if (!presetDomain) return;
+        setDomain(presetDomain);
+        setResult(preset);
+        resultRef.current = preset;
+        setPhase("done");
+      } catch {
+        /* swallow — idle state is fine */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const plain = useMemo(() => result?.findings_plain || [], [result]);
+  const previewRows = useMemo(() => {
+    const rows =
+      result?.findings_preview?.length && result.findings_preview.length > 0
+        ? result.findings_preview
+        : plain.map((text) => ({ text, severity: "medium" }));
+    // Priority list #45: CRITICAL first. Backend already sorts the payload
+    // the same way but the defensive client sort makes the contract explicit
+    // and protects the `findings_plain` fallback from silently drifting.
+    return sortPreviewBySeverity(rows);
+  }, [result, plain]);
   const issues = result?.issues_count ?? result?.findings_count ?? 0;
   const dnorm = normalizeDomain(domain);
 
@@ -227,6 +294,7 @@ export function HomeScanner() {
   };
 
   const onDomainChange = (v: string) => {
+    userInteractedRef.current = true;
     setDomain(v);
     if (phase === "done") {
       setPhase("idle");
