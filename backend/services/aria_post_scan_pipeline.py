@@ -55,6 +55,11 @@ import httpx
 from config import SMARTLEAD_API_KEY, SUPABASE_URL
 from services.apollo_enrichment import enrich_single_domain
 from services.aria_apify_scraper import canonical_vertical
+from services.aria_post_scan_filter import (
+    FilterDecision,
+    evaluate as _evaluate_filter,
+    record_decision as _record_filter_decision,
+)
 from services.crm_bool_setting import fetch_crm_bool
 
 logger = logging.getLogger(__name__)
@@ -103,6 +108,76 @@ def _fetch_prospect(prospect_id: str) -> dict[str, Any] | None:
     except Exception as exc:
         logger.warning("post-scan fetch prospect=%s failed: %s", prospect_id, exc)
         return None
+
+
+def _fetch_latest_scan(prospect_id: str) -> dict[str, Any] | None:
+    """Fetch the most recent ``crm_prospect_scans`` row for a prospect.
+
+    Returns ``None`` if Supabase isn't configured or the prospect has no
+    scan rows yet (which is rare in this flow because the post-scan
+    pipeline runs after the scanner persists the row, but we tolerate it).
+    """
+    if not _configured():
+        return None
+    try:
+        r = httpx.get(
+            f"{SUPABASE_URL}/rest/v1/crm_prospect_scans",
+            headers=_sb_headers(),
+            params={
+                "prospect_id": f"eq.{prospect_id}",
+                "select": "hawk_score,grade,findings,raw_layers,breach_cost_estimate,interpreted_findings,created_at",
+                "order": "created_at.desc",
+                "limit": "1",
+            },
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        rows = r.json() or []
+        return rows[0] if rows else None
+    except Exception as exc:
+        logger.warning("post-scan filter scan fetch prospect=%s: %s", prospect_id, exc)
+        return None
+
+
+def _archive_prospect(prospect_id: str, *, reason: str, priority: bool) -> bool:
+    """Mark the prospect ``pipeline_status='archived'`` so the rolling
+    dispatcher and Charlotte both skip it.
+
+    Returns True if the patch landed (or the row was already advanced past
+    the gate), False on hard error so the caller can decide whether to
+    fall back to the original flow.
+
+    Stage stays at ``scanned`` — the scan finding itself is still useful
+    for the portal, dashboards, and the threat-intel feed; only the
+    automated outbound path is shut off.
+    """
+    if not _configured():
+        return False
+    payload: dict[str, Any] = {
+        "pipeline_status": "archived",
+        "vulnerability_found": (reason[:200] if not priority
+                                else f"[PRIORITY] {reason[:190]}"),
+        "last_activity_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        r = httpx.patch(
+            f"{SUPABASE_URL}/rest/v1/prospects",
+            headers=_sb_headers(),
+            params={
+                "id": f"eq.{prospect_id}",
+                # Only archive while the prospect is still in the pre-outbound
+                # set — never overwrite a rep-advanced lead.
+                "stage": "in.(new,scanning,scanned)",
+                "pipeline_status": "in.(new,scanning,scanned)",
+            },
+            json=payload,
+            timeout=15.0,
+        )
+        r.raise_for_status()
+        return True
+    except Exception as exc:
+        logger.warning("post-scan archive patch prospect=%s: %s", prospect_id, exc)
+        return False
 
 
 def _patch_prospect(prospect_id: str, payload: dict[str, Any]) -> None:
@@ -377,6 +452,49 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
     domain = (prospect.get("domain") or "").strip().lower()
     if not domain:
         return {"ok": False, "prospect_id": prospect_id, "reason": "no domain"}
+
+    # ── PASS / ARCHIVE / PRIORITY filter (priority list #15) ────────────
+    #
+    # Decide whether this prospect is worth burning Apollo + OpenAI on
+    # before we spend the credits. ARCHIVE-decisions short-circuit the rest
+    # of the pipeline; PASS-decisions fall through to the existing Apollo
+    # + ZeroBounce + Charlotte flow. The hourly counter logs the bucket
+    # rollover for ops visibility.
+    scan_row = _fetch_latest_scan(prospect_id)
+    decision: FilterDecision | None = None
+    if scan_row is not None:
+        decision = _evaluate_filter(scan_row)
+        _record_filter_decision(decision)
+        logger.info(
+            "post_scan filter prospect=%s decision=%s priority=%s reason=%s",
+            prospect_id,
+            decision.decision,
+            decision.priority,
+            decision.reason,
+        )
+        if decision.decision == "archive":
+            archived = _archive_prospect(
+                prospect_id,
+                reason=decision.reason,
+                priority=decision.priority,
+            )
+            return {
+                "ok": True,
+                "prospect_id": prospect_id,
+                "domain": domain,
+                "outcome": "archived",
+                "priority": decision.priority,
+                "reason": decision.reason,
+                "patched": archived,
+            }
+    else:
+        # No scan row visible — fall through to the legacy Apollo path so
+        # we don't drop a prospect just because the scan write hasn't
+        # propagated yet. The next SLA tick will retry with the row in place.
+        logger.info(
+            "post_scan filter prospect=%s scan_row=missing — falling through to legacy enrichment",
+            prospect_id,
+        )
 
     vertical = _classify_vertical(prospect)
 

@@ -324,11 +324,22 @@ def _write_scan_result(
         breach_cost = result.get("breach_cost_estimate") or {}
         industry = result.get("industry")
 
+        # Stash insurance_readiness inside the findings JSON so the post-scan
+        # filter (#15) can read it without needing a new schema column.
+        # The scanner returns it as a top-level key.
+        ins = result.get("insurance_readiness")
+        findings_payload: dict[str, Any] = {
+            "source": "hawk_scanner_v2_async_sla",
+            "findings": findings,
+        }
+        if isinstance(ins, dict) and ins:
+            findings_payload["insurance_readiness"] = ins
+
         scan_row: dict[str, Any] = {
             "prospect_id": prospect_id,
             "hawk_score": score_int if score_int is not None else 0,
             "grade": result.get("grade"),
-            "findings": {"source": "hawk_scanner_v2_async_sla", "findings": findings},
+            "findings": findings_payload,
             "status": "complete",
             "scan_version": result.get("scan_version") or "2.0",
             "industry": industry,
