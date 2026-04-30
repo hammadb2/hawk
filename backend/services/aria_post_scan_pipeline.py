@@ -54,7 +54,7 @@ import httpx
 
 from config import SMARTLEAD_API_KEY, SUPABASE_URL
 from services.apollo_enrichment import enrich_single_domain
-from services.aria_apify_scraper import canonical_vertical
+from services.aria_apify_scraper import VERTICAL_QUERIES, canonical_vertical
 from services.crm_bool_setting import fetch_crm_bool
 
 logger = logging.getLogger(__name__)
@@ -221,31 +221,48 @@ def _soft_drop(prospect_id: str, domain: str, *, reason: str) -> None:
 
 
 # ── Vertical classification ──────────────────────────────────────────────
+#
+# Hint table for company_name / domain fallback when ``industry`` is missing.
+# ``canonical_vertical`` already covers explicit labels and aliases, so this
+# is only the company-name keyword path. Order matters: more-specific hints
+# (e.g. "orthodont" → dental) come before generic ones. The default is
+# "dental" because that's the historical campaign and the cheapest cross-
+# classification cost.
 
-_DENTAL_HINTS = ("dental", "dentist", "orthodont", "endodont", "periodont")
-_LEGAL_HINTS = ("law", "legal", "attorney", "lawyer", "barrister", "solicitor")
-_ACCOUNTING_HINTS = ("account", "cpa", "bookkeep", "tax", "audit")
+_VERTICAL_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("optometr", "eye care", "vision center"), "optometry"),
+    (("chiropract",), "chiropractic"),
+    (("physical therap", "physiotherap", "rehab"), "physical_therapy"),
+    (("psycholog", "psychiatr", "counsel", "therapy", "behavioral health"), "mental_health"),
+    (("pharmac", "drugstore", "rx "), "pharmacy"),
+    (("realty", "realtor", "real estate", "brokerage"), "real_estate"),
+    (("wealth", "investment advis", "financial advis", "financial planner", "ria "), "financial_advisor"),
+    (("insurance",), "insurance"),
+    (("mortgage", "home loan"), "mortgage"),
+    (("payroll", " peo ", "professional employer"), "hr_payroll"),
+    (("dental", "dentist", "orthodont", "endodont", "periodont"), "dental"),
+    (("law ", " law", "legal", "attorney", "lawyer", "barrister", "solicitor"), "legal"),
+    (("account", "cpa", "bookkeep", "tax ", " tax", "audit"), "accounting"),
+    # generic medical comes last so it doesn't swallow dental / optometry / chiropractic
+    (("medical", "physician", "clinic", "family practice", "primary care"), "medical"),
+)
 
 
 def _classify_vertical(prospect: dict[str, Any]) -> str:
-    """Pick one of {dental, legal, accounting} from prospect metadata."""
+    """Pick one of the supported pipeline verticals from prospect metadata."""
     raw = (prospect.get("industry") or "").lower()
     if raw:
         canon = canonical_vertical(raw)
-        if canon in ("dental", "legal", "accounting"):
+        if canon in VERTICAL_QUERIES:
             return canon
     # Deliberately exclude vulnerability_found — scan findings regularly contain
     # words like "audit" / "law" / "legal hold" which would cross-classify a
-    # dental practice into the accounting or legal campaign.
+    # dental practice into the wrong campaign.
     haystack = " ".join(
         str(prospect.get(k) or "").lower()
         for k in ("company_name", "domain")
     )
-    for hints, bucket in (
-        (_DENTAL_HINTS, "dental"),
-        (_LEGAL_HINTS, "legal"),
-        (_ACCOUNTING_HINTS, "accounting"),
-    ):
+    for hints, bucket in _VERTICAL_HINTS:
         if any(h in haystack for h in hints):
             return bucket
     return "dental"

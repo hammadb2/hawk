@@ -49,7 +49,22 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 # Keep in sync with backend/main.py scheduler registration.
 DAILY_CAP_PER_VERTICAL = int(os.environ.get("ARIA_DAILY_CAP_PER_VERTICAL", "200"))
 DISPATCH_TICK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16]
-VERTICALS = ("dental", "legal", "accounting")
+VERTICALS = (
+    "dental",
+    "legal",
+    "accounting",
+    "medical",
+    "optometry",
+    "chiropractic",
+    "physical_therapy",
+    "mental_health",
+    "pharmacy",
+    "real_estate",
+    "financial_advisor",
+    "insurance",
+    "mortgage",
+    "hr_payroll",
+)
 
 
 def _sb_headers() -> dict[str, str]:

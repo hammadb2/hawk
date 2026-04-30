@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from config import SUPABASE_URL
 from routers.crm_auth import require_supabase_uid
+from services.aria_apify_scraper import VERTICAL_QUERIES as _SUPPORTED_VERTICALS
 from services.aria_pipeline import (
     pause_pipeline,
     resume_pipeline,
@@ -81,7 +82,7 @@ def _require_pipeline_access(uid: str) -> dict[str, Any]:
 # ── Request/Response Models ───────────────────────────────────────────────
 
 class RunPipelineRequest(BaseModel):
-    vertical: str  # "dental", "legal", "accounting"
+    vertical: str  # one of services.aria_apify_scraper.VERTICAL_QUERIES keys
     location: str  # e.g. "USA", "New York, NY"
     batch_size: int = 50
 
@@ -107,8 +108,11 @@ def trigger_pipeline(
     the pipeline executes in the background."""
     prof = _require_pipeline_access(uid)
 
-    if body.vertical not in ("dental", "legal", "accounting"):
-        raise HTTPException(status_code=400, detail="Invalid vertical. Must be dental, legal, or accounting.")
+    if body.vertical not in _SUPPORTED_VERTICALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid vertical. Must be one of: {', '.join(sorted(_SUPPORTED_VERTICALS))}.",
+        )
     if not body.location.strip():
         raise HTTPException(status_code=400, detail="Location is required.")
     if body.batch_size < 1 or body.batch_size > 500:
@@ -302,8 +306,11 @@ def schedule_pipeline(
     """Schedule a pipeline run for a future time."""
     _require_pipeline_access(uid)
 
-    if body.vertical not in ("dental", "legal", "accounting"):
-        raise HTTPException(status_code=400, detail="Invalid vertical.")
+    if body.vertical not in _SUPPORTED_VERTICALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid vertical. Must be one of: {', '.join(sorted(_SUPPORTED_VERTICALS))}.",
+        )
 
     payload = {
         "triggered_by": uid,
