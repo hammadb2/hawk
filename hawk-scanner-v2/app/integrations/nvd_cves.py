@@ -1,12 +1,17 @@
 """Version-aware NVD CVE matching from WhatWeb fingerprints.
 
 Extracts technology **name + version** from WhatWeb output, queries NVD for
-that specific product, and checks whether the detected version falls inside
-the affected version ranges reported by each CVE.  Findings include the exact
-version detected, matching CVE IDs, CVSS scores, and patched versions.
+that specific product, and keeps only the CVEs whose CPE version range covers
+the detected version. Every finding includes the exact version detected, the
+top CVE (highest CVSS), its score, and the best patched version — rendered in
+the spec format::
 
-Falls back to keyword-only search when no version can be extracted (original
-behaviour).
+    WordPress 6.4.1 — CVE-2024-4439, CVSS 8.8, patch to 6.5.3
+
+When a technology is visible but no version can be extracted, the fallback
+layer emits a low-severity informational hint ("version unknown — verify
+vendor advisories") rather than a generic "known CVEs" statement, so clients
+never see the vague ``"<tech> has known CVEs"`` output.
 """
 from __future__ import annotations
 
@@ -63,7 +68,7 @@ _SLASH_VERSION_RE = re.compile(
 
 
 def _parse_version_tuple(v: str) -> tuple[int, ...]:
-    """Parse '2.4.51' → (2, 4, 51)."""
+    """Parse '2.4.51' → (2, 4, 51). Non-numeric components stop parsing."""
     parts: list[int] = []
     for p in v.split("."):
         try:
@@ -71,6 +76,17 @@ def _parse_version_tuple(v: str) -> tuple[int, ...]:
         except ValueError:
             break
     return tuple(parts) or (0,)
+
+
+def _max_version(versions: list[str]) -> str | None:
+    """Pick the semantically largest version string from a list.
+
+    Used to collapse multiple ``versionEndExcluding`` values into a single
+    "upgrade to X" target that clears every matching CVE at once.
+    """
+    if not versions:
+        return None
+    return max(versions, key=_parse_version_tuple)
 
 
 def _version_in_range(
@@ -129,6 +145,19 @@ def _extract_keywords(lines: list[str]) -> list[str]:
     return found
 
 
+def _versioned_techs_from_keywords(
+    lines: list[str], versioned: list[dict[str, str]]
+) -> list[str]:
+    """Return tech keywords visible in fingerprint that have *no* version."""
+    have_version = {v["tech"] for v in versioned}
+    out: list[str] = []
+    for kw in _extract_keywords(lines):
+        tech = kw.lower().replace(" ", "-")
+        if tech not in have_version and kw not in out:
+            out.append(kw)
+    return out
+
+
 async def _nvd_keyword_search(kw: str, settings: Settings) -> list[str]:
     params: dict[str, Any] = {"keywordSearch": kw, "resultsPerPage": 5}
     key = (getattr(settings, "nvd_api_key", None) or os.environ.get("NVD_API_KEY", "") or "").strip()
@@ -185,13 +214,30 @@ def _extract_fix_version(configs: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def _severity_from_cvss(score: float | None) -> str:
+    if score is None:
+        return "medium"
+    if score >= 9.0:
+        return "critical"
+    if score >= 7.0:
+        return "high"
+    if score >= 4.0:
+        return "medium"
+    return "low"
+
+
 async def _nvd_versioned_search(
     tech: str,
     version: str,
     label: str,
     settings: Settings,
 ) -> list[dict[str, Any]]:
-    """Query NVD for a technology keyword and filter CVEs matching the detected version."""
+    """Query NVD for *tech* and keep CVEs whose CPE range covers *version*.
+
+    Each returned dict has ``cve_id``, ``cvss_score`` (float | None),
+    ``cvss_vector`` (str), and ``fix_version`` (str | None). Sorted by CVSS
+    descending so callers can take the first entry as the headline CVE.
+    """
     params: dict[str, Any] = {"keywordSearch": tech, "resultsPerPage": 20}
     key = (getattr(settings, "nvd_api_key", None) or os.environ.get("NVD_API_KEY", "") or "").strip()
     if key:
@@ -211,6 +257,7 @@ async def _nvd_versioned_search(
 
     vulns = data.get("vulnerabilities") or []
     matched: list[dict[str, Any]] = []
+    tech_norm = tech.lower().replace("-", "").replace("_", "")
     for v in vulns:
         cve_obj = v.get("cve") or {}
         cve_id = cve_obj.get("id")
@@ -225,7 +272,7 @@ async def _nvd_versioned_search(
                     if not cm.get("vulnerable", False):
                         continue
                     cpe_uri = (cm.get("criteria") or "").lower()
-                    if tech.lower().replace("-", "").replace("_", "") not in cpe_uri.replace("-", "").replace("_", ""):
+                    if tech_norm not in cpe_uri.replace("-", "").replace("_", ""):
                         continue
                     si = cm.get("versionStartIncluding")
                     se = cm.get("versionStartExcluding")
@@ -235,7 +282,10 @@ async def _nvd_versioned_search(
                         if _version_in_range(version, si, se, ei, ee):
                             version_hit = True
                             if ee:
-                                fix_ver = ee
+                                # Take the lowest versionEndExcluding we see
+                                # within this CVE — that's the earliest fix.
+                                if not fix_ver or _parse_version_tuple(ee) < _parse_version_tuple(fix_ver):
+                                    fix_ver = ee
                     elif version in cpe_uri:
                         version_hit = True
 
@@ -249,9 +299,102 @@ async def _nvd_versioned_search(
                 "cvss_vector": cvss_vector,
                 "fix_version": fix_ver,
             })
-        if len(matched) >= 5:
-            break
-    return matched
+
+    # Sort by CVSS desc (None treated as 0) so the top entry is the worst.
+    matched.sort(key=lambda m: (m.get("cvss_score") or 0.0), reverse=True)
+    return matched[:5]
+
+
+def _build_versioned_finding(
+    label: str,
+    version: str,
+    domain: str,
+    matches: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Render the spec-format finding for a tech/version with >=1 matched CVE."""
+    top = matches[0]
+    top_cve: str = top["cve_id"]
+    top_cvss: float | None = top.get("cvss_score")
+
+    fix_versions = [m["fix_version"] for m in matches if m.get("fix_version")]
+    best_fix = _max_version(fix_versions)
+
+    # Spec headline: "WordPress 6.4.1 — CVE-2024-4439, CVSS 8.8, patch to 6.5.3"
+    cvss_phrase = f"CVSS {top_cvss:.1f}" if top_cvss is not None else "CVSS unknown"
+    title_parts = [f"{label} {version} — {top_cve}, {cvss_phrase}"]
+    if best_fix:
+        title_parts.append(f"patch to {best_fix}")
+    title = ", ".join(title_parts)
+
+    # Per-CVE technical detail, one per line.
+    detail_lines: list[str] = []
+    for m in matches:
+        score = m.get("cvss_score")
+        score_part = f"CVSS {score:.1f}" if score is not None else "CVSS n/a"
+        fix_part = f"patch to {m['fix_version']}" if m.get("fix_version") else "no patch listed"
+        detail_lines.append(f"{m['cve_id']} — {score_part} — {fix_part}")
+    technical_detail = "\n".join(detail_lines)
+
+    description = (
+        f"Detected **{label} {version}** on `{domain}`. "
+        f"{len(matches)} CVE(s) affect this exact version; highest is "
+        f"{top_cve} ({cvss_phrase})."
+    )
+    if best_fix:
+        description += f" Upgrade to {best_fix} to clear every matched CVE."
+
+    remediation = (
+        f"Upgrade {label} from {version}"
+        + (f" to {best_fix}" if best_fix else "")
+        + f" to remediate {top_cve}"
+        + (f" and {len(matches) - 1} other CVE(s)" if len(matches) > 1 else "")
+        + "; verify in a staging environment before rolling out."
+    )
+
+    return {
+        "id": str(uuid.uuid4()),
+        "severity": _severity_from_cvss(top_cvss),
+        "category": "Supply chain",
+        "title": title,
+        "description": description,
+        "technical_detail": technical_detail,
+        "affected_asset": domain,
+        "remediation": remediation,
+        "layer": "nvd_supply_chain",
+        "compliance": ["Vendor patch management"],
+    }
+
+
+def _build_unknown_version_finding(
+    kw: str, domain: str, cve_ids: list[str]
+) -> dict[str, Any]:
+    """Low-severity hint when fingerprint shows *kw* but no version.
+
+    Avoids the vague "known CVEs" framing — explicitly says version detection
+    is required before CVE matching can be authoritative.
+    """
+    sample = ", ".join(cve_ids[:3]) if cve_ids else "none in sample"
+    return {
+        "id": str(uuid.uuid4()),
+        "severity": "info",
+        "category": "Supply chain",
+        "title": f"{kw} detected — version unknown; verify vendor advisories",
+        "description": (
+            f"WhatWeb fingerprinted **{kw}** on `{domain}` but did not expose a "
+            "version string, so exact CVE matching is not possible. A sample "
+            f"of recent NVD records for {kw}: {sample}. "
+            "Run a version scan (or enable server version headers in a "
+            "controlled window) and re-scan for authoritative CVE results."
+        ),
+        "technical_detail": ", ".join(cve_ids[:5]),
+        "affected_asset": domain,
+        "remediation": (
+            f"Identify the installed {kw} version, compare against the latest "
+            "vendor advisory, and patch if below the current supported release."
+        ),
+        "layer": "nvd_supply_chain",
+        "compliance": ["Vendor patch management"],
+    }
 
 
 async def nvd_findings_from_whatweb(
@@ -259,7 +402,7 @@ async def nvd_findings_from_whatweb(
     domain: str,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Version-aware NVD matching with fallback to keyword search."""
+    """Version-aware NVD matching with informational fallback for unknowns."""
     settings = settings or get_settings()
     if os.environ.get("HAWK_NVD_DISABLED", "").strip().lower() in ("1", "true", "yes"):
         return []
@@ -277,81 +420,19 @@ async def nvd_findings_from_whatweb(
         )
         if not matches:
             continue
-        cve_lines: list[str] = []
-        max_cvss: float = 0.0
-        fix_versions: list[str] = []
-        for m in matches:
-            score_str = f" (CVSS {m['cvss_score']:.1f})" if m["cvss_score"] else ""
-            cve_lines.append(f"{m['cve_id']}{score_str}")
-            if m["cvss_score"] and m["cvss_score"] > max_cvss:
-                max_cvss = m["cvss_score"]
-            if m["fix_version"] and m["fix_version"] not in fix_versions:
-                fix_versions.append(m["fix_version"])
+        out.append(_build_versioned_finding(item["label"], item["version"], domain, matches))
 
-        if max_cvss >= 9.0:
-            sev = "critical"
-        elif max_cvss >= 7.0:
-            sev = "high"
-        elif max_cvss >= 4.0:
-            sev = "medium"
-        else:
-            sev = "low"
-
-        fix_note = (
-            f" Upgrade to {' or '.join(fix_versions)} to remediate."
-            if fix_versions else ""
-        )
-        out.append({
-            "id": str(uuid.uuid4()),
-            "severity": sev,
-            "category": "Supply chain",
-            "title": f"CVE match: {item['label']} {item['version']}",
-            "description": (
-                f"Detected **{item['label']} {item['version']}** on `{domain}`. "
-                f"{len(matches)} CVE(s) affect this exact version."
-                f"{fix_note}"
-            ),
-            "technical_detail": "; ".join(cve_lines),
-            "affected_asset": domain,
-            "remediation": (
-                f"Upgrade {item['label']} from {item['version']}"
-                + (f" to {fix_versions[0]}" if fix_versions else "")
-                + "; review each CVE for applicability."
-            ),
-            "layer": "nvd_supply_chain",
-            "compliance": ["Vendor patch management"],
-        })
-
-    if out:
+    # --- Phase 2: fallback — tech visible, no version extracted ---
+    if os.environ.get("HAWK_NVD_KEYWORD_FALLBACK", "1").strip().lower() in ("0", "false", "no"):
         return out
 
-    # --- Phase 2: fallback keyword search (original behaviour) ---
-    kws = _extract_keywords(whatweb_lines)
-    if not kws:
-        return []
-
-    for i, kw in enumerate(kws[:2]):
+    unknowns = _versioned_techs_from_keywords(whatweb_lines, versioned)
+    for i, kw in enumerate(unknowns[:2]):
         if i > 0 and not has_key:
             await asyncio.sleep(6.5)
         cve_ids = await _nvd_keyword_search(kw, settings)
         if not cve_ids:
             continue
-        sev = "medium" if len(cve_ids) >= 2 else "low"
-        desc = (
-            f"NIST NVD lists CVE records when searching for **{kw}**, which appears in your "
-            f"fingerprint for `{domain}`. Verify your exact version against vendor advisories — "
-            "not every CVE applies."
-        )
-        out.append({
-            "id": str(uuid.uuid4()),
-            "severity": sev,
-            "category": "Supply chain",
-            "title": f"NVD: known CVEs related to {kw} (fingerprint)",
-            "description": desc,
-            "technical_detail": ", ".join(cve_ids[:5]),
-            "affected_asset": domain,
-            "remediation": f"Confirm installed versions of {kw}; patch; re-scan after updates.",
-            "layer": "nvd_supply_chain",
-            "compliance": ["Vendor patch management"],
-        })
+        out.append(_build_unknown_version_finding(kw, domain, cve_ids))
+
     return out
