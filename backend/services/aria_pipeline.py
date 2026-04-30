@@ -51,21 +51,51 @@ DRY_RUN = os.environ.get("ARIA_PIPELINE_DRY_RUN", "").strip() == "1"
 SCAN_TIMEOUT = 120.0
 SCAN_CONCURRENCY = 10
 
-# Vertical → Apollo search config
-VERTICAL_CONFIG: dict[str, dict[str, Any]] = {
-    "dental": {
-        "keywords": ["dental", "dentistry", "dental clinic"],
-        "titles": ["dentist", "dental office manager", "clinic owner", "owner", "principal", "managing partner", "practice manager"],
-    },
-    "legal": {
-        "keywords": ["law firm", "legal services", "lawyer"],
-        "titles": ["lawyer", "solicitor", "managing partner", "law firm owner", "owner", "principal", "practice manager"],
-    },
-    "accounting": {
-        "keywords": ["accounting", "CPA", "bookkeeping"],
-        "titles": ["CPA", "accountant", "accounting firm owner", "owner", "principal", "managing partner", "practice manager"],
-    },
+# Vertical → Apollo search config.
+#
+# Derived from the existing per-vertical tables so we don't have a 6th
+# lockstep registry to maintain. ``titles`` comes from
+# ``apollo_enrichment.VERTICAL_TITLES`` (the same dict the dedicated Apollo
+# enrichment client uses). ``keywords`` is derived from
+# ``aria_apify_scraper.VERTICAL_QUERIES`` by stripping the trailing
+# ``{city}`` placeholder, plus a couple of static synonyms for verticals
+# whose query phrasing isn't a great keyword in Apollo's index.
+_KEYWORD_OVERRIDES: dict[str, list[str]] = {
+    "accounting": ["accounting", "CPA", "bookkeeping"],
+    "hr_payroll": ["HR", "payroll", "PEO"],
 }
+
+
+def _apollo_keywords_for(vertical: str) -> list[str]:
+    """Return Apollo ``q_organization_keyword_tags`` candidates for a vertical.
+
+    Falls back to the dental keywords if the vertical is unknown so legacy
+    callers don't break, but every vertical in
+    ``aria_apify_scraper.VERTICAL_QUERIES`` is covered.
+    """
+    from services.aria_apify_scraper import VERTICAL_QUERIES
+
+    if vertical in _KEYWORD_OVERRIDES:
+        return list(_KEYWORD_OVERRIDES[vertical])
+    raw = VERTICAL_QUERIES.get(vertical) or VERTICAL_QUERIES["dental"]
+    head = raw.replace("{city}", "").strip()
+    if not head:
+        head = vertical.replace("_", " ")
+    return [head]
+
+
+def _apollo_titles_for(vertical: str) -> list[str]:
+    """Return Apollo ``person_titles`` for a vertical, falling back to dental."""
+    from services.apollo_enrichment import VERTICAL_TITLES
+
+    return list(VERTICAL_TITLES.get(vertical) or VERTICAL_TITLES["dental"])
+
+
+def _apollo_config_for(vertical: str) -> dict[str, list[str]]:
+    return {
+        "keywords": _apollo_keywords_for(vertical),
+        "titles": _apollo_titles_for(vertical),
+    }
 
 
 def _sb_headers() -> dict[str, str]:
@@ -222,7 +252,7 @@ def step_apollo_pull(
         _update_run(run_id, {"leads_pulled": len(inserted)})
         return inserted
 
-    config = VERTICAL_CONFIG.get(vertical, VERTICAL_CONFIG["dental"])
+    config = _apollo_config_for(vertical)
     body: dict[str, Any] = {
         "page": 1,
         "per_page": min(batch_size, 100),
