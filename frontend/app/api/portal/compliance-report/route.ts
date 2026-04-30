@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   const base = API_URL.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/portal/pipeda-report.pdf`, {
+  const res = await fetch(`${base}/api/portal/compliance-report.pdf`, {
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
 
