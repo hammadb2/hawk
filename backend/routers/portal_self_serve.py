@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from routers.crm_auth import require_supabase_uid_and_email
 from services.portal_bootstrap import bootstrap_portal_account
+from services.portal_first_login import mark_first_portal_login
 from services.portal_primary_domain import set_portal_primary_domain
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -31,3 +32,16 @@ def post_primary_domain(
     """Set the monitored apex domain (required when sign-up email is a generic provider)."""
     uid, _email = auth
     return set_portal_primary_domain(uid, body.domain)
+
+
+@router.post("/mark-first-login-seen")
+def post_mark_first_login_seen(auth: tuple[str, str] = Depends(require_supabase_uid_and_email)):
+    """Stamp ``clients.last_portal_login_at`` for priority list #32.
+
+    Called from ``/portal/welcome`` on mount. PortalGate uses the
+    column's null-ness to decide whether to route first-time visitors
+    into the welcome view, so writing this timestamp is what retires
+    the one-shot redirect for this account.
+    """
+    uid, _email = auth
+    return mark_first_portal_login(uid)
