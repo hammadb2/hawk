@@ -266,17 +266,22 @@ def report_incident(
             logger.exception("incident client email raised: %s", e)
             email_status = "error:unknown"
 
-    # --- Mirror as internal support ticket.
+    # --- Mirror as internal support ticket. Wrap every network call so a
+    # transport-level exception (httpx.TimeoutException / ConnectError) can't
+    # crash the endpoint after the incident row is already persisted.
     ticket_id: str | None = None
-    ceo_pid = _ceo_profile_id()
-    if ceo_pid:
-        ticket_id = _insert_support_ticket_mirror(
-            case_id=case_id,
-            company=company,
-            domain=domain,
-            description=description,
-            ceo_profile_id=ceo_pid,
-        )
+    try:
+        ceo_pid = _ceo_profile_id()
+        if ceo_pid:
+            ticket_id = _insert_support_ticket_mirror(
+                case_id=case_id,
+                company=company,
+                domain=domain,
+                description=description,
+                ceo_profile_id=ceo_pid,
+            )
+    except Exception as e:
+        logger.exception("incident support ticket mirror raised: %s", e)
 
     _patch_incident_statuses(
         incident_id,

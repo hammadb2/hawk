@@ -185,6 +185,53 @@ def test_report_incident_tolerates_openphone_unconfigured(
     assert out["client_email_status"] == "sent"
 
 
+def test_report_incident_tolerates_support_ticket_mirror_crash(
+    monkeypatch: pytest.MonkeyPatch, stub_env: None
+) -> None:
+    """Transport-level errors in the ticket-mirror step must not crash the endpoint
+    after the incident row has already been persisted."""
+    import httpx
+
+    from services import portal_incident_report
+
+    monkeypatch.setattr(portal_incident_report, "get_client_id_for_portal_user", lambda _uid: "cid-42")
+
+    def _flaky_get(url: str, **kwargs: Any) -> _FakeResponse:
+        if "/rest/v1/profiles" in url:
+            raise httpx.ConnectError("simulated transport failure")
+        return _default_get(url, **kwargs)
+
+    monkeypatch.setattr(portal_incident_report.httpx, "get", _flaky_get)
+    monkeypatch.setattr(
+        portal_incident_report.httpx,
+        "post",
+        lambda url, **kw: _FakeResponse(
+            status_code=201,
+            json_body=[{"id": "inc-crash-1"}] if "client_incident_reports" in url else [{"id": "x"}],
+        ),
+    )
+    patch_calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        portal_incident_report.httpx,
+        "patch",
+        lambda url, **kw: (patch_calls.append({"url": url, "json": kw.get("json")}) or _FakeResponse(204)),
+    )
+    monkeypatch.setattr(portal_incident_report, "send_ceo_sms", lambda *_a, **_kw: {"ok": True})
+    monkeypatch.setattr(portal_incident_report, "send_resend", lambda **_kw: {"id": "resend-ok"})
+
+    out = portal_incident_report.report_incident(
+        uid="auth-uid-crash", user_email="user@acme-dental.example", description=""
+    )
+
+    # Endpoint still returns the receipt — the incident is persisted.
+    assert out["ok"] is True
+    assert out["ceo_sms_status"] == "sent"
+    assert out["client_email_status"] == "sent"
+    assert out["support_ticket_id"] is None
+    # Status patch still runs so the row isn't left with pending values.
+    assert patch_calls, "expected status patch to still run even when mirror fails"
+
+
 def test_report_incident_tolerates_resend_unconfigured(
     monkeypatch: pytest.MonkeyPatch, stub_env: None
 ) -> None:
