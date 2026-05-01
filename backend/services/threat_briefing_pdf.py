@@ -163,9 +163,14 @@ def render_weekly_briefing_pdf(
 
     story: list[Any] = []
     story.append(Paragraph("HAWK Weekly Threat Briefing", s_h1))
+    # ``_md_inline`` HTML-escapes the company / industry / week values so
+    # ampersands or angle brackets in a company name (e.g. "Smith &
+    # Associates") don't make reportlab's XML parser reject the meta line.
     story.append(
         Paragraph(
-            f"{company_clean} &middot; {industry_line} &middot; Week of {week}",
+            f"{_md_inline(company_clean)} &middot; "
+            f"{_md_inline(industry_line)} &middot; "
+            f"Week of {_md_inline(week)}",
             s_meta,
         )
     )

@@ -97,6 +97,23 @@ def test_render_weekly_briefing_pdf_escapes_angle_brackets() -> None:
     assert pdf and pdf[:4] == b"%PDF"
 
 
+def test_render_weekly_briefing_pdf_handles_ampersand_in_company_name() -> None:
+    """Reportlab Paragraph parses XML; bare ``&`` in a company name must
+    be escaped before interpolation or the meta line throws and the PDF
+    silently degrades to empty bytes (caught by the outer try/except).
+    """
+    from services.threat_briefing_pdf import render_weekly_briefing_pdf
+
+    pdf = render_weekly_briefing_pdf(
+        company="Smith & Associates, P.C.",
+        title="Test",
+        body_md="hi",
+        industry="legal & advisory",
+        week_start="2026-01-12",
+    )
+    assert pdf and pdf[:4] == b"%PDF"
+
+
 def test_render_weekly_briefing_pdf_renders_markdown_emphasis() -> None:
     """``**bold**`` and ``*italic*`` must produce a valid PDF (no raw stars)."""
     from services.threat_briefing_pdf import render_weekly_briefing_pdf

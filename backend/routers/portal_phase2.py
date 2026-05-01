@@ -611,11 +611,16 @@ def run_weekly_threat_briefings_for_all_clients() -> dict[str, Any]:
                             "content": base64.b64encode(pdf_bytes).decode("ascii"),
                         }
                     ]
+                # Only claim "PDF attached" when we actually attached one;
+                # ``render_weekly_briefing_pdf`` returns ``b""`` if reportlab
+                # is unavailable and the email still goes out without the
+                # attachment.
+                pdf_note = " (PDF attached)" if attachments else ""
                 send_resend(
                     to_email=to_email,
                     subject=f"HAWK Weekly Threat Briefing — {title[:80]}",
                     html=(
-                        f"<p>Your weekly sector briefing is ready (PDF attached).</p>"
+                        f"<p>Your weekly sector briefing is ready{pdf_note}.</p>"
                         f"<pre style='white-space:pre-wrap;font-family:system-ui,sans-serif'>{html_mod.escape(body_md)}</pre>"
                         f"<p><a href='{html_mod.escape(portal_url)}'>Open portal</a></p>"
                     ),
