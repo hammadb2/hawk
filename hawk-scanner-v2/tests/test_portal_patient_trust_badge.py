@@ -226,3 +226,37 @@ def test_embed_snippets_escape_quotes_and_company() -> None:
     # Plain copies of the URLs are preserved for the "copy URL" UI.
     assert out["image_url"] == "https://example.com/badge.svg?id=1&x=2"
     assert out["verify_url"] == "https://example.com/verify"
+
+
+# ---------- PNG rendering ------------------------------------------------
+
+
+def test_patient_trust_badge_png_renders_valid_png() -> None:
+    """cairosvg should produce valid PNG bytes from the badge SVG."""
+    from services.portal_patient_trust_badge import render_patient_trust_badge_svg
+
+    svg = render_patient_trust_badge_svg(
+        company_name="Smile Dental",
+        earned_on="2026-03-15",
+    )
+    import cairosvg
+
+    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"), dpi=192)
+    assert isinstance(png_bytes, bytes)
+    assert len(png_bytes) > 1000
+    # PNG magic number.
+    assert png_bytes[:4] == b"\x89PNG"
+
+
+def test_patient_trust_badge_png_escapes_special_chars() -> None:
+    """SVG with escaped characters should still render to PNG without error."""
+    from services.portal_patient_trust_badge import render_patient_trust_badge_svg
+
+    svg = render_patient_trust_badge_svg(
+        company_name="O'Brien & Associates <LLC>",
+        earned_on="2026-04-01",
+    )
+    import cairosvg
+
+    png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"), dpi=192)
+    assert png_bytes[:4] == b"\x89PNG"
