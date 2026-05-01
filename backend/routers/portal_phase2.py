@@ -523,6 +523,58 @@ def portal_journey_badge(uid: str = Depends(require_supabase_uid)):
     )
 
 
+@router.get("/journey/badge.png")
+def portal_journey_badge_png(uid: str = Depends(require_supabase_uid)):
+    """Return the HAWK Certified badge as PNG (2x DPI). 404 until certified."""
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+    cpp_r = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/client_portal_profiles",
+        headers=_sb(),
+        params={"user_id": f"eq.{uid}", "select": "client_id,company_name", "limit": "1"},
+        timeout=20.0,
+    )
+    cpp_r.raise_for_status()
+    cpp = (cpp_r.json() or [None])[0]
+    if not cpp:
+        raise HTTPException(status_code=404, detail="No portal profile")
+    cid = cpp["client_id"]
+
+    cl = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/clients",
+        headers=_sb(),
+        params={"id": f"eq.{cid}", "select": "company_name,domain,certified_at", "limit": "1"},
+        timeout=20.0,
+    )
+    cl.raise_for_status()
+    client = (cl.json() or [None])[0] or {}
+    certified_at = client.get("certified_at")
+    if not certified_at:
+        raise HTTPException(status_code=404, detail="Not yet HAWK Certified")
+
+    company = (
+        cpp.get("company_name")
+        or client.get("company_name")
+        or client.get("domain")
+        or "Your business"
+    )
+    on = str(certified_at)[:10]
+    svg = _render_certified_badge_svg(str(company), on)
+
+    try:
+        import cairosvg
+        png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"), dpi=192)
+    except Exception as exc:
+        logger.warning("cairosvg PNG render failed: %s", exc)
+        raise HTTPException(status_code=500, detail="PNG rendering unavailable")
+
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Content-Disposition": 'inline; filename="hawk-certified-badge.png"'},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Patient Trust Badge — priority list item #38
 # ---------------------------------------------------------------------------

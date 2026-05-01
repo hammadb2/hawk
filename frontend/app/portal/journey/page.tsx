@@ -165,12 +165,19 @@ export default function PortalJourneyPage() {
               {certifiedAt && (
                 <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
                   <p className="text-sm text-ink-100">
-                    Show off your certification — embed the badge on your website or download as SVG.
+                    Show off your certification — download the badge as PNG or SVG for your website.
                   </p>
+                  <a
+                    href="/api/portal/journey/badge.png"
+                    download="hawk-certified-badge.png"
+                    className="inline-flex items-center gap-2 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
+                  >
+                    Download badge (PNG)
+                  </a>
                   <a
                     href="/api/portal/journey/badge.svg"
                     download="hawk-certified-badge.svg"
-                    className="inline-flex items-center gap-2 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
+                    className="inline-flex items-center gap-2 rounded-full border border-signal/40 px-4 py-2 text-sm font-semibold text-signal transition-colors hover:bg-signal/10"
                   >
                     Download badge (SVG)
                   </a>
