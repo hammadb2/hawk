@@ -80,7 +80,13 @@ def _load_client_context(client_id: str) -> dict[str, Any]:
     r = httpx.get(
         f"{SUPABASE_URL}/rest/v1/clients",
         headers=_headers(),
-        params={"id": f"eq.{client_id}", "select": "id,company_name,domain", "limit": "1"},
+        params={
+            "id": f"eq.{client_id}",
+            "select": "id,company_name,domain,guarantee_status,"
+                      "guarantee_checklist_critical_ok,guarantee_checklist_high_ok,"
+                      "guarantee_checklist_subscription_ok",
+            "limit": "1",
+        },
         timeout=20.0,
     )
     r.raise_for_status()
@@ -294,6 +300,13 @@ def report_incident(
         },
     )
 
+    guarantee_status = client_ctx.get("guarantee_status", "active")
+    guarantee_conditions_met = all([
+        client_ctx.get("guarantee_checklist_critical_ok") is not False,
+        client_ctx.get("guarantee_checklist_high_ok") is not False,
+        client_ctx.get("guarantee_checklist_subscription_ok") is not False,
+    ])
+
     return {
         "ok": True,
         "incident_id": incident_id,
@@ -304,4 +317,6 @@ def report_incident(
         "ceo_sms_status": ceo_sms_status,
         "client_email_status": email_status,
         "support_ticket_id": ticket_id,
+        "guarantee_status": guarantee_status,
+        "guarantee_conditions_met": guarantee_conditions_met,
     }

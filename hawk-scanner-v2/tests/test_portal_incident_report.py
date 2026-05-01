@@ -55,7 +55,15 @@ def _default_get(url: str, **kwargs: Any) -> _FakeResponse:
     if "/rest/v1/clients" in url:
         return _FakeResponse(
             status_code=200,
-            json_body=[{"id": "cid-42", "company_name": "Acme Dental", "domain": "acme-dental.example"}],
+            json_body=[{
+                "id": "cid-42",
+                "company_name": "Acme Dental",
+                "domain": "acme-dental.example",
+                "guarantee_status": "active",
+                "guarantee_checklist_critical_ok": True,
+                "guarantee_checklist_high_ok": True,
+                "guarantee_checklist_subscription_ok": True,
+            }],
         )
     # CEO profile lookup
     if "/rest/v1/profiles" in url:
@@ -136,6 +144,8 @@ def test_report_incident_happy_path_returns_case_id_and_sla(
     assert out["client_email_status"] == "sent"
     assert out["support_ticket_id"] == "ticket-uuid-7"
     assert out["sla_minutes"] == 60
+    assert out["guarantee_status"] == "active"
+    assert out["guarantee_conditions_met"] is True
 
     # Incident row got posted with the expected columns.
     inc_post = next(c for c in post_calls if "client_incident_reports" in c["url"])
@@ -257,3 +267,50 @@ def test_report_incident_tolerates_resend_unconfigured(
 
     assert out["client_email_status"] == "skipped:no_resend_key"
     assert out["ceo_sms_status"] == "sent"
+
+
+def test_report_incident_returns_guarantee_suspended_when_conditions_unmet(
+    monkeypatch: pytest.MonkeyPatch, stub_env: None
+) -> None:
+    from services import portal_incident_report
+
+    monkeypatch.setattr(portal_incident_report, "get_client_id_for_portal_user", lambda _uid: "cid-42")
+
+    def _suspended_get(url: str, **kwargs: Any) -> _FakeResponse:
+        if "/rest/v1/clients" in url:
+            return _FakeResponse(
+                status_code=200,
+                json_body=[{
+                    "id": "cid-42",
+                    "company_name": "Acme Dental",
+                    "domain": "acme-dental.example",
+                    "guarantee_status": "suspended",
+                    "guarantee_checklist_critical_ok": False,
+                    "guarantee_checklist_high_ok": True,
+                    "guarantee_checklist_subscription_ok": True,
+                }],
+            )
+        if "/rest/v1/profiles" in url:
+            return _FakeResponse(status_code=200, json_body=[{"id": "ceo-uuid", "role": "ceo"}])
+        return _FakeResponse(status_code=404, text="unexpected GET")
+
+    monkeypatch.setattr(portal_incident_report.httpx, "get", _suspended_get)
+    monkeypatch.setattr(
+        portal_incident_report.httpx,
+        "post",
+        lambda url, **kw: _FakeResponse(
+            status_code=201,
+            json_body=[{"id": "inc-susp-1"}] if "client_incident_reports" in url else [{"id": "tkt-s"}],
+        ),
+    )
+    monkeypatch.setattr(portal_incident_report.httpx, "patch", lambda *_a, **_kw: _FakeResponse(204))
+    monkeypatch.setattr(portal_incident_report, "send_ceo_sms", lambda *_a, **_kw: {"ok": True})
+    monkeypatch.setattr(portal_incident_report, "send_resend", lambda **_kw: {"id": "resend-s"})
+
+    out = portal_incident_report.report_incident(
+        uid="auth-uid-susp", user_email="user@acme-dental.example", description="ransomware"
+    )
+
+    assert out["ok"] is True
+    assert out["guarantee_status"] == "suspended"
+    assert out["guarantee_conditions_met"] is False

@@ -25,6 +25,15 @@ type IncidentResult = {
   sla_minutes: number;
   ceo_sms_status: string;
   client_email_status: string;
+  guarantee_status: string;
+  guarantee_conditions_met: boolean;
+};
+
+type GuaranteeProps = {
+  guarantee_status: string | null;
+  guarantee_checklist_critical_ok: boolean | null;
+  guarantee_checklist_high_ok: boolean | null;
+  guarantee_checklist_subscription_ok: boolean | null;
 };
 
 function formatDeadline(iso: string): string {
@@ -42,7 +51,19 @@ function formatDeadline(iso: string): string {
   }
 }
 
-export function IncidentReportCard() {
+function guaranteeBadgeClass(status: string | null): string {
+  if (status === "suspended") return "bg-red/10 text-red ring-1 ring-red/30";
+  if (status === "at_risk") return "bg-signal/10 text-signal-700 ring-1 ring-signal/30";
+  return "bg-signal/10 text-signal-600 ring-1 ring-signal/20";
+}
+
+function guaranteeLabel(status: string | null): string {
+  if (status === "suspended") return "SUSPENDED";
+  if (status === "at_risk") return "AT RISK";
+  return "ACTIVE";
+}
+
+export function IncidentReportCard({ guarantee }: { guarantee?: GuaranteeProps | null }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [description, setDescription] = useState("");
@@ -81,6 +102,8 @@ export function IncidentReportCard() {
         sla_minutes: res.sla_minutes,
         ceo_sms_status: res.ceo_sms_status,
         client_email_status: res.client_email_status,
+        guarantee_status: res.guarantee_status,
+        guarantee_conditions_met: res.guarantee_conditions_met,
       });
       setConfirmOpen(false);
       setDescription("");
@@ -106,6 +129,19 @@ export function IncidentReportCard() {
           <dt>Client email</dt>
           <dd className="font-mono text-ink-100">{result.client_email_status}</dd>
         </dl>
+        <div className="mt-3 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2">
+          <p className="text-xs font-medium text-ink-200">Breach response guarantee</p>
+          <div className="mt-1 flex items-center gap-2">
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${guaranteeBadgeClass(result.guarantee_status)}`}>
+              {guaranteeLabel(result.guarantee_status)}
+            </span>
+            <span className="text-xs text-ink-200">
+              {result.guarantee_conditions_met
+                ? "All conditions met — coverage applies to this incident."
+                : "One or more conditions unmet — review your guarantee checklist."}
+            </span>
+          </div>
+        </div>
         <p className="mt-3 text-xs text-ink-200">
           A confirmation email is on its way. If you need to add context (timeline, affected
           systems, suspicious emails), reply to that thread.
@@ -117,6 +153,18 @@ export function IncidentReportCard() {
   return (
     <div className="rounded-xl border border-red/30 bg-red/5 p-4">
       <h2 className="text-sm font-semibold text-red">Report a security incident</h2>
+      {guarantee && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${guaranteeBadgeClass(guarantee.guarantee_status)}`}>
+            {guaranteeLabel(guarantee.guarantee_status)}
+          </span>
+          <span className="text-xs text-ink-200">
+            Breach response guarantee
+            {guarantee.guarantee_status === "suspended" && " — conditions unmet"}
+            {guarantee.guarantee_status === "at_risk" && " — resolve findings to stay covered"}
+          </span>
+        </div>
+      )}
       <p className="mt-2 text-sm text-ink-200">
         Hit this if you suspect an active breach — suspicious logins, extortion emails, ransomware
         notes, unauthorized wire requests, anything unusual. One click pages our response team with

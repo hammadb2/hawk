@@ -578,7 +578,14 @@ function PortalHomeContent() {
       </section>
 
       <section>
-        <IncidentReportCard />
+        <IncidentReportCard
+          guarantee={client ? {
+            guarantee_status: client.guarantee_status,
+            guarantee_checklist_critical_ok: client.guarantee_checklist_critical_ok,
+            guarantee_checklist_high_ok: client.guarantee_checklist_high_ok,
+            guarantee_checklist_subscription_ok: client.guarantee_checklist_subscription_ok,
+          } : null}
+        />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
