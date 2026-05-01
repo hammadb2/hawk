@@ -665,6 +665,40 @@ def portal_patient_trust_badge_svg(
     )
 
 
+@router.get("/patient-trust-badge.png")
+def portal_patient_trust_badge_png(
+    uid: str = Depends(require_supabase_uid),
+) -> Response:
+    """Return the Patient Trust Badge as PNG (2x DPI). 403 if not eligible."""
+    bundle = load_portal_client_bundle(uid)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="No portal profile")
+    elig = patient_trust_eligibility(bundle)
+    if not elig.get("eligible"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Not eligible: {elig.get('reason') or 'unknown'}",
+        )
+    svg = render_patient_trust_badge_svg(
+        company_name=_patient_trust_company(bundle),
+        earned_on=_patient_trust_earned_on(bundle),
+    )
+    try:
+        import cairosvg
+        png_bytes = cairosvg.svg2png(bytestring=svg.encode("utf-8"), dpi=192)
+    except Exception as exc:
+        logger.warning("cairosvg patient trust PNG render failed: %s", exc)
+        raise HTTPException(status_code=500, detail="PNG rendering unavailable")
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": 'inline; filename="hawk-patient-trust-badge.png"',
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
 def run_weekly_threat_briefings_for_all_clients() -> dict[str, Any]:
     """Called from cron — generates this week's briefing per portal client and emails."""
     if not SUPABASE_URL or not SERVICE_KEY:

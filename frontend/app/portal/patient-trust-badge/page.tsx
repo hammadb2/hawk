@@ -115,9 +115,16 @@ export default function PatientTrustBadgePage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <a
+                      href="/api/portal/patient-trust-badge.png"
+                      download="hawk-patient-trust-badge.png"
+                      className="inline-flex items-center gap-2 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
+                    >
+                      Download PNG
+                    </a>
+                    <a
                       href="/api/portal/patient-trust-badge.svg"
                       download="hawk-patient-trust-badge.svg"
-                      className="inline-flex items-center gap-2 rounded-full bg-signal px-4 py-2 text-sm font-semibold text-ink-950 shadow-signal-sm transition-colors hover:bg-signal-400"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-ink-100 transition-colors hover:bg-white/5"
                     >
                       Download SVG
                     </a>
@@ -134,6 +141,23 @@ export default function PatientTrustBadgePage() {
               </div>
 
               <div className="mt-6 space-y-4 border-t border-white/10 pt-5">
+                <div>
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-200">
+                    Display in your waiting room
+                  </h2>
+                  <p className="mt-1 text-xs text-ink-200">
+                    Print the PNG at 5×3&quot; or larger and frame it near your check-in desk
+                    or in your waiting area. Patients see that their data is protected
+                    before they hand over any information.
+                  </p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-ink-200">
+                    <li>Download the PNG above (high-resolution, print-ready at 2x DPI).</li>
+                    <li>Print at 5×3&quot; minimum — use a color laser printer or your office print service.</li>
+                    <li>Place in a small frame near the front desk, check-in tablet, or intake clipboard.</li>
+                    <li>Optionally add a line: &quot;Scan the QR code or visit securedbyhawk.com/verify to confirm.&quot;</li>
+                  </ol>
+                </div>
+
                 <div>
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-200">
                     Embed on your website
