@@ -247,6 +247,8 @@ export const portalApi = {
       ceo_sms_status: string;
       client_email_status: string;
       support_ticket_id: string | null;
+      guarantee_status: string;
+      guarantee_conditions_met: boolean;
     }>("/api/portal/incident-report", {
       method: "POST",
       body: JSON.stringify(body),
