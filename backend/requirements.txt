@@ -16,6 +16,7 @@ python-multipart>=0.0.6
 # PDF — user scan reports (ReportLab); compliance overview / CRM monthly still use WeasyPrint — see backend/Dockerfile for Railway.
 reportlab>=4.0
 weasyprint>=61.0
+cairosvg>=2.7.0
 supabase>=2.7.0
 python-dotenv>=1.0.0
 apscheduler>=3.10.0

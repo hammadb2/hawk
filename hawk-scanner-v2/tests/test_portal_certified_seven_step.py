@@ -327,3 +327,31 @@ def test_badge_svg_escapes_html_in_company_name() -> None:
     assert "<script>" not in svg
     assert "&amp;" in svg
     assert "&quot;" in svg or "&#x27;" in svg or "&#34;" in svg
+
+
+# ---------- badge PNG (priority list #35 — PNG download) -------------------
+
+
+def test_badge_png_renders_valid_png() -> None:
+    """SVG→PNG conversion via cairosvg produces a valid PNG header."""
+    from routers.portal_phase2 import _render_certified_badge_svg
+
+    import cairosvg
+
+    svg = _render_certified_badge_svg("Smile Dental", "2026-05-01")
+    png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), dpi=192)
+    assert isinstance(png, bytes)
+    assert len(png) > 1000
+    # PNG magic bytes
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_badge_png_renders_with_special_chars() -> None:
+    """Company names with special chars don't crash PNG rendering."""
+    from routers.portal_phase2 import _render_certified_badge_svg
+
+    import cairosvg
+
+    svg = _render_certified_badge_svg('O\'Brien & Associates "LLC"', "2026-05-01")
+    png = cairosvg.svg2png(bytestring=svg.encode("utf-8"), dpi=192)
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
