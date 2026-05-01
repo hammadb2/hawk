@@ -28,6 +28,11 @@ from services.portal_milestones import (
     ensure_portal_milestones,
     hawk_certified_progress,
 )
+from services.portal_patient_trust_badge import (
+    embed_snippets as patient_trust_embed_snippets,
+    patient_trust_eligibility,
+    render_patient_trust_badge_svg,
+)
 from services.scanner import run_scan
 
 logger = logging.getLogger(__name__)
@@ -457,6 +462,96 @@ def portal_journey_badge(uid: str = Depends(require_supabase_uid)):
         content=svg,
         media_type="image/svg+xml",
         headers={"Content-Disposition": 'inline; filename="hawk-certified-badge.svg"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Patient Trust Badge — priority list item #38
+# ---------------------------------------------------------------------------
+
+
+def _patient_trust_company(bundle: dict[str, Any]) -> str:
+    """Pick the friendliest display name for the badge's practice line."""
+    cpp = bundle.get("cpp") or {}
+    client = bundle.get("client") or {}
+    prospect = bundle.get("prospect") or {}
+    return str(
+        cpp.get("company_name")
+        or client.get("company_name")
+        or prospect.get("company_name")
+        or prospect.get("domain")
+        or cpp.get("domain")
+        or "Your practice"
+    )
+
+
+def _patient_trust_earned_on(bundle: dict[str, Any]) -> str:
+    client = bundle.get("client") or {}
+    raw = client.get("certified_at") or ""
+    return str(raw)[:10]
+
+
+@router.get("/patient-trust-badge")
+def portal_patient_trust_badge_status(
+    uid: str = Depends(require_supabase_uid),
+) -> dict[str, Any]:
+    """Return eligibility + embed snippets for the Patient Trust Badge.
+
+    Always returns 200 — the UI inspects ``eligible`` and renders either
+    the download/embed UI or a "what you need to do to earn this" tile.
+    """
+    bundle = load_portal_client_bundle(uid)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="No portal profile")
+
+    eligibility = patient_trust_eligibility(bundle)
+
+    base = os.environ.get("CRM_PUBLIC_BASE_URL", "https://securedbyhawk.com").rstrip("/")
+    badge_url = f"{base}/api/portal/patient-trust-badge.svg"
+    verify_url = f"{base}/portal/patient-trust-badge"
+    snippets = patient_trust_embed_snippets(
+        badge_url=badge_url,
+        verify_url=verify_url,
+        company_name=_patient_trust_company(bundle),
+    )
+    return {
+        "eligibility": eligibility,
+        "company_name": _patient_trust_company(bundle),
+        "earned_on": _patient_trust_earned_on(bundle),
+        "badge_url": badge_url,
+        "verify_url": verify_url,
+        "embed": snippets,
+    }
+
+
+@router.get("/patient-trust-badge.svg")
+def portal_patient_trust_badge_svg(
+    uid: str = Depends(require_supabase_uid),
+) -> Response:
+    """Return the Patient Trust Badge SVG. 403 if the client isn't eligible."""
+    bundle = load_portal_client_bundle(uid)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="No portal profile")
+    elig = patient_trust_eligibility(bundle)
+    if not elig.get("eligible"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Not eligible: {elig.get('reason') or 'unknown'}",
+        )
+    svg = render_patient_trust_badge_svg(
+        company_name=_patient_trust_company(bundle),
+        earned_on=_patient_trust_earned_on(bundle),
+    )
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={
+            "Content-Disposition": 'inline; filename="hawk-patient-trust-badge.svg"',
+            # Public cache for 1h — badge content only changes when
+            # certification status flips, so a short TTL is safe and
+            # offloads CDN traffic.
+            "Cache-Control": "public, max-age=3600",
+        },
     )
 
 
