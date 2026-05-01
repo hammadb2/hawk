@@ -12,6 +12,8 @@ type Finding = {
   severity?: string;
   title?: string;
   description?: string;
+  interpretation?: string;
+  fix_guide?: string;
   layer?: string;
   screenshot_data_url?: string;
 };
@@ -34,6 +36,7 @@ export default function PortalFindingsPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [statusMap, setStatusMap] = useState<Record<string, StatusRow>>({});
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -198,6 +201,25 @@ export default function PortalFindingsPage() {
                     <td className="max-w-md px-4 py-3 text-ink-0">
                       <div className="font-medium">{f.title || "Finding"}</div>
                       {f.description && <p className="mt-1 text-xs text-ink-200 line-clamp-3">{f.description}</p>}
+                      {f.interpretation && (
+                        <p className="mt-1 text-xs text-ink-100 italic">{f.interpretation}</p>
+                      )}
+                      {f.fix_guide && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedGuide(expandedGuide === fid ? null : fid)}
+                            className="text-xs font-medium text-signal hover:underline"
+                          >
+                            {expandedGuide === fid ? "Hide fix guide ▲" : "How to fix ▼"}
+                          </button>
+                          {expandedGuide === fid && (
+                            <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-white/10 bg-black/30 p-3 text-xs leading-relaxed text-ink-100">
+                              {f.fix_guide}
+                            </pre>
+                          )}
+                        </div>
+                      )}
                       {f.screenshot_data_url && f.screenshot_data_url.startsWith("data:image") && (
                         <div className="mt-3">
                           <p className="mb-1 text-[10px] font-medium uppercase text-ink-200">Live view</p>
