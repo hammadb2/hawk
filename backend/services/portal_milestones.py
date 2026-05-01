@@ -100,15 +100,20 @@ def is_dmarc_strict(scan: dict[str, Any]) -> bool:
 def is_spf_strict(scan: dict[str, Any]) -> bool:
     """SPF record ends in ``-all`` (strict fail). ``~all`` does not count.
 
+    Anchored to the end of the trimmed record (after stripping wrapping
+    quotes and whitespace). Substring matching is unsafe because include
+    domains like ``include:mail-allservices.example.com ~all`` contain
+    ``-all`` inside the hostname.
+
     Only inspects ``technical_detail`` (the literal SPF DNS record) — the
-    ``description`` for a ``~all`` softfail explicitly recommends ``-all`` so
-    substring-matching it would always falsely award the milestone.
+    ``description`` for a ``~all`` softfail explicitly recommends ``-all``
+    so substring-matching it would always falsely award the milestone.
     """
     f = _find_finding(scan, "spf")
     if not f:
         return False
-    record = str(f.get("technical_detail") or "").lower()
-    return "-all" in record
+    record = str(f.get("technical_detail") or "").lower().strip().strip('"').strip()
+    return record.endswith("-all")
 
 
 def _insurance_readiness_pct(scan: dict[str, Any]) -> int | None:

@@ -144,6 +144,37 @@ def test_is_spf_strict_rejects_tilde_all_with_real_description() -> None:
     assert is_spf_strict(_scan_with([finding])) is False
 
 
+def test_is_spf_strict_rejects_dash_all_inside_include_hostname() -> None:
+    """An include domain containing the substring ``-all`` must not pass.
+
+    Regression for the ``"-all" in record`` substring match — an include
+    like ``include:mail-allservices.example.com ~all`` would otherwise
+    falsely award the milestone even though the actual mechanism is ``~all``.
+    """
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "low",
+        "description": "SPF uses softfail (~all) — acceptable.",
+        "technical_detail": "v=spf1 include:mail-allservices.example.com ~all",
+    }
+    assert is_spf_strict(_scan_with([finding])) is False
+
+
+def test_is_spf_strict_handles_quoted_record() -> None:
+    """DNS TXT records sometimes round-trip with wrapping quotes."""
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "ok",
+        "description": "SPF uses strict fail (-all) — good.",
+        "technical_detail": '"v=spf1 include:_spf.google.com -all"',
+    }
+    assert is_spf_strict(_scan_with([finding])) is True
+
+
 def test_is_spf_strict_rejects_permissive_all_with_real_description() -> None:
     """Real scanner advice for +all/permissive mentions "-all or ~all"; must not match."""
     from services.portal_milestones import is_spf_strict
