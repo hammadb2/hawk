@@ -1,0 +1,329 @@
+"""Unit tests for the HAWK Certified 7-step tracker (priority list #35).
+
+Covers:
+
+1. The detection helpers (``is_dmarc_strict``, ``is_spf_strict``,
+   ``is_insurance_readiness_above_80``) against realistic finding rows
+   matching what the email_security analyzer + insurance_readiness pipe
+   produce, plus negative cases.
+2. ``hawk_certified_progress`` projects a list of milestone rows into
+   the 7-step structure with correct ``done`` / ``achieved_at`` values.
+3. ``_render_certified_badge_svg`` produces well-formed SVG with the
+   company name + cert date HTML-escaped (no XSS via SVG ``<text>``).
+"""
+from __future__ import annotations
+
+import pathlib
+import sys
+
+import pytest
+
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+_BACKEND = _REPO_ROOT / "backend"
+if str(_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_BACKEND))
+
+
+# ---------- detection helpers ----------------------------------------------
+
+
+# Description strings here mirror the real scanner output verbatim
+# (see hawk-scanner-v2/app/analysis/email_security.py:46-69) so we
+# catch substring-matching false positives like
+# "DMARC p=none ... increase to quarantine/reject."
+
+
+@pytest.fixture
+def dmarc_finding_strict() -> dict:
+    return {
+        "title": "DMARC policy",
+        "severity": "ok",
+        "description": "DMARC policy is reject — strong.",
+        "technical_detail": "v=DMARC1; p=reject; rua=mailto:dmarc@example.com",
+    }
+
+
+@pytest.fixture
+def dmarc_finding_quarantine() -> dict:
+    return {
+        "title": "DMARC policy",
+        "severity": "low",
+        "description": "DMARC policy is quarantine — good; consider reject when stable.",
+        "technical_detail": "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com",
+    }
+
+
+@pytest.fixture
+def dmarc_finding_none() -> dict:
+    """Real ``p=none`` description mentions both stricter policies as advice."""
+    return {
+        "title": "DMARC policy",
+        "severity": "medium",
+        "description": "DMARC p=none — monitoring only; increase to quarantine/reject.",
+        "technical_detail": "v=DMARC1; p=none; rua=mailto:dmarc@example.com",
+    }
+
+
+@pytest.fixture
+def dmarc_finding_missing() -> dict:
+    """When no DMARC record exists, technical_detail is empty per the analyzer."""
+    return {
+        "title": "DMARC policy",
+        "severity": "high",
+        "description": "No DMARC record — phishing and spoofing harder to detect.",
+        "technical_detail": "",
+    }
+
+
+def _scan_with(findings: list[dict]) -> dict:
+    return {"id": "scan-1", "findings": {"findings": findings}}
+
+
+def test_is_dmarc_strict_accepts_reject(dmarc_finding_strict: dict) -> None:
+    from services.portal_milestones import is_dmarc_strict
+
+    assert is_dmarc_strict(_scan_with([dmarc_finding_strict])) is True
+
+
+def test_is_dmarc_strict_accepts_quarantine(dmarc_finding_quarantine: dict) -> None:
+    from services.portal_milestones import is_dmarc_strict
+
+    assert is_dmarc_strict(_scan_with([dmarc_finding_quarantine])) is True
+
+
+def test_is_dmarc_strict_rejects_p_none(dmarc_finding_none: dict) -> None:
+    from services.portal_milestones import is_dmarc_strict
+
+    assert is_dmarc_strict(_scan_with([dmarc_finding_none])) is False
+
+
+def test_is_dmarc_strict_returns_false_when_finding_absent() -> None:
+    from services.portal_milestones import is_dmarc_strict
+
+    assert is_dmarc_strict(_scan_with([])) is False
+
+
+def test_is_dmarc_strict_returns_false_when_record_missing(
+    dmarc_finding_missing: dict,
+) -> None:
+    """No DMARC record → analyzer leaves technical_detail empty → not strict."""
+    from services.portal_milestones import is_dmarc_strict
+
+    assert is_dmarc_strict(_scan_with([dmarc_finding_missing])) is False
+
+
+def test_is_spf_strict_accepts_dash_all() -> None:
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "ok",
+        "description": "SPF uses strict fail (-all) — good.",
+        "technical_detail": "v=spf1 include:_spf.google.com -all",
+    }
+    assert is_spf_strict(_scan_with([finding])) is True
+
+
+def test_is_spf_strict_rejects_tilde_all_with_real_description() -> None:
+    """Real scanner advice for ~all says "consider -all"; must not match.
+
+    Regression test for the false positive when the description was scanned
+    alongside technical_detail. Description string is verbatim from
+    hawk-scanner-v2/app/analysis/email_security.py:48.
+    """
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "low",
+        "description": (
+            "SPF uses softfail (~all) — acceptable; consider -all when every sender is known."
+        ),
+        "technical_detail": "v=spf1 include:_spf.google.com ~all",
+    }
+    assert is_spf_strict(_scan_with([finding])) is False
+
+
+def test_is_spf_strict_rejects_dash_all_inside_include_hostname() -> None:
+    """An include domain containing the substring ``-all`` must not pass.
+
+    Regression for the ``"-all" in record`` substring match — an include
+    like ``include:mail-allservices.example.com ~all`` would otherwise
+    falsely award the milestone even though the actual mechanism is ``~all``.
+    """
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "low",
+        "description": "SPF uses softfail (~all) — acceptable.",
+        "technical_detail": "v=spf1 include:mail-allservices.example.com ~all",
+    }
+    assert is_spf_strict(_scan_with([finding])) is False
+
+
+def test_is_spf_strict_handles_quoted_record() -> None:
+    """DNS TXT records sometimes round-trip with wrapping quotes."""
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "ok",
+        "description": "SPF uses strict fail (-all) — good.",
+        "technical_detail": '"v=spf1 include:_spf.google.com -all"',
+    }
+    assert is_spf_strict(_scan_with([finding])) is True
+
+
+def test_is_spf_strict_rejects_permissive_all_with_real_description() -> None:
+    """Real scanner advice for +all/permissive mentions "-all or ~all"; must not match."""
+    from services.portal_milestones import is_spf_strict
+
+    finding = {
+        "title": "SPF policy",
+        "severity": "medium",
+        "description": "SPF may be permissive; verify ends with -all or ~all.",
+        "technical_detail": "v=spf1 include:_spf.google.com +all",
+    }
+    assert is_spf_strict(_scan_with([finding])) is False
+
+
+def test_is_insurance_readiness_above_80_uses_real_readiness_pct_key() -> None:
+    """Matches the real shape compute_insurance_readiness emits in hawk-scanner-v2.
+
+    The scanner returns ``{"readiness_pct": int, "tier": str, ...}`` and
+    aria_sla_auto_scan stashes it under ``findings.insurance_readiness``.
+    """
+    from services.portal_milestones import is_insurance_readiness_above_80
+
+    scan = {
+        "findings": {
+            "insurance_readiness": {"readiness_pct": 82, "tier": "ready", "summary": "..."},
+            "findings": [],
+        }
+    }
+    assert is_insurance_readiness_above_80(scan) is True
+
+
+def test_is_insurance_readiness_above_80_at_threshold() -> None:
+    from services.portal_milestones import is_insurance_readiness_above_80
+
+    scan = {"findings": {"insurance_readiness": {"readiness_pct": 80}, "findings": []}}
+    assert is_insurance_readiness_above_80(scan) is True
+
+
+def test_is_insurance_readiness_below_80_returns_false() -> None:
+    from services.portal_milestones import is_insurance_readiness_above_80
+
+    scan = {"findings": {"insurance_readiness": {"readiness_pct": 79}, "findings": []}}
+    assert is_insurance_readiness_above_80(scan) is False
+
+
+def test_is_insurance_readiness_falls_back_to_raw_layers() -> None:
+    """Older scan rows kept readiness on raw_layers instead of findings."""
+    from services.portal_milestones import is_insurance_readiness_above_80
+
+    scan = {
+        "findings": {"findings": []},
+        "raw_layers": {"insurance_readiness": {"readiness_pct": 90}},
+    }
+    assert is_insurance_readiness_above_80(scan) is True
+
+
+def test_is_insurance_readiness_above_80_missing_returns_false() -> None:
+    from services.portal_milestones import is_insurance_readiness_above_80
+
+    assert is_insurance_readiness_above_80({"findings": {"findings": []}}) is False
+
+
+def test_is_insurance_readiness_zero_does_not_fall_through_to_alias() -> None:
+    """A real ``readiness_pct: 0`` must not be treated as missing.
+
+    Regression: if the lookup uses an ``or`` chain, ``readiness_pct: 0`` would
+    fall through to the legacy ``score`` alias and could yield a stale
+    non-zero value, falsely awarding the milestone.
+    """
+    from services.portal_milestones import (
+        _insurance_readiness_pct,
+        is_insurance_readiness_above_80,
+    )
+
+    scan = {
+        "findings": {
+            "insurance_readiness": {"readiness_pct": 0, "score": 95},
+            "findings": [],
+        }
+    }
+    assert _insurance_readiness_pct(scan) == 0
+    assert is_insurance_readiness_above_80(scan) is False
+
+
+# ---------- hawk_certified_progress ----------------------------------------
+
+
+def test_hawk_certified_progress_empty_input() -> None:
+    from services.portal_milestones import hawk_certified_progress
+
+    out = hawk_certified_progress([])
+    assert out["completed"] == 0
+    assert out["total"] == 7
+    assert len(out["steps"]) == 7
+    assert all(s["done"] is False for s in out["steps"])
+    assert all(s["achieved_at"] is None for s in out["steps"])
+
+
+def test_hawk_certified_progress_marks_done_with_timestamp() -> None:
+    from services.portal_milestones import hawk_certified_progress
+
+    rows = [
+        {"milestone_key": "spf_strict", "achieved_at": "2026-01-15T12:00:00Z"},
+        {"milestone_key": "dmarc_strict", "achieved_at": "2026-01-15T12:01:00Z"},
+        {"milestone_key": "score_above_70", "achieved_at": "2026-02-01T09:00:00Z"},
+    ]
+    out = hawk_certified_progress(rows, certified_at=None)
+    assert out["completed"] == 3
+    assert out["total"] == 7
+    assert out["certified_at"] is None
+    by_key = {s["key"]: s for s in out["steps"]}
+    assert by_key["spf_strict"]["done"] is True
+    assert by_key["spf_strict"]["achieved_at"] == "2026-01-15T12:00:00Z"
+    assert by_key["thirty_days_clean"]["done"] is False
+
+
+def test_hawk_certified_progress_handles_none_input() -> None:
+    from services.portal_milestones import hawk_certified_progress
+
+    out = hawk_certified_progress(None, certified_at="2026-03-01T00:00:00Z")
+    assert out["completed"] == 0
+    assert out["certified_at"] == "2026-03-01T00:00:00Z"
+
+
+def test_hawk_certified_progress_step_order_is_stable() -> None:
+    from services.portal_milestones import HAWK_CERTIFIED_STEPS, hawk_certified_progress
+
+    out = hawk_certified_progress([])
+    keys = [s["key"] for s in out["steps"]]
+    assert keys == [s["key"] for s in HAWK_CERTIFIED_STEPS]
+
+
+# ---------- badge SVG ------------------------------------------------------
+
+
+def test_badge_svg_contains_company_and_date() -> None:
+    from routers.portal_phase2 import _render_certified_badge_svg
+
+    svg = _render_certified_badge_svg("Acme Dental", "2026-04-15")
+    assert svg.startswith('<?xml version="1.0"')
+    assert "<svg" in svg
+    assert "Acme Dental" in svg
+    assert "2026-04-15" in svg
+    assert "CERTIFIED" in svg
+
+
+def test_badge_svg_escapes_html_in_company_name() -> None:
+    from routers.portal_phase2 import _render_certified_badge_svg
+
+    svg = _render_certified_badge_svg('Evil & "Co" <script>', "2026-04-15")
+    assert "<script>" not in svg
+    assert "&amp;" in svg
+    assert "&quot;" in svg or "&#x27;" in svg or "&#34;" in svg
