@@ -533,6 +533,7 @@ function PortalHomeContent() {
           { href: "/portal/briefing", label: "Weekly briefing", sub: "Sector threat digest" },
           { href: "/portal/findings", label: "Findings", sub: "Status & verify fixes" },
           { href: "/portal/journey", label: "Journey", sub: "Scores & badges" },
+          { href: "/portal/patient-trust-badge", label: "Patient Trust Badge", sub: "Embed on your site" },
           { href: "/portal/benchmark", label: "Benchmark", sub: "Peer comparison" },
           { href: "/portal/attack-paths", label: "Attack paths", sub: "Breach scenarios" },
           { href: "/portal/enterprise", label: "Enterprise", sub: "Multi-domain rollup" },
