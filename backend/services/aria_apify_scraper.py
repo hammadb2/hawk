@@ -32,36 +32,8 @@ APIFY_BASE = "https://api.apify.com/v2"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
-# Generic mailbox prefixes we will not send cold outreach to. Unaddressed
-# emails (info@, contact@, etc.) burn sender-domain reputation and tank reply
-# rates, so we drop them at extraction time and let the lead fall through to
-# Prospeo → Apollo → suppression instead.
-GENERIC_EMAIL_PREFIXES: frozenset[str] = frozenset({
-    "info", "contact", "hello", "hi", "support", "help", "office", "team",
-    "admin", "administrator", "mail", "email", "enquiries", "enquiry",
-    "inquiries", "inquiry", "sales", "marketing", "hr", "careers", "jobs",
-    "billing", "accounts", "accounting", "finance", "legal", "press",
-    "media", "webmaster", "postmaster", "noreply", "no-reply", "donotreply",
-    "do-not-reply", "general", "frontdesk", "front-desk", "reception",
-    "receptionist", "appointments", "scheduling", "booking", "service",
-})
-
-
-def _is_generic_email(email: str) -> bool:
-    """True when an email's local-part is a role-based / unaddressed mailbox.
-
-    Matches case-insensitively and ignores ``+suffix`` aliases. Used to filter
-    Google-Places-extracted website emails before they win the priority race
-    over Prospeo / Apollo decision-maker contacts.
-    """
-    if not email or "@" not in email:
-        return False
-    local = email.split("@", 1)[0].strip().lower()
-    if not local:
-        return False
-    # Strip "+plus-addressing" alias.
-    base = local.split("+", 1)[0]
-    return base in GENERIC_EMAIL_PREFIXES
+# Generic mailbox prefixes — shared module; re-exported for backward compat.
+from services.generic_email_filter import GENERIC_EMAIL_PREFIXES, is_generic_email as _is_generic_email  # noqa: E402,F401
 
 # Actor IDs — only Actor 1 (Google Maps) is still used. Actors 2/3/4 have
 # been retired in favour of Apollo contact enrichment (cheaper + verified).

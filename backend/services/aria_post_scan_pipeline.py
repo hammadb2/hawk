@@ -5,9 +5,10 @@ Runs immediately after a prospect's scan completes (SLA auto-scan or manual
 
 1. Skip if stage past `scanned` (rep/ARIA already moved it) or already dispatched.
 2. Skip if already has a verified contact + email_subject (idempotent re-runs).
-3. Enrich contact via Apollo.io (domain → decision-maker lookup with verified
-   email + phone + LinkedIn URL, filtered to ``verified``/``likely to engage``
-   statuses only). If Apollo returns nothing, soft-drop.
+3. Enrich contact: **Prospeo first**, Apollo fallback if Prospeo returns
+   nothing. Generic/role-based emails (info@, contact@, hello@, etc.) are
+   treated as "no result" at both stages so they never reach outreach.
+   If both sources miss, route to VA queue.
 4. Classify the vertical (uses industry / business_name / canonical_vertical)
    to pick the correct Smartlead campaign id from crm_settings.
 5. Generate a personalized first-touch email via ARIA (reuses
@@ -19,27 +20,23 @@ Runs immediately after a prospect's scan completes (SLA auto-scan or manual
    ``email_subject``, ``email_body``, ``smartlead_campaign_id`` and flip
    ``pipeline_status=ready`` so the 600/day dispatcher can pick the prospect up.
 
-ZeroBounce is intentionally **disabled** on the verify step — Apollo already
-returns only ``verified`` / ``likely to engage`` email statuses (see
-``VERTICAL_TITLES`` filter in :mod:`services.apollo_enrichment`) and the
-extra ZB hop was soft-dropping too many catch-all domains that do actually
-receive mail. The column ``zero_bounce_result`` is still written with
-``'skipped'`` so historical analytics queries keep working. The kill switch
-lives in ``crm_settings.zerobounce_post_scan_enabled`` — flip to ``true`` to
+ZeroBounce is intentionally **disabled** on the verify step — Prospeo and
+Apollo already return only verified email statuses and the extra ZB hop was
+soft-dropping too many catch-all domains that do actually receive mail. The
+column ``zero_bounce_result`` is still written with ``'skipped'`` so
+historical analytics queries keep working. The kill switch lives in
+``crm_settings.zerobounce_post_scan_enabled`` — flip to ``true`` to
 re-enable without a redeploy.
 
 Soft-drop path: ``stage=lost``, ``pipeline_status=suppressed``, plus a
 ``suppressions`` row keyed by domain so the nightly discovery never re-queues
 the lead. We never hard-delete.
 
-Apollo-miss path (new): when Apollo returns no contact for a domain — which
-is the common case for the long tail of small US dental / tax / law
-shops Apollo simply doesn't index) — the prospect is routed to
-``pipeline_status=va_queue`` instead of soft-dropped, so a human VA can
-source the email manually. Stage stays ``scanned``. This unsticks the
-``scanned_backlog`` without synthesising contacts or bypassing the verified
-gate. Governed by ``crm_settings.apollo_miss_to_va_queue_enabled`` (default
-true) — flip to false to restore the old soft-drop behaviour.
+Enrichment-miss path: when both Prospeo and Apollo return no usable contact
+for a domain — the prospect is routed to ``pipeline_status=va_queue``
+instead of soft-dropped, so a human VA can source the email manually.
+Stage stays ``scanned``. Governed by
+``crm_settings.apollo_miss_to_va_queue_enabled`` (default true).
 """
 
 from __future__ import annotations
@@ -53,7 +50,7 @@ from typing import Any, Literal
 import httpx
 
 from config import SMARTLEAD_API_KEY, SUPABASE_URL
-from services.apollo_enrichment import enrich_single_domain
+from services.apollo_enrichment import enrich_single_domain as _apollo_enrich
 from services.aria_apify_scraper import VERTICAL_QUERIES, canonical_vertical
 from services.aria_post_scan_filter import (
     FilterDecision,
@@ -61,6 +58,8 @@ from services.aria_post_scan_filter import (
     record_decision as _record_filter_decision,
 )
 from services.crm_bool_setting import fetch_crm_bool
+from services.generic_email_filter import is_generic_email
+from services.prospeo_enrichment import enrich_single_domain as _prospeo_enrich
 
 logger = logging.getLogger(__name__)
 
@@ -374,31 +373,61 @@ def _resolve_campaign_id(vertical: str) -> str:
     return os.environ.get("SMARTLEAD_CAMPAIGN_ID", "").strip()
 
 
-# ── Apollo single-prospect enrichment ────────────────────────────────────
+# ── Prospeo-first / Apollo-fallback enrichment ──────────────────────────
+
+
+def _usable_enrichment(result: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return *result* only when it has a non-generic verified email."""
+    if not result:
+        return None
+    email = (result.get("email") or "").strip()
+    if not email or is_generic_email(email):
+        return None
+    return result
 
 
 async def _enrich_single(prospect: dict[str, Any], vertical: str) -> dict[str, Any] | None:
-    """Enrich the prospect's decision-maker contact via Apollo.io.
+    """Enrich via Prospeo first; fall back to Apollo if Prospeo misses.
 
-    Replaces the Apify actor 2→3→4 fall-through. Apollo returns verified
-    email, first/last name, title, phone, and LinkedIn URL in a single call,
-    which is both cheaper and faster. Returns ``None`` when no verified
-    contact is found so the caller can soft-drop.
+    Generic/role-based emails (info@, contact@, hello@, etc.) are treated as
+    "no result" so they never reach outreach.  Returns ``None`` when neither
+    source produces a usable contact.
     """
     domain = (prospect.get("domain") or "").strip().lower()
     if not domain:
         return None
+
+    enrich_kwargs: dict[str, Any] = dict(
+        domain=domain,
+        vertical=vertical,
+        company_name=prospect.get("company_name") or "",
+        city=prospect.get("city") or None,
+        province=prospect.get("province") or None,
+    )
+
+    # 1. Prospeo (primary)
     try:
-        return await enrich_single_domain(
-            domain=domain,
-            vertical=vertical,
-            company_name=prospect.get("company_name") or "",
-            city=prospect.get("city") or None,
-            province=prospect.get("province") or None,
-        )
+        hit = _usable_enrichment(await _prospeo_enrich(**enrich_kwargs))
+        if hit:
+            logger.info("post-scan enrichment prospect=%s source=prospeo email=%s",
+                        prospect.get("id"), hit["email"])
+            return hit
     except Exception as exc:
-        logger.warning("post-scan apollo enrichment prospect=%s failed: %s", prospect.get("id"), exc)
-        return None
+        logger.warning("post-scan prospeo enrichment prospect=%s failed: %s",
+                       prospect.get("id"), exc)
+
+    # 2. Apollo (fallback)
+    try:
+        hit = _usable_enrichment(await _apollo_enrich(**enrich_kwargs))
+        if hit:
+            logger.info("post-scan enrichment prospect=%s source=apollo email=%s",
+                        prospect.get("id"), hit["email"])
+            return hit
+    except Exception as exc:
+        logger.warning("post-scan apollo enrichment prospect=%s failed: %s",
+                       prospect.get("id"), exc)
+
+    return None
 
 
 # ── ZeroBounce single-email gate ─────────────────────────────────────────
@@ -507,7 +536,7 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
                 "patched": archived,
             }
     else:
-        # No scan row visible — fall through to the legacy Apollo path so
+        # No scan row visible — fall through to the enrichment path so
         # we don't drop a prospect just because the scan write hasn't
         # propagated yet. The next SLA tick will retry with the row in place.
         logger.info(
@@ -531,10 +560,9 @@ async def run_post_scan_async(prospect_id: str) -> dict[str, Any]:
         enrichment = await _enrich_single(prospect, vertical) or {}
 
     if not enrichment.get("email"):
-        # Apollo couldn't source a contact — most common for the long-tail US SMB
-        # long-tail (small dental / tax / law shops Apollo doesn't index).
-        # Route to VA queue for manual sourcing instead of soft-dropping so
-        # the lead is still reachable.
+        # Neither Prospeo nor Apollo returned a usable contact — common for
+        # the long tail of small US SMBs. Route to VA queue for manual
+        # sourcing instead of soft-dropping so the lead is still reachable.
         route_result = _route_to_va_queue(
             prospect_id, domain, reason="post_scan:no_contact_after_enrichment",
         )
