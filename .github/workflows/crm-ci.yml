@@ -61,5 +61,6 @@ jobs:
             tests/test_aria_generic_email_filter.py \
             tests/test_check_railway_env.py \
             tests/test_portal_certified_seven_step.py \
+            tests/test_aria_per_tz_dispatch.py \
             tests/test_threat_briefing_pdf.py \
             -v
