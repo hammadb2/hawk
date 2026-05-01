@@ -1,5 +1,5 @@
 """
-Charlotte daily automation: Apollo → ZeroBounce → suppressions / CRM dedupe → Scanner → OpenAI → Smartlead → Supabase log → CEO WhatsApp.
+Charlotte daily automation: Apollo discovery → Prospeo enrichment (first-pass) → Apollo email fallback → generic-email filter → ZeroBounce → suppressions / CRM dedupe → Scanner → OpenAI → Smartlead → Supabase log → CEO WhatsApp.
 
 Triggered by POST /api/crm/cron/charlotte-run (X-Cron-Secret).
 Set CHARLOTTE_AUTOMATION_DRY_RUN=1 to skip external APIs (smoke test structure only).
@@ -1095,32 +1095,37 @@ def run_charlotte_daily() -> dict[str, Any]:
         _ceo_sms_summary(stats)
         return stats
 
-    if not apollo_key or not zb_key or not openai_key:
+    if not zb_key or not openai_key:
         return {
             **stats,
             "ok": False,
-            "error": "Missing APOLLO_API_KEY, ZEROBOUNCE_API_KEY, or OPENAI_API_KEY",
+            "error": "Missing ZEROBOUNCE_API_KEY or OPENAI_API_KEY",
         }
+    if not apollo_key:
+        logger.warning("APOLLO_API_KEY not set — Apollo discovery + fallback disabled; Prospeo-only mode")
 
     run_row_id = _begin_charlotte_run_row(supabase_url, industry_cfg["label"])
 
-    # --- Apollo: 2 pages x 100
+    # --- Apollo discovery: 2 pages x 100 (lead discovery — names, domains,
+    # companies; emails are NOT the primary goal here since Prospeo is the
+    # first-pass enricher now).
     pulled: list[dict[str, Any]] = []
-    with httpx.Client(timeout=180.0) as client:
-        for page in (1, 2):
-            part = _apollo_search_page(client, industry_cfg, page=page, per_page=100)
-            pulled.extend(part)
-        _apollo_bulk_match_emails(client, pulled)
+    if apollo_key:
+        with httpx.Client(timeout=180.0) as client:
+            for page in (1, 2):
+                part = _apollo_search_page(client, industry_cfg, page=page, per_page=100)
+                pulled.extend(part)
 
     stats["leads_pulled"] = len(pulled)
 
-    # --- Prospeo enrichment for leads Apollo didn't return emails for
+    # --- Prospeo enrichment FIRST for all leads without emails
+    from services.generic_email_filter import is_generic_email
+    from services.prospeo_enrichment import enrich_bulk_domains as _prospeo_bulk
+
     prospeo_key = os.environ.get("PROSPEO_API_KEY", "").strip()
     if prospeo_key:
         no_email = [p for p in pulled if not (p.get("email") or "").strip()]
         if no_email:
-            from services.prospeo_enrichment import enrich_bulk_domains as _prospeo_bulk
-
             prospeo_leads = [
                 {
                     "domain": _normalize_domain(p.get("website") or ""),
@@ -1134,14 +1139,37 @@ def run_charlotte_daily() -> dict[str, Any]:
             for p in no_email:
                 dom = _normalize_domain(p.get("website") or "")
                 hit = prospeo_results.get(dom)
-                if hit and hit.get("email"):
+                if hit and hit.get("email") and not is_generic_email(hit["email"]):
                     p["email"] = hit["email"]
+                    p["email_finder"] = "prospeo"
                     if not p.get("first_name") and hit.get("first_name"):
                         p["first_name"] = hit["first_name"]
                     if not p.get("last_name") and hit.get("last_name"):
                         p["last_name"] = hit["last_name"]
             logger.info("Charlotte Prospeo enrichment: %d/%d leads got emails",
                         len(prospeo_results), len(no_email))
+
+    # --- Apollo email fallback for leads Prospeo didn't cover
+    still_no_email = [p for p in pulled if not (p.get("email") or "").strip()]
+    if still_no_email:
+        with httpx.Client(timeout=180.0) as client:
+            _apollo_bulk_match_emails(client, still_no_email)
+        for p in still_no_email:
+            if (p.get("email") or "").strip():
+                p.setdefault("email_finder", "apollo")
+        logger.info("Charlotte Apollo fallback: %d/%d leads got emails",
+                    sum(1 for p in still_no_email if (p.get("email") or "").strip()),
+                    len(still_no_email))
+
+    # --- Filter out generic/role-based emails (info@, contact@, etc.)
+    generic_dropped = 0
+    for p in pulled:
+        em = (p.get("email") or "").strip()
+        if em and is_generic_email(em):
+            p["email"] = ""
+            generic_dropped += 1
+    if generic_dropped:
+        logger.info("Charlotte generic-email filter: dropped %d role-based addresses", generic_dropped)
 
     # Dedupe by email
     seen: set[str] = set()
