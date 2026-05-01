@@ -147,8 +147,15 @@ def send_resend(
     html: str,
     tags: list[dict[str, str]] | None = None,
     from_email: str | None = None,
+    attachments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """POST https://api.resend.com/emails — returns JSON or raises."""
+    """POST https://api.resend.com/emails — returns JSON or raises.
+
+    ``attachments`` follows Resend's schema: each entry is a dict with
+    ``filename`` (str) and either ``content`` (base64 str) or ``path`` (URL).
+    Caller is responsible for base64-encoding raw bytes; pass-through here
+    avoids duplicate encoding for callers who already hold the encoded form.
+    """
     if not RESEND_API_KEY:
         logger.info("RESEND_API_KEY not set — skip email to %s: %s", to_email, subject)
         return {"skipped": True}
@@ -162,6 +169,8 @@ def send_resend(
     }
     if tags:
         body["tags"] = tags
+    if attachments:
+        body["attachments"] = attachments
 
     r = httpx.post(
         "https://api.resend.com/emails",
