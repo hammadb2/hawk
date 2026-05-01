@@ -29,6 +29,10 @@ from services.portal_milestones import (
     hawk_certified_progress,
 )
 from services.scanner import run_scan
+from services.threat_briefing_pdf import (
+    briefing_filename,
+    render_weekly_briefing_pdf,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +200,60 @@ def portal_latest_briefing(uid: str = Depends(require_supabase_uid)):
     if not rows:
         return {"briefing": None}
     return {"briefing": rows[0]}
+
+
+@router.get("/threat-briefing/latest.pdf")
+def portal_latest_briefing_pdf(uid: str = Depends(require_supabase_uid)) -> Response:
+    """Download the latest weekly briefing as a branded PDF.
+
+    Renders on the fly from the stored markdown so we don't have to keep
+    PDF blobs in Supabase. Same renderer the cron uses to build the
+    email attachment, so the file looks identical either way.
+    """
+    if not SUPABASE_URL or not SERVICE_KEY:
+        raise HTTPException(status_code=503, detail="Supabase not configured")
+    bundle = load_portal_client_bundle(uid)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="No portal profile")
+    cid = bundle["client"]["id"]
+    br = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/client_threat_briefings",
+        headers=_sb(),
+        params={
+            "client_id": f"eq.{cid}",
+            "select": "week_start,title,body_md",
+            "order": "week_start.desc",
+            "limit": "1",
+        },
+        timeout=20.0,
+    )
+    br.raise_for_status()
+    rows = br.json() or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="No briefing yet")
+    row = rows[0]
+    company = str(
+        bundle["cpp"].get("company_name")
+        or (bundle.get("prospect") or {}).get("domain")
+        or ""
+    )
+    pdf_bytes = render_weekly_briefing_pdf(
+        company=company,
+        title=str(row.get("title") or ""),
+        body_md=str(row.get("body_md") or ""),
+        industry=(bundle.get("prospect") or {}).get("industry"),
+        week_start=str(row.get("week_start") or ""),
+    )
+    if not pdf_bytes:
+        raise HTTPException(status_code=503, detail="PDF renderer unavailable")
+    fname = briefing_filename(
+        company=company, week_start=str(row.get("week_start") or "")
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/benchmark")
@@ -521,15 +579,53 @@ def run_weekly_threat_briefings_for_all_clients() -> dict[str, Any]:
         portal_url = f"{base}/portal"
         if to_email and "@" in to_email:
             try:
+                # Render a branded PDF copy of the briefing for the
+                # client's compliance binder. ``render_weekly_briefing_pdf``
+                # returns ``b""`` if reportlab is unavailable so the email
+                # still goes out with the inline body.
+                pdf_bytes = render_weekly_briefing_pdf(
+                    company=str(
+                        bundle["cpp"].get("company_name")
+                        or (bundle.get("prospect") or {}).get("domain")
+                        or ""
+                    ),
+                    title=title,
+                    body_md=body_md,
+                    industry=(bundle.get("prospect") or {}).get("industry"),
+                    week_start=week.isoformat(),
+                )
+                attachments: list[dict[str, Any]] | None = None
+                if pdf_bytes:
+                    import base64
+
+                    attachments = [
+                        {
+                            "filename": briefing_filename(
+                                company=str(
+                                    bundle["cpp"].get("company_name")
+                                    or (bundle.get("prospect") or {}).get("domain")
+                                    or ""
+                                ),
+                                week_start=week.isoformat(),
+                            ),
+                            "content": base64.b64encode(pdf_bytes).decode("ascii"),
+                        }
+                    ]
+                # Only claim "PDF attached" when we actually attached one;
+                # ``render_weekly_briefing_pdf`` returns ``b""`` if reportlab
+                # is unavailable and the email still goes out without the
+                # attachment.
+                pdf_note = " (PDF attached)" if attachments else ""
                 send_resend(
                     to_email=to_email,
                     subject=f"HAWK Weekly Threat Briefing — {title[:80]}",
                     html=(
-                        f"<p>Your weekly sector briefing is ready.</p>"
+                        f"<p>Your weekly sector briefing is ready{pdf_note}.</p>"
                         f"<pre style='white-space:pre-wrap;font-family:system-ui,sans-serif'>{html_mod.escape(body_md)}</pre>"
                         f"<p><a href='{html_mod.escape(portal_url)}'>Open portal</a></p>"
                     ),
                     tags=[{"name": "category", "value": "threat_briefing"}],
+                    attachments=attachments,
                 )
                 sent_at = datetime.now(timezone.utc).isoformat()
                 if bid:
