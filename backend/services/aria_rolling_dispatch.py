@@ -46,12 +46,15 @@ from config import SUPABASE_URL
 from services import mailbox_registry
 from services.crm_bool_setting import fetch_crm_bool
 from services.mailbox_smtp_sender import send_via_mailbox
+from services.state_timezone import is_state_in_business_hours
 
 logger = logging.getLogger(__name__)
 
-# Dispatch runs on Eastern Time so emails land in US business hours.
-# Per-state TZ routing is a v2 enhancement — for v1 we anchor to ET, which
-# covers EST/CST comfortably and still lands before PT close-of-business.
+# Dispatch ticks fire on Eastern Time (9am–4pm ET). Each tick filters the
+# fetched prospect batch by ``state_timezone.is_state_in_business_hours``
+# so a CA prospect isn't emailed at 6am Pacific just because the cron
+# ticked at 9am ET. Prospects with no/unknown state default to ET (the
+# dispatcher's historical anchor) so missing state data doesn't drop them.
 DISPATCH_TZ = ZoneInfo("America/New_York")
 # Backwards-compat alias (callers/tests may import ``MST``). Points to ET now.
 MST = DISPATCH_TZ
@@ -64,6 +67,15 @@ DAILY_CAP_PER_VERTICAL = int(os.environ.get("ARIA_DAILY_CAP_PER_VERTICAL", "200"
 # the dispatcher's total daily volume doesn't grow when verticals are added.
 DAILY_CAP_TOTAL = int(os.environ.get("ARIA_DAILY_CAP_TOTAL", "600"))
 DISPATCH_TICK_HOURS = [9, 10, 11, 12, 13, 14, 15, 16]
+# Per-tz business-hours window applied to each prospect's local time.
+# Same shape as ``DISPATCH_TICK_HOURS`` but expressed as ``(start, end)``
+# inclusive on both ends. Override per-deployment via env if needed.
+TZ_LOCAL_START_HOUR = int(os.environ.get("ARIA_TZ_LOCAL_START_HOUR", "9"))
+TZ_LOCAL_END_HOUR = int(os.environ.get("ARIA_TZ_LOCAL_END_HOUR", "16"))
+# When filtering by per-prospect TZ we fetch this multiple of the quota
+# so prospects in a non-business-hours TZ don't starve those who are.
+# 3x covers the worst case (~1 zone in window out of 3 contiguous zones).
+TZ_FETCH_OVERSCAN = int(os.environ.get("ARIA_TZ_FETCH_OVERSCAN", "3"))
 VERTICALS = (
     "dental",
     "legal",
@@ -160,6 +172,30 @@ def _fetch_ready_prospects(vertical: str, limit: int) -> list[dict[str, Any]]:
     except Exception as exc:
         logger.warning("rolling-dispatch fetch vertical=%s failed: %s", vertical, exc)
         return []
+
+
+def _split_in_window(
+    prospects: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Partition prospects into (in-business-hours-now, defer-to-later-tick).
+
+    The decision uses each prospect's ``province`` (US state code) mapped
+    via ``state_timezone.state_to_timezone``; missing/unknown states fall
+    back to ET so they keep getting picked at the historical cadence.
+    """
+    in_window: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+    for p in prospects:
+        state = (p.get("province") or "").strip()
+        if is_state_in_business_hours(
+            state,
+            start_hour=TZ_LOCAL_START_HOUR,
+            end_hour=TZ_LOCAL_END_HOUR,
+        ):
+            in_window.append(p)
+        else:
+            deferred.append(p)
+    return in_window, deferred
 
 
 def _contact_display_name(prospect: dict[str, Any]) -> str:
@@ -320,14 +356,26 @@ def run_rolling_dispatch() -> dict[str, Any]:
             }
             continue
 
-        prospects = _fetch_ready_prospects(vertical, quota)
+        # Over-fetch by ``TZ_FETCH_OVERSCAN`` so the per-tz filter has
+        # enough headroom: prospects whose state is currently outside
+        # 9–4 local will be deferred to a later tick this same day, and
+        # we still want to fill ``quota`` from the in-window subset.
+        fetched = _fetch_ready_prospects(vertical, quota * TZ_FETCH_OVERSCAN)
+        in_window, deferred = _split_in_window(fetched)
+        prospects = in_window[:quota]
         if not prospects:
             stats["by_vertical"][vertical] = {
                 "sent_today": sent_today,
                 "remaining_today": remaining_today,
                 "quota": quota,
                 "sent": 0,
-                "reason": "no ready prospects",
+                "fetched": len(fetched),
+                "deferred_outside_local_hours": len(deferred),
+                "reason": (
+                    "no ready prospects"
+                    if not fetched
+                    else "all_fetched_outside_local_business_hours"
+                ),
             }
             continue
 
@@ -367,6 +415,9 @@ def run_rolling_dispatch() -> dict[str, Any]:
             "auth_failed": auth_failed,
             "capacity_exhausted": capacity_exhausted,
             "errors_sample": error_samples,
+            "fetched": len(fetched),
+            "in_local_window": len(in_window),
+            "deferred_outside_local_hours": len(deferred),
         }
         stats["dispatched_total"] += sent
 
