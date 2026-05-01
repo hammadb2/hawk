@@ -65,4 +65,5 @@ jobs:
             tests/test_portal_patient_trust_badge.py \
             tests/test_threat_briefing_pdf.py \
             tests/test_prospeo_first_enrichment.py \
+            tests/test_fix_guides.py \
             -v

@@ -12,6 +12,7 @@ from app.breach_cost import build_estimate
 from app.compliance.hipaa_2026 import tag_all_findings
 from app.insurance_readiness import compute_insurance_readiness
 from app.integrations import attack_paths, breach_monitoring, exposure_screenshot, github_search, internetdb, nvd_cves, openai_interpret, ransomware_intel, vertical_fingerprint
+from services.fix_guides import apply_fallback_guides
 from app.models import Finding, ScanResponse
 from app.pipeline.layers import dnstwist, httpx_whatweb, naabu, nuclei, subfinder
 from app.scoring import compute_score
@@ -389,6 +390,10 @@ async def run_scan(
     _merge_interpretations(all_findings, interpreted)
     raw_layers["attack_paths_count"] = len(paths)
 
+    # --- Static fix-guide fallback for findings the LLM didn't cover ---
+    fallback_count = apply_fallback_guides(all_findings)
+    raw_layers["fix_guide_fallback_count"] = fallback_count
+
     # --- HIPAA 2026 control mapping on all findings ---
     tag_all_findings(all_findings)
 
@@ -534,6 +539,10 @@ async def run_scan_fast(
     if mfa_fs:
         all_findings.extend(mfa_fs)
     raw_layers["mfa_detection_count"] = len(mfa_fs)
+
+    # --- Static fix-guide fallback (fast path has no OpenAI) ---
+    fallback_count = apply_fallback_guides(all_findings)
+    raw_layers["fix_guide_fallback_count"] = fallback_count
 
     # --- HIPAA 2026 control mapping ---
     tag_all_findings(all_findings)
