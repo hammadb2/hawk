@@ -107,7 +107,7 @@ export default function PatientTrustBadgePage() {
                 <div className="min-w-0 flex-1 space-y-3">
                   <div>
                     <p className="text-xs uppercase tracking-widest text-signal">
-                      You're eligible
+                      You&apos;re eligible
                     </p>
                     <p className="text-sm text-ink-100">
                       {reasonLabel || "Earned — display on your site any time."}
@@ -139,7 +139,7 @@ export default function PatientTrustBadgePage() {
                     Embed on your website
                   </h2>
                   <p className="mt-1 text-xs text-ink-200">
-                    Copy this snippet into your site's footer or your "About / Privacy" page.
+                    Copy this snippet into your site&apos;s footer or your &quot;About / Privacy&quot; page.
                     The badge image is hosted by HAWK; the link points to a public verify page.
                   </p>
                 </div>
@@ -194,7 +194,7 @@ export default function PatientTrustBadgePage() {
                 href="/portal/journey"
                 className="mt-4 inline-block text-sm text-signal hover:underline"
               >
-                Open your journey to see what's unlocking next →
+                Open your journey to see what&apos;s unlocking next →
               </Link>
             </section>
           )}
